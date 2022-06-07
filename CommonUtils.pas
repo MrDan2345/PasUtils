@@ -22,9 +22,40 @@ type
 
   TUFloat = Single;
   PUFloat = ^TUFloat;
+  TUFloatArr = array[UInt16] of TUFloat;
+  PUFloatArr = ^TUFloatArr;
   TUDouble = Double;
   PUDouble = ^TUDouble;
+  TUDoubleArr = array[UInt16] of TUDouble;
+  PUDoubleArr = ^TUDoubleArr;
 
+  TUInt8 = UInt8;
+  TUInt8Arr = array[UInt16] of TUInt8;
+  PUInt8Arr = ^TUInt8Arr;
+  TUInt16 = UInt16;
+  TUInt16Arr = array[UInt16] of TUInt16;
+  PUInt16Arr = ^TUInt16Arr;
+  TUInt32 = UInt32;
+  TUInt32Arr = array[UInt16] of TUInt32;
+  PUInt32Arr = ^TUInt32Arr;
+  TUInt64 = UInt64;
+  TUInt64Arr = array[UInt16] of TUInt64;
+  PUInt64Arr = ^TUInt64Arr;
+  TInt8 = UInt8;
+  TInt8Arr = array[UInt16] of TInt8;
+  PInt8Arr = ^TInt8Arr;
+  TInt16 = UInt16;
+  TInt16Arr = array[UInt16] of TInt16;
+  PInt16Arr = ^TInt16Arr;
+  TInt32 = UInt32;
+  TInt32Arr = array[UInt16] of TInt32;
+  PInt32Arr = ^TInt32Arr;
+  TInt64 = UInt64;
+  TInt64Arr = array[UInt16] of TInt64;
+  PInt64Arr = ^TInt64Arr;
+
+  TUColor = UInt32;
+  PUColor = ^TUColor;
   TUMat = array[0..3, 0..3] of TUFloat;
   PUMat = ^TUMat;
   TUVec2 = array[0..1] of TUFloat;
@@ -35,6 +66,33 @@ type
   PUVec4 = ^TUVec4;
   TUQuat = array[0..3] of TUFloat;
   PUQuat = ^TUQuat;
+
+  type TUColorImpl = type helper for TUColor
+  private
+    function GetChannel(const Index: UInt8): UInt8; inline;
+    procedure SetChannel(const Index: UInt8; const Value: UInt8); inline;
+    function GetR: UInt8; inline;
+    procedure SetR(const Value: UInt8); inline;
+    function GetG: UInt8; inline;
+    procedure SetG(const Value: UInt8); inline;
+    function GetB: UInt8; inline;
+    procedure SetB(const Value: UInt8); inline;
+    function GetA: UInt8; inline;
+    procedure SetA(const Value: UInt8); inline;
+  public
+    property Channel[const Index: UInt8]: UInt8 read GetChannel write SetChannel; default;
+    property r: UInt8 read GetR write SetR;
+    property g: UInt8 read GetG write SetG;
+    property b: UInt8 read GetB write SetB;
+    property a: UInt8 read GetA write SetA;
+    class function Make(const Ar, Ag, Ab, Aa: UInt8): TUColor; static;
+    class function Black: TUColor; static;
+    class function White: TUColor; static;
+    class function Red: TUColor; static;
+    class function Blue: TUColor; static;
+    class function Green: TUColor; static;
+    procedure SetValue(const Ar, Ag, Ab, Aa: UInt8);
+  end;
 
   type TUMatImpl = type helper for TUMat
   private
@@ -705,6 +763,7 @@ procedure USinCos(const a: TUFloat; out s: TUFloat; out c: TUFloat);
 function UCoTan(const x: TUFloat): TUFloat;
 function UArcCos(const x: TUFloat): TUFloat;
 function UArcTan2(const y, x: TUFloat): TUFloat;
+function UPow(const b, e: TUFloat): TUFloat;
 function UAddMat(const m0, m1: TUMat): TUMat;
 function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 function USubMat(const m0, m1: TUMat): TUMat;
@@ -755,6 +814,95 @@ const
   URadToDeg = 180 / UPi;
 
 implementation
+
+// TUColorImpl begin
+function TUColorImpl.GetChannel(const Index: UInt8): UInt8;
+  var Arr: array[0..3] of UInt8 absolute Self;
+begin
+  Result := Arr[Index];
+end;
+
+procedure TUColorImpl.SetChannel(const Index: UInt8; const Value: UInt8);
+  var Arr: array[0..3] of UInt8 absolute Self;
+begin
+  Arr[Index] := Value;
+end;
+
+function TUColorImpl.GetR: UInt8;
+begin
+  Result := Self.Channel[0];
+end;
+
+procedure TUColorImpl.SetR(const Value: UInt8);
+begin
+  Channel[0] := Value;
+end;
+
+function TUColorImpl.GetG: UInt8;
+begin
+  Result := Channel[1];
+end;
+
+procedure TUColorImpl.SetG(const Value: UInt8);
+begin
+  Channel[1] := Value;
+end;
+
+function TUColorImpl.GetB: UInt8;
+begin
+  Result := Channel[2];
+end;
+
+procedure TUColorImpl.SetB(const Value: UInt8);
+begin
+  Channel[2] := Value;
+end;
+
+function TUColorImpl.GetA: UInt8;
+begin
+  Result := Channel[3];
+end;
+
+procedure TUColorImpl.SetA(const Value: UInt8);
+begin
+  Channel[3] := Value;
+end;
+
+class function TUColorImpl.Make(const Ar, Ag, Ab, Aa: UInt8): TUColor;
+begin
+  Result := Ar or (Ag shl 8) or (Ab shl 16) or (Aa shl 24);
+end;
+
+class function TUColorImpl.Black: TUColor;
+begin
+  Result := $ff000000;
+end;
+
+class function TUColorImpl.White: TUColor;
+begin
+  Result := $ffffffff;
+end;
+
+class function TUColorImpl.Red: TUColor;
+begin
+  Result := $ff0000ff;
+end;
+
+class function TUColorImpl.Blue: TUColor;
+begin
+  Result := $ffff0000;
+end;
+
+class function TUColorImpl.Green: TUColor;
+begin
+  Result := $ff00ff00;
+end;
+
+procedure TUColorImpl.SetValue(const Ar, Ag, Ab, Aa: UInt8);
+begin
+  Self := Ab or (Ag shl 8) or (Ar shl 16) or (Aa shl 24);
+end;
+// TUColorImpl end
 
 // TUMatImpl begin
 function TUMatImpl.GetElement(const Index: UInt32): TUFloat;
@@ -4473,6 +4621,11 @@ begin
   end;
   if x < 0 then Result += UPi;
   if Result > pi then result -= UTwoPi;
+end;
+
+function UPow(const b, e: TUFloat): TUFloat;
+begin
+  Result := Exp(e * Ln(b));
 end;
 
 function UAddMat(const m0, m1: TUMat): TUMat;
