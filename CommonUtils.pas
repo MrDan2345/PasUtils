@@ -3,9 +3,11 @@ unit CommonUtils;
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
 {$modeswitch typehelpers}
+{$optimization autoinline}
 {$warn 6058 off}
 {$warn 5024 off}
-
+{$warn 3123 off}
+{$warn 3124 off}
 interface
 
 uses
@@ -105,7 +107,7 @@ type
       const e01, e11, e21, e31: TUFloat;
       const e02, e12, e22, e32: TUFloat;
       const e03, e13, e23, e33: TUFloat
-    ): TUMat; static; inline;
+    ): TUMat; static;
     class function Zero: TUMat; static; inline;
     class function Identity: TUMat; static; inline;
     class function Scaling(const x, y, z: TUFloat): TUMat; static; overload; inline;
@@ -173,9 +175,9 @@ type
     class function Cross(const v0, v1: TUVec3): TUVec3; static; overload; inline;
     class function Norm(const v: TUVec3): TUVec3; static; overload; inline;
     procedure SetValue(const Ax, Ay, Az: TUFloat); inline;
-    function Dot(const v: TUVec3): TUFloat; overload; inline;
-    function Cross(const v: TUVec3): TUVec3; overload; inline;
-    function Norm: TUVec3; overload; inline;
+    function Dot(const v: TUVec3): TUFloat; overload;
+    function Cross(const v: TUVec3): TUVec3; overload;
+    function Norm: TUVec3; overload;
   end;
 
   type TUVec4Impl = type helper for TUVec4
@@ -582,9 +584,9 @@ type
     Value: String;
     TokenType: TUTokenType;
     class operator = (a, b: TUParserToken): Boolean; inline;
-    class operator in (a: TUParserToken; b: array of TUParserToken): Boolean; inline;
+    class operator in (a: TUParserToken; b: array of TUParserToken): Boolean;
     class operator = (a: TUParserToken; b: String): Boolean; inline;
-    class operator = (a: TUParserToken; b: array of String): Boolean; inline;
+    class operator = (a: TUParserToken; b: array of String): Boolean;
     class operator = (a: TUParserToken; b: TUTokenType): Boolean; inline;
     class operator in (a: TUParserToken; b: TUTokenTypes): Boolean; inline;
     class operator := (a: TUParserToken): String; inline;
@@ -745,7 +747,7 @@ type
   generic TUArray<T> = array of T;
 
 procedure UClear(out x; const Size: UInt32);
-procedure UMove(out Dest; const Src; const Size: UInt32); inline;
+procedure UMove(out Dest; const Src; const Size: UInt32);
 function USignOf(const v: Int64): Int64;
 function UCopyVarRec(constref src: TVarRec): TVarRec;
 function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArr;
@@ -1088,9 +1090,9 @@ end;
 class function TUMatImpl.View(const Origin, Target, Up: TUVec3): TUMat;
   var vx, vy, vz: TUVec3;
 begin
-  vz := (target - origin).norm;
-  vx := up.cross(vz).norm;
-  vy := vz.cross(vx).norm;
+  vz := (Target - Origin).Norm;
+  vx := up.Cross(vz).Norm;
+  vy := vz.Cross(vx).Norm;
   Result := Make(
     vx.x, vx.y, vx.z, -vx.Dot(Origin),
     vy.x, vy.y, vy.z, -vy.Dot(Origin),
