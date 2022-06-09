@@ -793,14 +793,17 @@ operator + (const v0, v1: TUVec2): TUVec2;
 operator - (const v0, v1: TUVec2): TUVec2;
 operator * (const v0, v1: TUVec2): TUVec2;
 operator / (const v0, v1: TUVec2): TUVec2;
+operator - (const v: TUVec2): TUVec2;
 operator + (const v0, v1: TUVec3): TUVec3;
 operator - (const v0, v1: TUVec3): TUVec3;
 operator * (const v0, v1: TUVec3): TUVec3;
 operator / (const v0, v1: TUVec3): TUVec3;
+operator - (const v: TUVec3): TUVec3;
 operator + (const v0, v1: TUVec4): TUVec4;
 operator - (const v0, v1: TUVec4): TUVec4;
 operator * (const v0, v1: TUVec4): TUVec4;
 operator / (const v0, v1: TUVec4): TUVec4;
+operator - (const v: TUVec4): TUVec4;
 operator + (const m0, m1: TUMat): TUMat;
 operator - (const m0, m1: TUMat): TUMat;
 operator * (const m0, m1: TUMat): TUMat;
@@ -4835,8 +4838,14 @@ end;
 
 operator / (const v0, v1: TUVec2): TUVec2;
 begin
-  result[0] := v0[0] / v1[0];
-  result[1] := v0[1] / v1[1];
+  Result[0] := v0[0] / v1[0];
+  Result[1] := v0[1] / v1[1];
+end;
+
+operator - (const v: TUVec2): TUVec2;
+begin
+  Result[0] := -v[0];
+  Result[1] := -v[1];
 end;
 
 operator + (const v0, v1: TUVec3): TUVec3;
@@ -4867,6 +4876,13 @@ begin
   Result[2] := v0[2] / v1[2];
 end;
 
+operator - (const v: TUVec3): TUVec3;
+begin
+  Result[0] := -v[0];
+  Result[1] := -v[1];
+  Result[2] := -v[2];
+end;
+
 operator + (const v0, v1: TUVec4): TUVec4;
 begin
   Result[0] := v0[0] + v1[0];
@@ -4893,10 +4909,18 @@ end;
 
 operator / (const v0, v1: TUVec4): TUVec4;
 begin
-  result[0] := v0[0] / v1[0];
-  result[1] := v0[1] / v1[1];
-  result[2] := v0[2] / v1[2];
-  result[3] := v0[3] / v1[3];
+  Result[0] := v0[0] / v1[0];
+  Result[1] := v0[1] / v1[1];
+  Result[2] := v0[2] / v1[2];
+  Result[3] := v0[3] / v1[3];
+end;
+
+operator - (const v: TUVec4): TUVec4;
+begin
+  Result[0] := -v[0];
+  Result[1] := -v[1];
+  Result[2] := -v[2];
+  Result[3] := -v[3];
 end;
 
 operator + (const m0, m1: TUMat): TUMat;
