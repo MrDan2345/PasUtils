@@ -170,7 +170,7 @@ type
     class function Zero: TUVec3; static; inline;
     class function Make(const Ax, Ay, Az: TUFloat): TUVec3; static; overload; inline;
     class function Make(const v2: TUVec2; const Az: TUFloat): TUVec3; static; overload; inline;
-    class function Make(const s: TUFloat): TUVec3; static; overload; inline;
+    class function Make(const s: TUFloat): TUVec3; static; overload;
     class function Dot(const v0, v1: TUVec3): TUFloat; static; overload; inline;
     class function Cross(const v0, v1: TUVec3): TUVec3; static; overload; inline;
     class function Norm(const v: TUVec3): TUVec3; static; overload; inline;
