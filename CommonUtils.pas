@@ -438,6 +438,7 @@ type
     generic procedure Write<T>(const Value: T); inline;
     procedure Skip(const Count: Int64); inline;
     procedure SkipString; inline;
+    function ToString: String; override;
     constructor Create(const AStream: TStream);
   end;
   type TUStreamHelperShared = specialize TUSharedRef<TUStreamHelper>;
@@ -702,6 +703,16 @@ type
       var Name: String;
       var Value: String;
     end;
+    type TEnumerator = class
+    private
+      var n: TUXML;
+      var i: Int32;
+      function GetCurrent: TUXML;
+    public
+      constructor Create(const Node: TUXML);
+      function MoveNext: Boolean;
+      property Current: TUXML read GetCurrent;
+    end;
   protected
     class var _SyntaxTags: TUParserSyntax;
     class var _SyntaxContent: TUParserSyntax;
@@ -728,6 +739,7 @@ type
     property Children[const Index: Integer]: TUXML read GetChild; default;
     property ChildCount: Integer read GetChildCount;
     property ChildContent[const NodeName: String]: String read GetChildContent;
+    function GetEnumerator: TEnumerator;
     class constructor CreateClass;
     constructor Create(const NodeName: String);
     destructor Destroy; override;
@@ -785,9 +797,12 @@ function UStrIsNumber(const Str: String): Boolean;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UFileToStr(const FileName: String): String;
 
-generic procedure USort<T>(var Arr: array of T);
+generic procedure UArrSort<T>(var Arr: array of T);
 generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T);
-generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Integer; const DelCount: Integer = 1);
+generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
+generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Int32; const DelCount: Int32 = 1);
+generic procedure UArrRemove<T>(var Arr: specialize TUArray<T>; const Item: T);
+generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
 
 operator + (const v0, v1: TUVec2): TUVec2;
 operator - (const v0, v1: TUVec2): TUVec2;
@@ -2224,6 +2239,15 @@ procedure TUStreamHelper.SkipString;
 begin
   l := ReadUInt32;
   Skip(l);
+end;
+
+function TUStreamHelper.ToString: String;
+begin
+  {$push}
+  {$hints off}
+  SetLength(Result, Remaining);
+  {$pop}
+  ReadBuffer(@Result[1], Remaining);
 end;
 
 constructor TUStreamHelper.Create(const AStream: TStream);
@@ -4109,6 +4133,24 @@ end;
 // TUShortStringReader end
 
 // TUXML begin
+function TUXML.TEnumerator.GetCurrent: TUXML;
+begin
+  if (i = -1) or (i >= n.ChildCount) then Exit(nil);
+  Result := n[i];
+end;
+
+constructor TUXML.TEnumerator.Create(const Node: TUXML);
+begin
+  n := Node;
+  i := -1;
+end;
+
+function TUXML.TEnumerator.MoveNext: Boolean;
+begin
+  if i < n.ChildCount then Inc(i);
+  Result := i < n.ChildCount;
+end;
+
 function TUXML.ReadXML(const p: TUParser): Boolean;
   var t: TUParserToken;
   var an, av, tc: String;
@@ -4269,6 +4311,11 @@ begin
   c := FindChild(NodeName);
   if not Assigned(c) then Exit('');
   Result := c.Content;
+end;
+
+function TUXML.GetEnumerator: TEnumerator;
+begin
+  Result := TEnumerator.Create(Self);
 end;
 
 class constructor TUXML.CreateClass;
@@ -5022,7 +5069,7 @@ begin
   end;
 end;
 
-generic procedure USort<T>(var Arr: array of T);
+generic procedure UArrSort<T>(var Arr: array of T);
   procedure SortRange(const RangeStart, RangeEnd: Integer); overload;
     var i, j: Integer;
     var tmp, pivot: T;
@@ -5056,8 +5103,22 @@ begin
   Arr[High(Arr)] := Item;
 end;
 
-generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Integer; const DelCount: Integer);
-  var i, dc: Integer;
+generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
+  var i, j: Int32;
+begin
+  SetLength(Arr, Length(Arr) + 1);
+  if Position < 0 then i := 0
+  else if Position > High(Arr) then i := High(Arr)
+  else i := Position;
+  for j := i to High(Arr) - 1 do
+  begin
+    Arr[j + 1] := Arr[j];
+  end;
+  Arr[i] := Item;
+end;
+
+generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Int32; const DelCount: Int32);
+  var i, dc: Int32;
 begin
   dc := DelStart;
   if DelStart + dc > Length(Arr) then dc := Length(Arr) - DelStart;
@@ -5069,6 +5130,31 @@ begin
   SetLength(Arr, Length(Arr) - dc);
 end;
 
+generic procedure UArrRemove<T>(var Arr: specialize TUArray<T>; const Item: T);
+  var i, j, n: Int32;
+begin
+  n := 0;
+  for i := High(Arr) downto 0 do
+  if Arr[i] = Item then
+  begin
+    for j := i to High(Arr) - 1 - n do
+    begin
+      Arr[j] := Arr[j + 1];
+    end;
+    Inc(n);
+  end;
+  SetLength(Arr, Length(Arr) - n);
+end;
+
+generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
+  var i: Int32;
+begin
+  for i := 0 to High(Arr) do
+  begin
+    if Arr[i] = Item then Exit(i);
+  end;
+  Result := -1;
+end;
 // Functions end
 
 
