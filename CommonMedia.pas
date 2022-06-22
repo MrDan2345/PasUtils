@@ -181,6 +181,765 @@ type
     procedure Save(const StreamHelper: TUStreamHelper); override;
   end;
 
+  TUSceneData = class(TURefClass)
+  public
+    type TVertexAttributeSemantic = (
+      as_invalid,
+      as_position,
+      as_normal,
+      as_tangent,
+      as_binormal,
+      as_color,
+      as_texcoord
+    );
+    type TVertexDataType = (
+      dt_invalid,
+      dt_bool,
+      dt_int,
+      dt_float
+    );
+    type TVertexAttribute = record
+      Semantic: TVertexAttributeSemantic;
+      DataType: TVertexDataType;
+      DataCount: UInt8;
+      SetNumber: UInt8;
+    end;
+    type TVertexDescriptor = array of TVertexAttribute;
+  public
+    class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
+    class function CanLoad(const FileName: String): Boolean; virtual; overload;
+    class function CanLoad(const Buffer: Pointer; const Size: UInt32): Boolean; virtual; overload;
+    class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; virtual; abstract; overload;
+    procedure Load(const Stream: TStream); virtual; overload;
+    procedure Load(const FileName: String); virtual; overload;
+    procedure Load(const Buffer: Pointer; const Size: UInt32); virtual; overload;
+    procedure Load(const StreamHelper: TUStreamHelper); virtual; abstract; overload;
+  end;
+
+  TUSceneDataDAE = class(TUSceneData)
+  public
+    type TColladaObject = class
+    public
+      type TObjectList = array of TColladaObject;
+      type TClass = class of TColladaObject;
+    private
+      var _Tag: String;
+      var _id: String;
+      var _sid: String;
+      var _Name: String;
+      var _Scoped: Boolean;
+      var _Parent: TColladaObject;
+      var _Children: TObjectList;
+      var _UserData: TObject;
+      var _AutoFreeUserData: Boolean;
+      procedure AddChild(const Child: TColladaObject); inline;
+      procedure RemoveChild(const Child: TColladaObject); inline;
+      procedure SetParent(const Value: TColladaObject); inline;
+    protected
+      procedure DumpBegin;
+      procedure DumpEnd;
+      procedure DumpData; virtual;
+      procedure Resolve;
+      procedure ResolveLinks; virtual;
+      procedure Initialize;
+      procedure InitializeObject; virtual;
+      function ResolveObject(
+        const Path: String;
+        const ObjectClass: TClass
+      ): TColladaObject;
+    public
+      property Tag: String read _Tag;
+      property id: String read _id;
+      property sid: String read _sid;
+      property Name: String read _Name;
+      property IsScoped: Boolean read _Scoped;
+      property Parent: TColladaObject read _Parent write SetParent;
+      property Children: TObjectList read _Children;
+      property UserData: TObject read _UserData write _UserData;
+      property AutoFreeUserData: Boolean read _AutoFreeUserData write _AutoFreeUserData;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+      function GetRoot: TColladaObject;
+      function Find(const Path: String): TColladaObject;
+      function FindChild(const NodeID: String): TColladaObject;
+      function FindChildRecursive(const NodeID: String): TColladaObject;
+      procedure Dump;
+    end;
+    type TColladaInstance = class (TColladaObject)
+    private
+      var _Url: String;
+    public
+      property Url: String read _Url;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaInstanceList = array of TColladaInstance;
+    type TColladaNodeType = (nt_invalid, nt_node, nt_joint);
+    type TColladaNode = class (TColladaObject)
+    public
+      type TNodeList = array of TColladaNode;
+    private
+      var _NodeType: TColladaNodeType;
+      var _Layers: TUStrArr;
+      var _Nodes: TNodeList;
+      var _Instances: TColladaInstanceList;
+    public
+      var Matrix: TUMat;
+      property NodeType: TColladaNodeType read _NodeType;
+      property Layers: TUStrArr read _Layers;
+      property Nodes: TNodeList read _Nodes;
+      property Instances: TColladaInstanceList read _Instances;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+      class function StringToNodeType(const NodeTypeName: String): TColladaNodeType;
+    end;
+    type TColladaNodeList = TColladaNode.TNodeList;
+    type TColladaInput = class (TColladaObject)
+    private
+      var _Semantic: String;
+      var _SourceRef: String;
+      var _Source: TColladaObject;
+      var _Offset: Int32;
+      var _Set: Int32;
+      function GetSize: UInt32; inline;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Semantic: String read _Semantic;
+      property Source: TColladaObject read _Source;
+      property Offset: Int32 read _Offset;
+      property InputSet: Int32 read _Set;
+      property Size: UInt32 read GetSize;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaInputList = array of TColladaInput;
+    type TColladaArrayType = (
+      at_invalid,
+      at_bool,
+      at_float,
+      at_idref,
+      at_int,
+      at_name,
+      at_sidref,
+      at_token
+    );
+    type TColladaDataArray = class (TColladaObject)
+    private
+      var _Data: array of UInt8;
+      var _DataString: array of String;
+      var _Count: Int32;
+      var _ItemSize: Int32;
+      var _ArrayType: TColladaArrayType;
+      function GetAsBool(const Index: Int32): PBoolean; inline;
+      function GetAsInt(const Index: Int32): PInt32; inline;
+      function GetAsFloat(const Index: Int32): PUFloat; inline;
+      function GetAsString(const Index: Int32): String; inline;
+      function GetRawData(const Offset: Int32): Pointer; inline;
+    public
+      property ArrayType: TColladaArrayType read _ArrayType;
+      property Count: Int32 read _Count;
+      property ItemSize: Int32 read _ItemSize;
+      property AsBool[const Index: Int32]: PBoolean read GetAsBool;
+      property AsInt[const Index: Int32]: PInt32 read GetAsInt;
+      property AsFloat[const Index: Int32]: PUFloat read GetAsFloat;
+      property AsString[const Index: Int32]: String read GetAsString;
+      property RawData[const Offset: Int32]: Pointer read GetRawData;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+      class function NodeNameToArrayType(const NodeName: String): TColladaArrayType;
+      class function TypeNameToArrayType(const TypeName: String): TColladaArrayType;
+      class function IsDataArrayNode(const XMLNode: TUXML): Boolean;
+    end;
+    type TColladaAccessor = class (TColladaObject)
+    public
+      type TParam = record
+        Name: String;
+        ParamType: TColladaArrayType;
+      end;
+      type TParamArr = array[0..High(UInt16)] of TParam;
+      type PParamArr = ^TParamArr;
+    private
+      var _SourceRef: String;
+      var _Source: TColladaDataArray;
+      var _Count: Int32;
+      var _Stride: Int32;
+      var _Params: array of TParam;
+      function GetParams: PParamArr;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Source: TColladaDataArray read _Source;
+      property Count: Int32 read _Count;
+      property Stride: Int32 read _Stride;
+      property Params: PParamArr read GetParams;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaSource = class (TColladaObject)
+    private
+      var _DataArray: TColladaDataArray;
+      var _Accessor: TColladaAccessor;
+    public
+      property DataArray: TColladaDataArray read _DataArray;
+      property Accessor: TColladaAccessor read _Accessor;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaSourceList = array of TColladaSource;
+    type TColladaVertices = class (TColladaObject)
+    private
+      var _Inputs: TColladaInputList;
+    public
+      property Inputs: TColladaInputList read _Inputs;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaTriangles = class (TColladaObject)
+    private
+      var _MaterialRef: String;
+      var _Count: Int32;
+      var _Inputs: TColladaInputList;
+      var _Indices: array of Int32;
+      var _VertexLayout: TColladaInputList;
+      function GetVertexSize: Int32;
+      function GetIndices: PUInt32Arr; inline;
+      function GetVertexDescriptor: TVertexDescriptor;
+      function GetInputSourceCount(const Index: UInt32): UInt32; inline;
+    protected
+      procedure InitializeObject; override;
+    public
+      property Count: Int32 read _Count;
+      property Inputs: TColladaInputList read _Inputs;
+      property Indices: PUInt32Arr read GetIndices;
+      property VertexLayout: TColladaInputList read _VertexLayout;
+      property VertexSize: Int32 read GetVertexSize;
+      property VertexDescriptor: TVertexDescriptor read GetVertexDescriptor;
+      property Material: String read _MaterialRef;
+      property InputSourceCount[const Index: UInt32]: UInt32 read GetInputSourceCount;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+      function CopyInputData(const Target: Pointer; const Input: TColladaInput; const Index: Int32): Pointer;
+    end;
+    type TColladaTrianglesList = array of TColladaTriangles;
+    type TColladaMesh = class (TColladaObject)
+    private
+      var _Sources: TColladaSourceList;
+      var _Vertices: TColladaVertices;
+      var _TrianglesList: TColladaTrianglesList;
+    public
+      property Sources: TColladaSourceList read _Sources;
+      property Vertices: TColladaVertices read _Vertices;
+      property TrianglesList: TColladaTrianglesList read _TrianglesList;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaMeshList = array of TColladaMesh;
+    type TColladaImage = class (TColladaObject)
+    private
+      var _Source: String;
+    public
+      property Source: String read _Source;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaImageList = array of TColladaImage;
+    type TColladaEffectProfileParamType = (pt_invalid, pt_surface, pt_sampler, pt_float, pt_float2, pt_float3, pt_float4);
+    type TColladaEffectProfileParam = class (TColladaObject)
+    public
+      type TDataSurface = class
+        var InitFrom: String;
+        var Image: TColladaImage;
+      end;
+      type TDataSampler = class
+        var Source: String;
+        var Surface: TDataSurface;
+      end;
+      type TDataFloat = class
+        var Value: TUFloat;
+      end;
+      type TDataFloat2 = class
+        var Value: TUVec2;
+      end;
+      type TDataFloat3 = class
+        var Value: TUVec3;
+      end;
+      type TDataFloat4 = class
+        var Value: TUVec4;
+      end;
+    private
+      var _ParamType: TColladaEffectProfileParamType;
+      var _Data: TObject;
+    public
+      property ParamType: TColladaEffectProfileParamType read _ParamType;
+      function AsSurface: TDataSurface; inline;
+      function AsSampler: TDataSampler; inline;
+      function AsFloat: TDataFloat; inline;
+      function AsFloat2: TDataFloat2; inline;
+      function AsFloat3: TDataFloat3; inline;
+      function AsFloat4: TDataFloat4; inline;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaEffectProfileParamList = array of TColladaEffectProfileParam;
+    type TColladaEffectProfile = class (TColladaObject)
+    private
+      var _Params: TColladaEffectProfileParamList;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Params: TColladaEffectProfileParamList read _Params;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaEffect = class (TColladaObject)
+    private
+      var _Profile: TColladaEffectProfile;
+    public
+      property Profile: TColladaEffectProfile read _Profile;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaEffectList = array of TColladaEffect;
+    type TColladaInstanceEffect = class (TColladaInstance)
+    private
+      var _Effect: TColladaEffect;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Effect: TColladaEffect read _Effect;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaMaterial = class (TColladaObject)
+    private
+      var _InstanceEffect: TColladaInstanceEffect;
+    public
+      property InstanceEffect: TColladaInstanceEffect read _InstanceEffect;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaMaterialList = array of TColladaMaterial;
+    type TColladaGeometry = class (TColladaObject)
+    private
+      var _Meshes: TColladaMeshList;
+    public
+      property Meshes: TColladaMeshList read _Meshes;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaGeometryList = array of TColladaGeometry;
+    type TColladaMorph = class (TColladaObject)
+    public
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaJoints = class (TColladaObject)
+    public
+      type TJoint = record
+        JointName: String;
+        BindPose: TUMat;
+      end;
+      type TJoints = array of TJoint;
+    private
+      var _Inputs: TColladaInputList;
+      var _Joints: TJoints;
+      function FindInput(const Semantic: String): TColladaInput;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Inputs: TColladaInputList read _Inputs;
+      property Joints: TJoints read _Joints;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaVertexWeights = class (TColladaObject)
+    public
+      type TVertexJointReference = record
+        JointIndex: Int32;
+        JointWeight: TUFloat;
+      end;
+      type TVertexJointReferenceArr = array of array of TVertexJointReference;
+    private
+      var _VCount: Int32;
+      var _Inputs: TColladaInputList;
+      var _VertexWeights: TVertexJointReferenceArr;
+      var _Indices: array of Int32;
+      function FindInput(const Semantic: String): TColladaInput;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property VCount: Int32 read _VCount;
+      property Inputs: TColladaInputList read _Inputs;
+      property Weights: TVertexJointReferenceArr read _VertexWeights;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaSkin = class (TColladaObject)
+    private
+      var _GeometryRef: String;
+      var _Geometry: TColladaGeometry;
+      var _BindShapeMatrix: TUMat;
+      var _Sources: TColladaSourceList;
+      var _Joints: TColladaJoints;
+      var _VertexWeights: TColladaVertexWeights;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Geometry: TColladaGeometry read _Geometry;
+      property BindShapeMatrix: TUMat read _BindShapeMatrix;
+      property Joints: TColladaJoints read _Joints;
+      property VertexWeights: TColladaVertexWeights read _VertexWeights;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaControllerType = (ct_invalid, ct_skin, ct_morph);
+    type TColladaController = class (TColladaObject)
+    private
+      var _ControllerType: TColladaControllerType;
+      var _Controller: TColladaObject;
+      function GetAsSkin: TColladaSkin; inline;
+      function GetAsMorph: TColladaMorph; inline;
+    public
+      property Controller: TColladaObject read _Controller;
+      property ControllerType: TColladaControllerType read _ControllerType;
+      property AsSkin: TColladaSkin read GetAsSkin;
+      property AsMorph: TColladaMorph read GetAsMorph;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaControllerList = array of TColladaController;
+    type TColladaAnimationInterpolation = (ai_step, ai_linear, ai_bezier);
+    type TColladaAnimationSampler = class (TColladaObject)
+    public
+      type TKey = record
+        Time: TUFloat;
+        Value: Pointer;
+        TangentIn: array of TUFloat;
+        TangentOut: array of TUFloat;
+        Interpolation: TColladaAnimationInterpolation;
+      end;
+      type PKey = ^TKey;
+    private
+      var _Data: Pointer;
+      var _Inputs: TColladaInputList;
+      var _Keys: array of TKey;
+      var _DataType: TColladaArrayType;
+      var _DataStride: UInt32;
+      var _DataSize: UInt32;
+      function GetKey(const Index: Int32): PKey; inline;
+      function GetKeyCount: Int32; inline;
+      function FindKey(const Time: TUFloat): Int32;
+      function GetMaxTime: TUFloat; inline;
+      function GetSampleSize: UInt32; inline;
+    protected
+      procedure ResolveLinks; override;
+      procedure DumpData; override;
+    public
+      property Inputs: TColladaInputList read _Inputs;
+      property MaxTime: TUFloat read GetMaxTime;
+      property SampleSize: UInt32 read GetSampleSize;
+      property DataType: TColladaArrayType read _DataType;
+      property Keys[const Index: Int32]: PKey read GetKey;
+      property KeyCount: Int32 read GetKeyCount;
+      procedure SampleData(const Output: Pointer; const Time: TUFloat; const Loop: Boolean = False);
+      function SampleAsFloat(const Time: TUFloat; const Loop: Boolean = false): TUFloat;
+      function SampleAsFloat2(const Time: TUFloat; const Loop: Boolean = false): TUVec2;
+      function SampleAsFloat3(const Time: TUFloat; const Loop: Boolean = false): TUVec3;
+      function SampleAsFloat4(const Time: TUFloat; const Loop: Boolean = false): TUVec4;
+      function SampleAsMatrix(const Time: TUFloat; const Loop: Boolean = false): TUMat;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaAnimationSamplerList = array of TColladaAnimationSampler;
+    type TColladaAnimationChannel = class (TColladaObject)
+    private
+      var _SourceRef: String;
+      var _TargetRef: String;
+      var _Sampler: TColladaAnimationSampler;
+      var _Target: TColladaObject;
+      var _TargetProperty: String;
+      function GetMaxTime: TUFloat; inline;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Sampler: TColladaAnimationSampler read _Sampler;
+      property Target: TColladaObject read _Target;
+      property TargetProperty: String read _TargetProperty;
+      property MaxTime: TUFloat read GetMaxTime;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaAnimationChannelList = array of TColladaAnimationChannel;
+    type TColladaAnimation = class (TColladaObject)
+    public
+      type TAnimationList = array of TColladaAnimation;
+    private
+      var _Animations: TAnimationList;
+      var _Sources: TColladaSourceList;
+      var _Samplers: TColladaAnimationSamplerList;
+      var _Channels: TColladaAnimationChannelList;
+    public
+      property Animations: TAnimationList read _Animations;
+      property Sources: TColladaSourceList read _Sources;
+      property Samplers: TColladaAnimationSamplerList read _Samplers;
+      property Channels: TColladaAnimationChannelList read _Channels;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaAnimationList = TColladaAnimation.TAnimationList;
+    type TColladaCamera = class (TColladaObject)
+    private
+      var _FOV: TUFloat;
+      var _Aspect: TUFloat;
+      var _Near: TUFloat;
+      var _Far: TUFloat;
+    public
+      property FOV: TUFloat read _FOV;
+      property Aspect: TUFloat read _Aspect;
+      property ClipNear: TUFloat read _Near;
+      property ClipFar: TUFloat read _Far;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaCameraList = array of TColladaCamera;
+    type TColladaLightType = (lt_ambient, lt_directional, lt_point, lt_spot);
+    type TColladaLight = class (TColladaObject)
+    private
+      var _LightType: TColladaLightType;
+      var _Color: TUVec3;
+      var _AttenuationConstant: TUFloat;
+      var _AttenuationLinear: TUFloat;
+      var _AttenuationQuadratic: TUFloat;
+      var _FalloffAngle: TUFloat;
+      var _FalloffExponent: TUFloat;
+    public
+      property LightType: TColladaLightType read _LightType;
+      property Color: TUVec3 read _Color;
+      property AttenuationConstant: TUFloat read _AttenuationConstant;
+      property AttenuationLinear: TUFloat read _AttenuationLinear;
+      property AttenuationQuadratic: TUFloat read _AttenuationQuadratic;
+      property FalloffAngle: TUFloat read _FalloffAngle;
+      property FalloffExponent: TUFloat read _FalloffExponent;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaLightList = array of TColladaLight;
+    type TColladaInstanceMaterial = class (TColladaObject)
+    private
+      var _Symbol: String;
+      var _Target: String;
+      var _Material: TColladaMaterial;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Material: TColladaMaterial read _Material;
+      property Symbol: String read _Symbol;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaInstanceMaterialList = array of TColladaInstanceMaterial;
+    type TColladaInstanceGeometry = class (TColladaInstance)
+    private
+      var _Geometry: TColladaGeometry;
+      var _MaterialBindings: TColladaInstanceMaterialList;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Geometry: TColladaGeometry read _Geometry;
+      property MaterialBindings: TColladaInstanceMaterialList read _MaterialBindings;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaInstanceController = class (TColladaInstance)
+    private
+      var _SkeletonRef: String;
+      var _Skeleton: TColladaNode;
+      var _Controller: TColladaController;
+      var _MaterialBindings: TColladaInstanceMaterialList;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Skeleton: TColladaNode read _Skeleton;
+      property Controller: TColladaController read _Controller;
+      property MaterialBindings: TColladaInstanceMaterialList read _MaterialBindings;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaInstanceCamera = class (TColladaInstance)
+    private
+      var _Camera: TColladaCamera;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Camera: TColladaCamera read _Camera;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaInstanceLight = class (TColladaInstance)
+    private
+      var _Light: TColladaLight;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property Light: TColladaLight read _Light;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaVisualScene = class (TColladaObject)
+    private
+      var _Nodes: TColladaNodeList;
+    public
+      property Nodes: TColladaNodeList read _Nodes;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaVisualSceneList = array of TColladaVisualScene;
+    type TColladaLibraryAnimations = class (TColladaObject)
+    private
+      var _Animations: TColladaAnimationList;
+    public
+      property Animations: TColladaAnimationList read _Animations;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaLibraryMaterials = class (TColladaObject)
+    private
+      var _Materials: TColladaMaterialList;
+    public
+      property Materials: TColladaMaterialList read _Materials;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaLibraryEffects = class (TColladaObject)
+    private
+      var _Effects: TColladaEffectList;
+    public
+      property Effects: TColladaEffectList read _Effects;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaLibraryImages = class (TColladaObject)
+    private
+      var _Images: TColladaImageList;
+    public
+      property Images: TColladaImageList read _Images;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaLibraryGeometries = class (TColladaObject)
+    private
+      var _Geometries: TColladaGeometryList;
+    public
+      property Geometries: TColladaGeometryList read _Geometries;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaLibraryControllers = class (TColladaObject)
+    private
+      var _Controllers: TColladaControllerList;
+    public
+      property Controllers: TColladaControllerList read _Controllers;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaLibraryCameras = class (TColladaObject)
+    private
+      var _Cameras: TColladaCameraList;
+    public
+      property Cameras: TColladaCameraList read _Cameras;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaLibraryLights = class (TColladaObject)
+    private
+      var _Lights: TColladaLightList;
+    public
+      property Lights: TColladaLightList read _Lights;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaLibraryVisualScenes = class (TColladaObject)
+    private
+      var _VisualScenes: TColladaVisualSceneList;
+    public
+      property VisualScenes: TColladaVisualSceneList read _VisualScenes;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaInstanceVisualScene = class (TColladaInstance)
+    private
+      var _VisualScene: TColladaVisualScene;
+    protected
+      procedure ResolveLinks; override;
+    public
+      property VisualScene: TColladaVisualScene read _VisualScene;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaScene = class (TColladaObject)
+    private
+      var _VisualScene: TColladaInstanceVisualScene;
+    public
+      property VisualScene: TColladaInstanceVisualScene read _VisualScene;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaAsset = class (TColladaObject)
+    private
+      var _UpAxis: TUSwizzle;
+    public
+      property UpAxis: TUSwizzle read _UpAxis;
+      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      destructor Destroy; override;
+    end;
+    type TColladaRoot = class (TColladaObject)
+    private
+      var _Asset: TColladaAsset;
+      var _LibMaterials: TColladaLibraryMaterials;
+      var _LibEffects: TColladaLibraryEffects;
+      var _LibImages: TColladaLibraryImages;
+      var _LibGeometries: TColladaLibraryGeometries;
+      var _LibControllers: TColladaLibraryControllers;
+      var _LibAnimations: TColladaLibraryAnimations;
+      var _LibCameras: TColladaLibraryCameras;
+      var _LibLights: TColladaLibraryLights;
+      var _LibVisualScenes: TColladaLibraryVisualScenes;
+      var _Scene: TColladaScene;
+    public
+      property Asset: TColladaAsset read _Asset;
+      property LibMaterials: TColladaLibraryMaterials read _LibMaterials;
+      property LibEffects: TColladaLibraryEffects read _LibEffects;
+      property LibImages: TColladaLibraryImages read _LibImages;
+      property LibGeometries: TColladaLibraryGeometries read _LibGeometries;
+      property LibControllers: TColladaLibraryControllers read _LibControllers;
+      property LibAnimations: TColladaLibraryAnimations read _LibAnimations;
+      property LibCameras: TColladaLibraryCameras read _LibCameras;
+      property LibLights: TColladaLibraryLights read _LibLights;
+      property LibVisualScenes: TColladaLibraryVisualScenes read _LibVisualScenes;
+      property Scene: TColladaScene read _Scene;
+      constructor Create(const XMLNode: TUXML);
+      destructor Destroy; override;
+    end;
+  private
+    var _Root: TColladaRoot;
+    class function FindNextValue(const Str: String; var CurPos: Int32): String;
+    class function LoadMatrix(
+      const Node: TUXML
+    ): TUMat;
+    class function LoadMatrix(
+      const Src: TColladaSource;
+      const Index: Int32
+    ): TUMat;
+    procedure Read(const XML: TUXML);
+  public
+    property Root: TColladaRoot read _Root;
+    class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; override;
+    procedure Load(const StreamHelper: TUStreamHelper); override;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
 function ULoadImageData(const Stream: TStream): TUImageDataShared; overload;
 function ULoadImageData(const FileName: String): TUImageDataShared; overload;
 function ULoadImageData(const Buffer: Pointer; const Size: UInt32): TUImageDataShared; overload;
@@ -1340,5 +2099,2654 @@ begin
   ChunkEnd;
 end;
 // TUImageDataPNG end
+
+// TUSceneData begin
+class function TUSceneData.CanLoad(const Stream: TStream): Boolean;
+  var sh: TUStreamHelper;
+begin
+  sh := TUStreamHelper.Create(Stream);
+  try
+    Result := CanLoad(sh);
+  finally
+    sh.Free;
+  end;
+end;
+
+class function TUSceneData.CanLoad(const FileName: String): Boolean;
+  var fs: TFileStream;
+begin
+  fs := TFileStream.Create(FileName, fmOpenRead);
+  try
+    Result := CanLoad(fs);
+  finally
+    fs.Free;
+  end;
+end;
+
+class function TUSceneData.CanLoad(const Buffer: Pointer; const Size: UInt32): Boolean;
+  var ms: TUConstMemoryStream;
+begin
+  ms := TUConstMemoryStream.Create(Buffer, Size);
+  try
+    Result := CanLoad(ms);
+  finally
+    ms.Free;
+  end;
+end;
+
+procedure TUSceneData.Load(const Stream: TStream);
+  var sh: TUStreamHelper;
+begin
+  sh := TUStreamHelper.Create(Stream);
+  try
+    Load(sh);
+  finally
+    sh.Free;
+  end;
+end;
+
+procedure TUSceneData.Load(const FileName: String);
+  var fs: TFileStream;
+begin
+  fs := TFileStream.Create(FileName, fmOpenRead);
+  try
+    Load(fs);
+  finally
+    fs.Free;
+  end;
+end;
+
+procedure TUSceneData.Load(const Buffer: Pointer; const Size: UInt32);
+  var ms: TUConstMemoryStream;
+begin
+  ms := TUConstMemoryStream.Create(Buffer, Size);
+  try
+    Load(ms);
+  finally
+    ms.Free;
+  end;
+end;
+// TUSceneData end
+
+// TUSceneDataDAE begin
+procedure TUSceneDataDAE.TColladaObject.AddChild(const Child: TColladaObject);
+begin
+  specialize UArrAppend<TColladaObject>(_Children, Child);
+end;
+
+procedure TUSceneDataDAE.TColladaObject.RemoveChild(const Child: TColladaObject);
+begin
+  specialize UArrRemove<TColladaObject>(_Children, Child);
+end;
+
+procedure TUSceneDataDAE.TColladaObject.SetParent(const Value: TColladaObject);
+begin
+  if _Parent = Value then Exit;
+  if Assigned(_Parent) then _Parent.RemoveChild(Self);
+  _Parent := Value;
+  if Assigned(_Parent) then _Parent.AddChild(Self);
+end;
+
+procedure TUSceneDataDAE.TColladaObject.DumpBegin;
+begin
+  //LabLog(AnsiString(_Tag) + ': {', 2);
+end;
+
+procedure TUSceneDataDAE.TColladaObject.DumpEnd;
+begin
+  //LabLog('}', -2);
+end;
+
+procedure TUSceneDataDAE.TColladaObject.DumpData;
+begin
+  //if Length(_id) > 0 then LabLog('id: ' + AnsiString(_id));
+  //if Length(_sid) > 0 then LabLog('sid: ' + AnsiString(_sid));
+  //if Length(_Name) > 0 then LabLog('name: ' + AnsiString(_Name));
+end;
+
+procedure TUSceneDataDAE.TColladaObject.Resolve;
+  var i: Int32;
+begin
+  for i := 0 to High(_Children) do
+  begin
+    _Children[i].Resolve;
+  end;
+  ResolveLinks;
+end;
+
+procedure TUSceneDataDAE.TColladaObject.ResolveLinks;
+begin
+
+end;
+
+procedure TUSceneDataDAE.TColladaObject.Initialize;
+  var i: Int32;
+begin
+  for i := 0 to High(_Children) do
+  begin
+    _Children[i].Initialize;
+  end;
+  InitializeObject;
+end;
+
+procedure TUSceneDataDAE.TColladaObject.InitializeObject;
+begin
+
+end;
+
+function TUSceneDataDAE.TColladaObject.ResolveObject(
+  const Path: String; const ObjectClass: TClass
+): TColladaObject;
+begin
+  Result := Find(Path);
+  if Assigned(Result)
+  and not (Result is ObjectClass) then
+  begin
+    Result := nil;
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaObject.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+begin
+  _Scoped := False;
+  _Tag := LowerCase(XMLNode.Name);
+  _id := XMLNode.AttributeValue['id'];
+  _sid := XMLNode.AttributeValue['sid'];
+  _Name := XMLNode.AttributeValue['name'];
+  _UserData := nil;
+  _AutoFreeUserData := False;
+  if Length(_id) > 0 then _Scoped := True;
+  Parent := AParent;
+end;
+
+destructor TUSceneDataDAE.TColladaObject.Destroy;
+  var i: Int32;
+begin
+  if _AutoFreeUserData and Assigned(_UserData) then _UserData.Free;
+  for i := 0 to High(_Children) do
+  begin
+    _Children[i].Free;
+  end;
+  _Children := nil;
+  inherited Destroy;
+end;
+
+function TUSceneDataDAE.TColladaObject.GetRoot: TColladaObject;
+begin
+  if _Parent = nil then Exit(Self);
+  Result := _Parent.GetRoot;
+end;
+
+function TUSceneDataDAE.TColladaObject.Find(const Path: String): TColladaObject;
+  var SearchPath: String;
+  var i: Int32;
+  var PathArr: TUStrArr;
+begin
+  if Length(Path) = 0 then Exit(nil);
+  SearchPath := Path;
+  if SearchPath[1] = '#' then Delete(SearchPath, 1, 1);
+  if Length(SearchPath) = 0 then Exit(nil);
+  PathArr := UStrExplode(SearchPath, '/');
+  Result := GetRoot;
+  for i := 0 to High(PathArr) do
+  begin
+    Result := Result.FindChildRecursive(PathArr[i]);
+    if not Assigned(Result) then Break;
+  end;
+  if not Assigned(Result) then
+  begin
+    //LabLog('Unresolved link: ' + AnsiString(Path));
+  end;
+end;
+
+function TUSceneDataDAE.TColladaObject.FindChild(
+  const NodeID: String
+): TColladaObject;
+  var i: Int32;
+begin
+  for i := 0 to High(_Children) do
+  if (_Children[i].id = NodeID)
+  or (_Children[i].sid = NodeID) then
+  begin
+    Exit(_Children[i]);
+  end;
+  Result := nil;
+end;
+
+function TUSceneDataDAE.TColladaObject.FindChildRecursive(
+  const NodeID: String
+): TColladaObject;
+  var i: Int32;
+begin
+  for i := 0 to High(_Children) do
+  begin
+    if (_Children[i].id = NodeID)
+    or (_Children[i].sid = NodeID) then
+    begin
+      Exit(_Children[i]);
+    end
+    else
+    begin
+      Result := _Children[i].FindChildRecursive(NodeID);
+      if Assigned(Result) then Exit;
+    end;
+  end;
+  Result := nil;
+end;
+
+procedure TUSceneDataDAE.TColladaObject.Dump;
+  var i: Int32;
+begin
+  DumpBegin;
+  DumpData;
+  for i := 0 to High(_Children) do
+  begin
+    _Children[i].Dump;
+  end;
+  DumpEnd;
+end;
+
+constructor TUSceneDataDAE.TColladaInstance.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+begin
+  inherited Create(XMLNode, AParent);
+  _Url := XMLNode.AttributeValue['url'];
+end;
+
+destructor TUSceneDataDAE.TColladaInstance.Destroy;
+begin
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaNode.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Data, CurLayer: String;
+  var p, i: Int32;
+  var Node: TUXML;
+  var NodeName: String;
+  var XfLookAt: array [0..8] of TUFloat;
+  var XfRotate: array [0..3] of TUFloat;
+  var XfScale: TUVec3;
+  var XfTranslate: TUVec3;
+  var XfSkew: array [0..6] of TUFloat;
+begin
+  inherited Create(XMLNode, AParent);
+  _NodeType := StringToNodeType(XMLNode.AttributeValue['type']);
+  Data := XMLNode.AttributeValue['layer'];
+  if Length(Data) > 0 then
+  begin
+    p := 1;
+    repeat
+      CurLayer := FindNextValue(Data, p);
+      if Length(CurLayer) > 0 then
+      begin
+        specialize UArrAppend<String>(_Layers, CurLayer);
+      end;
+    until Length(CurLayer) = 0;
+  end;
+  Node := XMLNode.FindChild('matrix');
+  if Assigned(Node) then
+  begin
+    Matrix := LoadMatrix(Node);
+  end
+  else
+  begin
+    Node := XMLNode.FindChild('lookat');
+    if Assigned(Node) then
+    begin
+      Data := Node.Content;
+      p := 1;
+      for i := 0 to 8 do
+      begin
+        XfLookAt[i] := StrToFloatDef(AnsiString(FindNextValue(Data, p)), 0);
+      end;
+      Matrix := TUMat.View(
+        TUVec3.Make(XfLookAt[0], XfLookAt[1], XfLookAt[2]),
+        TUVec3.Make(XfLookAt[3], XfLookAt[4], XfLookAt[5]),
+        TUVec3.Make(XfLookAt[6], XfLookAt[7], XfLookAt[8])
+      );
+    end
+    else
+    begin
+      Matrix := TUMat.Identity;
+      for Node in XMLNode do
+      begin
+        NodeName := LowerCase(Node.Name);
+        if NodeName = 'rotate' then
+        begin
+          Data := Node.Content;
+          p := 1;
+          for i := 0 to 3 do
+          begin
+            XfRotate[i] := StrToFloatDef(FindNextValue(Data, p), 0);
+          end;
+          Matrix := TUMat.Rotation(
+            TUVec3.Make(XfRotate[0], XfRotate[1], XfRotate[2]),
+            XfRotate[3] * UDegToRad
+          ) * Matrix;
+        end
+        else if NodeName = 'scale' then
+        begin
+          Data := Node.Content;
+          p := 1;
+          for i := 0 to 2 do
+          begin
+            XfScale[i] := StrToFloatDef(FindNextValue(Data, p), 0);
+          end;
+          Matrix := TUMat.Scaling(XfScale) * Matrix;
+        end
+        else if NodeName = 'translate' then
+        begin
+          Data := Node.Content;
+          p := 1;
+          for i := 0 to 2 do
+          begin
+            XfTranslate[i] := StrToFloatDef(FindNextValue(Data, p), 0);
+          end;
+          Matrix := TUMat.Translation(XfTranslate) * Matrix;
+        end
+        else if NodeName = 'skew' then
+        begin
+          Data := Node.Content;
+          p := 1;
+          for i := 0 to 6 do
+          begin
+            XfSkew[i] := StrToFloatDef(FindNextValue(Data, p), 0);
+          end;
+          Matrix := TUMat.Skew(
+            TUVec3.Make(XfSkew[4], XfSkew[5], XfSkew[6]),
+            TUVec3.Make(XfSkew[1], XfSkew[2], XfSkew[3]),
+            XfSkew[0] * UDegToRad
+          ) * Matrix;
+        end;
+      end;
+    end;
+  end;
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'node' then
+    begin
+      specialize UArrAppend<TColladaNode>(
+        _Nodes, TColladaNode.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'instance_geometry' then
+    begin
+      specialize UArrAppend<TColladaInstance>(
+        _Instances, TColladaInstanceGeometry.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'instance_controller' then
+    begin
+      specialize UArrAppend<TColladaInstance>(
+        _Instances, TColladaInstanceController.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'instance_camera' then
+    begin
+      specialize UArrAppend<TColladaInstance>(
+        _Instances, TColladaInstanceCamera.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'instance_light' then
+    begin
+      specialize UArrAppend<TColladaInstance>(
+        _Instances, TColladaInstanceLight.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaNode.Destroy;
+begin
+  specialize UArrClear<TColladaInstance>(_Instances);
+  specialize UArrClear<TColladaNode>(_Nodes);
+  inherited Destroy;
+end;
+
+class function TUSceneDataDAE.TColladaNode.StringToNodeType(
+  const NodeTypeName: String
+): TColladaNodeType;
+  var NodeTypeNameLC: String;
+begin
+  NodeTypeNameLC := LowerCase(NodeTypeName);
+  if NodeTypeNameLC = 'node' then Exit(nt_node);
+  if NodeTypeNameLC = 'joint' then Exit(nt_joint);
+  Result := nt_invalid;
+end;
+
+function TUSceneDataDAE.TColladaInput.GetSize: UInt32;
+  var Src: TColladaSource;
+begin
+  if _Source is TColladaSource then
+  begin
+    Src := TColladaSource(Source);
+  end
+  else if _Source is TColladaVertices then
+  begin
+    Src := TColladaSource(TColladaVertices(_Source).Inputs[0].Source);
+  end
+  else
+  begin
+    Exit(0);
+  end;
+  Result := Src.DataArray.ItemSize * Src.Accessor.Stride;
+end;
+
+procedure TUSceneDataDAE.TColladaInput.ResolveLinks;
+  var Obj: TColladaObject;
+begin
+  inherited ResolveLinks;
+  Obj := Find(_SourceRef);
+  if Assigned(Obj) and ((Obj is TColladaSource) or (Obj is TColladaVertices)) then
+  begin
+    _Source := Obj;
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaInput.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+begin
+  inherited Create(XMLNode, AParent);
+  _Semantic := UpperCase(XMLNode.AttributeValue['semantic']);
+  _SourceRef := XMLNode.AttributeValue['source'];
+  _Offset := StrToIntDef(XMLNode.AttributeValue['offset'], 0);
+  _Set := StrToIntDef(XMLNode.AttributeValue['set'], 0);
+end;
+
+destructor TUSceneDataDAE.TColladaInput.Destroy;
+begin
+  inherited Destroy;
+end;
+
+function TUSceneDataDAE.TColladaDataArray.GetAsBool(const Index: Int32): PBoolean;
+  var i: Int32;
+begin
+  i := _ItemSize * Index;
+  if (i < 0) or (i + _ItemSize > Length(_Data)) then Exit(nil);
+  Result := PBoolean(@_Data[i]);
+end;
+
+function TUSceneDataDAE.TColladaDataArray.GetAsInt(const Index: Int32): PInt32;
+  var i: Int32;
+begin
+  i := _ItemSize * Index;
+  if (i < 0) or (i + _ItemSize > Length(_Data)) then Exit(nil);
+  Result := PInt32(@_Data[i]);
+end;
+
+function TUSceneDataDAE.TColladaDataArray.GetAsFloat(const Index: Int32): PUFloat;
+  var i: Int32;
+begin
+  i := _ItemSize * Index;
+  if (i < 0) or (i + _ItemSize > Length(_Data)) then Exit(nil);
+  Result := PUFloat(@_Data[i]);
+end;
+
+function TUSceneDataDAE.TColladaDataArray.GetAsString(const Index: Int32): String;
+begin
+  if (Index < 0) or (Index > High(_DataString)) then Exit('');
+  Result := _DataString[Index];
+end;
+
+function TUSceneDataDAE.TColladaDataArray.GetRawData(const Offset: Int32): Pointer;
+begin
+  Result := @_Data[Offset];
+end;
+
+constructor TUSceneDataDAE.TColladaDataArray.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Data: String;
+  var i, p: Int32;
+begin
+  inherited Create(XMLNode, AParent);
+  _ArrayType := NodeNameToArrayType(XMLNode.Name);
+  _Count := StrToIntDef(XMLNode.AttributeValue['count'], 0);
+  Data := XMLNode.Content;
+  p := 1;
+  case _ArrayType of
+    at_bool:
+    begin
+      _ItemSize := SizeOf(Boolean);
+      SetLength(_Data, _Count * _ItemSize);
+      for i := 0 to _Count - 1 do
+      begin
+        AsBool[i]^ := StrToBoolDef(FindNextValue(Data, p), False);
+      end;
+    end;
+    at_int:
+    begin
+      _ItemSize := SizeOf(Int32);
+      SetLength(_Data, _Count * _ItemSize);
+      for i := 0 to _Count - 1 do
+      begin
+        AsInt[i]^ := StrToIntDef(FindNextValue(Data, p), 0);
+      end;
+    end;
+    at_float:
+    begin
+      _ItemSize := SizeOf(TUFloat);
+      SetLength(_Data, _Count * _ItemSize);
+      for i := 0 to _Count - 1 do
+      begin
+        AsFloat[i]^ := StrToFloatDef(FindNextValue(Data, p), 0);
+      end;
+    end;
+    at_sidref,
+    at_idref,
+    at_name:
+    begin
+      _ItemSize := 0;
+      SetLength(_DataString, _Count);
+      for i := 0 to _Count - 1 do
+      begin
+        _DataString[i] := FindNextValue(Data, p);
+      end;
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaDataArray.Destroy;
+begin
+  inherited Destroy;
+end;
+
+class function TUSceneDataDAE.TColladaDataArray.NodeNameToArrayType(
+  const NodeName: String
+): TColladaArrayType;
+  var NodeNameLC: String;
+begin
+  NodeNameLC := LowerCase(NodeName);
+  if NodeNameLC = 'bool_array' then Exit(at_bool);
+  if NodeNameLC = 'float_array' then Exit(at_float);
+  if NodeNameLC = 'idref_array' then Exit(at_idref);
+  if NodeNameLC = 'int_array' then Exit(at_int);
+  if NodeNameLC = 'name_array' then Exit(at_name);
+  if NodeNameLC = 'sidref_array' then Exit(at_sidref);
+  if NodeNameLC = 'token_array' then Exit(at_token);
+  Result := at_invalid;
+end;
+
+class function TUSceneDataDAE.TColladaDataArray.TypeNameToArrayType(
+  const TypeName: String
+): TColladaArrayType;
+  var TypeNameLC: String;
+begin
+  TypeNameLC := LowerCase(TypeName);
+  if TypeNameLC = 'bool' then Exit(at_bool);
+  if TypeNameLC = 'float' then Exit(at_float);
+  if TypeNameLC = 'idref' then Exit(at_idref);
+  if TypeNameLC = 'int' then Exit(at_int);
+  if TypeNameLC = 'name' then Exit(at_name);
+  if TypeNameLC = 'sidref' then Exit(at_sidref);
+  if TypeNameLC = 'token' then Exit(at_token);
+  Result := at_invalid;
+end;
+
+class function TUSceneDataDAE.TColladaDataArray.IsDataArrayNode(
+  const XMLNode: TUXML
+): Boolean;
+begin
+  Result := NodeNameToArrayType(XMLNode.Name) <> at_invalid;
+end;
+
+function TUSceneDataDAE.TColladaAccessor.GetParams: PParamArr;
+begin
+  Result := @_Params[0];
+end;
+
+procedure TUSceneDataDAE.TColladaAccessor.ResolveLinks;
+begin
+  inherited ResolveLinks;
+  _Source := ResolveObject(_SourceRef, TColladaDataArray) as TColladaDataArray;
+end;
+
+constructor TUSceneDataDAE.TColladaAccessor.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+  var i: Int32;
+begin
+  inherited Create(XMLNode, AParent);
+  _SourceRef := XMLNode.AttributeValue['source'];
+  _Count := StrToIntDef(XMLNode.AttributeValue['count'], 0);
+  _Stride := StrToIntDef(XMLNode.AttributeValue['stride'], 1);
+  SetLength(_Params, _Stride);
+  for i := 0 to High(_Params) do _Params[i].ParamType := at_invalid;
+  i := 0;
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'param' then
+    begin
+      _Params[i].Name := Node.AttributeValue['name'];
+      _Params[i].ParamType := TColladaDataArray.TypeNameToArrayType(Node.AttributeValue['type']);
+      Inc(i);
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaAccessor.Destroy;
+begin
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaSource.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    if not Assigned(_DataArray)
+    and TColladaDataArray.IsDataArrayNode(Node) then
+    begin
+      _DataArray := TColladaDataArray.Create(Node, Self);
+    end;
+  end;
+  _Accessor := nil;
+  Node := XMLNode.FindChild('technique_common');
+  if Assigned(Node) then
+  begin
+    Node := Node.FindChild('accessor');
+    if Assigned(Node) then
+    begin
+      _Accessor := TColladaAccessor.Create(Node, Self);
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaSource.Destroy;
+begin
+  FreeAndNil(_Accessor);
+  FreeAndNil(_DataArray);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaVertices.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'input' then
+    begin
+      specialize UArrAppend<TColladaInput>(
+        _Inputs, TColladaInput.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaVertices.Destroy;
+begin
+  specialize UArrClear<TColladaInput>(_Inputs);
+  inherited Destroy;
+end;
+
+function TUSceneDataDAE.TColladaTriangles.GetVertexSize: Int32;
+  var i: Int32;
+  var Src: TColladaSource;
+begin
+  Result := 0;
+  for i := 0 to High(_VertexLayout) do
+  begin
+    Src := TColladaSource(_VertexLayout[i].Source);
+    Result += Src.Accessor.Source.ItemSize * Src.Accessor.Stride;
+  end;
+end;
+
+function TUSceneDataDAE.TColladaTriangles.GetIndices: PUInt32Arr;
+begin
+  Result := @_Indices[0];
+end;
+
+function TUSceneDataDAE.TColladaTriangles.GetVertexDescriptor: TVertexDescriptor;
+  var CurAttr: Int32;
+  procedure AddInput(const Input: TColladaInput);
+    const SemanticMap: array[0..5] of record
+      Name: String;
+      Value: TVertexAttributeSemantic;
+    end = (
+      (Name: 'POSITION'; Value: as_position),
+      (Name: 'COLOR'; Value: as_color),
+      (Name: 'NORMAL'; Value: as_normal),
+      (Name: 'TEXTANGENT'; Value: as_tangent),
+      (Name: 'TEXBINORMAL'; Value: as_binormal),
+      (Name: 'TEXCOORD'; Value: as_texcoord)
+    );
+    var Vertices: TColladaVertices;
+    var Source: TColladaSource;
+    var i: Int32;
+  begin
+    if not Assigned(Input) or not Assigned(Input.Source) then Exit;
+    if Input.Source is TColladaVertices then
+    begin
+      Vertices := TColladaVertices(Input.Source);
+      for i := 0 to High(Vertices.Inputs) do
+      begin
+        AddInput(Vertices.Inputs[i]);
+      end;
+    end
+    else if Input.Source is TColladaSource then
+    begin
+      Source := TColladaSource(Input.Source);
+      if Source.DataArray.ArrayType in [at_bool, at_float, at_int] then
+      begin
+        for i := 0 to High(SemanticMap) do
+        if SemanticMap[i].Name = Input.Semantic then
+        begin
+          Result[CurAttr].Semantic := SemanticMap[i].Value;
+          case Source.DataArray.ArrayType of
+            at_bool: Result[CurAttr].DataType := dt_bool;
+            at_int: Result[CurAttr].DataType := dt_int;
+            at_float: Result[CurAttr].DataType := dt_float;
+            else Result[CurAttr].DataType := dt_invalid;
+          end;
+          Result[CurAttr].DataCount := Source.Accessor.Stride;
+          Result[CurAttr].SetNumber := Input.InputSet;
+          Inc(CurAttr);
+          Break;
+        end;
+      end;
+    end;
+  end;
+  var i: Int32;
+begin
+  Result := nil;
+  SetLength(Result, Length(Inputs));
+  CurAttr := 0;
+  for i := 0 to High(Inputs) do
+  begin
+    AddInput(Inputs[i]);
+  end;
+  if Length(Result) <> CurAttr then
+  begin
+    SetLength(Result, CurAttr);
+  end;
+end;
+
+function TUSceneDataDAE.TColladaTriangles.GetInputSourceCount(
+  const Index: UInt32
+): UInt32;
+  var Source: TColladaSource;
+begin
+  if _Inputs[Index].Source is TColladaSource then
+  begin
+    Source := TColladaSource(_Inputs[Index].Source);
+  end
+  else if _Inputs[Index].Source is TColladaVertices then
+  begin
+    Source := TColladaSource(TColladaVertices(_Inputs[Index].Source).Inputs[0].Source);
+  end
+  else
+  begin
+    Exit(0);
+  end;
+  Result := Source.Accessor.Count;
+end;
+
+procedure TUSceneDataDAE.TColladaTriangles.InitializeObject;
+  procedure ProcessInput(const Input: TColladaInput);
+    var i: Int32;
+    var Vertices: TColladaVertices;
+  begin
+    if not Assigned(Input) or not Assigned(Input.Source) then Exit;
+    if Input.Source is TColladaVertices then
+    begin
+      Vertices := TColladaVertices(Input.Source);
+      for i := 0 to High(Vertices.Inputs) do
+      begin
+        ProcessInput(Vertices.Inputs[i]);
+      end;
+    end
+    else
+    begin
+      specialize UArrAppend<TColladaInput>(
+        _VertexLayout, Input
+      );
+    end;
+  end;
+  var i: Int32;
+begin
+  inherited InitializeObject;
+  _VertexLayout := nil;
+  for i := 0 to High(_Inputs) do
+  begin
+    ProcessInput(_Inputs[i]);
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaTriangles.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+  var IndexStr: String;
+  var i, p, MaxOffset: Int32;
+begin
+  inherited Create(XMLNode, AParent);
+  _MaterialRef := XMLNode.AttributeValue['material'];
+  _Count := StrToIntDef(XMLNode.AttributeValue['count'], 0);
+  IndexStr := '';
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'input' then
+    begin
+      specialize UArrAppend<TColladaInput>(
+        _Inputs, TColladaInput.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'p' then
+    begin
+      IndexStr += Node.Content;
+    end;
+  end;
+  MaxOffset := 0;
+  for i := 0 to High(_Inputs) do
+  if _Inputs[i].Offset > MaxOffset then
+  begin
+    MaxOffset := _Inputs[i].Offset;
+  end;
+  if Length(IndexStr) > 0 then
+  begin
+    SetLength(_Indices, _Count * 3 * (MaxOffset + 1));
+    p := 1;
+    for i := 0 to High(_Indices) do
+    begin
+      _Indices[i] := StrToIntDef(FindNextValue(IndexStr, p), 0);
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaTriangles.Destroy;
+begin
+  specialize UArrClear<TColladaInput>(_Inputs);
+  inherited Destroy;
+end;
+
+function TUSceneDataDAE.TColladaTriangles.CopyInputData(
+  const Target: Pointer;
+  const Input: TColladaInput;
+  const Index: Int32
+): Pointer;
+  var Dest: PUInt8;
+  var Vertices: TColladaVertices;
+  var Source: TColladaSource;
+  var i: Int32;
+begin
+  if not Assigned(Input) or not Assigned(Input.Source) then Exit;
+  Dest := Target;
+  if Input.Source is TColladaVertices then
+  begin
+    Vertices := TColladaVertices(Input.Source);
+    for i := 0 to High(Vertices.Inputs) do
+    begin
+      Dest := CopyInputData(Dest, Vertices.Inputs[i], Index);
+    end;
+  end
+  else if Input.Source is TColladaSource then
+  begin
+    Source := TColladaSource(Input.Source);
+    if Source.DataArray.ArrayType in [at_bool, at_float, at_int] then
+    begin
+      Move(
+        Source.DataArray.RawData[Source.DataArray.ItemSize * Source.Accessor.Stride * Index]^,
+        Dest^,
+        Source.DataArray.ItemSize * Source.Accessor.Stride
+      );
+      Inc(Dest, Source.DataArray.ItemSize * Source.Accessor.Stride);
+    end;
+  end;
+  Result := Dest;
+end;
+
+constructor TUSceneDataDAE.TColladaMesh.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  _Vertices := nil;
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'source' then
+    begin
+      specialize UArrAppend<TColladaSource>(
+        _Sources, TColladaSource.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'vertices' then
+    begin
+      if not Assigned(_Vertices) then
+      begin
+        _Vertices := TColladaVertices.Create(Node, Self);
+      end;
+    end
+    else if (NodeName = 'triangles') or (NodeName = 'polygons') then
+    begin
+      specialize UArrAppend<TColladaTriangles>(
+        _TrianglesList, TColladaTriangles.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaMesh.Destroy;
+begin
+  FreeAndNil(_Vertices);
+  specialize UArrClear<TColladaTriangles>(_TrianglesList);
+  specialize UArrClear<TColladaSource>(_Sources);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaImage.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+begin
+  inherited Create(XMLNode, AParent);
+  Node := XMLNode.FindChild('init_from');
+  if Assigned(Node) then
+  begin
+    _Source := Node.Content;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaImage.Destroy;
+begin
+  inherited Destroy;
+end;
+
+function TUSceneDataDAE.TColladaEffectProfileParam.AsSurface: TDataSurface;
+begin
+  Result := _Data as TDataSurface;
+end;
+
+function TUSceneDataDAE.TColladaEffectProfileParam.AsSampler: TDataSampler;
+begin
+  Result := _Data as TDataSampler;
+end;
+
+function TUSceneDataDAE.TColladaEffectProfileParam.AsFloat: TDataFloat;
+begin
+  Result := _Data as TDataFloat;
+end;
+
+function TUSceneDataDAE.TColladaEffectProfileParam.AsFloat2: TDataFloat2;
+begin
+  Result := _Data as TDataFloat2;
+end;
+
+function TUSceneDataDAE.TColladaEffectProfileParam.AsFloat3: TDataFloat3;
+begin
+  Result := _Data as TDataFloat3;
+end;
+
+function TUSceneDataDAE.TColladaEffectProfileParam.AsFloat4: TDataFloat4;
+begin
+  Result := _Data as TDataFloat4;
+end;
+
+constructor TUSceneDataDAE.TColladaEffectProfileParam.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node, SubNode: TUXML;
+  var NodeName, VecData: String;
+  var DataSurface: TDataSurface;
+  var DataSampler: TDataSampler;
+  var DataFloat: TDataFloat;
+  var DataFloat2: TDataFloat2;
+  var DataFloat3: TDataFloat3;
+  var DataFloat4: TDataFloat4;
+  var i, p: Int32;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'surface' then
+    begin
+      DataSurface := TDataSurface.Create;
+      SubNode := Node.FindChild('init_from');
+      if Assigned(SubNode) then
+      begin
+        DataSurface.InitFrom := SubNode.Content;
+      end;
+      _Data := DataSurface;
+      _ParamType := pt_surface;
+    end
+    else if (NodeName = 'sampler1d')
+    or (NodeName = 'sampler2d')
+    or (NodeName = 'sampler3d') then
+    begin
+      DataSampler := TDataSampler.Create;
+      SubNode := Node.FindChild('source');
+      if Assigned(SubNode) then
+      begin
+        DataSampler.Source := SubNode.Content;
+      end;
+      _Data := DataSampler;
+      _ParamType := pt_sampler;
+    end
+    else if (NodeName = 'float') then
+    begin
+      DataFloat := TDataFloat.Create;
+      VecData := Node.Content;
+      p := 1;
+      DataFloat.Value := StrToFloatDef(FindNextValue(VecData, p), 0);
+      _Data := DataFloat;
+      _ParamType := pt_float;
+    end
+    else if (NodeName = 'float2') then
+    begin
+      DataFloat2 := TDataFloat2.Create;
+      VecData := Node.Content;
+      p := 1;
+      for i := 0 to 1 do
+      begin
+        DataFloat2.Value[i] := StrToFloatDef(FindNextValue(VecData, p), 0);
+      end;
+      _Data := DataFloat2;
+      _ParamType := pt_float2;
+    end
+    else if (NodeName = 'float3') then
+    begin
+      DataFloat3 := TDataFloat3.Create;
+      VecData := Node.Content;
+      p := 1;
+      for i := 0 to 2 do
+      begin
+        DataFloat3.Value[i] := StrToFloatDef(FindNextValue(VecData, p), 0);
+      end;
+      _Data := DataFloat3;
+      _ParamType := pt_float3;
+    end
+    else if (NodeName = 'float4') then
+    begin
+      DataFloat4 := TDataFloat4.Create;
+      VecData := Node.Content;
+      p := 1;
+      for i := 0 to 3 do
+      begin
+        DataFloat4.Value[i] := StrToFloatDef(FindNextValue(VecData, p), 0);
+      end;
+      _Data := DataFloat4;
+      _ParamType := pt_float4;
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaEffectProfileParam.Destroy;
+begin
+  FreeAndNil(_Data);
+  inherited Destroy;
+end;
+
+procedure TUSceneDataDAE.TColladaEffectProfile.ResolveLinks;
+  var i: Int32;
+  var Obj: TColladaObject;
+begin
+  for i := 0 to High(_Params) do
+  begin
+    case _Params[i].ParamType of
+      pt_sampler:
+      begin
+        Obj := Find(_Params[i].AsSampler.Source);
+        if (Obj is TColladaEffectProfileParam)
+        and (TColladaEffectProfileParam(Obj).ParamType = pt_surface) then
+        begin
+          _Params[i].AsSampler.Surface := TColladaEffectProfileParam(Obj).AsSurface;
+        end;
+      end;
+      pt_surface:
+      begin
+        _Params[i].AsSurface.Image := TColladaImage(Find(_Params[i].AsSurface.InitFrom));
+      end;
+    end;
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaEffectProfile.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'newparam' then
+    begin
+      specialize UArrAppend<TColladaEffectProfileParam>(
+        _Params, TColladaEffectProfileParam.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaEffectProfile.Destroy;
+begin
+  specialize UArrClear<TColladaEffectProfileParam>(_Params);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaEffect.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'profile_common' then
+    begin
+      _Profile := TColladaEffectProfile.Create(Node, Self);
+      Break;
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaEffect.Destroy;
+begin
+  FreeAndNil(_Profile);
+  inherited Destroy;
+end;
+
+procedure TUSceneDataDAE.TColladaInstanceEffect.ResolveLinks;
+  var Obj: TColladaObject;
+begin
+  inherited ResolveLinks;
+  Obj := Find(Url);
+  if Assigned(Obj) and (Obj is TColladaEffect) then
+  begin
+    _Effect := TColladaEffect(Obj);
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaInstanceEffect.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+begin
+  inherited Create(XMLNode, AParent);
+end;
+
+destructor TUSceneDataDAE.TColladaInstanceEffect.Destroy;
+begin
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaMaterial.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+begin
+  inherited Create(XMLNode, AParent);
+  Node := XMLNode.FindChild('instance_effect');
+  if Assigned(Node) then
+  begin
+    _InstanceEffect := TColladaInstanceEffect.Create(Node, Self);
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaMaterial.Destroy;
+begin
+  FreeAndNil(_InstanceEffect);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaGeometry.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'mesh' then
+    begin
+      specialize UArrAppend<TColladaMesh>(
+        _Meshes, TColladaMesh.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaGeometry.Destroy;
+begin
+  specialize UArrClear<TColladaMesh>(_Meshes);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaMorph.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+begin
+  inherited Create(XMLNode, AParent);
+end;
+
+destructor TUSceneDataDAE.TColladaMorph.Destroy;
+begin
+  inherited Destroy;
+end;
+
+function TUSceneDataDAE.TColladaJoints.FindInput(
+  const Semantic: String
+): TColladaInput;
+  var i: Int32;
+begin
+  for i := 0 to High(_Inputs) do
+  begin
+    if _Inputs[i].Semantic = Semantic then Exit(_Inputs[i]);
+  end;
+  Result := nil;
+end;
+
+procedure TUSceneDataDAE.TColladaJoints.ResolveLinks;
+  var InputJoints: TColladaInput;
+  var InputBinds: TColladaInput;
+  var SrcJoints: TColladaSource;
+  var SrcBinds: TColladaSource;
+  var i, JointCount: Int32;
+begin
+  inherited ResolveLinks;
+  InputJoints := FindInput('JOINT');
+  InputBinds := FindInput('INV_BIND_MATRIX');
+  if Assigned(InputJoints) and Assigned(InputBinds) then
+  begin
+    SrcJoints := TColladaSource(InputJoints.Source);
+    SrcBinds := TColladaSource(InputBinds.Source);
+    JointCount := SrcJoints.Accessor.Count;
+    SetLength(_Joints, JointCount);
+    for i := 0 to JointCount - 1 do
+    begin
+      _Joints[i].JointName := SrcJoints.DataArray.AsString[i];
+      _Joints[i].BindPose := LoadMatrix(SrcBinds, i);
+    end;
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaJoints.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'input' then
+    begin
+      specialize UArrAppend<TColladaInput>(
+        _Inputs, TColladaInput.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaJoints.Destroy;
+begin
+  specialize UArrClear<TColladaInput>(_Inputs);
+  inherited Destroy;
+end;
+
+function TUSceneDataDAE.TColladaVertexWeights.FindInput(
+  const Semantic: String
+): TColladaInput;
+  var i: Int32;
+begin
+  for i := 0 to High(_Inputs) do
+  begin
+    if _Inputs[i].Semantic = Semantic then Exit(_Inputs[i]);
+  end;
+  Result := nil;
+end;
+
+procedure TUSceneDataDAE.TColladaVertexWeights.ResolveLinks;
+  var InputIndex, InputWeight: TColladaInput;
+  var SrcWeight: TColladaSource;
+  var i, j, p: Int32;
+  var tw, w: TUFloat;
+begin
+  inherited ResolveLinks;
+  InputIndex := FindInput('JOINT');
+  InputWeight := FindInput('WEIGHT');
+  if not Assigned(InputIndex)
+  or not Assigned(InputWeight) then Exit;
+  SrcWeight := TColladaSource(InputWeight.Source);
+  p := 0;
+  for i := 0 to High(_VertexWeights) do
+  begin
+    tw := 0;
+    for j := 0 to High(_VertexWeights[i]) do
+    begin
+      w := SrcWeight.DataArray.AsFloat[_Indices[p + InputWeight.Offset]]^;
+      tw += w;
+      _VertexWeights[i][j].JointIndex := _Indices[p + InputIndex.Offset];
+      _VertexWeights[i][j].JointWeight := w;
+      Inc(p, 2);
+    end;
+    tw := 1 / tw;
+    for j := 0 to High(_VertexWeights[i]) do
+    with _VertexWeights[i][j] do
+    begin
+      JointWeight *= tw;
+    end;
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaVertexWeights.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName, Str: String;
+  var i, p, n, ic: Int32;
+begin
+  inherited Create(XMLNode, AParent);
+  _VCount := StrToIntDef(XMLNode.AttributeValue['count'], 0);
+  SetLength(_VertexWeights, _VCount);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'input' then
+    begin
+      specialize UArrAppend<TColladaInput>(
+        _Inputs, TColladaInput.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'vcount' then
+    begin
+      ic := 0;
+      Str := Node.Content;
+      p := 1;
+      for i := 0 to _VCount - 1 do
+      begin
+        n := StrToIntDef(FindNextValue(str, p), 0);
+        SetLength(_VertexWeights[i], n);
+        Inc(ic, n * 2);
+      end;
+    end;
+  end;
+  Node := XMLNode.FindChild('v');
+  if Assigned(Node) then
+  begin
+    SetLength(_Indices, ic);
+    Str := Node.Content;
+    p := 1;
+    for i := 0 to ic - 1 do
+    begin
+      _Indices[i] := StrToIntDef(FindNextValue(str, p), 0);
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaVertexWeights.Destroy;
+begin
+  specialize UArrClear<TColladaInput>(_Inputs);
+  inherited Destroy;
+end;
+
+procedure TUSceneDataDAE.TColladaSkin.ResolveLinks;
+  var Obj: TColladaObject;
+begin
+  inherited ResolveLinks;
+  Obj := Find(_GeometryRef);
+  if Assigned(Obj) and (Obj is TColladaGeometry) then
+  begin
+    _Geometry := TColladaGeometry(Obj);
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaSkin.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  _GeometryRef := XMLNode.AttributeValue['source'];
+  _BindShapeMatrix := TUMat.Identity;
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'bind_shape_matrix' then
+    begin
+      _BindShapeMatrix := LoadMatrix(Node);
+    end
+    else if NodeName = 'source' then
+    begin
+      specialize UArrAppend<TColladaSource>(
+        _Sources, TColladaSource.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'joints' then
+    begin
+      _Joints := TColladaJoints.Create(Node, Self);
+    end
+    else if NodeName = 'vertex_weights' then
+    begin
+      _VertexWeights := TColladaVertexWeights.Create(Node, Self);
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaSkin.Destroy;
+begin
+  FreeAndNil(_VertexWeights);
+  FreeAndNil(_Joints);
+  specialize UArrClear<TColladaSource>(_Sources);
+  inherited Destroy;
+end;
+
+function TUSceneDataDAE.TColladaController.GetAsSkin: TColladaSkin;
+begin
+  Result := TColladaSkin(_Controller);
+end;
+
+function TUSceneDataDAE.TColladaController.GetAsMorph: TColladaMorph;
+begin
+  Result := TColladaMorph(_Controller);
+end;
+
+constructor TUSceneDataDAE.TColladaController.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+begin
+  inherited Create(XMLNode, AParent);
+  _ControllerType := ct_invalid;
+  Node := XMLNode.FindChild('skin');
+  if Assigned(Node) then
+  begin
+    _ControllerType := ct_skin;
+    _Controller := TColladaSkin.Create(Node, Self);
+  end
+  else
+  begin
+    Node := XMLNode.FindChild('morph');
+    if Assigned(Node) then
+    begin
+      _ControllerType := ct_morph;
+      _Controller := TColladaMorph.Create(Node, Self);
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaController.Destroy;
+begin
+  inherited Destroy;
+end;
+
+function TUSceneDataDAE.TColladaAnimationSampler.GetKey(const Index: Int32): PKey;
+begin
+  Result := @_Keys[Index];
+end;
+
+function TUSceneDataDAE.TColladaAnimationSampler.GetKeyCount: Int32;
+begin
+  Result := Length(_Keys);
+end;
+
+function TUSceneDataDAE.TColladaAnimationSampler.FindKey(const Time: TUFloat): Int32;
+  var i: Int32;
+begin
+  for i := 0 to High(_Keys) do
+  if _Keys[i].Time <= Time then
+  begin
+    Exit(i);
+  end;
+  Result := High(_Keys);
+end;
+
+function TUSceneDataDAE.TColladaAnimationSampler.GetMaxTime: TUFloat;
+begin
+  if Length(_Keys) > 0 then Exit(_Keys[High(_Keys)].Time) else Result := 0;
+end;
+
+function TUSceneDataDAE.TColladaAnimationSampler.GetSampleSize: UInt32;
+begin
+  Result := _DataSize * _DataStride;
+end;
+
+procedure TUSceneDataDAE.TColladaAnimationSampler.ResolveLinks;
+  function FindInput(const Semantic: String): TColladaInput;
+    var i: Int32;
+  begin
+    for i := 0 to High(_Inputs) do
+    if _Inputs[i].Semantic = Semantic then
+    begin
+      Exit(_Inputs[i]);
+    end;
+    Exit(nil);
+  end;
+  var InputTime, InputValue, InputInterpolation, InputTangentIn, InputTangentOut: TColladaInput;
+  var src: TColladaSource;
+  var i, j, n: Int32;
+begin
+  InputTime := FindInput('INPUT');
+  InputValue := FindInput('OUTPUT');
+  InputInterpolation := FindInput('INTERPOLATION');
+  InputTangentIn := FindInput('IN_TANGENT');
+  InputTangentOut := FindInput('OUT_TANGENT');
+  if (Assigned(InputTime))
+  or (Assigned(InputValue)) then
+  begin
+    src := TColladaSource(InputValue.Source);
+    GetMemory(_Data, src.Accessor.Count * src.Accessor.Stride * src.DataArray.ItemSize);
+    _DataType := src.DataArray.ArrayType;
+    _DataStride := src.Accessor.Stride;
+    _DataSize := src.DataArray.ItemSize;
+    SetLength(_Keys, TColladaSource(InputTime.Source).Accessor.Count);
+    for i := 0 to High(_Keys) do
+    begin
+      src := TColladaSource(InputTime.Source);
+      _Keys[i].Time := src.DataArray.AsFloat[src.Accessor.Stride * i]^;
+      src := TColladaSource(InputValue.Source);
+      n := i * src.Accessor.Stride * src.DataArray.ItemSize;
+      _Keys[i].Value := _Data + n;
+      Move(src.DataArray.RawData[n]^, _Keys[i].Value^, src.Accessor.Stride * src.DataArray.ItemSize);
+      if Assigned(InputInterpolation) then
+      begin
+        src := TColladaSource(InputInterpolation.Source);
+        if src.DataArray.AsString[i] = 'STEP' then
+        begin
+          _Keys[i].Interpolation := ai_step;
+        end
+        else if src.DataArray.AsString[i] = 'BEZIER' then
+        begin
+          if Assigned(InputTangentIn)
+          and Assigned(InputTangentOut) then
+          begin
+            src := TColladaSource(InputTangentIn.Source);
+            SetLength(_Keys[i].TangentIn, src.Accessor.Stride);
+            for j := 0 to src.Accessor.Stride - 1 do
+            begin
+              _Keys[i].TangentIn[j] := src.DataArray.AsFloat[i * src.Accessor.Stride + j]^;
+            end;
+            src := TColladaSource(InputTangentOut.Source);
+            SetLength(_Keys[i].TangentOut, src.Accessor.Stride);
+            for j := 0 to src.Accessor.Stride - 1 do
+            begin
+              _Keys[i].TangentOut[j] := src.DataArray.AsFloat[i * src.Accessor.Stride + j]^;
+            end;
+            _Keys[i].Interpolation := ai_bezier;
+          end
+          else
+          begin
+            _Keys[i].Interpolation := ai_linear;
+          end;
+        end
+        else
+        begin
+          _Keys[i].Interpolation := ai_linear;
+        end;
+      end
+      else
+      begin
+        _Keys[i].Interpolation := ai_linear;
+      end;
+    end;
+  end;
+end;
+
+procedure TUSceneDataDAE.TColladaAnimationSampler.DumpData;
+  //var i, j: TVkInt32;
+  //var val_str: AnsiString;
+begin
+  inherited DumpData;
+  (*
+  if _DataType <> at_float then Exit;
+  LabLog('Keys[' + IntToStr(Length(_Keys)) + '] {', 2);
+  for i := 0 to High(_Keys) do
+  begin
+    val_str := '{';
+    for j := 0 to _DataStride - 1 do
+    begin
+      val_str += ' ' + FormatFloat('0.###', PLabFloatArr(_Keys[i].Value)^[j]);
+      if j < _DataStride - 1 then val_str += ',';
+    end;
+    val_str += ' }';
+    LabLog('Time = ' + FormatFloat('0.###', _Keys[i].Time) + '; Value = ' + val_str);
+  end;
+  LabLog('}', -2);
+  //*)
+end;
+
+procedure TUSceneDataDAE.TColladaAnimationSampler.SampleData(
+  const Output: Pointer;
+  const Time: TUFloat;
+  const Loop: Boolean
+);
+  var InFloat0, InFloat1: PUFloat;
+  var OutFloat: PUFloat;
+  var k0, k1, i: Int32;
+  var t, dt: TUFloat;
+begin
+  if _DataType = at_float then
+  begin
+    if not Loop then
+    begin
+      if Time <= _Keys[0].Time then
+      begin
+        Move(_Keys[0].Value^, Output^, _DataSize * _DataStride);
+        Exit;
+      end;
+      if Time >= _Keys[High(_Keys)].Time then
+      begin
+        Move(_Keys[High(_Keys)].Value^, Output^, _DataSize * _DataStride);
+        Exit;
+      end;
+    end;
+    k0 := FindKey(Time);
+    k1 := (k0 + 1) mod Length(_Keys);
+    OutFloat := PUFloat(Output);
+    InFloat0 := PUFloat(_Keys[k0].Value);
+    InFloat1 := PUFloat(_Keys[k1].Value);
+    t := Time mod _Keys[High(_Keys)].Time;
+    if k1 < k0 then dt := 1 / _Keys[0].Time else dt := 1 / (_Keys[k1].Time - _Keys[k0].Time);
+    t := t * dt;
+    case _Keys[k0].Interpolation of
+      ai_step:
+      begin
+        for i := 0 to _DataStride - 1 do
+        begin
+          OutFloat^ := InFloat0^;
+          Inc(OutFloat); Inc(InFloat0);
+        end;
+      end;
+      ai_linear:
+      begin
+        for i := 0 to _DataStride - 1 do
+        begin
+          OutFloat^ := ULerp(InFloat0^, InFloat1^, t);
+          Inc(OutFloat); Inc(InFloat0); Inc(InFloat1);
+        end;
+      end;
+      ai_bezier:
+      begin
+        for i := 0 to _DataStride - 1 do
+        begin
+          OutFloat^ := UBezier(
+            InFloat0^,
+            _Keys[k0].TangentOut[i],
+            _Keys[k0].TangentIn[i],
+            InFloat1^,
+            t
+          );
+          Inc(OutFloat); Inc(InFloat0); Inc(InFloat1);
+        end;
+      end;
+    end;
+  end;
+end;
+
+function TUSceneDataDAE.TColladaAnimationSampler.SampleAsFloat(
+  const Time: TUFloat; const Loop: Boolean
+): TUFloat;
+begin
+  SampleData(@Result, Time, Loop);
+end;
+
+function TUSceneDataDAE.TColladaAnimationSampler.SampleAsFloat2(
+  const Time: TUFloat; const Loop: Boolean): TUVec2;
+begin
+  SampleData(@Result, Time, Loop);
+end;
+
+function TUSceneDataDAE.TColladaAnimationSampler.SampleAsFloat3(
+  const Time: TUFloat; const Loop: Boolean): TUVec3;
+begin
+  SampleData(@Result, Time, Loop);
+end;
+
+function TUSceneDataDAE.TColladaAnimationSampler.SampleAsFloat4(
+  const Time: TUFloat; const Loop: Boolean): TUVec4;
+begin
+  SampleData(@Result, Time, Loop);
+end;
+
+function TUSceneDataDAE.TColladaAnimationSampler.SampleAsMatrix(
+  const Time: TUFloat; const Loop: Boolean): TUMat;
+begin
+  SampleData(@Result, Time, Loop);
+end;
+
+constructor TUSceneDataDAE.TColladaAnimationSampler.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'input' then
+    begin
+      specialize UArrAppend<TColladaInput>(
+        _Inputs, TColladaInput.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaAnimationSampler.Destroy;
+begin
+  if Assigned(_Data) then FreeMemory(_Data);
+  specialize UArrClear<TColladaInput>(_Inputs);
+  inherited Destroy;
+end;
+
+function TUSceneDataDAE.TColladaAnimationChannel.GetMaxTime: TUFloat;
+begin
+  if Assigned(_Sampler) then Exit(_Sampler.MaxTime) else Result := 0;
+end;
+
+procedure TUSceneDataDAE.TColladaAnimationChannel.ResolveLinks;
+  var Obj: TColladaObject;
+begin
+  inherited ResolveLinks;
+  Obj := Find(_SourceRef);
+  if Assigned(Obj)
+  and (Obj is TColladaAnimationSampler) then
+  begin
+    _Sampler := TColladaAnimationSampler(Obj);
+  end;
+  _Target := Find(_TargetRef);
+end;
+
+constructor TUSceneDataDAE.TColladaAnimationChannel.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var TargetObject, TargetProp: String;
+  var i: Int32;
+begin
+  inherited Create(XMLNode, AParent);
+  _SourceRef := XMLNode.AttributeValue['source'];
+  _TargetRef := XMLNode.AttributeValue['target'];
+  TargetObject := _TargetRef;
+  for i := Length(TargetObject) downto 1 do
+  if _TargetRef[i] = '/' then
+  begin
+    Delete(TargetObject, i, Length(_TargetRef) - i + 1);
+    Break;
+  end;
+  TargetProp := _TargetRef;
+  Delete(TargetProp, 1, Length(TargetObject) + 1);
+  _TargetRef := TargetObject;
+  _TargetProperty := TargetProp;
+end;
+
+destructor TUSceneDataDAE.TColladaAnimationChannel.Destroy;
+begin
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaAnimation.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'animation' then
+    begin
+      specialize UArrAppend<TColladaAnimation>(
+        _Animations, TColladaAnimation.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'source' then
+    begin
+      specialize UArrAppend<TColladaSource>(
+        _Sources, TColladaSource.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'sampler' then
+    begin
+      specialize UArrAppend<TColladaAnimationSampler>(
+        _Samplers, TColladaAnimationSampler.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'channel' then
+    begin
+      specialize UArrAppend<TColladaAnimationChannel>(
+        _Channels, TColladaAnimationChannel.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaAnimation.Destroy;
+begin
+  specialize UArrClear<TColladaAnimationChannel>(_Channels);
+  specialize UArrClear<TColladaAnimationSampler>(_Samplers);
+  specialize UArrClear<TColladaSource>(_Sources);
+  specialize UArrClear<TColladaAnimation>(_Animations);
+end;
+
+constructor TUSceneDataDAE.TColladaCamera.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node, SubNode: TUXML;
+begin
+  inherited Create(XMLNode, AParent);
+  _FOV := 60 * UDegToRad;
+  _Aspect := 1;
+  _Near := 0.1;
+  _Far := 100;
+  Node := XMLNode.FindChild('optics');
+  if Assigned(Node) then Node := Node.FindChild('technique_common');
+  if Assigned(Node) then Node := Node.FindChild('perspective');
+  if Assigned(Node) then
+  begin
+    SubNode := Node.FindChild('xfov');
+    if Assigned(SubNode) then _FOV := StrToFloatDef(SubNode.Content, 60) * UDegToRad;
+    SubNode := Node.FindChild('aspect_ratio');
+    if Assigned(SubNode) then _Aspect := StrToFloatDef(SubNode.Content, 1);
+    SubNode := Node.FindChild('znear');
+    if Assigned(SubNode) then _Near := StrToFloatDef(SubNode.Content, 0.1);
+    SubNode := Node.FindChild('zfar');
+    if Assigned(SubNode) then _Far := StrToFloatDef(SubNode.Content, 100);
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaCamera.Destroy;
+begin
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaLight.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node, NodeLight, NodeParams: TUXML;
+  var NodeName: String;
+  var NodeValue: TUStrArr;
+  var i: Int32;
+begin
+  inherited Create(XMLNode, AParent);
+  _LightType := lt_ambient;
+  _Color := TUVec3.Make(1);
+  _AttenuationConstant := 1;
+  _AttenuationLinear := 0;
+  _AttenuationQuadratic := 0;
+  _FalloffAngle := UPi;
+  _FalloffExponent := 0;
+  Node := XMLNode.FindChild('technique_common');
+  for NodeLight in Node do
+  begin
+    NodeName := LowerCase(NodeLight.Name);
+    if NodeName = 'ambient' then
+    begin
+      _LightType := lt_ambient;
+    end
+    else if NodeName = 'directional' then
+    begin
+      _LightType := lt_directional;
+    end
+    else if NodeName = 'point' then
+    begin
+      _LightType := lt_point;
+    end
+    else if NodeName = 'spot' then
+    begin
+      _LightType := lt_spot;
+    end;
+    for NodeParams in NodeLight do
+    begin
+      NodeName := LowerCase(NodeParams.Name);
+      if NodeName = 'color' then
+      begin
+        NodeValue := UStrExplode(NodeParams.Content, ' ');
+        for i := 0 to specialize UMin<Int32>(2, High(NodeValue)) do
+        begin
+          _Color[i] := StrToFloatDef(NodeValue[i], 0);
+        end;
+      end
+      else if NodeName = 'constant_attenuation' then
+      begin
+        _AttenuationConstant := StrToFloatDef(NodeParams.Content, 1);
+      end
+      else if NodeName = 'linear_attenuation' then
+      begin
+        _AttenuationLinear := StrToFloatDef(NodeParams.Content, 0);
+      end
+      else if NodeName = 'quadratic_attenuation' then
+      begin
+        _AttenuationQuadratic := StrToFloatDef(NodeParams.Content, 0);
+      end
+      else if NodeName = 'falloff_angle' then
+      begin
+        _FalloffAngle := StrToFloatDef(NodeParams.Content, 180) * UDegToRad;
+      end
+      else if NodeName = 'falloff_exponent' then
+      begin
+        _FalloffExponent := StrToFloatDef(NodeParams.Content, 0);
+      end;
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaLight.Destroy;
+begin
+  inherited Destroy;
+end;
+
+procedure TUSceneDataDAE.TColladaInstanceMaterial.ResolveLinks;
+  var Obj: TColladaObject;
+begin
+  inherited ResolveLinks;
+  Obj := Find(_Target);
+  if Assigned(Obj) and (Obj is TColladaMaterial) then
+  begin
+    _Material := TColladaMaterial(Obj);
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaInstanceMaterial.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+begin
+  inherited Create(XMLNode, AParent);
+  _Symbol := XMLNode.AttributeValue['symbol'];
+  _Target := XMLNode.AttributeValue['target'];
+end;
+
+destructor TUSceneDataDAE.TColladaInstanceMaterial.Destroy;
+begin
+  inherited Destroy;
+end;
+
+procedure TUSceneDataDAE.TColladaInstanceGeometry.ResolveLinks;
+  var Obj: TColladaObject;
+begin
+  inherited ResolveLinks;
+  Obj := Find(Url);
+  if Assigned(Obj) and (Obj is TColladaGeometry) then
+  begin
+    _Geometry := TColladaGeometry(Obj);
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaInstanceGeometry.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node, NodeInstMat: TUXML;
+begin
+  inherited Create(XMLNode, AParent);
+  Node := XMLNode.FindChild('bind_material');
+  if Assigned(Node) then
+  begin
+    Node := Node.FindChild('technique_common');
+    if Assigned(Node) then
+    begin
+      for NodeInstMat in Node do
+      if LowerCase(NodeInstMat.Name) = 'instance_material' then
+      begin
+        specialize UArrAppend<TColladaInstanceMaterial>(
+          _MaterialBindings, TColladaInstanceMaterial.Create(NodeInstMat, Self)
+        );
+      end;
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaInstanceGeometry.Destroy;
+begin
+  specialize UArrClear<TColladaInstanceMaterial>(_MaterialBindings);
+  inherited Destroy;
+end;
+
+procedure TUSceneDataDAE.TColladaInstanceController.ResolveLinks;
+  var Obj: TColladaObject;
+begin
+  inherited ResolveLinks;
+  Obj := Find(Url);
+  if Assigned(Obj) and (Obj is TColladaController) then
+  begin
+    _Controller := TColladaController(Obj);
+  end;
+  Obj := Find(_SkeletonRef);
+  if Assigned(Obj) and (Obj is TColladaNode) then
+  begin
+    _Skeleton := TColladaNode(Obj);
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaInstanceController.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node, NodeTech, NodeInstMat: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'skeleton' then
+    begin
+      _SkeletonRef := Node.Content;
+    end
+    else if NodeName = 'bind_material' then
+    begin
+      NodeTech := Node.FindChild('technique_common');
+      if Assigned(NodeTech) then
+      begin
+        for NodeInstMat in NodeTech do
+        if LowerCase(NodeInstMat.Name) = 'instance_material' then
+        begin
+          specialize UArrAppend<TColladaInstanceMaterial>(
+            _MaterialBindings, TColladaInstanceMaterial.Create(NodeInstMat, Self)
+          );
+        end;
+      end;
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaInstanceController.Destroy;
+begin
+  specialize UArrClear<TColladaInstanceMaterial>(_MaterialBindings);
+  inherited Destroy;
+end;
+
+procedure TUSceneDataDAE.TColladaInstanceCamera.ResolveLinks;
+  var Obj: TColladaObject;
+begin
+  Obj := Find(Url);
+  if Assigned(Obj) and (Obj is TColladaCamera) then
+  begin
+    _Camera := TColladaCamera(Obj);
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaInstanceCamera.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+begin
+  inherited Create(XMLNode, AParent);
+end;
+
+destructor TUSceneDataDAE.TColladaInstanceCamera.Destroy;
+begin
+  inherited Destroy;
+end;
+
+procedure TUSceneDataDAE.TColladaInstanceLight.ResolveLinks;
+  var Obj: TColladaObject;
+begin
+  Obj := Find(Url);
+  if Assigned(Obj) and (Obj is TColladaLight) then
+  begin
+    _Light := TColladaLight(Obj);
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaInstanceLight.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+begin
+  inherited Create(XMLNode, AParent);
+end;
+
+destructor TUSceneDataDAE.TColladaInstanceLight.Destroy;
+begin
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaVisualScene.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'node' then
+    begin
+      specialize UArrAppend<TColladaNode>(
+        _Nodes, TColladaNode.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaVisualScene.Destroy;
+begin
+  specialize UArrClear<TColladaNode>(_Nodes);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaLibraryAnimations.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'animation' then
+    begin
+      specialize UArrAppend<TColladaAnimation>(
+        _Animations, TColladaAnimation.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaLibraryAnimations.Destroy;
+begin
+  specialize UArrClear<TColladaAnimation>(_Animations);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaLibraryMaterials.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'material' then
+    begin
+      specialize UArrAppend<TColladaMaterial>(
+        _Materials, TColladaMaterial.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaLibraryMaterials.Destroy;
+begin
+  specialize UArrClear<TColladaMaterial>(_Materials);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaLibraryEffects.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'effect' then
+    begin
+      specialize UArrAppend<TColladaEffect>(
+        _Effects, TColladaEffect.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaLibraryEffects.Destroy;
+begin
+  specialize UArrClear<TColladaEffect>(_Effects);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaLibraryImages.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'image' then
+    begin
+      specialize UArrAppend<TColladaImage>(
+        _Images, TColladaImage.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaLibraryImages.Destroy;
+begin
+  specialize UArrClear<TColladaImage>(_Images);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaLibraryGeometries.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'geometry' then
+    begin
+      specialize UArrAppend<TColladaGeometry>(
+        _Geometries, TColladaGeometry.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaLibraryGeometries.Destroy;
+begin
+  specialize UArrClear<TColladaGeometry>(_Geometries);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaLibraryControllers.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'controller' then
+    begin
+      specialize UArrAppend<TColladaController>(
+        _Controllers, TColladaController.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaLibraryControllers.Destroy;
+begin
+  specialize UArrClear<TColladaController>(_Controllers);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaLibraryCameras.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'camera' then
+    begin
+      specialize UArrAppend<TColladaCamera>(
+        _Cameras, TColladaCamera.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaLibraryCameras.Destroy;
+begin
+  specialize UArrClear<TColladaCamera>(_Cameras);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaLibraryLights.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'light' then
+    begin
+      specialize UArrAppend<TColladaLight>(
+        _Lights, TColladaLight.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaLibraryLights.Destroy;
+begin
+  specialize UArrClear<TColladaLight>(_Lights);
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaLibraryVisualScenes.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'visual_scene' then
+    begin
+      specialize UArrAppend<TColladaVisualScene>(
+        _VisualScenes, TColladaVisualScene.Create(Node, Self)
+      );
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaLibraryVisualScenes.Destroy;
+begin
+  specialize UArrClear<TColladaVisualScene>(_VisualScenes);
+  inherited Destroy;
+end;
+
+procedure TUSceneDataDAE.TColladaInstanceVisualScene.ResolveLinks;
+  var Obj: TColladaObject;
+begin
+  inherited ResolveLinks;
+  Obj := Find(Url);
+  if Assigned(Obj) and (Obj is TColladaVisualScene) then
+  begin
+    _VisualScene := TColladaVisualScene(Obj);
+  end;
+end;
+
+constructor TUSceneDataDAE.TColladaInstanceVisualScene.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+begin
+  inherited Create(XMLNode, AParent);
+end;
+
+destructor TUSceneDataDAE.TColladaInstanceVisualScene.Destroy;
+begin
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaScene.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+begin
+  inherited Create(XMLNode, AParent);
+  Node := XMLNode.FindChild('instance_visual_scene');
+  if Assigned(Node) then
+  begin
+    _VisualScene := TColladaInstanceVisualScene.Create(Node, Self);
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaScene.Destroy;
+begin
+  if Assigned(_VisualScene) then
+  begin
+    FreeAndNil(_VisualScene);
+  end;
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaAsset.Create(
+  const XMLNode: TUXML;
+  const AParent: TColladaObject
+);
+  var Node: TUXML;
+  var Str: String;
+begin
+  inherited Create(XMLNode, AParent);
+  _UpAxis.SetIdentity;
+  Node := XMLNode.FindChild('up_axis');
+  if Assigned(Node) then
+  begin
+    Str := LowerCase(Node.Content);
+    if Str = 'x_up' then
+    begin
+      _UpAxis.SetValue(1, 0);
+    end
+    else if Str = 'z_up' then
+    begin
+      _UpAxis.SetValue(0, 2, 1);
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaAsset.Destroy;
+begin
+  inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TColladaRoot.Create(const XMLNode: TUXML);
+  var Node: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, nil);
+  Node := XMLNode.FindChild('asset');
+  if Assigned(Node) then
+  begin
+    _Asset := TColladaAsset.Create(Node, Self);
+  end;
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'library_cameras' then
+    begin
+      //_LibCameras := TLabColladaLibraryCameras.Create(CurNode, Self);
+    end
+    else if NodeName = 'library_lights' then
+    begin
+      //_LibLights := TLabColladaLibraryLights.Create(CurNode, Self);
+    end
+    else if NodeName = 'library_images' then
+    begin
+      //_LibImages := TLabColladaLibraryImages.Create(CurNode, Self);
+    end
+    else if NodeName = 'library_effects' then
+    begin
+      //_LibEffects := TLabColladaLibraryEffects.Create(CurNode, Self);
+    end
+    else if NodeName = 'library_materials' then
+    begin
+      //_LibMaterials := TLabColladaLibraryMaterials.Create(CurNode, Self);
+    end
+    else if NodeName = 'library_geometries' then
+    begin
+      //_LibGeometries := TLabColladaLibraryGeometries.Create(CurNode, Self);
+    end
+    else if NodeName = 'library_controllers' then
+    begin
+      //_LibControllers := TLabColladaLibraryControllers.Create(CurNode, Self);
+    end
+    else if NodeName = 'library_animations' then
+    begin
+      //_LibAnimations := TLabColladaLibraryAnimations.Create(CurNode, Self);
+    end
+    else if NodeName = 'library_visual_scenes' then
+    begin
+      //_LibVisualScenes := TLabColladaLibraryVisualScenes.Create(CurNode, Self);
+    end
+    else if NodeName = 'scene' then
+    begin
+      //_Scene := TLabColladaScene.Create(CurNode, Self);
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaRoot.Destroy;
+begin
+  inherited Destroy;
+end;
+
+class function TUSceneDataDAE.FindNextValue(
+  const Str: String; var CurPos: Int32
+): String;
+begin
+  Result := '';
+  while (
+    (CurPos <= Length(Str)) and (
+      (Str[CurPos] = ' ')
+      or (Str[CurPos] = #$D)
+      or (Str[CurPos] = #$A)
+    )
+  ) do Inc(CurPos);
+  while CurPos <= Length(Str) do
+  begin
+    if (
+      (Str[CurPos] = ' ')
+      or (Str[CurPos] = #$D)
+      or (Str[CurPos] = #$A)
+    ) then Break
+    else
+    begin
+      Result += Str[CurPos];
+      Inc(CurPos);
+    end;
+  end;
+end;
+
+class function TUSceneDataDAE.LoadMatrix(
+  const Node: TUXML
+): TUMat;
+  var Data: String;
+  var x, y, p: Int32;
+begin
+  Data := Node.Content;
+  p := 1;
+  for y := 0 to 3 do
+  for x := 0 to 3 do
+  begin
+    Result[x, y] := StrToFloatDef(FindNextValue(Data, p), 0);
+  end;
+end;
+
+class function TUSceneDataDAE.LoadMatrix(
+  const Src: TColladaSource;
+  const Index: Int32
+): TUMat;
+  var i, x, y: Int32;
+begin
+  i := Index * Src.Accessor.Stride;
+  for y := 0 to 3 do
+  for x := 0 to 3 do
+  begin
+    Result[x, y] := Src.DataArray.AsFloat[i]^;
+    Inc(i);
+  end;
+end;
+
+procedure TUSceneDataDAE.Read(const XML: TUXML);
+begin
+  if LowerCase(XML.Name) <> 'collada' then Exit;
+  if Assigned(_Root) then FreeAndNil(_Root);
+  _Root := TColladaRoot.Create(XML);
+  _Root.Resolve;
+  _Root.Initialize;
+end;
+
+class function TUSceneDataDAE.CanLoad(const StreamHelper: TUStreamHelper): Boolean;
+  var xml: TUXML;
+begin
+  xml := TUXML.Load(StreamHelper.ToString);
+  try
+    if LowerCase(xml.Name) <> 'collada' then Exit(False);
+    Result := True;
+  finally
+    xml.Free;
+  end;
+end;
+
+procedure TUSceneDataDAE.Load(const StreamHelper: TUStreamHelper);
+  var xml: TUXML;
+begin
+  xml := TUXML.Load(StreamHelper.ToString);
+  try
+    Read(xml);
+  finally
+    xml.Free;
+  end;
+end;
+
+constructor TUSceneDataDAE.Create;
+begin
+  inherited Create;
+end;
+
+destructor TUSceneDataDAE.Destroy;
+begin
+  if Assigned(_Root) then FreeAndNil(_Root);
+  inherited Destroy;
+end;
+
+// TUSceneDataDAE end
 
 end.

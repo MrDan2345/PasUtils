@@ -125,6 +125,7 @@ type
     class function View(const Origin, Target, Up: TUVec3): TUMat; static; inline;
     class function Proj(const FoV, Aspect, ZNear, ZFar: TUFloat): TUMat; static; inline;
     class function Orth(const Width, Height, ZNear, ZFar: TUFloat): TUMat; static; inline;
+    class function Skew(const Amount, Axis: TUVec3; const Angle: TUFloat): TUMat; static; inline;
     class function Inverse(const m: TUMat): TUMat; static; overload;
     procedure SetValue(
       const e00, e10, e20, e30: TUFloat;
@@ -908,6 +909,8 @@ operator - (const v: TUVec4): TUVec4;
 operator + (const m0, m1: TUMat): TUMat;
 operator - (const m0, m1: TUMat): TUMat;
 operator * (const m0, m1: TUMat): TUMat;
+operator mod (const a, b: TUDouble): TUDouble;
+operator mod (const a, b: TUFloat): TUFloat;
 
 const
   tt_any = [tt_error, tt_eof, tt_symbol, tt_word, tt_keyword, tt_string, tt_number];
@@ -1226,6 +1229,27 @@ begin
     2 / Width, 0, 0, 0,
     0, 2 / Height, 0, 0,
     0, 0, RcpD, -ZNear * RcpD,
+    0, 0, 0, 1
+  );
+end;
+
+class function TUMatImpl.Skew(const Amount, Axis: TUVec3; const Angle: TUFloat): TUMat;
+  var vr: TUVec3;
+  var s, c, cr, xs, ys, zs, crxy, crxz, cryz: TUFloat;
+begin
+  vr := Axis.Norm;
+  USinCos(Angle, s, c);
+  cr := 1 - c;
+  xs := vr.x * s;
+  ys := vr.y * s;
+  zs := vr.z * s;
+  crxy := cr * vr.x * vr.y;
+  crxz := cr * vr.x * vr.z;
+  cryz := cr * vr.y * vr.z;
+  Result := TUMat.Make(
+    ULerp(1, cr * Axis.x * Axis.x + c, Amount.x), ULerp(1, -zs + crxy, Amount.y), ULerp(1, ys + crxz, Amount.z), 0,
+    ULerp(1, zs + crxy, Amount.x), ULerp(1, cr * Axis.y * Axis.y + c, Amount.y), ULerp(1, -xs + cryz, Amount.z), 0,
+    ULerp(1, -ys + crxz, Amount.x), ULerp(1, xs + cryz, Amount.y), ULerp(1, cr * Axis.z * Axis.z + c, Amount.z), 0,
     0, 0, 0, 1
   );
 end;
@@ -5436,6 +5460,16 @@ end;
 operator * (const m0, m1: TUMat): TUMat;
 begin
   Result := UMulMat(m0, m1);
+end;
+
+operator mod (const a, b: TUDouble): TUDouble;
+begin
+  Result := a - b * Int(a / b);
+end;
+
+operator mod (const a, b: TUFloat): TUFloat;
+begin
+  Result := a - b * Int(a / b);
 end;
 
 function UStrExplode(const Str: String; const Separator: String): TUStrArr;
