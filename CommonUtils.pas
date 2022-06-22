@@ -793,13 +793,62 @@ procedure UFinalizeVarRecArr(var arr: array of TVarRec);
 function UIntToBool(const i: Integer): Boolean;
 function UBoolToInt(const b: Boolean): Integer;
 function UBoolToStr(const b: Boolean): String;
-generic function UMin<T>(const a, b: T): T; inline;
-{$define UMinFloat := specialize UMinFloat<TUFloat>}
-{$define UMinInt8 := specialize UMinFloat<Int8>}
-{$define UMinInt16 := specialize UMinFloat<Int16>}
-{$define UMinInt32 := specialize UMinFloat<Int32>}
-{$define UMinInt64 := specialize UMinFloat<int64>}
-generic function UMax<T>(const a, b: T): T; inline;
+generic function UMin<T>(const a, b: T): T; inline; overload;
+function UMin(const a, b: Int8): Int8; inline; overload;
+function UMin(const a, b: Int16): Int16; inline; overload;
+function UMin(const a, b: Int32): Int32; inline; overload;
+function UMin(const a, b: Int64): Int64; inline; overload;
+function UMin(const a, b: UInt8): UInt8; inline; overload;
+function UMin(const a, b: UInt16): UInt16; inline; overload;
+function UMin(const a, b: UInt32): UInt32; inline; overload;
+function UMin(const a, b: UInt64): UInt64; inline; overload;
+function UMin(const a, b: TUFloat): TUFloat; inline; overload;
+function UMin(const a, b: TUDouble): TUDouble; inline; overload;
+function UMin(const a, b: TUVec2): TUVec2; inline; overload;
+function UMin(const a, b: TUVec3): TUVec3; inline; overload;
+function UMin(const a, b: TUVec4): TUVec4; inline; overload;
+generic function UMax<T>(const a, b: T): T; inline; overload;
+function UMax(const a, b: Int8): Int8; inline; overload;
+function UMax(const a, b: Int16): Int16; inline; overload;
+function UMax(const a, b: Int32): Int32; inline; overload;
+function UMax(const a, b: Int64): Int64; inline; overload;
+function UMax(const a, b: UInt8): UInt8; inline; overload;
+function UMax(const a, b: UInt16): UInt16; inline; overload;
+function UMax(const a, b: UInt32): UInt32; inline; overload;
+function UMax(const a, b: UInt64): UInt64; inline; overload;
+function UMax(const a, b: TUFloat): TUFloat; inline; overload;
+function UMax(const a, b: TUDouble): TUDouble; inline; overload;
+function UMax(const a, b: TUVec2): TUVec2; inline; overload;
+function UMax(const a, b: TUVec3): TUVec3; inline; overload;
+function UMax(const a, b: TUVec4): TUVec4; inline; overload;
+generic function UClamp<T>(const v, MinV, MaxV: T): T; inline; overload;
+function UClamp(const v, MinV, MaxV: Int8): Int8; inline; overload;
+function UClamp(const v, MinV, MaxV: Int16): Int16; inline; overload;
+function UClamp(const v, MinV, MaxV: Int32): Int32; inline; overload;
+function UClamp(const v, MinV, MaxV: Int64): Int64; inline; overload;
+function UClamp(const v, MinV, MaxV: UInt8): UInt8; inline; overload;
+function UClamp(const v, MinV, MaxV: UInt16): UInt16; inline; overload;
+function UClamp(const v, MinV, MaxV: UInt32): UInt32; inline; overload;
+function UClamp(const v, MinV, MaxV: UInt64): UInt64; inline; overload;
+function UClamp(const v, MinV, MaxV: TUFloat): TUFloat; inline; overload;
+function UClamp(const v, MinV, MaxV: TUDouble): TUDouble; inline; overload;
+function UClamp(const v, MinV, MaxV: TUVec2): TUVec2; inline; overload;
+function UClamp(const v, MinV, MaxV: TUVec3): TUVec3; inline; overload;
+function UClamp(const v, MinV, MaxV: TUVec4): TUVec4; inline; overload;
+function ULerp(const a, b, s: TUFloat): TUFloat; inline;
+function USmoothStep(const v, MinV, MaxV: TUFloat): TUFloat; inline;
+generic function UBezier<T>(const f0, f1, f2, f3: T; const s: TUFloat): T; inline; overload;
+function UBezier(const v0, v1, v2, v3: TUFloat; const s: TUFloat): TUFloat; inline; overload;
+function UBezier(const v0, v1, v2, v3: TUDouble; const s: TUFloat): TUDouble; inline; overload;
+function UBezier(const v0, v1, v2, v3: TUVec2; const s: TUFloat): TUVec2; inline; overload;
+function UBezier(const v0, v1, v2, v3: TUVec3; const s: TUFloat): TUVec3; inline; overload;
+function UBezier(const v0, v1, v2, v3: TUVec4; const s: TUFloat): TUVec4; inline; overload;
+generic function UCatmullRom<T>(const v0, v1, v2, v3: T; const s: TUFloat): T; inline; overload;
+function UCatmullRom(const v0, v1, v2, v3: TUFloat; const s: TUFloat): TUFloat; inline; overload;
+function UCatmullRom(const v0, v1, v2, v3: TUDouble; const s: TUFloat): TUDouble; inline; overload;
+function UCatmullRom(const v0, v1, v2, v3: TUVec2; const s: TUFloat): TUVec2; inline; overload;
+function UCatmullRom(const v0, v1, v2, v3: TUVec3; const s: TUFloat): TUVec3; inline; overload;
+function UCatmullRom(const v0, v1, v2, v3: TUVec4; const s: TUFloat): TUVec4; inline; overload;
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
 generic function USelect<T>(const Cond: Boolean; constref IfTrue: T; constref IfFalse: T): T; inline;
 
@@ -839,16 +888,22 @@ operator + (const v0, v1: TUVec2): TUVec2;
 operator - (const v0, v1: TUVec2): TUVec2;
 operator * (const v0, v1: TUVec2): TUVec2;
 operator / (const v0, v1: TUVec2): TUVec2;
+operator * (const v: TUVec2; const f: TUFloat): TUVec2;
+operator * (const f: TUFloat; const v: TUVec2): TUVec2;
 operator - (const v: TUVec2): TUVec2;
 operator + (const v0, v1: TUVec3): TUVec3;
 operator - (const v0, v1: TUVec3): TUVec3;
 operator * (const v0, v1: TUVec3): TUVec3;
 operator / (const v0, v1: TUVec3): TUVec3;
+operator * (const v: TUVec3; const f: TUFloat): TUVec3;
+operator * (const f: TUFloat; const v: TUVec3): TUVec3;
 operator - (const v: TUVec3): TUVec3;
 operator + (const v0, v1: TUVec4): TUVec4;
 operator - (const v0, v1: TUVec4): TUVec4;
 operator * (const v0, v1: TUVec4): TUVec4;
 operator / (const v0, v1: TUVec4): TUVec4;
+operator * (const v: TUVec4; const f: TUFloat): TUVec4;
+operator * (const f: TUFloat; const v: TUVec4): TUVec4;
 operator - (const v: TUVec4): TUVec4;
 operator + (const m0, m1: TUMat): TUMat;
 operator - (const m0, m1: TUMat): TUMat;
@@ -4671,9 +4726,296 @@ begin
   if a < b then Exit(a) else Exit(b);
 end;
 
+function UMin(const a, b: Int8): Int8;
+begin
+  Result := specialize UMin<Int8>(a, b);
+end;
+
+function UMin(const a, b: Int16): Int16;
+begin
+  Result := specialize UMin<Int16>(a, b);
+end;
+
+function UMin(const a, b: Int32): Int32;
+begin
+  Result := specialize UMin<Int32>(a, b);
+end;
+
+function UMin(const a, b: Int64): Int64;
+begin
+  Result := specialize UMin<Int64>(a, b);
+end;
+
+function UMin(const a, b: UInt8): UInt8;
+begin
+  Result := specialize UMin<UInt8>(a, b);
+end;
+
+function UMin(const a, b: UInt16): UInt16;
+begin
+  Result := specialize UMin<UInt16>(a, b);
+end;
+
+function UMin(const a, b: UInt32): UInt32;
+begin
+  Result := specialize UMin<UInt32>(a, b);
+end;
+
+function UMin(const a, b: UInt64): UInt64;
+begin
+  Result := specialize UMin<UInt64>(a, b);
+end;
+
+function UMin(const a, b: TUFloat): TUFloat;
+begin
+  Result := specialize UMin<TUFloat>(a, b);
+end;
+
+function UMin(const a, b: TUDouble): TUDouble;
+begin
+  Result := specialize UMin<TUDouble>(a, b);
+end;
+
+function UMin(const a, b: TUVec2): TUVec2;
+  var i: Int32;
+begin
+  for i := 0 to High(TUVec2) do Result[i] := UMin(a[i], b[i]);
+end;
+
+function UMin(const a, b: TUVec3): TUVec3;
+  var i: Int32;
+begin
+  for i := 0 to High(TUVec3) do Result[i] := UMin(a[i], b[i]);
+end;
+
+function UMin(const a, b: TUVec4): TUVec4;
+  var i: Int32;
+begin
+  for i := 0 to High(TUVec4) do Result[i] := UMin(a[i], b[i]);
+end;
+
 generic function UMax<T>(const a, b: T): T;
 begin
   if a > b then Exit(a) else Exit(b);
+end;
+
+function UMax(const a, b: Int8): Int8;
+begin
+  Result := specialize UMax<Int8>(a, b);
+end;
+
+function UMax(const a, b: Int16): Int16;
+begin
+  Result := specialize UMax<Int16>(a, b);
+end;
+
+function UMax(const a, b: Int32): Int32; 
+begin
+  Result := specialize UMax<Int32>(a, b);
+end;
+
+function UMax(const a, b: Int64): Int64;
+begin
+  Result := specialize UMax<Int64>(a, b);
+end;
+
+function UMax(const a, b: UInt8): UInt8; 
+begin
+  Result := specialize UMax<UInt8>(a, b);
+end;
+
+function UMax(const a, b: UInt16): UInt16; 
+begin
+  Result := specialize UMax<UInt16>(a, b);
+end;
+
+function UMax(const a, b: UInt32): UInt32;   
+begin
+  Result := specialize UMax<UInt32>(a, b);
+end;
+
+function UMax(const a, b: UInt64): UInt64;  
+begin
+  Result := specialize UMax<UInt64>(a, b);
+end;
+
+function UMax(const a, b: TUFloat): TUFloat;   
+begin
+  Result := specialize UMax<TUFloat>(a, b);
+end;
+
+function UMax(const a, b: TUDouble): TUDouble; 
+begin
+  Result := specialize UMax<TUDouble>(a, b);
+end;
+
+function UMax(const a, b: TUVec2): TUVec2;
+  var i: Int32;
+begin
+  for i := 0 to High(TUVec2) do Result[i] := UMax(a[i], b[i]);
+end;
+
+function UMax(const a, b: TUVec3): TUVec3;   
+  var i: Int32;
+begin
+  for i := 0 to High(TUVec3) do Result[i] := UMax(a[i], b[i]);
+end;
+
+function UMax(const a, b: TUVec4): TUVec4;   
+  var i: Int32;
+begin
+  for i := 0 to High(TUVec4) do Result[i] := UMax(a[i], b[i]);
+end;
+
+generic function UClamp<T>(const v, MinV, MaxV: T): T;
+begin
+  if v < MinV then Exit(MinV) else if v > MaxV then Exit(MaxV) else Exit(v);
+end;
+
+function UClamp(const v, MinV, MaxV: Int8): Int8;
+begin
+  Result := specialize UClamp<Int8>(v, MinV, MaxV);
+end;
+
+function UClamp(const v, MinV, MaxV: Int16): Int16;    
+begin
+  Result := specialize UClamp<Int16>(v, MinV, MaxV);
+end;
+
+function UClamp(const v, MinV, MaxV: Int32): Int32;   
+begin
+  Result := specialize UClamp<Int32>(v, MinV, MaxV);
+end;
+
+function UClamp(const v, MinV, MaxV: Int64): Int64;    
+begin
+  Result := specialize UClamp<Int64>(v, MinV, MaxV);
+end;
+
+function UClamp(const v, MinV, MaxV: UInt8): UInt8;  
+begin
+  Result := specialize UClamp<UInt8>(v, MinV, MaxV);
+end;
+
+function UClamp(const v, MinV, MaxV: UInt16): UInt16; 
+begin
+  Result := specialize UClamp<UInt16>(v, MinV, MaxV);
+end;
+
+function UClamp(const v, MinV, MaxV: UInt32): UInt32; 
+begin
+  Result := specialize UClamp<UInt32>(v, MinV, MaxV);
+end;
+
+function UClamp(const v, MinV, MaxV: UInt64): UInt64;    
+begin
+  Result := specialize UClamp<UInt64>(v, MinV, MaxV);
+end;
+
+function UClamp(const v, MinV, MaxV: TUFloat): TUFloat;    
+begin
+  Result := specialize UClamp<TUFloat>(v, MinV, MaxV);
+end;
+
+function UClamp(const v, MinV, MaxV: TUDouble): TUDouble; 
+begin
+  Result := specialize UClamp<TUDouble>(v, MinV, MaxV);
+end;
+
+function UClamp(const v, MinV, MaxV: TUVec2): TUVec2;
+  var i: Int32;
+begin
+  for i := 0 to High(TUVec2) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
+end;
+
+function UClamp(const v, MinV, MaxV: TUVec3): TUVec3; 
+  var i: Int32;
+begin
+  for i := 0 to High(TUVec3) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
+end;
+
+function UClamp(const v, MinV, MaxV: TUVec4): TUVec4;    
+  var i: Int32;
+begin
+  for i := 0 to High(TUVec4) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
+end;
+
+function ULerp(const a, b, s: TUFloat): TUFloat;
+begin
+  Result := a + (b - a) * s;
+end;
+
+function USmoothStep(const v, MinV, MaxV: TUFloat): TUFloat;
+  var x: TUFloat absolute Result;
+begin
+  x := UClamp((v - MinV) / (MaxV - MinV), 0, 1);
+  Result := x * x * (3 - 2 * x);
+end;
+
+generic function UBezier<T>(const f0, f1, f2, f3: T; const s: TUFloat): T;
+  var s2, s3: TUFloat;
+begin
+  s2 := s * s;
+  s3 := s2 * s;
+  Result := s3 * f3 + (3 * s2 - 3 * s3) * f2 + (3 * s3 - 6 * s2 + 3 * s) * f1 + (3 * s2 - s3 - 3 * s + 1) * f0;
+end;
+
+function UBezier(const v0, v1, v2, v3: TUFloat; const s: TUFloat): TUFloat;
+begin
+  Result := specialize UBezier<TUFloat>(v0, v1, v2, v3, s);
+end;
+
+function UBezier(const v0, v1, v2, v3: TUDouble; const s: TUFloat): TUDouble;
+begin
+  Result := specialize UBezier<TUDouble>(v0, v1, v2, v3, s);
+end;
+
+function UBezier(const v0, v1, v2, v3: TUVec2; const s: TUFloat): TUVec2;
+begin
+  Result := specialize UBezier<TUVec2>(v0, v1, v2, v3, s);
+end;
+
+function UBezier(const v0, v1, v2, v3: TUVec3; const s: TUFloat): TUVec3;
+begin
+  Result := specialize UBezier<TUVec3>(v0, v1, v2, v3, s);
+end;
+
+function UBezier(const v0, v1, v2, v3: TUVec4; const s: TUFloat): TUVec4;
+begin
+  Result := specialize UBezier<TUVec4>(v0, v1, v2, v3, s);
+end;
+
+generic function UCatmullRom<T>(const v0, v1, v2, v3: T; const s: TUFloat): T;
+  var s2, s3: TUFloat;
+begin
+  s2 := s * s;
+  s3 := s2 * s;
+  Result := 0.5 * (2 * v1 + (v2 - v0) * s + (2 * v0 - 5 * v1 + 4 * v2 - v3) * s2 + (v3 - 3 * v2 + 3 * v1 - v0) * s3);
+end;
+
+function UCatmullRom(const v0, v1, v2, v3: TUFloat; const s: TUFloat): TUFloat;
+begin
+  Result := specialize UCatmullRom<TUFloat>(v0, v1, v2, v3, s);
+end;
+
+function UCatmullRom(const v0, v1, v2, v3: TUDouble; const s: TUFloat): TUDouble;
+begin
+  Result := specialize UCatmullRom<TUDouble>(v0, v1, v2, v3, s);
+end;
+
+function UCatmullRom(const v0, v1, v2, v3: TUVec2; const s: TUFloat): TUVec2;
+begin
+  Result := specialize UCatmullRom<TUVec2>(v0, v1, v2, v3, s);
+end;
+
+function UCatmullRom(const v0, v1, v2, v3: TUVec3; const s: TUFloat): TUVec3;
+begin
+  Result := specialize UCatmullRom<TUVec3>(v0, v1, v2, v3, s);
+end;
+
+function UCatmullRom(const v0, v1, v2, v3: TUVec4; const s: TUFloat): TUVec4;
+begin
+  Result := specialize UCatmullRom<TUVec4>(v0, v1, v2, v3, s);
 end;
 
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
@@ -4958,6 +5300,18 @@ begin
   Result[1] := v0[1] / v1[1];
 end;
 
+operator * (const v: TUVec2; const f: TUFloat): TUVec2;
+begin
+  Result[0] := v[0] * f;
+  Result[1] := v[1] * f;
+end;
+
+operator * (const f: TUFloat; const v: TUVec2): TUVec2;
+begin
+  Result[0] := v[0] * f;
+  Result[1] := v[1] * f;
+end;
+
 operator - (const v: TUVec2): TUVec2;
 begin
   Result[0] := -v[0];
@@ -4990,6 +5344,20 @@ begin
   Result[0] := v0[0] / v1[0];
   Result[1] := v0[1] / v1[1];
   Result[2] := v0[2] / v1[2];
+end;
+
+operator * (const v: TUVec3; const f: TUFloat): TUVec3;
+begin
+  Result[0] := v[0] * f;
+  Result[1] := v[1] * f;
+  Result[2] := v[2] * f;
+end;
+
+operator * (const f: TUFloat; const v: TUVec3): TUVec3;
+begin
+  Result[0] := v[0] * f;
+  Result[1] := v[1] * f;
+  Result[2] := v[2] * f;
 end;
 
 operator - (const v: TUVec3): TUVec3;
@@ -5029,6 +5397,22 @@ begin
   Result[1] := v0[1] / v1[1];
   Result[2] := v0[2] / v1[2];
   Result[3] := v0[3] / v1[3];
+end;
+
+operator * (const v: TUVec4; const f: TUFloat): TUVec4;
+begin
+  Result[0] := v[0] * f;
+  Result[1] := v[1] * f;
+  Result[2] := v[2] * f;
+  Result[3] := v[3] * f;
+end;
+
+operator * (const f: TUFloat; const v: TUVec4): TUVec4;
+begin
+  Result[0] := v[0] * f;
+  Result[1] := v[1] * f;
+  Result[2] := v[2] * f;
+  Result[3] := v[3] * f;
 end;
 
 operator - (const v: TUVec4): TUVec4;
