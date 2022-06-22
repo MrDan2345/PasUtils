@@ -4,6 +4,7 @@ unit CommonUtils;
 {$modeswitch advancedrecords}
 {$modeswitch typehelpers}
 {$optimization autoinline}
+{$macro on}
 {$warn 6058 off}
 {$warn 5024 off}
 {$warn 3123 off}
@@ -223,6 +224,30 @@ type
     property y: TUFloat read GetY write SetY;
     property z: TUFloat read GetZ write SetZ;
     property w: TUFloat read GetW write SetW;
+  end;
+
+  type TUSwizzle = object
+  private
+    const DefaultSwizzle: UInt8 = (0 or (1 shl 2) or (2 shl 4) or (3 shl 6));
+    var _Remap: UInt8;
+    function GetOffset(const Index: UInt8): UInt8; inline;
+    procedure SetOffset(const Index: UInt8; const Value: UInt8); inline;
+  public
+    property Remap: UInt8 read _Remap;
+    property Offset[const Index: UInt8]: UInt8 read GetOffset write SetOffset; default;
+    class function Make(
+      const ord0: UInt8 = 0;
+      const ord1: UInt8 = 1;
+      const ord2: UInt8 = 2;
+      const ord3: UInt8 = 3
+    ): TUSwizzle;
+    procedure SetIdentity; inline;
+    procedure SetValue(
+      const ord0: UInt8 = 0;
+      const ord1: UInt8 = 1;
+      const ord2: UInt8 = 2;
+      const ord3: UInt8 = 3
+    );
   end;
 
   type TUCriticalSection = record
@@ -769,6 +794,11 @@ function UIntToBool(const i: Integer): Boolean;
 function UBoolToInt(const b: Boolean): Integer;
 function UBoolToStr(const b: Boolean): String;
 generic function UMin<T>(const a, b: T): T; inline;
+{$define UMinFloat := specialize UMinFloat<TUFloat>}
+{$define UMinInt8 := specialize UMinFloat<Int8>}
+{$define UMinInt16 := specialize UMinFloat<Int16>}
+{$define UMinInt32 := specialize UMinFloat<Int32>}
+{$define UMinInt64 := specialize UMinFloat<int64>}
 generic function UMax<T>(const a, b: T): T; inline;
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
 generic function USelect<T>(const Cond: Boolean; constref IfTrue: T; constref IfFalse: T): T; inline;
@@ -803,6 +833,7 @@ generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; c
 generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Int32; const DelCount: Int32 = 1);
 generic procedure UArrRemove<T>(var Arr: specialize TUArray<T>; const Item: T);
 generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
+generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
 
 operator + (const v0, v1: TUVec2): TUVec2;
 operator - (const v0, v1: TUVec2): TUVec2;
@@ -1534,6 +1565,44 @@ begin
   Self[3] := Value;
 end;
 // TUQuatImpl end
+
+// TUSwizzle begin
+function TUSwizzle.GetOffset(const Index: UInt8): UInt8;
+begin
+  Result := (_Remap shr (Index * 2)) and 3;
+end;
+
+procedure TUSwizzle.SetOffset(const Index: UInt8; const Value: UInt8);
+  var i: UInt8;
+begin
+  i := Index * 2;
+  _Remap := (_Remap and (not (3 shl i))) or (Value shl i);
+end;
+
+class function TUSwizzle.Make(
+  const ord0: UInt8; const ord1: UInt8;
+  const ord2: UInt8; const ord3: UInt8
+): TUSwizzle;
+begin
+  {$push}
+  {$warnings off}
+  Result.SetValue(ord0, ord1, ord2, ord3);
+  {$pop}
+end;
+
+procedure TUSwizzle.SetIdentity;
+begin
+  _Remap := DefaultSwizzle;
+end;
+
+procedure TUSwizzle.SetValue(
+  const ord0: UInt8; const ord1: UInt8;
+  const ord2: UInt8; const ord3: UInt8
+);
+begin
+  _Remap := ord0 or (ord1 shl 2) or (ord2 shl 4) or (ord3 shl 6);
+end;
+// TUSwizzle end
 
 // TUCriticalSection begin
 procedure TUCriticalSection.Initialize;
@@ -5155,6 +5224,14 @@ begin
   end;
   Result := -1;
 end;
+
+generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
+  var i: Int32;
+begin
+  for i := 0 to High(Arr) do FreeAndNil(Arr[i]);
+  Arr := nil;
+end;
+
 // Functions end
 
 
