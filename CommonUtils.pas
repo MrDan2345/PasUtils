@@ -345,7 +345,7 @@ type
     class function StartTask(const Proc: TFunc; const Args: array of const): TUTask; static;
     class operator Initialize(var v: TUTask);
     class operator Finalize(var v: TUTask);
-    class operator Copy(constref src: TUTask; var dst: TUTask);
+    class operator Copy(constref Src: TUTask; var Dst: TUTask);
   end;
   type TUTaskString = specialize TUTask<String>;
   type TUTaskBool = specialize TUTask<Boolean>;
@@ -356,12 +356,14 @@ type
     type TPtr = T;
     type TSelf = specialize TUSharedRef<T>;
   private
-    var _Ptr: iinterface;
+    var _Ptr: IInterface;
     function GetPtr: TPtr; inline;
     procedure SetPtr(const Value: TPtr); inline;
+    procedure Initialize;
   public
     property Ptr: TPtr read GetPtr write SetPtr;
     function IsValid: Boolean; inline;
+    class operator Initialize(var v: TSelf);
     class operator := (const Value: TPtr): TSelf; inline;
     class operator := (const Value: Pointer): TSelf; inline;
     class operator = (v1, v2: TSelf): Boolean; inline;
@@ -373,7 +375,7 @@ type
     type TSelf = specialize TUWeakRef<T>;
     type TShared = specialize TUSharedRef<T>;
   private
-    var _Weak: iinterface;
+    var _Weak: IInterface;
     procedure Assign(const Value: TPtr);
   public
     function IsValid: Boolean; inline;
@@ -2003,9 +2005,9 @@ begin
   v.Finalize;
 end;
 
-class operator TUTask.Copy(constref src: TUTask; var dst: TUTask);
+class operator TUTask.Copy(constref Src: TUTask; var Dst: TUTask);
 begin
-  dst.SetThread(src._Thread);
+  Dst.SetThread(Src._Thread);
 end;
 // TUTask end
 
@@ -2021,19 +2023,35 @@ begin
   _Ptr := IInterface(Value);
 end;
 
+procedure TUSharedRef.Initialize;
+begin
+  _Ptr := nil;
+end;
+
 function TUSharedRef.IsValid: Boolean;
 begin
   Result := _Ptr <> nil;
 end;
 
+class operator TUSharedRef.Initialize(var v: TSelf);
+begin
+  v.Initialize;
+end;
+
 class operator TUSharedRef.:=(const Value: TPtr): TSelf;
 begin
-  Result.ptr := Value;
+  {$push}
+  {$warnings off}
+  Result.Ptr := Value;
+  {$opo}
 end;
 
 class operator TUSharedRef.:=(const Value: Pointer): TSelf;
 begin
-  Result.ptr := TPtr(Value);
+  {$push}
+  {$warnings off}
+  Result.Ptr := TPtr(Value);
+  {$pop}
 end;
 
 class operator TUSharedRef.=(v1, v2: TSelf): Boolean;
