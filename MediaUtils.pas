@@ -1,4 +1,4 @@
-unit CommonMedia;
+unit MediaUtils;
 
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
