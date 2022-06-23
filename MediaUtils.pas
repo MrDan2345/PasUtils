@@ -2263,14 +2263,9 @@ begin
 end;
 
 destructor TUSceneDataDAE.TColladaObject.Destroy;
-  var i: Int32;
 begin
-  if _AutoFreeUserData and Assigned(_UserData) then _UserData.Free;
-  for i := 0 to High(_Children) do
-  begin
-    _Children[i].Free;
-  end;
-  _Children := nil;
+  if _AutoFreeUserData then FreeAndNil(_UserData);
+  specialize UArrClear<TColladaObject>(_Children);
   inherited Destroy;
 end;
 
@@ -2507,8 +2502,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaNode.Destroy;
 begin
-  specialize UArrClear<TColladaInstance>(_Instances);
-  specialize UArrClear<TColladaNode>(_Nodes);
   inherited Destroy;
 end;
 
@@ -2774,8 +2767,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaSource.Destroy;
 begin
-  FreeAndNil(_Accessor);
-  FreeAndNil(_DataArray);
   inherited Destroy;
 end;
 
@@ -2801,7 +2792,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaVertices.Destroy;
 begin
-  specialize UArrClear<TColladaInput>(_Inputs);
   inherited Destroy;
 end;
 
@@ -2984,7 +2974,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaTriangles.Destroy;
 begin
-  specialize UArrClear<TColladaInput>(_Inputs);
   inherited Destroy;
 end;
 
@@ -3060,9 +3049,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaMesh.Destroy;
 begin
-  FreeAndNil(_Vertices);
-  specialize UArrClear<TColladaTriangles>(_TrianglesList);
-  specialize UArrClear<TColladaSource>(_Sources);
   inherited Destroy;
 end;
 
@@ -3257,7 +3243,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaEffectProfile.Destroy;
 begin
-  specialize UArrClear<TColladaEffectProfileParam>(_Params);
   inherited Destroy;
 end;
 
@@ -3282,7 +3267,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaEffect.Destroy;
 begin
-  FreeAndNil(_Profile);
   inherited Destroy;
 end;
 
@@ -3326,7 +3310,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaMaterial.Destroy;
 begin
-  FreeAndNil(_InstanceEffect);
   inherited Destroy;
 end;
 
@@ -3352,7 +3335,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaGeometry.Destroy;
 begin
-  specialize UArrClear<TColladaMesh>(_Meshes);
   inherited Destroy;
 end;
 
@@ -3427,7 +3409,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaJoints.Destroy;
 begin
-  specialize UArrClear<TColladaInput>(_Inputs);
   inherited Destroy;
 end;
 
@@ -3524,7 +3505,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaVertexWeights.Destroy;
 begin
-  specialize UArrClear<TColladaInput>(_Inputs);
   inherited Destroy;
 end;
 
@@ -3575,9 +3555,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaSkin.Destroy;
 begin
-  FreeAndNil(_VertexWeights);
-  FreeAndNil(_Joints);
-  specialize UArrClear<TColladaSource>(_Sources);
   inherited Destroy;
 end;
 
@@ -3878,7 +3855,6 @@ end;
 destructor TUSceneDataDAE.TColladaAnimationSampler.Destroy;
 begin
   if Assigned(_Data) then FreeMemory(_Data);
-  specialize UArrClear<TColladaInput>(_Inputs);
   inherited Destroy;
 end;
 
@@ -3968,10 +3944,7 @@ end;
 
 destructor TUSceneDataDAE.TColladaAnimation.Destroy;
 begin
-  specialize UArrClear<TColladaAnimationChannel>(_Channels);
-  specialize UArrClear<TColladaAnimationSampler>(_Samplers);
-  specialize UArrClear<TColladaSource>(_Sources);
-  specialize UArrClear<TColladaAnimation>(_Animations);
+  inherited Destroy;
 end;
 
 constructor TUSceneDataDAE.TColladaCamera.Create(
@@ -4146,7 +4119,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaInstanceGeometry.Destroy;
 begin
-  specialize UArrClear<TColladaInstanceMaterial>(_MaterialBindings);
   inherited Destroy;
 end;
 
@@ -4200,7 +4172,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaInstanceController.Destroy;
 begin
-  specialize UArrClear<TColladaInstanceMaterial>(_MaterialBindings);
   inherited Destroy;
 end;
 
@@ -4272,7 +4243,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaVisualScene.Destroy;
 begin
-  specialize UArrClear<TColladaNode>(_Nodes);
   inherited Destroy;
 end;
 
@@ -4298,7 +4268,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaLibraryAnimations.Destroy;
 begin
-  specialize UArrClear<TColladaAnimation>(_Animations);
   inherited Destroy;
 end;
 
@@ -4324,7 +4293,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaLibraryMaterials.Destroy;
 begin
-  specialize UArrClear<TColladaMaterial>(_Materials);
   inherited Destroy;
 end;
 
@@ -4350,7 +4318,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaLibraryEffects.Destroy;
 begin
-  specialize UArrClear<TColladaEffect>(_Effects);
   inherited Destroy;
 end;
 
@@ -4376,7 +4343,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaLibraryImages.Destroy;
 begin
-  specialize UArrClear<TColladaImage>(_Images);
   inherited Destroy;
 end;
 
@@ -4402,7 +4368,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaLibraryGeometries.Destroy;
 begin
-  specialize UArrClear<TColladaGeometry>(_Geometries);
   inherited Destroy;
 end;
 
@@ -4428,7 +4393,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaLibraryControllers.Destroy;
 begin
-  specialize UArrClear<TColladaController>(_Controllers);
   inherited Destroy;
 end;
 
@@ -4454,7 +4418,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaLibraryCameras.Destroy;
 begin
-  specialize UArrClear<TColladaCamera>(_Cameras);
   inherited Destroy;
 end;
 
@@ -4480,7 +4443,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaLibraryLights.Destroy;
 begin
-  specialize UArrClear<TColladaLight>(_Lights);
   inherited Destroy;
 end;
 
@@ -4506,7 +4468,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaLibraryVisualScenes.Destroy;
 begin
-  specialize UArrClear<TColladaVisualScene>(_VisualScenes);
   inherited Destroy;
 end;
 
@@ -4550,10 +4511,6 @@ end;
 
 destructor TUSceneDataDAE.TColladaScene.Destroy;
 begin
-  if Assigned(_VisualScene) then
-  begin
-    FreeAndNil(_VisualScene);
-  end;
   inherited Destroy;
 end;
 
@@ -4601,43 +4558,43 @@ begin
     NodeName := LowerCase(Node.Name);
     if NodeName = 'library_cameras' then
     begin
-      //_LibCameras := TLabColladaLibraryCameras.Create(CurNode, Self);
+      _LibCameras := TColladaLibraryCameras.Create(Node, Self);
     end
     else if NodeName = 'library_lights' then
     begin
-      //_LibLights := TLabColladaLibraryLights.Create(CurNode, Self);
+      _LibLights := TColladaLibraryLights.Create(Node, Self);
     end
     else if NodeName = 'library_images' then
     begin
-      //_LibImages := TLabColladaLibraryImages.Create(CurNode, Self);
+      _LibImages := TColladaLibraryImages.Create(Node, Self);
     end
     else if NodeName = 'library_effects' then
     begin
-      //_LibEffects := TLabColladaLibraryEffects.Create(CurNode, Self);
+      _LibEffects := TColladaLibraryEffects.Create(Node, Self);
     end
     else if NodeName = 'library_materials' then
     begin
-      //_LibMaterials := TLabColladaLibraryMaterials.Create(CurNode, Self);
+      _LibMaterials := TColladaLibraryMaterials.Create(Node, Self);
     end
     else if NodeName = 'library_geometries' then
     begin
-      //_LibGeometries := TLabColladaLibraryGeometries.Create(CurNode, Self);
+      _LibGeometries := TColladaLibraryGeometries.Create(Node, Self);
     end
     else if NodeName = 'library_controllers' then
     begin
-      //_LibControllers := TLabColladaLibraryControllers.Create(CurNode, Self);
+      _LibControllers := TColladaLibraryControllers.Create(Node, Self);
     end
     else if NodeName = 'library_animations' then
     begin
-      //_LibAnimations := TLabColladaLibraryAnimations.Create(CurNode, Self);
+      _LibAnimations := TColladaLibraryAnimations.Create(Node, Self);
     end
     else if NodeName = 'library_visual_scenes' then
     begin
-      //_LibVisualScenes := TLabColladaLibraryVisualScenes.Create(CurNode, Self);
+      _LibVisualScenes := TColladaLibraryVisualScenes.Create(Node, Self);
     end
     else if NodeName = 'scene' then
     begin
-      //_Scene := TLabColladaScene.Create(CurNode, Self);
+      _Scene := TColladaScene.Create(Node, Self);
     end;
   end;
 end;
@@ -4743,7 +4700,7 @@ end;
 
 destructor TUSceneDataDAE.Destroy;
 begin
-  if Assigned(_Root) then FreeAndNil(_Root);
+  FreeAndNil(_Root);
   inherited Destroy;
 end;
 
