@@ -638,7 +638,6 @@ type
     procedure AddKeyword(const AKeyword: String);
     procedure AddKeywords(const AKeywords: array of String);
     procedure Reset;
-    procedure Sort;
   end;
   type PUParserSyntax = ^TUParserSyntax;
 
@@ -884,6 +883,7 @@ generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T);
 generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
 generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Int32; const DelCount: Int32 = 1);
 generic procedure UArrRemove<T>(var Arr: specialize TUArray<T>; const Item: T);
+generic function UArrPop<T>(var Arr: specialize TUArray<T>): T;
 generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
 generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
 
@@ -3714,11 +3714,6 @@ begin
   SetLength(Keywords, 0);
   CaseSensitive := False;
 end;
-
-procedure TUParserSyntax.Sort;
-begin
-
-end;
 // TUParserSyntax end
 
 // TUParser begin
@@ -3886,15 +3881,12 @@ end;
 
 procedure TUParser.SyntaxPush;
 begin
-  SetLength(_SyntaxStack, Length(_SyntaxStack) + 1);
-  _SyntaxStack[High(_SyntaxStack)] := Syntax;
+  specialize UArrAppend<PUParserSyntax>(_SyntaxStack, Syntax);
 end;
 
 procedure TUParser.SyntaxPop;
 begin
-  if Length(_SyntaxStack) < 1 then Exit;
-  Syntax := _SyntaxStack[High(_SyntaxStack)];
-  SetLength(_SyntaxStack, Length(_SyntaxStack) - 1);
+  specialize UArrPop<PUParserSyntax>(_SyntaxStack);
 end;
 
 function TUParser.Read(const Count: Int32): String;
@@ -4512,16 +4504,9 @@ begin
 end;
 
 destructor TUXML.Destroy;
-  var i: Integer;
 begin
-  for i := High(_Attributes) downto 0 do
-  begin
-    _Attributes[i].Free;
-  end;
-  for i := High(_Children) downto 0 do
-  begin
-    _Children[i].Free;
-  end;
+  specialize UArrClear<TAttribute>(_Attributes);
+  specialize UArrClear<TUXML>(_Children);
   inherited Destroy;
 end;
 
@@ -4536,8 +4521,7 @@ begin
   att := TAttribute.Create;
   att.Name := AttName;
   att.Value := AttValue;
-  SetLength(_Attributes, Length(_Attributes) + 1);
-  _Attributes[High(_Attributes)] := att;
+  specialize UArrAppend<TAttribute>(_Attributes, att);
 end;
 
 function TUXML.FindAttribute(const AttName: String): TAttribute;
@@ -5651,6 +5635,13 @@ begin
   SetLength(Arr, Length(Arr) - n);
 end;
 
+generic function UArrPop<T>(var Arr: specialize TUArray<T>): T;
+begin
+  if Length(Arr) < 1 then Exit(Default(T));
+  Result := Arr[High(Arr)];
+  SetLength(Arr, Length(Arr) - 1);
+end;
+
 generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
   var i: Int32;
 begin
@@ -5664,7 +5655,7 @@ end;
 generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
   var i: Int32;
 begin
-  for i := 0 to High(Arr) do FreeAndNil(Arr[i]);
+  for i := High(Arr) downto 0 do FreeAndNil(Arr[i]);
   Arr := nil;
 end;
 
