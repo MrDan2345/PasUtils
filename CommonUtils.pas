@@ -2043,7 +2043,7 @@ begin
   {$push}
   {$warnings off}
   Result.Ptr := Value;
-  {$opo}
+  {$pop}
 end;
 
 class operator TUSharedRef.:=(const Value: Pointer): TSelf;
@@ -2231,6 +2231,7 @@ begin
   Result := _Stream.Read(Buffer^, Count);
 end;
 
+{$push}
 {$hints off}
 function TUStreamHelper.ReadBool: Boolean;
 begin
@@ -2311,7 +2312,7 @@ generic function TUStreamHelper.Read<T>: T; inline;
 begin
   ReadBuffer(@Result, SizeOf(T));
 end;
-{$hints on}
+{$pop}
 
 function TUStreamHelper.WriteBuffer(const Buffer: Pointer; const Count: Int64): Int64;
 begin
