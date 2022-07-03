@@ -155,6 +155,7 @@ type
     function Dot(const v: TUVec2): TUFloat; overload; inline;
     function Cross(const v: TUVec2): TUFloat; overload; inline;
     function Norm: TUVec2; overload; inline;
+    function IsZero: Boolean; inline;
   end;
 
   type TUVec3Impl = type helper for TUVec3
@@ -173,13 +174,25 @@ type
     class function Make(const Ax, Ay, Az: TUFloat): TUVec3; static; overload; inline;
     class function Make(const v2: TUVec2; const Az: TUFloat): TUVec3; static; overload; inline;
     class function Make(const s: TUFloat): TUVec3; static; overload;
+    class function Len(const v: TUVec3): TUFloat; static; overload; inline;
+    class function LenSq(const v: TUVec3): TUFloat; static; overload; inline;
     class function Dot(const v0, v1: TUVec3): TUFloat; static; overload; inline;
     class function Cross(const v0, v1: TUVec3): TUVec3; static; overload; inline;
     class function Norm(const v: TUVec3): TUVec3; static; overload; inline;
     procedure SetValue(const Ax, Ay, Az: TUFloat); inline;
+    function Transform3x3(const m: TUMat): TUVec3;
+    function Transform4x3(const m: TUMat): TUVec3;
+    function Transform4x4(const m: TUMat): TUVec3;
+    function TransformQuat(const q: TUQuat): TUVec3; inline;
+    function Len: TUFloat;
+    function LenSq: TUFloat;
     function Dot(const v: TUVec3): TUFloat; overload;
     function Cross(const v: TUVec3): TUVec3; overload;
     function Norm: TUVec3; overload;
+    function xy: TUVec2; inline;
+    function AngleTo(const v: TUVec3): TUFloat; inline;
+    function RotationTo(const v: TUVec3): TUQuat; inline;
+    function IsZero: Boolean; inline;
   end;
 
   type TUVec4Impl = type helper for TUVec4
@@ -208,6 +221,9 @@ type
     procedure SetValue(const Ax, Ay, Az, Aw: TUFloat); inline;
     function Dot(const v: TUVec4): TUFloat; overload; inline;
     function Norm: TUVec4; overload; inline;
+    function xyz: TUVec3; inline;
+    function xy: TUVec2; inline;
+    function IsZero: Boolean; inline;
   end;
 
   type TUQuatImpl = type helper for TUQuat
@@ -225,6 +241,10 @@ type
     property y: TUFloat read GetY write SetY;
     property z: TUFloat read GetZ write SetZ;
     property w: TUFloat read GetW write SetW;
+    class function Identity: TUQuat; static; inline;
+    class function Make(const Ax, Ay, Az, Aw: TUFloat): TUQuat; static; inline;
+    class function Norm(const v: TUQuat): TUQuat; static; overload; inline;
+    function Norm: TUQuat; inline;
   end;
 
   type TUSwizzle = object
@@ -871,7 +891,9 @@ function UMulVec2Mat4x4(const v: TUVec2; const m: TUMat): TUVec2;
 function UMulVec3Mat3x3(const v: TUVec3; const m: TUMat): TUVec3;
 function UMulVec3Mat4x3(const v: TUVec3; const m: TUMat): TUVec3;
 function UMulVec3Mat4x4(const v: TUVec3; const m: TUMat): TUVec3;
+function UMulVec3Quat(const v: TUVec3; const q: TUQuat): TUVec3;
 function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4;
+function UTriangleNormal(const v0, v1, v2: TUVec3): TUVec3;
 
 function UStrExplode(const Str: String; const Separator: String): TUStrArr;
 function UStrIsNumber(const Str: String): Boolean;
@@ -1387,6 +1409,11 @@ function TUVec2Impl.Norm: TUVec2;
 begin
   Result := Norm(Self);
 end;
+
+function TUVec2Impl.IsZero: Boolean;
+begin
+  Result := (x = 0) and (y = 0);
+end;
 // TUVec2Impl end
 
 // TUVec3Impl begin
@@ -1442,6 +1469,16 @@ begin
   Result := Make(s, s, s);
 end;
 
+class function TUVec3Impl.Len(const v: TUVec3): TUFloat;
+begin
+  Result := Sqrt(Dot(v, v));
+end;
+
+class function TUVec3Impl.LenSq(const v: TUVec3): TUFloat;
+begin
+  Result := Dot(v, v)
+end;
+
 class function TUVec3Impl.Dot(const v0, v1: TUVec3): TUFloat;
 begin
   Result := v0[0] * v1[0] + v0[1] * v1[1] + v0[2] * v1[2];
@@ -1476,6 +1513,36 @@ begin
   Self[2] := Az;
 end;
 
+function TUVec3Impl.Transform3x3(const m: TUMat): TUVec3;
+begin
+  Result := UMulVec3Mat3x3(Self, m);
+end;
+
+function TUVec3Impl.Transform4x3(const m: TUMat): TUVec3;
+begin
+  Result := UMulVec3Mat4x3(Self, m);
+end;
+
+function TUVec3Impl.Transform4x4(const m: TUMat): TUVec3;
+begin
+  Result := UMulVec3Mat4x4(Self, m);
+end;
+
+function TUVec3Impl.TransformQuat(const q: TUQuat): TUVec3;
+begin
+  Result := UMulVec3Quat(Self, q);
+end;
+
+function TUVec3Impl.Len: TUFloat;
+begin
+  Result := Len(Self);
+end;
+
+function TUVec3Impl.LenSq: TUFloat;
+begin
+  Result := LenSq(Self);
+end;
+
 function TUVec3Impl.Dot(const v: TUVec3): TUFloat;
 begin
   Result := Dot(Self, v);
@@ -1489,6 +1556,36 @@ end;
 function TUVec3Impl.Norm: TUVec3;
 begin
   Result := Norm(Self);
+end;
+
+function TUVec3Impl.xy: TUVec2;
+begin
+  Result[0] := x;
+  Result[1] := y;
+end;
+
+function TUVec3Impl.AngleTo(const v: TUVec3): TUFloat;
+  var VecLen: TUFloat;
+begin
+  VecLen := Len * v.Len;
+  if VecLen > 0 then Result := UArcCos(Dot(v) / VecLen) else Result := 0;
+end;
+
+function TUVec3Impl.RotationTo(const v: TUVec3): TUQuat;
+  var q: TUQuat;
+  var cp: TUVec3;
+begin
+  cp := Cross(v);
+  q := TUQuat.Make(
+    cp.x, cp.y, cp.z,
+    Sqrt((LenSq) * (v.LenSq)) + Dot(v)
+  );
+  Result := q.Norm;
+end;
+
+function TUVec3Impl.IsZero: Boolean;
+begin
+  Result := (x = 0) and (y = 0) and (z = 0);
 end;
 // TUVec3Impl end
 
@@ -1603,6 +1700,24 @@ function TUVec4Impl.Norm: TUVec4;
 begin
   Result := Norm(Self);
 end;
+
+function TUVec4Impl.xyz: TUVec3;
+begin
+  Result[0] := x;
+  Result[1] := y;
+  Result[2] := z;
+end;
+
+function TUVec4Impl.xy: TUVec2;
+begin
+  Result[0] := x;
+  Result[1] := y;
+end;
+
+function TUVec4Impl.IsZero: Boolean;
+begin
+  Result := (x = 0) and (y = 0) and (z = 0) and (w = 0);
+end;
 // TUVec4Impl end
 
 // TUQuatImpl begin
@@ -1644,6 +1759,42 @@ end;
 procedure TUQuatImpl.SetW(const Value: TUFloat);
 begin
   Self[3] := Value;
+end;
+
+class function TUQuatImpl.Identity: TUQuat;
+begin
+  Result[0] := 0;
+  Result[1] := 0;
+  Result[2] := 0;
+  Result[3] := 1;
+end;
+
+class function TUQuatImpl.Make(const Ax, Ay, Az, Aw: TUFloat): TUQuat;
+begin
+  Result[0] := Ax;
+  Result[1] := Ay;
+  Result[2] := Az;
+  Result[3] := Aw;
+end;
+
+class function TUQuatImpl.Norm(const v: TUQuat): TUQuat;
+  var d: TUFloat;
+begin
+  d := Sqrt(TUVec4.Dot(PUVec4(@v)^, PUVec4(@v)^));
+  if d > 0 then
+  begin
+    d := 1 / d;
+    Result := Make(v.x * d, v.y * d, v.z * d, v.w * d);
+  end
+  else
+  begin
+    Result := Identity;
+  end;
+end;
+
+function TUQuatImpl.Norm: TUQuat;
+begin
+  Result := Norm(Self);
 end;
 // TUQuatImpl end
 
@@ -5293,6 +5444,15 @@ begin
   );
 end;
 
+function UMulVec3Quat(const v: TUVec3; const q: TUQuat): TUVec3;
+  var u: TUVec3;
+  var s: TUFloat;
+begin
+  u := TUVec3.Make(q.x, q.y, q.z);
+  s := q.w;
+  Result := 2 * u.Dot(v) * u + (s * s - u.Dot(u)) * v + 2 * s * u.Cross(v);
+end;
+
 function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4;
 begin
   Result := TUVec4.Make(
@@ -5301,6 +5461,11 @@ begin
     v.x * m[0, 2] + v.y * m[1, 2] + v.z * m[2, 2] + v.w * m[3, 2],
     v.x * m[0, 3] + v.y * m[1, 3] + v.z * m[2, 3] + v.w * m[3, 3]
   );
+end;
+
+function UTriangleNormal(const v0, v1, v2: TUVec3): TUVec3;
+begin
+  Result := (v1 - v0).Cross(v2 - v0).Norm;
 end;
 
 operator + (const v0, v1: TUVec2): TUVec2;
