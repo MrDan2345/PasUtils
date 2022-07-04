@@ -2,8 +2,13 @@ unit MediaUtils;
 
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
+{$modeswitch typehelpers}
+{$optimization autoinline}
+{$macro on}
 {$warn 6058 off}
 {$warn 5024 off}
+{$warn 3123 off}
+{$warn 3124 off}
 
 interface
 
@@ -222,14 +227,21 @@ type
       var _VertexSize: Int32;
       var _IndexSize: Int32;
       function GetVertexDescriptor: TUVertexDescriptor; virtual;
+      function GetVertexBufferSize: Int32;
+      function GetIndexBufferSize: Int32;
+      function GetIndex(const Id: Int32): UInt32;
     public
-      property VertexDescritor: TUVertexDescriptor read GetVertexDescriptor;
+      property VertexDescriptor: TUVertexDescriptor read GetVertexDescriptor;
       property VertexData: Pointer read _VertexData;
       property IndexData: Pointer read _IndexData;
       property VertexCount: Int32 read _VertexCount;
       property IndexCount: Int32 read _IndexCount;
       property VertexSize: Int32 read _VertexSize;
       property IndexSize: Int32 read _IndexSize;
+      property VertexBufferSize: Int32 read GetVertexBufferSize;
+      property IndexBufferSize: Int32 read GetIndexBufferSize;
+      property Index[const Id: Int32]: UInt32 read GetIndex;
+      destructor Destroy; override;
     end;
     type TMeshSubsetInterfaceList = array of TMeshSubsetInterface;
     type TMeshInterface = class
@@ -970,7 +982,6 @@ type
       function GetVertexDescriptor: TUVertexDescriptor; override;
     public
       constructor Create(const ColladaTriangles: TColladaTriangles);
-      destructor Destroy; override;
     end;
     type TMeshInterfaceCollada = class (TMeshInterface)
     private
@@ -1000,6 +1011,8 @@ function ULoadImageData(const Stream: TStream): TUImageDataShared; overload;
 function ULoadImageData(const FileName: String): TUImageDataShared; overload;
 function ULoadImageData(const Buffer: Pointer; const Size: UInt32): TUImageDataShared; overload;
 function ULoadImageData(const StreamHelper: TUStreamHelper): TUImageDataShared; overload;
+
+function UCmpVertexDescriptors(const vd0, vd1: TUVertexDescriptor): Boolean;
 
 implementation
 
@@ -1062,6 +1075,23 @@ begin
     Exit;
   end;
   Result := nil;
+end;
+
+function UCmpVertexDescriptors(const vd0, vd1: TUVertexDescriptor): Boolean;
+  var i: Int32;
+begin
+  if Length(vd0) <> Length(vd1) then Exit(False);
+  for i := 0 to High(vd0) do
+  begin
+    if (vd0[i].Semantic <> vd1[i].Semantic)
+    or (vd0[i].DataType <> vd1[i].DataType)
+    or (vd0[i].DataCount <> vd1[i].DataCount)
+    or (vd0[i].SetNumber <> vd1[i].SetNumber) then
+    begin
+      Exit(False);
+    end;
+  end;
+  Result := True;
 end;
 
 // TUImageData begin
@@ -2184,6 +2214,29 @@ end;
 function TUSceneData.TMeshSubsetInterface.GetVertexDescriptor: TUVertexDescriptor;
 begin
   Result := nil;
+end;
+
+function TUSceneData.TMeshSubsetInterface.GetVertexBufferSize: Int32;
+begin
+  Result := _VertexCount * _VertexSize;
+end;
+
+function TUSceneData.TMeshSubsetInterface.GetIndexBufferSize: Int32;
+begin
+  Result := _IndexCount * _IndexSize;
+end;
+
+function TUSceneData.TMeshSubsetInterface.GetIndex(const Id: Int32): UInt32;
+begin
+  if (_IndexSize = 2) then Exit(PUInt16(_IndexData + Id * _IndexSize)^)
+  else Exit(PUInt32(_IndexData + Id * _IndexSize)^);
+end;
+
+destructor TUSceneData.TMeshSubsetInterface.Destroy;
+begin
+  FreeMemAndNil(_IndexData);
+  FreeMemAndNil(_VertexData);
+  inherited Destroy;
 end;
 
 destructor TUSceneData.TMeshInterface.Destroy;
@@ -4909,7 +4962,6 @@ constructor TUSceneDataDAE.TMeshSubsetInterfaceCollada.Create(
       end;
     end;
     SetLength(Tangents, TangentCount);
-    WriteLn('Tangent Count = ', TangentCount, '; Index Count = ', _ColladaTriangles.Count * 3);
   end;
   var VertexBuffer: array of array of Int32;
   var VertexRemap: array of Int32;
@@ -4957,16 +5009,9 @@ begin
   TangentInd := -1;
   BinormalInd := -1;
   TexCoordInd := -1;
-  IndexInputStride := 0;
-  for i := 0 to High(_ColladaTriangles.Inputs) do
-  if IndexInputStride < _ColladaTriangles.Inputs[i].Offset then
-  begin
-    IndexInputStride := _ColladaTriangles.Inputs[i].Offset;
-  end;
-  IndexInputStride += 1;
+  IndexInputStride := _ColladaTriangles.InputStride;
   for i := 0 to High(_VertexDescriptor) do
   begin
-    WriteLn(specialize UEnumSetToStr<TUVertexAttributeSemantic>(_VertexDescriptor[i].Semantic));
     case _VertexDescriptor[i].Semantic of
       as_position: if (PositionInd = -1) then PositionInd := i;
       as_normal: if (NormalInd = -1) then NormalInd := i;
@@ -5045,7 +5090,6 @@ begin
     end;
     VertexRemap[i] := AddVertex(AttribIndices);
   end;
-  WriteLn('Vertex Buffer Size = ', Length(VertexBuffer));
   _VertexCount := Length(VertexBuffer);
   _VertexData := GetMem(VertexSize * _VertexCount);
   _IndexCount := _ColladaTriangles.Count * 3;
@@ -5065,22 +5109,24 @@ begin
       case _VertexDescriptor[ai].Semantic of
         as_normal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Normals[VertexBuffer[i][j]];
         as_tangent: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][j]].Tangent;
-        as_binormal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := TAngents[VertexBuffer[i][j]].Binormal;
+        as_binormal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][j]].Binormal;
       end;
     end;
   end;
-  for i := 0 to High(VertexRemap) do
+  if _IndexSize = 2 then
   begin
-    if _IndexSize = 2 then PUInt16(_IndexData + i * IndexSize)^ := VertexRemap[i]
-    else PUInt32(_IndexData + i * IndexSize)^ := VertexRemap[i];
+    for i := 0 to High(VertexRemap) do
+    begin
+      PUInt16(_IndexData + i * IndexSize)^ := UInt16(VertexRemap[i]);
+    end;
+  end
+  else
+  begin
+    for i := 0 to High(VertexRemap) do
+    begin
+      PUInt32(_IndexData + i * IndexSize)^ := VertexRemap[i];
+    end;
   end;
-end;
-
-destructor TUSceneDataDAE.TMeshSubsetInterfaceCollada.Destroy;
-begin
-  FreeMemAndNil(_IndexData);
-  FreeMemAndNil(_VertexData);
-  inherited Destroy;
 end;
 
 constructor TUSceneDataDAE.TMeshInterfaceCollada.Create(
