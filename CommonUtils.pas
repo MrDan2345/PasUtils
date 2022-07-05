@@ -808,6 +808,7 @@ type
 procedure UClear(out x; const Size: UInt32);
 procedure UMove(out Dest; const Src; const Size: UInt32);
 function USignOf(const v: Int64): Int64;
+function UIntToPtr(const i: PtrUInt): Pointer;
 function UCopyVarRec(constref src: TVarRec): TVarRec;
 function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArr;
 procedure UFinalizeVarRec(var vr: TVarRec);
@@ -4771,6 +4772,11 @@ end;
 function USignOf(const v: Int64): Int64;
 begin
   if v < 0 then Result := -1 else Result := 1;
+end;
+
+function UIntToPtr(const i: PtrUInt): Pointer;
+begin
+  Result := nil; Result += i;
 end;
 
 function UCopyVarRec(constref src: TVarRec): TVarRec;

@@ -216,6 +216,9 @@ type
   end;
   type TUVertexDescriptor = array of TUVertexAttribute;
 
+  type TSceneDataOptions = (sdo_optimize, sdo_gen_normals, sdo_gen_tangents);
+  type TSceneDataOptionsSet = set of TSceneDataOptions;
+
   type TUSceneData = class (TURefClass)
   public
     type TMeshSubsetInterface = class
@@ -253,8 +256,11 @@ type
     end;
     type TMeshInterfaceList = array of TMeshInterface;
     var _MeshList: TMeshInterfaceList;
+  protected
+    var _Options: TSceneDataOptionsSet;
   public
     property MeshList: TMeshInterfaceList read _MeshList;
+    property Options: TSceneDataOptionsSet read _Options;
     class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
     class function CanLoad(const FileName: String): Boolean; virtual; overload;
     class function CanLoad(const Buffer: Pointer; const Size: UInt32): Boolean; virtual; overload;
@@ -264,6 +270,7 @@ type
     procedure Load(const FileName: String); virtual; overload;
     procedure Load(const Buffer: Pointer; const Size: UInt32); virtual; overload;
     procedure Load(const StreamHelper: TUStreamHelper); virtual; abstract; overload;
+    constructor Create(const AOptions: TSceneDataOptionsSet = []);
   end;
 
   TUSceneDataDAE = class (TUSceneData)
@@ -958,6 +965,7 @@ type
       var _LibLights: TColladaLibraryLights;
       var _LibVisualScenes: TColladaLibraryVisualScenes;
       var _Scene: TColladaScene;
+      var _Options: TSceneDataOptionsSet;
     public
       property Asset: TColladaAsset read _Asset;
       property LibMaterials: TColladaLibraryMaterials read _LibMaterials;
@@ -970,7 +978,8 @@ type
       property LibLights: TColladaLibraryLights read _LibLights;
       property LibVisualScenes: TColladaLibraryVisualScenes read _LibVisualScenes;
       property Scene: TColladaScene read _Scene;
-      constructor Create(const XMLNode: TUXML);
+      property Options: TSceneDataOptionsSet read _Options;
+      constructor Create(const XMLNode: TUXML; const AOptions: TSceneDataOptionsSet);
       destructor Destroy; override;
     end;
   private
@@ -1003,7 +1012,6 @@ type
     property Root: TColladaRoot read _Root;
     class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; override;
     procedure Load(const StreamHelper: TUStreamHelper); override;
-    constructor Create;
     destructor Destroy; override;
   end;
 
@@ -2316,6 +2324,12 @@ begin
     ms.Free;
   end;
 end;
+
+constructor TUSceneData.Create(const AOptions: TSceneDataOptionsSet);
+begin
+  inherited Create;
+  _Options := AOptions;
+end;
 // TUSceneData end
 
 // TUSceneDataDAE begin
@@ -3114,6 +3128,7 @@ procedure TUSceneDataDAE.TColladaTriangles.InitializeObject;
     end;
   end;
   var i: Int32;
+  var Root: TColladaRoot;
 begin
   inherited InitializeObject;
   _VertexLayout := nil;
@@ -3121,11 +3136,15 @@ begin
   begin
     ProcessInput(_Inputs[i]);
   end;
-  for i := 0 to High(_Inputs) do
-  if Assigned(_Inputs[i].Source)
-  and (_Inputs[i].Source is TColladaSource) then
+  Root := GetRoot as TColladaRoot;
+  if Assigned(Root) and (sdo_optimize in Root.Options) then
   begin
-    OptimizeSource(TColladaSource(_Inputs[i].Source), _Inputs[i].Offset);
+    for i := 0 to High(_Inputs) do
+    if Assigned(_Inputs[i].Source)
+    and (_Inputs[i].Source is TColladaSource) then
+    begin
+      OptimizeSource(TColladaSource(_Inputs[i].Source), _Inputs[i].Offset);
+    end;
   end;
 end;
 
@@ -4745,7 +4764,7 @@ begin
   inherited Destroy;
 end;
 
-constructor TUSceneDataDAE.TColladaRoot.Create(const XMLNode: TUXML);
+constructor TUSceneDataDAE.TColladaRoot.Create(const XMLNode: TUXML; const AOptions: TSceneDataOptionsSet);
   var Node: TUXML;
   var NodeName: String;
 begin
@@ -5001,8 +5020,10 @@ constructor TUSceneDataDAE.TMeshSubsetInterfaceCollada.Create(
   var AttribOffsets: array of Int32;
   var AttribIndices: array of Int32;
   var i, j, ai, Ind: Int32;
+  var Root: TColladaRoot;
 begin
   _ColladaTriangles := ColladaTriangles;
+  Root := _ColladaTriangles.GetRoot as TColladaRoot;
   _VertexDescriptor := _ColladaTriangles.VertexDescriptor;
   PositionInd := -1;
   NormalInd := -1;
@@ -5021,8 +5042,14 @@ begin
     end;
   end;
   GenAttribs := 0;
-  GenNormals := (NormalInd = -1) and (PositionInd > -1);
-  GenTangents := ((TangentInd = -1) or (BinormalInd = -1)) and (TexCoordInd > -1);
+  GenNormals := (
+    (NormalInd = -1) and (PositionInd > -1)
+    and (Assigned(Root) and (sdo_gen_normals in Root.Options))
+  );
+  GenTangents := (
+    ((TangentInd = -1) or (BinormalInd = -1)) and (TexCoordInd > -1)
+    and (Assigned(Root) and (sdo_gen_tangents in Root.Options))
+  );
   if GenNormals then
   begin
     NormalInd := Length(_VertexDescriptor);
@@ -5107,9 +5134,9 @@ begin
     begin
       ai := Length(_ColladaTriangles.VertexLayout) + j;
       case _VertexDescriptor[ai].Semantic of
-        as_normal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Normals[VertexBuffer[i][j]];
-        as_tangent: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][j]].Tangent;
-        as_binormal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][j]].Binormal;
+        as_normal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Normals[VertexBuffer[i][ai]];
+        as_tangent: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][ai]].Tangent;
+        as_binormal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][ai]].Binormal;
       end;
     end;
   end;
@@ -5209,7 +5236,7 @@ procedure TUSceneDataDAE.Read(const XML: TUXML);
 begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
-  _Root := TColladaRoot.Create(XML);
+  _Root := TColladaRoot.Create(XML, _Options);
   _Root.Resolve;
   _Root.Initialize;
   for Geom in _Root.LibGeometries.Geometries do
@@ -5245,11 +5272,6 @@ begin
   finally
     xml.Free;
   end;
-end;
-
-constructor TUSceneDataDAE.Create;
-begin
-  inherited Create;
 end;
 
 destructor TUSceneDataDAE.Destroy;
