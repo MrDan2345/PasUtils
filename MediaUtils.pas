@@ -221,6 +221,15 @@ type
 
   type TUSceneData = class (TURefClass)
   public
+    type TImageInterface = class
+    protected
+      var _FileName: String;
+      var _Path: String;
+    public
+      property FileName: String read _FileName;
+      property Path: String read _Path;
+    end;
+    type TImageInterfaceList = array of TImageInterface;
     type TMeshSubsetInterface = class
     protected
       var _VertexData: Pointer;
@@ -255,11 +264,48 @@ type
       destructor Destroy; override;
     end;
     type TMeshInterfaceList = array of TMeshInterface;
+    type TMaterialInterface = class
+    public
+
+    end;
+    type TMaterialInterfaceList = array of TMaterialInterface;
+    type TAttachment = class
+    end;
+    type TAttachmentList = array of TAttachment;
+    type TAttachmentMesh = class (TAttachment)
+    protected
+      var _Mesh: TMeshInterface;
+    public
+      property Mesh: TMeshInterface read _Mesh;
+    end;
+    type TNodeInterface = class
+    public
+      type TNodeList = array of TNodeInterface;
+    protected
+      var _Name: String;
+      var _Transform: TUMat;
+      var _Attachments: TAttachmentList;
+      var _Parent: TNodeInterface;
+      var _Children: TNodeList;
+      procedure SetParent(const Value: TNodeInterface);
+    public
+      property Name: String read _Name;
+      property Transform: TUMat read _Transform;
+      property Attachments: TAttachmentList read _Attachments;
+      property Children: TNodeList read _Children;
+      property Parent: TNodeInterface read _Parent write SetParent;
+      destructor Destroy; override;
+    end;
+    var _ImageList: TImageInterfaceList;
+    var _MaterialList: TMaterialInterfaceList;
     var _MeshList: TMeshInterfaceList;
+    var _RootNode: TNodeInterface;
   protected
     var _Options: TSceneDataOptionsSet;
   public
+    property ImageList: TImageInterfaceList read _ImageList;
     property MeshList: TMeshInterfaceList read _MeshList;
+    property RootNode: TNodeInterface read _RootNode;
     property Options: TSceneDataOptionsSet read _Options;
     class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
     class function CanLoad(const FileName: String): Boolean; virtual; overload;
@@ -966,6 +1012,7 @@ type
       var _LibVisualScenes: TColladaLibraryVisualScenes;
       var _Scene: TColladaScene;
       var _Options: TSceneDataOptionsSet;
+      var _RootPath: String;
     public
       property Asset: TColladaAsset read _Asset;
       property LibMaterials: TColladaLibraryMaterials read _LibMaterials;
@@ -979,10 +1026,19 @@ type
       property LibVisualScenes: TColladaLibraryVisualScenes read _LibVisualScenes;
       property Scene: TColladaScene read _Scene;
       property Options: TSceneDataOptionsSet read _Options;
-      constructor Create(const XMLNode: TUXML; const AOptions: TSceneDataOptionsSet);
+      property RootPath: String read _RootPath;
+      constructor Create(const XMLNode: TUXML; const AOptions: TSceneDataOptionsSet; const Path: String);
       destructor Destroy; override;
     end;
   private
+    type TImageInterfaceCollada = class (TImageInterface)
+    public
+      constructor Create(const ColladaImage: TColladaImage);
+    end;
+    type TMaterialInterfaceCollada = class (TMaterialInterface)
+    public
+      constructor Create(const ColladaMaterial: TColladaMaterial);
+    end;
     type TMeshSubsetInterfaceCollada = class (TMeshSubsetInterface)
     private
       var _ColladaTriangles: TColladaTriangles;
@@ -993,12 +1049,19 @@ type
       constructor Create(const ColladaTriangles: TColladaTriangles);
     end;
     type TMeshInterfaceCollada = class (TMeshInterface)
-    private
-      var _ColladaMesh: TColladaMesh;
     public
       constructor Create(const ColladaMesh: TColladaMesh);
     end;
+    type TAttachmentMeshCollada = class (TAttachmentMesh)
+    public
+      constructor Create(const ColladaMesh: TColladaMesh; const GeometryInstance: TColladaInstanceGeometry);
+    end;
+    type TNodeInterfaceCollada = class (TNodeInterface)
+    public
+      constructor Create(const ColladaNode: TColladaNode; const AParent: TNodeInterfaceCollada);
+    end;
     var _Root: TColladaRoot;
+    var _Path: String;
     class function FindNextValue(const Str: String; var CurPos: Int32): String;
     class function LoadMatrix(
       const Node: TUXML
@@ -1012,6 +1075,7 @@ type
     property Root: TColladaRoot read _Root;
     class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; override;
     procedure Load(const StreamHelper: TUStreamHelper); override;
+    procedure Load(const FileName: String); override;
     destructor Destroy; override;
   end;
 
@@ -2253,6 +2317,31 @@ begin
   inherited Destroy;
 end;
 
+procedure TUSceneData.TNodeInterface.SetParent(const Value: TNodeInterface);
+begin
+  if Value = _Parent then Exit;
+  if Assigned(_Parent) then
+  begin
+    specialize UArrRemove<TNodeInterface>(
+      _Parent._Children, Self
+    );
+  end;
+  _Parent := Value;
+  if Assigned(_Parent) then
+  begin
+    specialize UArrAppend<TNodeInterface>(
+      _Parent._Children, Self
+    );
+  end;
+end;
+
+destructor TUSceneData.TNodeInterface.Destroy;
+begin
+  specialize UArrClear<TAttachment>(_Attachments);
+  specialize UArrClear<TNodeInterface>(_Children);
+  inherited Destroy;
+end;
+
 class function TUSceneData.CanLoad(const Stream: TStream): Boolean;
   var sh: TUStreamHelper;
 begin
@@ -2289,6 +2378,7 @@ end;
 destructor TUSceneData.Destroy;
 begin
   specialize UArrClear<TMeshInterface>(_MeshList);
+  specialize UArrClear<TImageInterface>(_ImageList);
   inherited Destroy;
 end;
 
@@ -4764,11 +4854,16 @@ begin
   inherited Destroy;
 end;
 
-constructor TUSceneDataDAE.TColladaRoot.Create(const XMLNode: TUXML; const AOptions: TSceneDataOptionsSet);
+constructor TUSceneDataDAE.TColladaRoot.Create(
+  const XMLNode: TUXML;
+  const AOptions: TSceneDataOptionsSet;
+  const Path: String
+);
   var Node: TUXML;
   var NodeName: String;
 begin
   inherited Create(XMLNode, nil);
+  _RootPath := Path;
   Node := XMLNode.FindChild('asset');
   if Assigned(Node) then
   begin
@@ -4823,6 +4918,23 @@ end;
 destructor TUSceneDataDAE.TColladaRoot.Destroy;
 begin
   inherited Destroy;
+end;
+
+constructor TUSceneDataDAE.TImageInterfaceCollada.Create(
+  const ColladaImage: TColladaImage
+);
+  var Root: TColladaRoot;
+begin
+  Root := ColladaImage.GetRoot as TColladaRoot;
+  if Assigned(Root) then _Path := Root.RootPath;
+  _FileName := ColladaImage.Source;
+end;
+
+constructor TUSceneDataDAE.TMaterialInterfaceCollada.Create(
+  const ColladaMaterial: TColladaMaterial
+);
+begin
+  //ColladaMaterial.InstanceEffect;
 end;
 
 function TUSceneDataDAE.TMeshSubsetInterfaceCollada.GetVertexDescriptor: TUVertexDescriptor;
@@ -5162,13 +5274,61 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.Create(
   var Tris: TColladaTriangles;
   var Intf: TMeshSubsetInterfaceCollada;
 begin
-  _ColladaMesh := ColladaMesh;
-  for Tris in _ColladaMesh.TrianglesList do
+  ColladaMesh.UserData := Self;
+  for Tris in ColladaMesh.TrianglesList do
   begin
     Intf := TMeshSubsetInterfaceCollada.Create(Tris);
     specialize UArrAppend<TMeshSubsetInterface>(
       _Subsets, Intf
     );
+  end;
+end;
+
+constructor TUSceneDataDAE.TAttachmentMeshCollada.Create(
+  const ColladaMesh: TColladaMesh;
+  const GeometryInstance: TColladaInstanceGeometry
+);
+begin
+  _Mesh := TMeshInterfaceCollada(ColladaMesh.UserData);
+end;
+
+constructor TUSceneDataDAE.TNodeInterfaceCollada.Create(
+  const ColladaNode: TColladaNode;
+  const AParent: TNodeInterfaceCollada
+);
+  var Child: TColladaObject;
+  var Mesh: TColladaMesh;
+begin
+  _Transform := TUMat.Identity;
+  Parent := AParent;
+  if Assigned(ColladaNode) then
+  begin
+    ColladaNode.UserData := Self;
+    if Length(ColladaNode.Name) > 0 then
+    begin
+      _Name := ColladaNode.Name;
+    end
+    else
+    begin
+      _Name := ColladaNode.id;
+    end;
+    for Child in ColladaNode.Children do
+    begin
+      if Child is TColladaNode then
+      begin
+        TNodeInterfaceCollada.Create(TColladaNode(Child), Self);
+      end
+      else if Child is TColladaInstanceGeometry then
+      begin
+        for Mesh in TColladaInstanceGeometry(Child).Geometry.Meshes do
+        begin
+          specialize UArrAppend<TAttachment>(
+            _Attachments,
+            TAttachmentMeshCollada.Create(Mesh, TColladaInstanceGeometry(Child))
+          );
+        end;
+      end;
+    end;
   end;
 end;
 
@@ -5230,24 +5390,48 @@ begin
 end;
 
 procedure TUSceneDataDAE.Read(const XML: TUXML);
+  var Image: TColladaImage;
+  var Mat: TColladaMaterial;
   var Geom: TColladaGeometry;
   var Mesh: TColladaMesh;
-  var Intf: TMeshInterfaceCollada;
+  var Node: TColladaNode;
+  var IntfImage: TImageInterfaceCollada;
+  var IntfMat: TMaterialInterfaceCollada;
+  var IntfMesh: TMeshInterfaceCollada;
 begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
-  _Root := TColladaRoot.Create(XML, _Options);
+  _Root := TColladaRoot.Create(XML, _Options, _Path);
   _Root.Resolve;
   _Root.Initialize;
+  for Image in _Root.LibImages.Images do
+  begin
+    IntfImage := TImageInterfaceCollada.Create(Image);
+    specialize UArrAppend<TImageInterface>(
+      _ImageList, IntfImage
+    );
+  end;
+  for Mat in _Root.LibMaterials.Materials do
+  begin
+    IntfMat := TMaterialInterfaceCollada.Create(Mat);
+    specialize UArrAppend<TMaterialInterface>(
+      _MaterialList, IntfMat
+    );
+  end;
   for Geom in _Root.LibGeometries.Geometries do
   begin
     for Mesh in Geom.Meshes do
     begin
-      Intf := TMeshInterfaceCollada.Create(Mesh);
+      IntfMesh := TMeshInterfaceCollada.Create(Mesh);
       specialize UArrAppend<TMeshInterface>(
-        _MeshList, Intf
+        _MeshList, IntfMesh
       );
     end;
+  end;
+  _RootNode := TNodeInterfaceCollada.Create(nil, nil);
+  for Node in _Root.Scene.VisualScene.VisualScene.Nodes do
+  begin
+    TNodeInterfaceCollada.Create(Node, TNodeInterfaceCollada(_RootNode));
   end;
 end;
 
@@ -5272,6 +5456,12 @@ begin
   finally
     xml.Free;
   end;
+end;
+
+procedure TUSceneDataDAE.Load(const FileName: String);
+begin
+  _Path := ExpandFileName(ExtractFileDir(FileName));
+  inherited Load(FileName);
 end;
 
 destructor TUSceneDataDAE.Destroy;
