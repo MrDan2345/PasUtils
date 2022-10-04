@@ -266,17 +266,111 @@ type
     type TMeshInterfaceList = array of TMeshInterface;
     type TMaterialInterface = class
     public
-
+      type TImageType = (it_1d, it_2d, it_3d, it_cube);
+      type TParam = class
+      public
+        type TParamClass = class of TParam;
+      private
+        var _Name: String;
+      public
+        property Name: String read _Name write _Name;
+        function ParamClass: TParamClass; virtual;
+        procedure AssignValue(const Param: TParam); virtual;
+      end;
+      type TParamImage = class (TParam)
+      private
+        var _ImageType: TImageType;
+        var _Source: String;
+      public
+        property ImageType: TImageType read _ImageType write _ImageType;
+        property Source: String read _Source write _Source;
+        property Value: String read _Source write _Source;
+        constructor Create;
+        procedure AssignValue(const Param: TParam); override;
+      end;
+      type TParamFloat = class (TParam)
+      private
+        var _Value: TUFloat;
+      public
+        property Value: TUFloat read _Value write _Value;
+        constructor Create;
+        procedure AssignValue(const Param: TParam); override;
+      end;
+      type TParamVec2 = class (TParam)
+      private
+        var _Value: TUVec2;
+      public
+        property Value: TUVec2 read _Value write _Value;
+        constructor Create;
+        procedure AssignValue(const Param: TParam); override;
+      end;
+      type TParamVec3 = class (TParam)
+      private
+        var _Value: TUVec3;
+      public
+        property Value: TUVec3 read _Value write _Value;
+        constructor Create;
+        procedure AssignValue(const Param: TParam); override;
+      end;
+      type TParamVec4 = class (TParam)
+      private
+        var _Value: TUVec4;
+      public
+        property Value: TUVec4 read _Value write _Value;
+        constructor Create;
+        procedure AssignValue(const Param: TParam); override;
+      end;
+      type TParamMat = class (TParam)
+      private
+        var _Dim: array[0..1] of UInt8;
+        var _Value: TUMat;
+        procedure SetValue(const Value: TUMat);
+      public
+        property DimX: UInt8 read _Dim[0] write _Dim[0];
+        property DimY: UInt8 read _Dim[1] write _Dim[1];
+        property Value: TUMat read _Value write SetValue;
+        constructor Create;
+        procedure AssignValue(const Param: TParam); override;
+      end;
+      type TParamList = array of TParam;
+    protected
+      var _MaterialId: String;
+      var _MaterialName: String;
+      var _Params: TParamList;
+    public
+      property MaterialId: String read _MaterialId;
+      property MaterialName: String read _MaterialName;
+      property Params: TParamList read _Params;
+      function FindParam(const Name: String): TParam;
+      function NewParam(const Name: String; const ParamClass: TParam.TParamClass): TParam;
+      function NewParamImage(const Name: String): TParamImage;
+      function NewParamFloat(const Name: String): TParamFloat;
+      function NewParamVec2(const Name: String): TParamVec2;
+      function NewParamVec3(const Name: String): TParamVec3;
+      function NewParamVec4(const Name: String): TParamVec4;
+      function NewParamMat(const Name: String; const DimX: UInt8 = 4; const DimY: UInt8 = 4): TParamMat;
+      destructor Destroy; override;
     end;
     type TMaterialInterfaceList = array of TMaterialInterface;
+    type TMaterialInstanceInterface = class (TMaterialInterface)
+    private
+      var _BaseMaterial: TMaterialInterface;
+    public
+      property BaseMaterial: TMaterialInterface read _BaseMaterial;
+      procedure Assign(const Material: TMaterialInterface);
+    end;
+    type TMaterialInstanceInterfaceList = array of TMaterialInstanceInterface;
     type TAttachment = class
     end;
     type TAttachmentList = array of TAttachment;
     type TAttachmentMesh = class (TAttachment)
     protected
       var _Mesh: TMeshInterface;
+      var _MaterialBindings: TMaterialInstanceInterfaceList;
     public
       property Mesh: TMeshInterface read _Mesh;
+      property MaterialBindings: TMaterialInstanceInterfaceList read _MaterialBindings;
+      destructor Destroy; override;
     end;
     type TNodeInterface = class
     public
@@ -552,6 +646,7 @@ type
     type TColladaEffectProfileParamType = (pt_invalid, pt_surface, pt_sampler, pt_float, pt_float2, pt_float3, pt_float4);
     type TColladaEffectProfileParam = class (TColladaObject)
     public
+      type TSamplerType = (st_1d, st_2d, st_3d, st_cube);
       type TDataSurface = class
         var InitFrom: String;
         var Image: TColladaImage;
@@ -559,6 +654,7 @@ type
       type TDataSampler = class
         var Source: String;
         var Surface: TDataSurface;
+        var SamplerType: TSamplerType;
       end;
       type TDataFloat = class
         var Value: TUFloat;
@@ -2317,6 +2413,168 @@ begin
   inherited Destroy;
 end;
 
+function TUSceneData.TMaterialInterface.TParam.ParamClass: TParamClass;
+begin
+  Result := TParamClass(ClassType);
+end;
+
+procedure TUSceneData.TMaterialInterface.TParam.AssignValue(const Param: TParam);
+begin
+
+end;
+
+constructor TUSceneData.TMaterialInterface.TParamImage.Create;
+begin
+  _ImageType := it_2d;
+  _Source := '';
+end;
+
+procedure TUSceneData.TMaterialInterface.TParamImage.AssignValue(const Param: TParam);
+begin
+  if not (Param is ParamClass) then Exit;
+  _ImageType := TParamImage(Param).ImageType;
+  _Source := TParamImage(Param).Source;
+end;
+
+constructor TUSceneData.TMaterialInterface.TParamFloat.Create;
+begin
+  _Value := 0;
+end;
+
+procedure TUSceneData.TMaterialInterface.TParamFloat.AssignValue(const Param: TParam);
+begin
+  if not (Param is ParamClass) then Exit;
+  _Value := TParamFloat(Param).Value;
+end;
+
+constructor TUSceneData.TMaterialInterface.TParamVec2.Create;
+begin
+  _Value := TUVec2.Zero;
+end;
+
+procedure TUSceneData.TMaterialInterface.TParamVec2.AssignValue(const Param: TParam);
+begin
+  if not (Param is ParamClass) then Exit;
+  _Value := TParamVec2(Param).Value;
+end;
+
+constructor TUSceneData.TMaterialInterface.TParamVec3.Create;
+begin
+  _Value := TUVec3.Zero;
+end;
+
+procedure TUSceneData.TMaterialInterface.TParamVec3.AssignValue(const Param: TParam);
+begin
+  if not (Param is ParamClass) then Exit;
+  _Value := TParamVec3(Param).Value;
+end;
+
+constructor TUSceneData.TMaterialInterface.TParamVec4.Create;
+begin
+  _Value := TUVec4.Zero;
+end;
+
+procedure TUSceneData.TMaterialInterface.TParamVec4.AssignValue(const Param: TParam);
+begin
+  if not (Param is ParamClass) then Exit;
+  _Value := TParamVec4(Param).Value;
+end;
+
+procedure TUSceneData.TMaterialInterface.TParamMat.SetValue(const Value: TUMat);
+  var i, j: Int32;
+begin
+  for i := 0 to _Dim[0] - 1 do
+  for j := 0 to _Dim[1] - 1 do
+  _Value[i, j] := Value[i, j];
+end;
+
+constructor TUSceneData.TMaterialInterface.TParamMat.Create;
+begin
+  _Dim[0] := 4;
+  _Dim[1] := 4;
+  _Value := TUMat.Identity;
+end;
+
+procedure TUSceneData.TMaterialInterface.TParamMat.AssignValue(const Param: TParam);
+begin
+  if not (Param is ParamClass) then Exit;
+  _Value := TParamMat(Param).Value;
+  _Dim[0] := TParamMat(Param).DimX;
+  _Dim[1] := TParamMat(Param).DimY;
+end;
+
+function TUSceneData.TMaterialInterface.FindParam(const Name: String): TParam;
+  var Param: TParam;
+begin
+  for Param in _Params do
+  if Param.Name = Name then Exit(Param);
+  Result := nil;
+end;
+
+function TUSceneData.TMaterialInterface.NewParam(const Name: String; const ParamClass: TParam.TParamClass): TParam;
+begin
+  Result := ParamClass.Create;
+  Result.Name := Name;
+  specialize UArrAppend<TParam>(_Params, Result);
+end;
+
+function TUSceneData.TMaterialInterface.NewParamImage(const Name: String): TParamImage;
+begin
+  Result := TParamImage(NewParam(Name, TParamImage));
+end;
+
+function TUSceneData.TMaterialInterface.NewParamFloat(const Name: String): TParamFloat;
+begin
+  Result := TParamFloat(NewParam(Name, TParamFloat));
+end;
+
+function TUSceneData.TMaterialInterface.NewParamVec2(const Name: String): TParamVec2;
+begin
+  Result := TParamVec2(NewParam(Name, TParamVec2));
+end;
+
+function TUSceneData.TMaterialInterface.NewParamVec3(const Name: String): TParamVec3;
+begin
+  Result := TParamVec3(NewParam(Name, TParamVec3));
+end;
+
+function TUSceneData.TMaterialInterface.NewParamVec4(const Name: String): TParamVec4;
+begin
+  Result := TParamVec4(NewParam(Name, TParamVec4));
+end;
+
+function TUSceneData.TMaterialInterface.NewParamMat(const Name: String; const DimX: UInt8; const DimY: UInt8): TParamMat;
+begin
+  Result := TParamMat(NewParam(Name, TParamMat));
+  Result.DimX := DimX;
+  Result.DimY := DimY;
+end;
+
+destructor TUSceneData.TMaterialInterface.Destroy;
+begin
+  specialize UArrClear<TParam>(_Params);
+  inherited Destroy;
+end;
+
+procedure TUSceneData.TMaterialInstanceInterface.Assign(const Material: TMaterialInterface);
+  var i: Int32;
+begin
+  specialize UArrClear<TParam>(_Params);
+  _BaseMaterial := Material;
+  SetLength(_Params, Length(_BaseMaterial.Params));
+  for i := 0 to High(_Params) do
+  begin
+    _Params[i] := _BaseMaterial.Params[i].ParamClass.Create;
+    _Params[i].AssignValue(_BaseMaterial.Params[i]);
+  end;
+end;
+
+destructor TUSceneData.TAttachmentMesh.Destroy;
+begin
+  specialize UArrClear<TMaterialInstanceInterface>(_MaterialBindings);
+  inherited Destroy;
+end;
+
 procedure TUSceneData.TNodeInterface.SetParent(const Value: TNodeInterface);
 begin
   if Value = _Parent then Exit;
@@ -3443,7 +3701,8 @@ begin
     end
     else if (NodeName = 'sampler1d')
     or (NodeName = 'sampler2d')
-    or (NodeName = 'sampler3d') then
+    or (NodeName = 'sampler3d')
+    or (NodeName = 'samplercube') then
     begin
       DataSampler := TDataSampler.Create;
       SubNode := Node.FindChild('source');
@@ -3451,6 +3710,11 @@ begin
       begin
         DataSampler.Source := SubNode.Content;
       end;
+      if NodeName = 'sampler1d' then DataSampler.SamplerType := st_1d
+      else if NodeName = 'sampler2d' then DataSampler.SamplerType := st_2d
+      else if NodeName = 'sampler3d' then DataSampler.SamplerType := st_3d
+      else if NodeName = 'samplercube' then DataSampler.SamplerType := st_cube
+      else DataSampler.SamplerType := st_2d;
       _Data := DataSampler;
       _ParamType := pt_sampler;
     end
@@ -4933,8 +5197,57 @@ end;
 constructor TUSceneDataDAE.TMaterialInterfaceCollada.Create(
   const ColladaMaterial: TColladaMaterial
 );
+  var Profile: TColladaEffectProfile;
+  var i: Int32;
+  var Param: TColladaEffectProfileParam;
 begin
-  //ColladaMaterial.InstanceEffect;
+  ColladaMaterial.UserData := Self;
+  _MaterialId := ColladaMaterial.id;
+  _MaterialName := ColladaMaterial.Name;
+  if not Assigned(ColladaMaterial.InstanceEffect)
+  or not Assigned(ColladaMaterial.InstanceEffect.Effect)
+  or not Assigned(ColladaMaterial.InstanceEffect.Effect.Profile) then Exit;
+  Profile := ColladaMaterial.InstanceEffect.Effect.Profile;
+  for i := 0 to High(Profile.Params) do
+  begin
+    Param := Profile.Params[i];
+    case Profile.Params[i].ParamType of
+      pt_sampler:
+      begin
+        if Assigned(Param.AsSampler.Surface)
+        and Assigned(Param.AsSampler.Surface.Image) then
+        begin
+          with NewParamImage(Param.id) do
+          begin
+            Source := Param.AsSampler.Surface.Image.Source;
+            case Param.AsSampler.SamplerType of
+              st_1d: ImageType := it_1d;
+              st_2d: ImageType := it_2d;
+              st_3d: ImageType := it_3d;
+              st_cube: ImageType := it_cube;
+              else ImageType := it_2d;
+            end;
+          end;
+        end;
+      end;
+      pt_float:
+      begin
+        NewParamFloat(Param.id).Value := Param.AsFloat.Value;
+      end;
+      pt_float2:
+      begin
+        NewParamVec2(Param.id).Value := Param.AsFloat2.Value;
+      end;
+      pt_float3:
+      begin
+        NewParamVec3(Param.id).Value := Param.AsFloat3.Value;
+      end;
+      pt_float4:
+      begin
+        NewParamVec4(Param.id).Value := Param.AsFloat4.Value;
+      end;
+    end;
+  end;
 end;
 
 function TUSceneDataDAE.TMeshSubsetInterfaceCollada.GetVertexDescriptor: TUVertexDescriptor;
@@ -5288,8 +5601,17 @@ constructor TUSceneDataDAE.TAttachmentMeshCollada.Create(
   const ColladaMesh: TColladaMesh;
   const GeometryInstance: TColladaInstanceGeometry
 );
+  var i: Int32;
 begin
   _Mesh := TMeshInterfaceCollada(ColladaMesh.UserData);
+  SetLength(_MaterialBindings, Length(GeometryInstance.MaterialBindings));
+  for i := 0 to High(_MaterialBindings) do
+  begin
+    _MaterialBindings[i] := TMaterialInstanceInterface.Create;
+    _MaterialBindings[i].Assign(
+      TMaterialInterface(GeometryInstance.MaterialBindings[i].UserData)
+    );
+  end;
 end;
 
 constructor TUSceneDataDAE.TNodeInterfaceCollada.Create(
