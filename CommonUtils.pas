@@ -803,6 +803,29 @@ type
   end;
   type TUXMLRef = specialize TUSharedRef<TUXML>;
 
+  generic TUMap<TKey, TValue> = record
+  public
+    type TItem = record
+      Key: TKey;
+      Value: TValue;
+    end;
+  private
+    var _Items: array of TItem;
+    function GetValue(const Index: Int32): TValue; inline;
+  public
+    property Get[const Index: Int32]: TValue read GetValue; default;
+    function Add(const Key: TKey; const Value: TValue): Int32;
+    function HasKey(const Key: TKey): Boolean;
+    procedure RemoveByKey(const Key: TKey);
+    procedure RemoveByValue(const Value: TValue);
+    procedure RemoveByIndex(const Index: Int32);
+    function FindIndexByKey(const Key: TKey): Int32;
+    function FindIndexByValue(const Value: TValue): Int32;
+    function FindValueByKey(const Key: TKey): TValue;
+    function FindValueByIndex(const Index: Int32): TValue;
+    function Count: Int32; inline;
+  end;
+
   generic TUArray<T> = array of T;
 
 procedure UClear(out x; const Size: UInt32);
@@ -4755,8 +4778,129 @@ begin
   s := Save;
   Stream.Write(s[1], Length(s));
 end;
-
 // TUXML end
+
+// TUMap begin
+function TUMap.GetValue(const Index: Int32): TValue;
+begin
+  Result := FindValueByIndex(Index);
+end;
+
+function TUMap.Add(const Key: TKey; const Value: TValue): Int32;
+  var l, h, m: Int32;
+begin
+  l := 0;
+  h := High(_Items);
+  while l <= h do
+  begin
+    m := (l + h) shr 1;
+    if _Items[m].Key < Key then
+    begin
+      l := m + 1;
+    end
+    else
+    begin
+      h := m - 1;
+    end;
+  end;
+  if l > High(_Items) then
+  begin
+    SetLength(_Items, Length(_Items) + 1);
+    _Items[l].Key := Key;
+    _Items[l].Value := Value;
+  end
+  else if _Items[l].Key = Key then
+  begin
+    _Items[l].Value := Value;
+  end
+  else
+  begin
+    SetLength(_Items, Length(_Items) + 1);
+    for m := High(_Items) downto l + 1 do
+    begin
+      _Items[m] := _Items[m - 1];
+    end;
+    _Items[l].Key := Key;
+    _Items[l].Value := Value;
+  end;
+  Result := l;
+end;
+
+function TUMap.HasKey(const Key: TKey): Boolean;
+begin
+  Result := FindIndexByKey(Key) > -1;
+end;
+
+procedure TUMap.RemoveByKey(const Key: TKey);
+  var i: Int32;
+begin
+  i := FindIndexByKey(Key);
+  if i = -1 then Exit;
+  RemoveByIndex(i);
+end;
+
+procedure TUMap.RemoveByValue(const Value: TValue);
+  var i: Int32;
+begin
+  i := FindIndexByValue(Value);
+  if i = -1 then Exit;
+  RemoveByIndex(i);
+end;
+
+procedure TUMap.RemoveByIndex(const Index: Int32);
+begin
+  specialize UArrDelete<TItem>(_Items, Index);
+end;
+
+function TUMap.FindIndexByKey(const Key: TKey): Int32;
+  var l, h, m: Int32;
+begin
+  l := 0;
+  h := High(_Items);
+  while l <= h do
+  begin
+    m := (l + h) shr 1;
+    if _Items[m].Key = Key then Exit(m);
+    if _Items[m].Key < Key then
+    begin
+      l := m + 1;
+    end
+    else
+    begin
+      h := m - 1;
+    end;
+  end;
+  if (l < Length(_Items)) and (_Items[l].Key = Key) then Exit(l);
+  Result := -1;
+end;
+
+function TUMap.FindIndexByValue(const Value: TValue): Int32;
+  var i: Int32;
+begin
+  for i := 0 to High(_Items) do
+  if _Items[i].Value = Value then Exit(i);
+  Result := -1;
+end;
+
+function TUMap.FindValueByKey(const Key: TKey): TValue;
+  var i: Int32;
+begin
+  i := FindIndexByKey(Key);
+  if i = -1 then Exit(Default(TValue));
+  Result := _Items[i].Value;
+end;
+
+function TUMap.FindValueByIndex(const Index: Int32): TValue;
+begin
+  if (Index < 0) or (Index > High(_Items)) then Exit(Default(TValue));
+  Result := _Items[Index].Value;
+end;
+
+function TUMap.Count: Int32;
+begin
+  Result := Length(_Items);
+end;
+// TUMap end
 
 // Functions begin
 procedure UClear(out x; const Size: UInt32);
