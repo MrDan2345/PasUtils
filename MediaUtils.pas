@@ -280,11 +280,13 @@ type
       type TParamImage = class (TParam)
       private
         var _ImageType: TImageType;
+        var _Image: TImageInterface;
         var _Source: String;
       public
         property ImageType: TImageType read _ImageType write _ImageType;
+        property Image: TImageInterface read _Image write _Image;
         property Source: String read _Source write _Source;
-        property Value: String read _Source write _Source;
+        property Value: TImageInterface read _Image write _Image;
         constructor Create;
         procedure AssignValue(const Param: TParam); override;
       end;
@@ -2433,6 +2435,7 @@ procedure TUSceneData.TMaterialInterface.TParamImage.AssignValue(const Param: TP
 begin
   if not (Param is ParamClass) then Exit;
   _ImageType := TParamImage(Param).ImageType;
+  _Image := TParamImage(Param).Image;
   _Source := TParamImage(Param).Source;
 end;
 
@@ -5219,6 +5222,7 @@ begin
         begin
           with NewParamImage(Param.id) do
           begin
+            Image := TImageInterface(Param.AsSampler.Surface.Image.UserData);
             Source := Param.AsSampler.Surface.Image.Source;
             case Param.AsSampler.SamplerType of
               st_1d: ImageType := it_1d;
@@ -5609,8 +5613,9 @@ begin
   begin
     _MaterialBindings[i] := TMaterialInstanceInterface.Create;
     _MaterialBindings[i].Assign(
-      TMaterialInterface(GeometryInstance.MaterialBindings[i].UserData)
+      TMaterialInterface(GeometryInstance.MaterialBindings[i].Material.UserData)
     );
+    GeometryInstance.MaterialBindings[i].UserData := _MaterialBindings[i];
   end;
 end;
 
