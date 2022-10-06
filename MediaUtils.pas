@@ -400,6 +400,7 @@ type
     var _Options: TSceneDataOptionsSet;
   public
     property ImageList: TImageInterfaceList read _ImageList;
+    property MaterialList: TMaterialInterfaceList read _MaterialList;
     property MeshList: TMeshInterfaceList read _MeshList;
     property RootNode: TNodeInterface read _RootNode;
     property Options: TSceneDataOptionsSet read _Options;
@@ -5192,6 +5193,7 @@ constructor TUSceneDataDAE.TImageInterfaceCollada.Create(
 );
   var Root: TColladaRoot;
 begin
+  ColladaImage.UserData := Self;
   Root := ColladaImage.GetRoot as TColladaRoot;
   if Assigned(Root) then _Path := Root.RootPath;
   _FileName := ColladaImage.Source;
@@ -5203,6 +5205,8 @@ constructor TUSceneDataDAE.TMaterialInterfaceCollada.Create(
   var Profile: TColladaEffectProfile;
   var i: Int32;
   var Param: TColladaEffectProfileParam;
+  var Sampler: TColladaEffectProfileParam.TDataSampler;
+  var ParamName: String;
 begin
   ColladaMaterial.UserData := Self;
   _MaterialId := ColladaMaterial.id;
@@ -5214,16 +5218,20 @@ begin
   for i := 0 to High(Profile.Params) do
   begin
     Param := Profile.Params[i];
+    ParamName := Param.sid;
+    if Length(Param.id) > 0 then ParamName := Param.id;
+    if Length(Param.Name) > 0 then ParamName := Param.Name;
     case Profile.Params[i].ParamType of
       pt_sampler:
       begin
-        if Assigned(Param.AsSampler.Surface)
-        and Assigned(Param.AsSampler.Surface.Image) then
+        Sampler := Param.AsSampler;
+        if Assigned(Sampler.Surface)
+        and Assigned(Sampler.Surface.Image) then
         begin
-          with NewParamImage(Param.id) do
+          with NewParamImage(ParamName) do
           begin
-            Image := TImageInterface(Param.AsSampler.Surface.Image.UserData);
-            Source := Param.AsSampler.Surface.Image.Source;
+            Image := TImageInterface(Sampler.Surface.Image.UserData);
+            Source := Sampler.Surface.Image.Source;
             case Param.AsSampler.SamplerType of
               st_1d: ImageType := it_1d;
               st_2d: ImageType := it_2d;
