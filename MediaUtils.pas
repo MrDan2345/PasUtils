@@ -939,6 +939,7 @@ type
     public
       property Material: TColladaMaterial read _Material;
       property Symbol: String read _Symbol;
+      property Target: String read _Target;
       constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
       destructor Destroy; override;
     end;
@@ -5613,17 +5614,32 @@ constructor TUSceneDataDAE.TAttachmentMeshCollada.Create(
   const ColladaMesh: TColladaMesh;
   const GeometryInstance: TColladaInstanceGeometry
 );
+  function FindMaterialBinding(const Material: String): TColladaInstanceMaterial;
+    var i: Int32;
+  begin
+    for i := 0 to High(GeometryInstance.MaterialBindings) do
+    if GeometryInstance.MaterialBindings[i].Symbol = Material then
+    begin
+      Exit(GeometryInstance.MaterialBindings[i]);
+    end;
+    Result := nil;
+  end;
   var i: Int32;
+  var cm: TColladaInstanceMaterial;
 begin
   _Mesh := TMeshInterfaceCollada(ColladaMesh.UserData);
-  SetLength(_MaterialBindings, Length(GeometryInstance.MaterialBindings));
-  for i := 0 to High(_MaterialBindings) do
+  SetLength(_MaterialBindings, Length(ColladaMesh.TrianglesList));
+  for i := 0 to High(ColladaMesh.TrianglesList) do
   begin
     _MaterialBindings[i] := TMaterialInstanceInterface.Create;
-    _MaterialBindings[i].Assign(
-      TMaterialInterface(GeometryInstance.MaterialBindings[i].Material.UserData)
-    );
-    GeometryInstance.MaterialBindings[i].UserData := _MaterialBindings[i];
+    cm := FindMaterialBinding(ColladaMesh.TrianglesList[i].Material);
+    if not Assigned(cm) then Continue;
+    begin
+      _MaterialBindings[i].Assign(
+        TMaterialInterface(cm.Material.UserData)
+      );
+      cm.UserData := _MaterialBindings[i];
+    end;
   end;
 end;
 

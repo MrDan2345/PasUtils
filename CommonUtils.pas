@@ -5925,7 +5925,7 @@ end;
 generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Int32; const DelCount: Int32);
   var i, dc: Int32;
 begin
-  dc := DelStart;
+  dc := DelCount;
   if DelStart + dc > Length(Arr) then dc := Length(Arr) - DelStart;
   if (dc < 1) or (DelStart < 0) then Exit;
   for i := DelStart to DelStart + dc - 1 do
