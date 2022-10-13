@@ -264,6 +264,19 @@ type
       destructor Destroy; override;
     end;
     type TMeshInterfaceList = array of TMeshInterface;
+    type TSkinInterface = class
+    public
+      type TSubset = class
+      protected
+        var _VertexData: Pointer;
+        var _WeightCount: Int32;
+      end;
+    private
+      var _Mesh: TMeshInterface;
+    public
+      destructor Destroy; override;
+    end;
+    type TSkinInterfaceList = array of TSkinInterface;
     type TMaterialInterface = class
     public
       type TImageType = (it_1d, it_2d, it_3d, it_cube);
@@ -395,6 +408,7 @@ type
     var _ImageList: TImageInterfaceList;
     var _MaterialList: TMaterialInterfaceList;
     var _MeshList: TMeshInterfaceList;
+    var _SkinList: TSkinInterfaceList;
     var _RootNode: TNodeInterface;
   protected
     var _Options: TSceneDataOptionsSet;
@@ -402,6 +416,7 @@ type
     property ImageList: TImageInterfaceList read _ImageList;
     property MaterialList: TMaterialInterfaceList read _MaterialList;
     property MeshList: TMeshInterfaceList read _MeshList;
+    property SkinList: TSkinInterfaceList read _SkinList;
     property RootNode: TNodeInterface read _RootNode;
     property Options: TSceneDataOptionsSet read _Options;
     class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
@@ -1151,6 +1166,10 @@ type
     type TMeshInterfaceCollada = class (TMeshInterface)
     public
       constructor Create(const ColladaMesh: TColladaMesh);
+    end;
+    type TSkinInterfaceCollada = class (TSkinInterface)
+    public
+      constructor Create(const ColladaSkin: TColladaSkin);
     end;
     type TAttachmentMeshCollada = class (TAttachmentMesh)
     public
@@ -2414,6 +2433,12 @@ end;
 destructor TUSceneData.TMeshInterface.Destroy;
 begin
   specialize UArrClear<TMeshSubsetInterface>(_Subsets);
+  inherited Destroy;
+end;
+
+destructor TUSceneData.TSkinInterface.Destroy;
+begin
+
   inherited Destroy;
 end;
 
@@ -5610,6 +5635,14 @@ begin
   end;
 end;
 
+constructor TUSceneDataDAE.TSkinInterfaceCollada.Create(
+  const ColladaSkin: TColladaSkin
+);
+begin
+  ColladaSkin.UserData := Self;
+  //ColladaSkin.Geometry.Meshes[0].;
+end;
+
 constructor TUSceneDataDAE.TAttachmentMeshCollada.Create(
   const ColladaMesh: TColladaMesh;
   const GeometryInstance: TColladaInstanceGeometry
@@ -5746,9 +5779,12 @@ procedure TUSceneDataDAE.Read(const XML: TUXML);
   var Geom: TColladaGeometry;
   var Mesh: TColladaMesh;
   var Node: TColladaNode;
+  var Controller: TColladaController;
+  var Skin: TColladaSkin;
   var IntfImage: TImageInterfaceCollada;
   var IntfMat: TMaterialInterfaceCollada;
   var IntfMesh: TMeshInterfaceCollada;
+  var IntfSkin: TSkinInterfaceCollada;
 begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
@@ -5778,6 +5814,16 @@ begin
         _MeshList, IntfMesh
       );
     end;
+  end;
+  for Controller in _Root.LibControllers.Controllers do
+  if Controller.ControllerType = ct_skin then
+  begin
+    Skin := Controller.AsSkin;
+    if not Assigned(Skin) then Continue;
+    IntfSkin := TSkinInterfaceCollada.Create(Skin);
+    specialize UArrAppend<TSkinInterface>(
+      _SkinList, IntfSkin
+    );
   end;
   _RootNode := TNodeInterfaceCollada.Create(nil, nil);
   for Node in _Root.Scene.VisualScene.VisualScene.Nodes do
