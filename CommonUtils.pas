@@ -743,6 +743,33 @@ type
     generic function Read<T>: T;
   end;
 
+  generic TUMap<TKey, TValue> = record
+  public
+    type TItem = record
+      Key: TKey;
+      Value: TValue;
+    end;
+  private
+    var _Items: array of TItem;
+    function GetValue(const Index: Int32): TValue; inline;
+  public
+    property Get[const Index: Int32]: TValue read GetValue; default;
+    function GetKey(const Index: Int32): TKey; inline;
+    function Add(const Key: TKey; const Value: TValue): Int32;
+    function HasKey(const Key: TKey): Boolean;
+    procedure RemoveByKey(const Key: TKey);
+    procedure RemoveByValue(const Value: TValue);
+    procedure RemoveByIndex(const Index: Int32);
+    function FindIndexByKey(const Key: TKey): Int32;
+    function FindIndexByValue(const Value: TValue): Int32;
+    function FindValueByKey(const Key: TKey): TValue;
+    function FindValueByIndex(const Index: Int32): TValue;
+    function Count: Int32; inline;
+    procedure Clear;
+  end;
+
+  generic TUArray<T> = array of T;
+
   type TUXML = class (TURefClass)
   public
     type TAttribute = class
@@ -798,35 +825,72 @@ type
     class function Load(const Stream: TStream): TUXML;
     class function LoadFromFile(const FileName: String): TUXML;
     function Save: String;
-    procedure Save(const FileName: String);
     procedure Save(const Stream: TStream);
+    procedure SaveToFile(const FileName: String);
   end;
   type TUXMLRef = specialize TUSharedRef<TUXML>;
 
-  generic TUMap<TKey, TValue> = record
+  type TUJson = class (TURefClass)
   public
-    type TItem = record
-      Key: TKey;
-      Value: TValue;
+    type TNodeType = (nt_invalid, nt_value, nt_object, nt_array);
+    type TNamedNode = record
+      Name: String;
+      Node: TUJson;
     end;
+    type TContent = array of TNamedNode;
+    type TElements = array of TUJson;
+    type TEnumerator = class
+    private
+      var n: TUJson;
+      var i: Int32;
+      function GetCurrent: TUJson;
+    public
+      constructor Create(const Node: TUJson);
+      function MoveNext: Boolean;
+      property Current: TUJson read GetCurrent;
+    end;
+  protected
+    class var _Syntax: TUParserSyntax;
   private
-    var _Items: array of TItem;
-    function GetValue(const Index: Int32): TValue; inline;
+    var _NodeType: TNodeType;
+    var _Value: String;
+    var _Content: TContent;
+    var _Elements: TElements;
+    function ReadJson(const p: TUParser): Boolean;
+    procedure SetNodeType(const Value: TNodeType);
+    function GetValue: String;
+    function GetContent(const Key: String): TUJson; inline;
+    function GetName(const Index: Int32): String; inline;
+    function GetElement(const Index: Int32): TUJson; inline;
+    function GetCount: Int32; inline;
+    function GetIsSingleValue: Boolean; inline;
+    function GetIsObject: Boolean; inline;
+    function GetIsArray: Boolean; inline;
+    function GetIsNumber: Boolean; inline;
   public
-    property Get[const Index: Int32]: TValue read GetValue; default;
-    function Add(const Key: TKey; const Value: TValue): Int32;
-    function HasKey(const Key: TKey): Boolean;
-    procedure RemoveByKey(const Key: TKey);
-    procedure RemoveByValue(const Value: TValue);
-    procedure RemoveByIndex(const Index: Int32);
-    function FindIndexByKey(const Key: TKey): Int32;
-    function FindIndexByValue(const Value: TValue): Int32;
-    function FindValueByKey(const Key: TKey): TValue;
-    function FindValueByIndex(const Index: Int32): TValue;
-    function Count: Int32; inline;
+    property NodeType: TNodeType read _NodeType write SetNodeType;
+    property Value: String read GetValue;
+    property Content[const Key: String]: TUJson read GetContent; default;
+    property Name[const Index: Int32]: String read GetName;
+    property Element[const Index: Int32]: TUJson read GetElement;
+    property Count: Int32 read GetCount;
+    property IsSingleValue: Boolean read GetIsSingleValue;
+    property IsObject: Boolean read GetIsObject;
+    property IsArray: Boolean read GetIsArray;
+    property IsNumber: Boolean read GetIsNumber;
+    function GetEnumerator: TEnumerator;
+    function FormatJson(const Offset: String = ''): String;
+    class constructor CreateClass;
+    constructor Create;
+    destructor Destroy; override;
+    class function Load(const Json: String): TUJson;
+    class function Load(const Stream: TStream): TUJson;
+    class function LoadFromFile(const FileName: String): TUJson;
+    function Save: String;
+    procedure Save(const Stream: TStream);
+    procedure SaveToFile(const FileName: String);
   end;
-
-  generic TUArray<T> = array of T;
+  TUJsonRef = specialize TUSharedRef<TUJson>;
 
 procedure UClear(out x; const Size: UInt32);
 procedure UMove(out Dest; const Src; const Size: UInt32);
@@ -4466,6 +4530,139 @@ begin
 end;
 // TUShortStringReader end
 
+// TUMap begin
+function TUMap.GetValue(const Index: Int32): TValue;
+begin
+  Result := FindValueByIndex(Index);
+end;
+
+function TUMap.GetKey(const Index: Int32): TKey;
+begin
+  if (Index < 0) or (Index > High(_Items)) then Exit(Default(TKey));
+  Result := _Items[Index].Key;
+end;
+
+function TUMap.Add(const Key: TKey; const Value: TValue): Int32;
+  var l, h, m: Int32;
+begin
+  l := 0;
+  h := High(_Items);
+  while l <= h do
+  begin
+    m := (l + h) shr 1;
+    if _Items[m].Key < Key then
+    begin
+      l := m + 1;
+    end
+    else
+    begin
+      h := m - 1;
+    end;
+  end;
+  if l > High(_Items) then
+  begin
+    SetLength(_Items, Length(_Items) + 1);
+    _Items[l].Key := Key;
+    _Items[l].Value := Value;
+  end
+  else if _Items[l].Key = Key then
+  begin
+    _Items[l].Value := Value;
+  end
+  else
+  begin
+    SetLength(_Items, Length(_Items) + 1);
+    for m := High(_Items) downto l + 1 do
+    begin
+      _Items[m] := _Items[m - 1];
+    end;
+    _Items[l].Key := Key;
+    _Items[l].Value := Value;
+  end;
+  Result := l;
+end;
+
+function TUMap.HasKey(const Key: TKey): Boolean;
+begin
+  Result := FindIndexByKey(Key) > -1;
+end;
+
+procedure TUMap.RemoveByKey(const Key: TKey);
+  var i: Int32;
+begin
+  i := FindIndexByKey(Key);
+  if i = -1 then Exit;
+  RemoveByIndex(i);
+end;
+
+procedure TUMap.RemoveByValue(const Value: TValue);
+  var i: Int32;
+begin
+  i := FindIndexByValue(Value);
+  if i = -1 then Exit;
+  RemoveByIndex(i);
+end;
+
+procedure TUMap.RemoveByIndex(const Index: Int32);
+begin
+  specialize UArrDelete<TItem>(_Items, Index);
+end;
+
+function TUMap.FindIndexByKey(const Key: TKey): Int32;
+  var l, h, m: Int32;
+begin
+  l := 0;
+  h := High(_Items);
+  while l <= h do
+  begin
+    m := (l + h) shr 1;
+    if _Items[m].Key = Key then Exit(m);
+    if _Items[m].Key < Key then
+    begin
+      l := m + 1;
+    end
+    else
+    begin
+      h := m - 1;
+    end;
+  end;
+  if (l < Length(_Items)) and (_Items[l].Key = Key) then Exit(l);
+  Result := -1;
+end;
+
+function TUMap.FindIndexByValue(const Value: TValue): Int32;
+  var i: Int32;
+begin
+  for i := 0 to High(_Items) do
+  if _Items[i].Value = Value then Exit(i);
+  Result := -1;
+end;
+
+function TUMap.FindValueByKey(const Key: TKey): TValue;
+  var i: Int32;
+begin
+  i := FindIndexByKey(Key);
+  if i = -1 then Exit(Default(TValue));
+  Result := _Items[i].Value;
+end;
+
+function TUMap.FindValueByIndex(const Index: Int32): TValue;
+begin
+  if (Index < 0) or (Index > High(_Items)) then Exit(Default(TValue));
+  Result := _Items[Index].Value;
+end;
+
+function TUMap.Count: Int32;
+begin
+  Result := Length(_Items);
+end;
+
+procedure TUMap.Clear;
+begin
+  _Items := nil;
+end;
+// TUMap end
+
 // TUXML begin
 function TUXML.TEnumerator.GetCurrent: TUXML;
 begin
@@ -4742,6 +4939,7 @@ class function TUXML.Load(const Stream: TStream): TUXML;
 begin
   s := '';
   SetLength(s, Stream.Size);
+  Stream.Read(s[1], Stream.Size);
   Result := Load(s);
 end;
 
@@ -4761,7 +4959,14 @@ begin
   Result := '<?xml version="1.0" encoding="UTF-8"?>'#$D#$A + WriteXML;
 end;
 
-procedure TUXML.Save(const FileName: String);
+procedure TUXML.Save(const Stream: TStream);
+  var s: String;
+begin
+  s := Save;
+  Stream.Write(s[1], Length(s));
+end;
+
+procedure TUXML.SaveToFile(const FileName: String);
   var fs: TFileStream;
 begin
   fs := TFileStream.Create(FileName, fmCreate);
@@ -4771,136 +4976,370 @@ begin
     fs.Free;
   end;
 end;
+// TUXML end
 
-procedure TUXML.Save(const Stream: TStream);
+// TUJson begin
+function TUJson.TEnumerator.GetCurrent: TUJson;
+begin
+  if (i = -1) or (i >= n.Count) then Exit(nil);
+  Result := n.Element[i];
+end;
+
+constructor TUJson.TEnumerator.Create(const Node: TUJson);
+begin
+  n := Node;
+  i := -1;
+end;
+
+function TUJson.TEnumerator.MoveNext: Boolean;
+begin
+  if i < n.Count then Inc(i);
+  Result := i < n.Count;
+end;
+
+function TUJson.ReadJson(const p: TUParser): Boolean;
+  var t: TUParserToken;
+  var NamedNode: TNamedNode;
+  var Json: TUJson;
+begin
+  Result := False;
+  t := p.NextToken;
+  if t.TokenType in [tt_string, tt_word, tt_number] then
+  begin
+    NodeType := nt_value;
+    if (t.TokenType = tt_number) and (p.CheckToken = '.') then
+    begin
+      _Value := t;
+      _Value += p.NextToken.Value;
+      t := p.NextToken;
+      if t <> tt_number then Exit;
+      _Value += t.Value;
+    end
+    else
+    begin
+      _Value := t;
+    end;
+  end
+  else if t = tt_keyword then
+  begin
+    NodeType := nt_object;
+    _Value := LowerCase(t.Value);
+  end
+  else if t = '{' then
+  begin
+    NodeType := nt_object;
+    repeat
+      t := p.NextToken;
+      if t = ',' then t := p.NextToken;
+      if t = '}' then Break;
+      if not (t in [tt_string, tt_word]) then Exit;
+      NamedNode.Name := t;
+      t := p.NextToken;
+      if not (t = ':') then Exit;
+      NamedNode.Node := TUJson.Create;
+      if not NamedNode.Node.ReadJson(p) then
+      begin
+        FreeAndNil(NamedNode.Node);
+        Exit;
+      end;
+      specialize UArrAppend<TNamedNode>(_Content, NamedNode);
+    until t = tt_eof;
+  end
+  else if t = '[' then
+  begin
+    NodeType := nt_array;
+    repeat
+      t := p.CheckToken;
+      if t = ',' then t := p.NextToken;
+      if t = ']' then
+      begin
+        t := p.NextToken;
+        Break;
+      end;
+      Json := TUJson.Create;
+      if not Json.ReadJson(p) then
+      begin
+        FreeAndNil(Json);
+        Exit;
+      end;
+      specialize UArrAppend<TUJson>(_Elements, Json);
+    until t = tt_eof;
+  end
+  else
+  begin
+    Exit;
+  end;
+  Result := True;
+end;
+
+procedure TUJson.SetNodeType(const Value: TNodeType);
+  var i: Int32;
+begin
+  if _NodeType = Value then Exit;
+  case _NodeType of
+    nt_object:
+    begin
+      for i := 0 to High(_Content) do
+      begin
+        FreeAndNil(_Content[i].Node);
+      end;
+      _Content := nil;
+    end;
+    nt_array:
+    begin
+      specialize UArrClear<TUJson>(_Elements);
+    end;
+  end;
+  _NodeType := Value;
+  if (_NodeType = nt_object) then _Value := '';
+end;
+
+function TUJson.GetValue: String;
+  var i: Int32;
+begin
+  case _NodeType of
+    nt_value: Result := _Value;
+    nt_object:
+    begin
+      if Length(_Value) > 0 then
+      begin
+        Result := _Value;
+      end
+      else
+      begin
+        Result := '{';
+        for i := 0 to High(_Content) do
+        begin
+          Result += '"' + _Content[i].Name + '":';
+          if _Content[i].Node.IsSingleValue
+          and not _Content[i].Node.IsNumber then
+          begin
+            Result += '"' + _Content[i].Node.Value + '"';
+          end
+          else
+          begin
+            Result += _Content[i].Node.Value;
+          end;
+          if i < High(_Content) then Result += ',';
+        end;
+        Result += '}';
+      end;
+    end;
+    nt_array:
+    begin
+      Result := '[';
+      for i := 0 to High(_Elements) do
+      begin
+        Result += _Elements[i].Value;
+        if i < High(_Elements) then Result += ',';
+      end;
+      Result += ']';
+    end;
+  end;
+end;
+
+function TUJson.GetContent(const Key: String): TUJson;
+  var i: Int32;
+begin
+  if _NodeType <> nt_object then Exit(nil);
+  for i := 0 to High(_Content) do
+  if _Content[i].Name = Key then
+  begin
+    Exit(_Content[i].Node);
+  end;
+  Result := nil;
+end;
+
+function TUJson.GetName(const Index: Int32): String;
+begin
+  case _NodeType of
+    nt_object:
+    begin
+      if (Index < 0) or (Index > High(_Content)) then Exit('');
+      Result := _Content[Index].Name;
+    end;
+    nt_array:
+    begin
+      if (Index < 0) or (Index > High(_Elements)) then Exit('');
+      Result := IntToStr(Index);
+    end;
+    else Result := '';
+  end;
+end;
+
+function TUJson.GetElement(const Index: Int32): TUJson;
+begin
+  case _NodeType of
+    nt_array:
+    begin
+      if (Index < 0) or (Index > High(_Elements)) then Exit(nil);
+      Result := _Elements[Index];
+    end;
+    nt_object:
+    begin
+      if (Index < 0) or (Index > High(_Content)) then Exit(nil);
+      Result := _Content[Index].Node;
+    end;
+  end;
+end;
+
+function TUJson.GetCount: Int32;
+begin
+  case _NodeType of
+    nt_object: Result := Length(_Content);
+    nt_array: Result := Length(_Elements);
+    else Result := 0;
+  end;
+end;
+
+function TUJson.GetIsSingleValue: Boolean;
+begin
+  Result := _NodeType = nt_value;
+end;
+
+function TUJson.GetIsObject: Boolean;
+begin
+  Result := _NodeType = nt_object;
+end;
+
+function TUJson.GetIsArray: Boolean;
+begin
+  Result := _NodeType = nt_array;
+end;
+
+function TUJson.GetIsNumber: Boolean;
+begin
+  Result := (_NodeType = nt_value) and UStrIsNumber(_Value);
+end;
+
+function TUJson.GetEnumerator: TEnumerator;
+begin
+
+end;
+
+function TUJson.FormatJson(const Offset: String): String;
+  var i: Int32;
+begin
+  case _NodeType of
+    nt_value: Result := _Value;
+    nt_object:
+    begin
+      if Length(_Value) > 0 then
+      begin
+        Result := _Value;
+      end
+      else
+      begin
+        Result := #$D#$A + Offset + '{';
+        for i := 0 to High(_Content) do
+        begin
+          Result += #$D#$A + Offset + '  "' + _Content[i].Name + '":';
+          if _Content[i].Node.IsSingleValue
+          and not _Content[i].Node.IsNumber then
+          begin
+            Result += '"' + _Content[i].Node.Value + '"';
+          end
+          else
+          begin
+            Result += _Content[i].Node.FormatJson(Offset + '  ');
+          end;
+          if i < High(_Content) then Result += ',';
+        end;
+        Result += #$D#$A + Offset + '}';
+      end;
+    end;
+    nt_array:
+    begin
+      Result := #$D#$A + Offset + '[';
+      for i := 0 to High(_Elements) do
+      begin
+        Result += _Elements[i].FormatJson(Offset + '  ');
+        if i < High(_Elements) then Result += ',';
+      end;
+      Result += #$D#$A + Offset + ']';
+    end;
+  end;
+end;
+
+class constructor TUJson.CreateClass;
+begin
+  with _Syntax do
+  begin
+    AddSymbols(['{', '}', '[', ']', ':', ',', '.']);
+    AddString('"');
+    AddKeywords(['null', 'undefined']);
+  end;
+end;
+
+constructor TUJson.Create;
+begin
+  _NodeType := nt_invalid;
+end;
+
+destructor TUJson.Destroy;
+begin
+  NodeType := nt_invalid;
+  inherited Destroy;
+end;
+
+class function TUJson.Load(const Json: String): TUJson;
+  var p: TUParser;
+begin
+  Result := nil;
+  p := TUParser.Create(Json);
+  p.Syntax := @_Syntax;
+  try
+    Result := TUJson.Create;
+    if not Result.ReadJson(p) then FreeAndNil(Result);
+    if not Assigned(Result) then WriteLn('Error, line: ', p.Line);
+  finally
+    p.Free;
+  end;
+end;
+
+class function TUJson.Load(const Stream: TStream): TUJson;
+  var s: String;
+begin
+  s := '';
+  SetLength(s, Stream.Size);
+  Stream.Read(s[1], Stream.Size);
+  Result := Load(s);
+end;
+
+class function TUJson.LoadFromFile(const FileName: String): TUJson;
+  var fs: TFileStream;
+begin
+  try
+    fs := TFileStream.Create(FileName, fmOpenRead);
+    Result := Load(fs);
+  finally
+    fs.Free;
+  end;
+end;
+
+function TUJson.Save: String;
+begin
+  Result := Value;
+end;
+
+procedure TUJson.Save(const Stream: TStream);
   var s: String;
 begin
   s := Save;
   Stream.Write(s[1], Length(s));
 end;
-// TUXML end
 
-// TUMap begin
-function TUMap.GetValue(const Index: Int32): TValue;
+procedure TUJson.SaveToFile(const FileName: String);
+  var fs: TFileStream;
 begin
-  Result := FindValueByIndex(Index);
-end;
-
-function TUMap.Add(const Key: TKey; const Value: TValue): Int32;
-  var l, h, m: Int32;
-begin
-  l := 0;
-  h := High(_Items);
-  while l <= h do
-  begin
-    m := (l + h) shr 1;
-    if _Items[m].Key < Key then
-    begin
-      l := m + 1;
-    end
-    else
-    begin
-      h := m - 1;
-    end;
+  fs := TFileStream.Create(FileName, fmCreate);
+  try
+    Save(fs);
+  finally
+    fs.Free;
   end;
-  if l > High(_Items) then
-  begin
-    SetLength(_Items, Length(_Items) + 1);
-    _Items[l].Key := Key;
-    _Items[l].Value := Value;
-  end
-  else if _Items[l].Key = Key then
-  begin
-    _Items[l].Value := Value;
-  end
-  else
-  begin
-    SetLength(_Items, Length(_Items) + 1);
-    for m := High(_Items) downto l + 1 do
-    begin
-      _Items[m] := _Items[m - 1];
-    end;
-    _Items[l].Key := Key;
-    _Items[l].Value := Value;
-  end;
-  Result := l;
 end;
-
-function TUMap.HasKey(const Key: TKey): Boolean;
-begin
-  Result := FindIndexByKey(Key) > -1;
-end;
-
-procedure TUMap.RemoveByKey(const Key: TKey);
-  var i: Int32;
-begin
-  i := FindIndexByKey(Key);
-  if i = -1 then Exit;
-  RemoveByIndex(i);
-end;
-
-procedure TUMap.RemoveByValue(const Value: TValue);
-  var i: Int32;
-begin
-  i := FindIndexByValue(Value);
-  if i = -1 then Exit;
-  RemoveByIndex(i);
-end;
-
-procedure TUMap.RemoveByIndex(const Index: Int32);
-begin
-  specialize UArrDelete<TItem>(_Items, Index);
-end;
-
-function TUMap.FindIndexByKey(const Key: TKey): Int32;
-  var l, h, m: Int32;
-begin
-  l := 0;
-  h := High(_Items);
-  while l <= h do
-  begin
-    m := (l + h) shr 1;
-    if _Items[m].Key = Key then Exit(m);
-    if _Items[m].Key < Key then
-    begin
-      l := m + 1;
-    end
-    else
-    begin
-      h := m - 1;
-    end;
-  end;
-  if (l < Length(_Items)) and (_Items[l].Key = Key) then Exit(l);
-  Result := -1;
-end;
-
-function TUMap.FindIndexByValue(const Value: TValue): Int32;
-  var i: Int32;
-begin
-  for i := 0 to High(_Items) do
-  if _Items[i].Value = Value then Exit(i);
-  Result := -1;
-end;
-
-function TUMap.FindValueByKey(const Key: TKey): TValue;
-  var i: Int32;
-begin
-  i := FindIndexByKey(Key);
-  if i = -1 then Exit(Default(TValue));
-  Result := _Items[i].Value;
-end;
-
-function TUMap.FindValueByIndex(const Index: Int32): TValue;
-begin
-  if (Index < 0) or (Index > High(_Items)) then Exit(Default(TValue));
-  Result := _Items[Index].Value;
-end;
-
-function TUMap.Count: Int32;
-begin
-  Result := Length(_Items);
-end;
-// TUMap end
+// TUJson end
 
 // Functions begin
 procedure UClear(out x; const Size: UInt32);
@@ -5842,6 +6281,7 @@ end;
 function UStrIsNumber(const Str: String): Boolean;
   var i: Integer;
 begin
+  if Length(Str) < 1 then Exit(False);
   for i := 1 to Length(Str) do
   if not (Str[i] in ['0'..'9']) then Exit(False);
   Result := True;
