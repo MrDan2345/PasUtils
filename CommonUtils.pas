@@ -991,7 +991,8 @@ procedure UStrToFile(const FileName: String; const Str: String);
 function UFileToStr(const FileName: String): String;
 
 generic procedure UArrSort<T>(var Arr: array of T);
-generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T);
+generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T); overload;
+generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Other: specialize TUArray<T>); overload;
 generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
 generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Int32; const DelCount: Int32 = 1);
 generic procedure UArrRemove<T>(var Arr: specialize TUArray<T>; const Item: T);
@@ -6361,6 +6362,14 @@ generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T);
 begin
   SetLength(Arr, Length(Arr) + 1);
   Arr[High(Arr)] := Item;
+end;
+
+generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Other: specialize TUArray<T>);
+  var i, n: Int32;
+begin
+  n := Length(Arr);
+  SetLength(Arr, Length(Arr) + Length(Other));
+  for i := 0 to Length(Other) do Arr[n + i] := Other[i];
 end;
 
 generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
