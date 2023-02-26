@@ -868,6 +868,7 @@ type
     function GetIsObject: Boolean; inline;
     function GetIsArray: Boolean; inline;
     function GetIsNumber: Boolean; inline;
+    function GetIsNull: Boolean; inline;
   public
     property NodeType: TNodeType read _NodeType write SetNodeType;
     property Value: String read GetValue;
@@ -879,6 +880,7 @@ type
     property IsObject: Boolean read GetIsObject;
     property IsArray: Boolean read GetIsArray;
     property IsNumber: Boolean read GetIsNumber;
+    property IsNull: Boolean read GetIsNull;
     function GetEnumerator: TEnumerator;
     function FormatJson(const Offset: String = ''): String;
     class constructor CreateClass;
@@ -5001,6 +5003,7 @@ end;
 function TUJson.ReadJson(const p: TUParser): Boolean;
   var t: TUParserToken;
   var NamedNode: TNamedNode;
+  var StrArr: TUStrArr;
   var Json: TUJson;
 begin
   Result := False;
@@ -5013,7 +5016,13 @@ begin
       _Value := t;
       _Value += p.NextToken.Value;
       t := p.NextToken;
-      if t <> tt_number then Exit;
+      if t <> tt_number then
+      begin
+        StrArr := UStrExplode(t.Value, 'E');
+        if Length(StrArr) < 2 then Exit;
+        if not UStrIsNumber(StrArr[0])
+        or not UStrIsNumber(StrArr[1]) then Exit;
+      end;
       _Value += t.Value;
     end
     else
@@ -5213,9 +5222,14 @@ begin
   Result := (_NodeType = nt_value) and UStrIsNumber(_Value);
 end;
 
+function TUJson.GetIsNull: Boolean;
+begin
+  Result := (_NodeType = nt_object) and (Length(_Value) > 0);
+end;
+
 function TUJson.GetEnumerator: TEnumerator;
 begin
-
+  Result := TEnumerator.Create(Self);
 end;
 
 function TUJson.FormatJson(const Offset: String): String;
@@ -6280,10 +6294,11 @@ begin
 end;
 
 function UStrIsNumber(const Str: String): Boolean;
-  var i: Integer;
+  var i, n: Integer;
 begin
   if Length(Str) < 1 then Exit(False);
-  for i := 1 to Length(Str) do
+  if Str[1] in ['-', '+'] then n := 2 else n := 1;
+  for i := n to Length(Str) do
   if not (Str[i] in ['0'..'9']) then Exit(False);
   Result := True;
 end;
