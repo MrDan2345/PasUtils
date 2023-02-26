@@ -397,10 +397,11 @@ type
   private
     var _Weak: IInterface;
     procedure Assign(const Value: TPtr);
+    function GetPtr: TPtr; inline;
   public
+    property Ptr: TPtr read GetPtr;
     function IsValid: Boolean; inline;
     function AsShared: TShared; inline;
-    function Ptr: TPtr; inline;
     class operator := (const Value: TPtr): TSelf; inline;
     class operator := (const Value: TShared): TSelf; inline;
   end;
@@ -2322,6 +2323,11 @@ begin
   end;
 end;
 
+function TUWeakRef.GetPtr: TPtr;
+begin
+  Result := TPtr((_Weak as TUWeakCounter).Obj);
+end;
+
 function TUWeakRef.IsValid: Boolean;
 begin
   Result := Assigned(_Weak) and Assigned((_Weak as TUWeakCounter).Obj);
@@ -2330,11 +2336,6 @@ end;
 function TUWeakRef.AsShared: TShared;
 begin
   if IsValid then Result := TPtr((_Weak as TUWeakCounter).Obj) else Result := nil;
-end;
-
-function TUWeakRef.Ptr: TPtr;
-begin
-  Result := TPtr((_Weak as TUWeakCounter).Obj);
 end;
 
 class operator TUWeakRef.:= (const Value: TPtr): TSelf;
@@ -4031,7 +4032,7 @@ constructor TUParser.Create;
 begin
   inherited Create;
   _Position := 0;
-  _Text := '';
+  _Text := nil;
   _DefaultSyntax.CaseSensitive := False;
   _Syntax := @_DefaultSyntax;
 end;
