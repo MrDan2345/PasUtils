@@ -6369,8 +6369,11 @@ generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Other: spe
   var i, n: Int32;
 begin
   n := Length(Arr);
-  SetLength(Arr, Length(Arr) + Length(Other));
-  for i := 0 to Length(Other) do Arr[n + i] := Other[i];
+  SetLength(Arr, n + Length(Other));
+  for i := 0 to High(Other) do
+  begin
+    Arr[n + i] := Other[i];
+  end;
 end;
 
 generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
