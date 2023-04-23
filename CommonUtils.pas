@@ -819,6 +819,7 @@ type
     procedure RemoveByKey(const Key: TKey);
     procedure RemoveByValue(const Value: TValue);
     procedure RemoveByIndex(const Index: Int32);
+    procedure Clear;
     function FindIndexByKey(const Key: TKey): Int32;
     function FindIndexByValue(const Value: TValue): Int32;
     function FindValueByKey(const Key: TKey): TValue;
@@ -918,6 +919,8 @@ function UMulVec3Mat4x4(const v: TUVec3; const m: TUMat): TUVec3;
 function UMulVec3Quat(const v: TUVec3; const q: TUQuat): TUVec3;
 function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4;
 function UTriangleNormal(const v0, v1, v2: TUVec3): TUVec3;
+
+function UXc2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
 
 function UStrExplode(const Str: String; const Separator: String): TUStrArr;
 function UStrIsNumber(const Str: String): Boolean;
@@ -4852,6 +4855,11 @@ begin
   specialize UArrDelete<TItem>(_Items, Index);
 end;
 
+procedure TUMap.Clear;
+begin
+  _Items := nil;
+end;
+
 function TUMap.FindIndexByKey(const Key: TKey): Int32;
   var l, h, m: Int32;
 begin
@@ -5788,6 +5796,28 @@ end;
 operator mod (const a, b: TUFloat): TUFloat;
 begin
   Result := a - b * Int(a / b);
+end;
+
+function UXc2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
+  function Sgn(const x: TUFloat): TUFloat;
+  begin
+    if x < 0 then Exit(-1) else Exit(1);
+  end;
+  var u, v, s0, s1: TUVec2;
+  var dr, d, dt, dr2_rcp: TUFloat;
+begin
+  u := v0 - c;
+  v := v1 - v0;
+  dr := Sqrt(Sqr(v.x) + Sqr(v.y));
+  d := u.x * v.y - v.x * u.y;
+  dt := Sqr(r) * Sqr(dr) - Sqr(d);
+  if (dt < 0) then Exit(False);
+  dr2_rcp := 1 / Sqr(dr);
+  s0 := TUVec2.Make(d * v.y, -d * v.x);
+  s1 := TUVec2.Make(Sgn(v.y) * v.x, Abs(v.y)) * Sqrt(dt);
+  x0 := c + (s0 + s1) * dr2_rcp;
+  x1 := c + (s0 - s1) * dr2_rcp;
+  Result := True;
 end;
 
 function UStrExplode(const Str: String; const Separator: String): TUStrArr;

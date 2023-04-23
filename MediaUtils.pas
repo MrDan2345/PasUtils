@@ -408,6 +408,12 @@ type
       property MaterialBindings: TMaterialInstanceInterfaceList read _MaterialBindings;
       destructor Destroy; override;
     end;
+    type TAttachmentSkin = class (TAttachmentMesh)
+    protected
+      var _Skin: TSkinInterface;
+    public
+      property Skin: TSkinInterface read _Skin;
+    end;
     type TNodeInterface = class
     public
       type TNodeList = array of TNodeInterface;
@@ -1189,7 +1195,7 @@ type
     end;
     type TMeshInterfaceCollada = class (TMeshInterface)
     public
-      constructor Create(const ColladaMesh: TColladaMesh);
+      constructor Create(const ColladaGeometry: TColladaGeometry);
     end;
     type TSkinInterfaceCollada = class (TSkinInterface)
     public
@@ -1197,7 +1203,11 @@ type
     end;
     type TAttachmentMeshCollada = class (TAttachmentMesh)
     public
-      constructor Create(const ColladaMesh: TColladaMesh; const GeometryInstance: TColladaInstanceGeometry);
+      constructor Create(const GeometryInstance: TColladaInstanceGeometry);
+    end;
+    type TAttachmentSkinCollada = class (TAttachmentSkin)
+    public
+      constructor Create(const ControllerInstance: TColladaInstanceController);
     end;
     type TNodeInterfaceCollada = class (TNodeInterface)
     public
@@ -1213,6 +1223,10 @@ type
       const Src: TColladaSource;
       const Index: Int32
     ): TUMat;
+    class function GenerateMaterialBindings(
+      const ColladaGeometry: TColladaGeometry;
+      const ColladaBindings: TColladaInstanceMaterialList
+    ): TMaterialInstanceInterfaceList;
     procedure Read(const XML: TUXML);
   public
     property Root: TColladaRoot read _Root;
@@ -2878,7 +2892,7 @@ begin
   end;
   if not Assigned(Result) then
   begin
-    //LabLog('Unresolved link: ' + AnsiString(Path));
+    WriteLn('Unresolved link: ' + AnsiString(Path));
   end;
 end;
 
@@ -2956,6 +2970,8 @@ constructor TUSceneDataDAE.TColladaNode.Create(
   var XfScale: TUVec3;
   var XfTranslate: TUVec3;
   var XfSkew: array [0..6] of TUFloat;
+  var InstGeometry: TColladaInstanceGeometry;
+  var InstController: TColladaInstanceController;
 begin
   inherited Create(XMLNode, AParent);
   _NodeType := StringToNodeType(XMLNode.AttributeValue['type']);
@@ -3060,14 +3076,16 @@ begin
     end
     else if NodeName = 'instance_geometry' then
     begin
+      InstGeometry := TColladaInstanceGeometry.Create(Node, Self);
       specialize UArrAppend<TColladaInstance>(
-        _Instances, TColladaInstanceGeometry.Create(Node, Self)
+        _Instances, InstGeometry
       );
     end
     else if NodeName = 'instance_controller' then
     begin
+      InstController := TColladaInstanceController.Create(Node, Self);
       specialize UArrAppend<TColladaInstance>(
-        _Instances, TColladaInstanceController.Create(Node, Self)
+        _Instances, InstController
       );
     end
     else if NodeName = 'instance_camera' then
@@ -5339,6 +5357,7 @@ end;
 constructor TUSceneDataDAE.TMeshSubsetInterfaceCollada.Create(
   const ColladaTriangles: TColladaTriangles
 );
+  var VertexInd: Int32;
   var PositionInd: Int32;
   var TexCoordInd: Int32;
   var IndexInputStride: Int32;
@@ -5525,6 +5544,7 @@ constructor TUSceneDataDAE.TMeshSubsetInterfaceCollada.Create(
   var GenTangents: Boolean;
   var AttribOffsets: array of Int32;
   var AttribIndices: array of Int32;
+  var VertexIndices: array of Int32;
   var i, j, ai, Ind: Int32;
   var Root: TColladaRoot;
 begin
@@ -5601,10 +5621,12 @@ begin
   begin
     _IndexSize := 2;
   end;
-  _VertexRemap := nil;
-  SetLength(_VertexRemap, ColladaTriangles.Count * 3);
+  VertexIndices := nil;
+  SetLength(VertexIndices, ColladaTriangles.Count * 3);
   AttribIndices := nil;
   SetLength(AttribIndices, Length(_VertexDescriptor));
+  _VertexRemap := nil;
+  SetLength(_VertexRemap, Length(VertexIndices));
   for i := 0 to ColladaTriangles.Count * 3 - 1 do
   begin
     for j := 0 to High(ColladaTriangles.VertexLayout) do
@@ -5621,7 +5643,9 @@ begin
       end;
       AttribIndices[ai] := Ind;
     end;
-    _VertexRemap[i] := AddVertex(AttribIndices);
+    VertexInd := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[PositionInd].Offset];
+    VertexIndices[i] := AddVertex(AttribIndices);
+    _VertexRemap[VertexIndices[i]] := VertexInd;
   end;
   _VertexCount := Length(VertexBuffer);
   _VertexData := GetMem(VertexSize * _VertexCount);
@@ -5648,33 +5672,37 @@ begin
   end;
   if _IndexSize = 2 then
   begin
-    for i := 0 to High(_VertexRemap) do
+    for i := 0 to High(VertexIndices) do
     begin
-      PUInt16(_IndexData + i * IndexSize)^ := UInt16(_VertexRemap[i]);
+      PUInt16(_IndexData + i * IndexSize)^ := UInt16(VertexIndices[i]);
     end;
   end
   else
   begin
-    for i := 0 to High(_VertexRemap) do
+    for i := 0 to High(VertexIndices) do
     begin
-      PUInt32(_IndexData + i * IndexSize)^ := _VertexRemap[i];
+      PUInt32(_IndexData + i * IndexSize)^ := VertexIndices[i];
     end;
   end;
 end;
 
 constructor TUSceneDataDAE.TMeshInterfaceCollada.Create(
-  const ColladaMesh: TColladaMesh
+  const ColladaGeometry: TColladaGeometry
 );
+  var Mesh: TColladaMesh;
   var Tris: TColladaTriangles;
   var Intf: TMeshSubsetInterfaceCollada;
 begin
-  ColladaMesh.UserData := Self;
-  for Tris in ColladaMesh.TrianglesList do
+  ColladaGeometry.UserData := Self;
+  for Mesh in ColladaGeometry.Meshes do
   begin
-    Intf := TMeshSubsetInterfaceCollada.Create(Tris);
-    specialize UArrAppend<TMeshSubsetInterface>(
-      _Subsets, Intf
-    );
+    for Tris in Mesh.TrianglesList do
+    begin
+      Intf := TMeshSubsetInterfaceCollada.Create(Tris);
+      specialize UArrAppend<TMeshSubsetInterface>(
+        _Subsets, Intf
+      );
+    end;
   end;
 end;
 
@@ -5729,7 +5757,7 @@ begin
       end;
     end;
   end;
-  MaxWeightCount := UMax(MaxWeightCount, 4);
+  MaxWeightCount := UMin(MaxWeightCount, 4);
   VertexStride := MaxWeightCount * SizeOf(TWeight);
   SetLength(_Subsets, Length(_Mesh.Subsets));
   WeightsOffset := MaxWeightCount * SizeOf(UInt32);
@@ -5760,36 +5788,24 @@ begin
 end;
 
 constructor TUSceneDataDAE.TAttachmentMeshCollada.Create(
-  const ColladaMesh: TColladaMesh;
   const GeometryInstance: TColladaInstanceGeometry
 );
-  function FindMaterialBinding(const Material: String): TColladaInstanceMaterial;
-    var i: Int32;
-  begin
-    for i := 0 to High(GeometryInstance.MaterialBindings) do
-    if GeometryInstance.MaterialBindings[i].Symbol = Material then
-    begin
-      Exit(GeometryInstance.MaterialBindings[i]);
-    end;
-    Result := nil;
-  end;
-  var i: Int32;
-  var cm: TColladaInstanceMaterial;
 begin
-  _Mesh := TMeshInterfaceCollada(ColladaMesh.UserData);
-  SetLength(_MaterialBindings, Length(ColladaMesh.TrianglesList));
-  for i := 0 to High(ColladaMesh.TrianglesList) do
-  begin
-    _MaterialBindings[i] := TMaterialInstanceInterface.Create;
-    cm := FindMaterialBinding(ColladaMesh.TrianglesList[i].Material);
-    if not Assigned(cm) then Continue;
-    begin
-      _MaterialBindings[i].Assign(
-        TMaterialInterface(cm.Material.UserData)
-      );
-      cm.UserData := _MaterialBindings[i];
-    end;
-  end;
+  inherited Create;
+  _Mesh := TMeshInterfaceCollada(GeometryInstance.Geometry.UserData);
+  _MaterialBindings := GenerateMaterialBindings(
+    GeometryInstance.Geometry, GeometryInstance.MaterialBindings
+  );
+end;
+
+constructor TUSceneDataDAE.TAttachmentSkinCollada.Create(
+  const ControllerInstance: TColladaInstanceController
+);
+begin
+  _Skin := TSkinInterfaceCollada(ControllerInstance.Controller.UserData);
+  _MaterialBindings := GenerateMaterialBindings(
+    ControllerInstance.Controller.AsSkin.Geometry, ControllerInstance.MaterialBindings
+  );
 end;
 
 constructor TUSceneDataDAE.TNodeInterfaceCollada.Create(
@@ -5797,8 +5813,9 @@ constructor TUSceneDataDAE.TNodeInterfaceCollada.Create(
   const AParent: TNodeInterfaceCollada
 );
   var Child: TColladaObject;
-  var Mesh: TColladaMesh;
+  var AttachMesh: TAttachmentMeshCollada;
 begin
+  inherited Create;
   _Transform := TUMat.Identity;
   Parent := AParent;
   if Assigned(ColladaNode) then
@@ -5820,13 +5837,21 @@ begin
       end
       else if Child is TColladaInstanceGeometry then
       begin
-        for Mesh in TColladaInstanceGeometry(Child).Geometry.Meshes do
-        begin
-          specialize UArrAppend<TAttachment>(
-            _Attachments,
-            TAttachmentMeshCollada.Create(Mesh, TColladaInstanceGeometry(Child))
-          );
-        end;
+        AttachMesh := TAttachmentMeshCollada.Create(
+          TColladaInstanceGeometry(Child)
+        );
+        specialize UArrAppend<TAttachment>(
+          _Attachments, AttachMesh
+        );
+      end
+      else if Child is TColladaInstanceController then
+      begin
+        specialize UArrAppend<TAttachment>(
+          _Attachments,
+          TAttachmentSkinCollada.Create(
+            TColladaInstanceController(Child)
+          )
+        );
       end;
     end;
   end;
@@ -5889,11 +5914,53 @@ begin
   end;
 end;
 
+class function TUSceneDataDAE.GenerateMaterialBindings(
+  const ColladaGeometry: TColladaGeometry;
+  const ColladaBindings: TColladaInstanceMaterialList
+): TMaterialInstanceInterfaceList;
+  function FindMaterialBinding(const Material: String): TColladaInstanceMaterial;
+    var i: Int32;
+  begin
+    for i := 0 to High(ColladaBindings) do
+    if ColladaBindings[i].Symbol = Material then
+    begin
+      Exit(ColladaBindings[i]);
+    end;
+    Result := nil;
+  end;
+  var i, j, n: Int32;
+  var cm: TColladaInstanceMaterial;
+begin
+  Result := nil;
+  n := 0;
+  for i := 0 to High(ColladaGeometry.Meshes) do
+  begin
+    n += Length(ColladaGeometry.Meshes[i].TrianglesList);
+  end;
+  SetLength(Result, n);
+  n := 0;
+  for j := 0 to High(ColladaGeometry.Meshes) do
+  begin
+    for i := 0 to High(ColladaGeometry.Meshes[j].TrianglesList) do
+    begin
+      Result[n] := TMaterialInstanceInterface.Create;
+      cm := FindMaterialBinding(ColladaGeometry.Meshes[j].TrianglesList[i].Material);
+      if not Assigned(cm) then Continue;
+      begin
+        Result[n].Assign(
+          TMaterialInterface(cm.Material.UserData)
+        );
+        cm.UserData := Result[n];
+      end;
+      Inc(n);
+    end;
+  end;
+end;
+
 procedure TUSceneDataDAE.Read(const XML: TUXML);
   var Image: TColladaImage;
   var Mat: TColladaMaterial;
   var Geom: TColladaGeometry;
-  var Mesh: TColladaMesh;
   var Node: TColladaNode;
   var Controller: TColladaController;
   var Skin: TColladaSkin;
@@ -5923,13 +5990,10 @@ begin
   end;
   for Geom in _Root.LibGeometries.Geometries do
   begin
-    for Mesh in Geom.Meshes do
-    begin
-      IntfMesh := TMeshInterfaceCollada.Create(Mesh);
-      specialize UArrAppend<TMeshInterface>(
-        _MeshList, IntfMesh
-      );
-    end;
+    IntfMesh := TMeshInterfaceCollada.Create(Geom);
+    specialize UArrAppend<TMeshInterface>(
+      _MeshList, IntfMesh
+    );
   end;
   for Controller in _Root.LibControllers.Controllers do
   if Controller.ControllerType = ct_skin then
