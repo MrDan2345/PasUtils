@@ -408,11 +408,14 @@ type
       property MaterialBindings: TMaterialInstanceInterfaceList read _MaterialBindings;
       destructor Destroy; override;
     end;
-    type TAttachmentSkin = class (TAttachmentMesh)
+    type TAttachmentSkin = class (TAttachment)
     protected
       var _Skin: TSkinInterface;
+      var _MaterialBindings: TMaterialInstanceInterfaceList;
     public
       property Skin: TSkinInterface read _Skin;
+      property MaterialBindings: TMaterialInstanceInterfaceList read _MaterialBindings;
+      destructor Destroy; override;
     end;
     type TNodeInterface = class
     public
@@ -2662,6 +2665,12 @@ begin
   inherited Destroy;
 end;
 
+destructor TUSceneData.TAttachmentSkin.Destroy;
+begin
+  specialize UArrClear<TMaterialInstanceInterface>(_MaterialBindings);
+  inherited Destroy;
+end;
+
 procedure TUSceneData.TNodeInterface.SetParent(const Value: TNodeInterface);
 begin
   if Value = _Parent then Exit;
@@ -2788,19 +2797,19 @@ end;
 
 procedure TUSceneDataDAE.TColladaObject.DumpBegin;
 begin
-  //LabLog(AnsiString(_Tag) + ': {', 2);
+  ULog(AnsiString(_Tag) + ': {', 2);
 end;
 
 procedure TUSceneDataDAE.TColladaObject.DumpEnd;
 begin
-  //LabLog('}', -2);
+  ULog('}', -2);
 end;
 
 procedure TUSceneDataDAE.TColladaObject.DumpData;
 begin
-  //if Length(_id) > 0 then LabLog('id: ' + AnsiString(_id));
-  //if Length(_sid) > 0 then LabLog('sid: ' + AnsiString(_sid));
-  //if Length(_Name) > 0 then LabLog('name: ' + AnsiString(_Name));
+  if Length(_id) > 0 then ULog('id: ' + AnsiString(_id));
+  if Length(_sid) > 0 then ULog('sid: ' + AnsiString(_sid));
+  if Length(_Name) > 0 then ULog('name: ' + AnsiString(_Name));
 end;
 
 procedure TUSceneDataDAE.TColladaObject.Resolve;
@@ -4377,26 +4386,24 @@ begin
 end;
 
 procedure TUSceneDataDAE.TColladaAnimationSampler.DumpData;
-  //var i, j: TVkInt32;
-  //var val_str: AnsiString;
+  var i, j: Int32;
+  var val_str: AnsiString;
 begin
   inherited DumpData;
-  (*
   if _DataType <> at_float then Exit;
-  LabLog('Keys[' + IntToStr(Length(_Keys)) + '] {', 2);
+  ULog('Keys[' + IntToStr(Length(_Keys)) + '] {', 2);
   for i := 0 to High(_Keys) do
   begin
     val_str := '{';
     for j := 0 to _DataStride - 1 do
     begin
-      val_str += ' ' + FormatFloat('0.###', PLabFloatArr(_Keys[i].Value)^[j]);
+      val_str += ' ' + FormatFloat('0.###', PUFloatArr(_Keys[i].Value)^[j]);
       if j < _DataStride - 1 then val_str += ',';
     end;
     val_str += ' }';
-    LabLog('Time = ' + FormatFloat('0.###', _Keys[i].Time) + '; Value = ' + val_str);
+    ULog('Time = ' + FormatFloat('0.###', _Keys[i].Time) + '; Value = ' + val_str);
   end;
-  LabLog('}', -2);
-  //*)
+  ULog('}', -2);
 end;
 
 procedure TUSceneDataDAE.TColladaAnimationSampler.SampleData(
@@ -4756,6 +4763,7 @@ begin
   if Assigned(Obj) and (Obj is TColladaGeometry) then
   begin
     _Geometry := TColladaGeometry(Obj);
+    WriteLn(Name, ' _Geometry = ', PtrUInt(_Geometry));
   end;
 end;
 
@@ -5814,6 +5822,7 @@ constructor TUSceneDataDAE.TNodeInterfaceCollada.Create(
 );
   var Child: TColladaObject;
   var AttachMesh: TAttachmentMeshCollada;
+  var AttachSkin: TAttachmentSkinCollada;
 begin
   inherited Create;
   _Transform := TUMat.Identity;
@@ -5840,17 +5849,18 @@ begin
         AttachMesh := TAttachmentMeshCollada.Create(
           TColladaInstanceGeometry(Child)
         );
+        WriteLn('AttachMesh.Mesh = ', PtrUInt(AttachMesh.Mesh));
         specialize UArrAppend<TAttachment>(
           _Attachments, AttachMesh
         );
       end
       else if Child is TColladaInstanceController then
       begin
+        AttachSkin := TAttachmentSkinCollada.Create(
+          TColladaInstanceController(Child)
+        );
         specialize UArrAppend<TAttachment>(
-          _Attachments,
-          TAttachmentSkinCollada.Create(
-            TColladaInstanceController(Child)
-          )
+          _Attachments, AttachSkin
         );
       end;
     end;
@@ -5974,6 +5984,7 @@ begin
   _Root := TColladaRoot.Create(XML, _Options, _Path);
   _Root.Resolve;
   _Root.Initialize;
+  //_Root.Dump;
   for Image in _Root.LibImages.Images do
   begin
     IntfImage := TImageInterfaceCollada.Create(Image);

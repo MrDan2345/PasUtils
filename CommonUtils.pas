@@ -991,6 +991,8 @@ function UStrExplode(const Str: String; const Separator: String): TUStrArr;
 function UStrIsNumber(const Str: String): Boolean;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UFileToStr(const FileName: String): String;
+procedure ULog(const Text: String; const Offset: Int32 = 0);
+procedure ULogOffset(const Offset: Int32);
 
 generic procedure UArrSort<T>(var Arr: array of T);
 generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T); overload;
@@ -6352,6 +6354,31 @@ begin
       fs.Free;
     end;
   end;
+end;
+
+var LogOffset: Int32 = 0;
+procedure ULog(const Text: String; const Offset: Int32);
+  var Spaces: String;
+begin
+  if Offset < 0 then LogOffset += Offset;
+  if LogOffset > 0 then
+  begin
+    SetLength(Spaces, LogOffset);
+    FillChar(Spaces[1], LogOffset, ' ');
+    //WriteLn(LogFile, Spaces + Msg);
+    WriteLn(Spaces + Text);
+  end
+  else
+  begin
+    //WriteLn(LogFile, Msg);
+    WriteLn(Text);
+  end;
+  if Offset > 0 then LogOffset += Offset;
+end;
+
+procedure ULogOffset(const Offset: Int32);
+begin
+  LogOffset += Offset;
 end;
 
 generic procedure UArrSort<T>(var Arr: array of T);
