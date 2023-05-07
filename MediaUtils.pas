@@ -5810,7 +5810,7 @@ constructor TUSceneDataDAE.TAttachmentSkinCollada.Create(
   const ControllerInstance: TColladaInstanceController
 );
 begin
-  _Skin := TSkinInterfaceCollada(ControllerInstance.Controller.UserData);
+  _Skin := TSkinInterfaceCollada(ControllerInstance.Controller.AsSkin.UserData);
   _MaterialBindings := GenerateMaterialBindings(
     ControllerInstance.Controller.AsSkin.Geometry, ControllerInstance.MaterialBindings
   );
@@ -5849,12 +5849,12 @@ begin
         AttachMesh := TAttachmentMeshCollada.Create(
           TColladaInstanceGeometry(Child)
         );
-        WriteLn('AttachMesh.Mesh = ', PtrUInt(AttachMesh.Mesh));
         specialize UArrAppend<TAttachment>(
           _Attachments, AttachMesh
         );
       end
-      else if Child is TColladaInstanceController then
+      else if (Child is TColladaInstanceController)
+      and (TColladaInstanceController(Child).Controller.ControllerType = ct_skin) then
       begin
         AttachSkin := TAttachmentSkinCollada.Create(
           TColladaInstanceController(Child)
