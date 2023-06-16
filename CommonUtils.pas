@@ -3964,7 +3964,7 @@ constructor TUParser.Create;
 begin
   inherited Create;
   _Position := 0;
-  _Text := '';
+  _Text := nil;
   _DefaultSyntax.CaseSensitive := False;
   _Syntax := @_DefaultSyntax;
 end;
