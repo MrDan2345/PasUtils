@@ -264,6 +264,40 @@ type
       destructor Destroy; override;
     end;
     type TMeshInterfaceList = array of TMeshInterface;
+    type TSkinInterface = class
+    public
+      type TJoint = record
+        Name: String;
+        Bind: TUMat;
+      end;
+      type TJointList = array of TJoint;
+      type TWeight = record
+        JointIndex: UInt32;
+        JointWeight: TUFloat;
+        class operator > (const a, b: TWeight): Boolean;
+      end;
+      type TSubset = class
+      private
+        var _VertexData: Pointer;
+        var _WeightCount: Int32;
+      public
+        property VertexData: Pointer read _VertexData;
+        property WeightCount: Int32 read _WeightCount;
+        constructor Create(const AWeightCount, AVertexCount: Int32);
+        destructor Destroy; override;
+      end;
+      type TSubsetList = array of TSubset;
+    protected
+      var _Mesh: TMeshInterface;
+      var _Joints: TJointList;
+      var _Subsets: TSubsetList;
+    public
+      property Mesh: TMeshInterface read _Mesh;
+      property Joints: TJointList read _Joints;
+      property Subsets: TSubsetList read _Subsets;
+      destructor Destroy; override;
+    end;
+    type TSkinInterfaceList = array of TSkinInterface;
     type TMaterialInterface = class
     public
       type TImageType = (it_1d, it_2d, it_3d, it_cube);
@@ -374,6 +408,15 @@ type
       property MaterialBindings: TMaterialInstanceInterfaceList read _MaterialBindings;
       destructor Destroy; override;
     end;
+    type TAttachmentSkin = class (TAttachment)
+    protected
+      var _Skin: TSkinInterface;
+      var _MaterialBindings: TMaterialInstanceInterfaceList;
+    public
+      property Skin: TSkinInterface read _Skin;
+      property MaterialBindings: TMaterialInstanceInterfaceList read _MaterialBindings;
+      destructor Destroy; override;
+    end;
     type TNodeInterface = class
     public
       type TNodeList = array of TNodeInterface;
@@ -395,6 +438,7 @@ type
     var _ImageList: TImageInterfaceList;
     var _MaterialList: TMaterialInterfaceList;
     var _MeshList: TMeshInterfaceList;
+    var _SkinList: TSkinInterfaceList;
     var _RootNode: TNodeInterface;
   protected
     var _Options: TSceneDataOptionsSet;
@@ -402,6 +446,7 @@ type
     property ImageList: TImageInterfaceList read _ImageList;
     property MaterialList: TMaterialInterfaceList read _MaterialList;
     property MeshList: TMeshInterfaceList read _MeshList;
+    property SkinList: TSkinInterfaceList read _SkinList;
     property RootNode: TNodeInterface read _RootNode;
     property Options: TSceneDataOptionsSet read _Options;
     class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
@@ -1140,21 +1185,32 @@ type
       constructor Create(const ColladaMaterial: TColladaMaterial);
     end;
     type TMeshSubsetInterfaceCollada = class (TMeshSubsetInterface)
+    public
+      type TVertexRemap = array of Int32;
     private
-      var _ColladaTriangles: TColladaTriangles;
       var _VertexDescriptor: TUVertexDescriptor;
+      var _VertexRemap: TVertexRemap;
     protected
       function GetVertexDescriptor: TUVertexDescriptor; override;
     public
+      property VertexRemap: TVertexRemap read _VertexRemap;
       constructor Create(const ColladaTriangles: TColladaTriangles);
     end;
     type TMeshInterfaceCollada = class (TMeshInterface)
     public
-      constructor Create(const ColladaMesh: TColladaMesh);
+      constructor Create(const ColladaGeometry: TColladaGeometry);
+    end;
+    type TSkinInterfaceCollada = class (TSkinInterface)
+    public
+      constructor Create(const ColladaSkin: TColladaSkin);
     end;
     type TAttachmentMeshCollada = class (TAttachmentMesh)
     public
-      constructor Create(const ColladaMesh: TColladaMesh; const GeometryInstance: TColladaInstanceGeometry);
+      constructor Create(const GeometryInstance: TColladaInstanceGeometry);
+    end;
+    type TAttachmentSkinCollada = class (TAttachmentSkin)
+    public
+      constructor Create(const ControllerInstance: TColladaInstanceController);
     end;
     type TNodeInterfaceCollada = class (TNodeInterface)
     public
@@ -1170,6 +1226,10 @@ type
       const Src: TColladaSource;
       const Index: Int32
     ): TUMat;
+    class function GenerateMaterialBindings(
+      const ColladaGeometry: TColladaGeometry;
+      const ColladaBindings: TColladaInstanceMaterialList
+    ): TMaterialInstanceInterfaceList;
     procedure Read(const XML: TUXML);
   public
     property Root: TColladaRoot read _Root;
@@ -2417,6 +2477,31 @@ begin
   inherited Destroy;
 end;
 
+class operator TUSceneData.TSkinInterface.TWeight.>(const a, b: TWeight): Boolean;
+begin
+  Result := a.JointWeight > b.JointWeight;
+end;
+
+constructor TUSceneData.TSkinInterface.TSubset.Create(
+  const AWeightCount, AVertexCount: Int32
+);
+begin
+  _WeightCount := AWeightCount;
+  _VertexData := GetMemory(AVertexCount * AWeightCount * (SizeOf(UInt32) + SizeOf(TUFloat)));
+end;
+
+destructor TUSceneData.TSkinInterface.TSubset.Destroy;
+begin
+  if Assigned(_VertexData) then FreeMemory(_VertexData);
+  inherited Destroy;
+end;
+
+destructor TUSceneData.TSkinInterface.Destroy;
+begin
+  specialize UArrClear<TSubset>(_Subsets);
+  inherited Destroy;
+end;
+
 function TUSceneData.TMaterialInterface.TParam.ParamClass: TParamClass;
 begin
   Result := TParamClass(ClassType);
@@ -2580,6 +2665,12 @@ begin
   inherited Destroy;
 end;
 
+destructor TUSceneData.TAttachmentSkin.Destroy;
+begin
+  specialize UArrClear<TMaterialInstanceInterface>(_MaterialBindings);
+  inherited Destroy;
+end;
+
 procedure TUSceneData.TNodeInterface.SetParent(const Value: TNodeInterface);
 begin
   if Value = _Parent then Exit;
@@ -2706,19 +2797,19 @@ end;
 
 procedure TUSceneDataDAE.TColladaObject.DumpBegin;
 begin
-  //LabLog(AnsiString(_Tag) + ': {', 2);
+  ULog(AnsiString(_Tag) + ': {', 2);
 end;
 
 procedure TUSceneDataDAE.TColladaObject.DumpEnd;
 begin
-  //LabLog('}', -2);
+  ULog('}', -2);
 end;
 
 procedure TUSceneDataDAE.TColladaObject.DumpData;
 begin
-  //if Length(_id) > 0 then LabLog('id: ' + AnsiString(_id));
-  //if Length(_sid) > 0 then LabLog('sid: ' + AnsiString(_sid));
-  //if Length(_Name) > 0 then LabLog('name: ' + AnsiString(_Name));
+  if Length(_id) > 0 then ULog('id: ' + AnsiString(_id));
+  if Length(_sid) > 0 then ULog('sid: ' + AnsiString(_sid));
+  if Length(_Name) > 0 then ULog('name: ' + AnsiString(_Name));
 end;
 
 procedure TUSceneDataDAE.TColladaObject.Resolve;
@@ -2810,7 +2901,7 @@ begin
   end;
   if not Assigned(Result) then
   begin
-    //LabLog('Unresolved link: ' + AnsiString(Path));
+    WriteLn('Unresolved link: ' + AnsiString(Path));
   end;
 end;
 
@@ -2888,6 +2979,8 @@ constructor TUSceneDataDAE.TColladaNode.Create(
   var XfScale: TUVec3;
   var XfTranslate: TUVec3;
   var XfSkew: array [0..6] of TUFloat;
+  var InstGeometry: TColladaInstanceGeometry;
+  var InstController: TColladaInstanceController;
 begin
   inherited Create(XMLNode, AParent);
   _NodeType := StringToNodeType(XMLNode.AttributeValue['type']);
@@ -2992,14 +3085,16 @@ begin
     end
     else if NodeName = 'instance_geometry' then
     begin
+      InstGeometry := TColladaInstanceGeometry.Create(Node, Self);
       specialize UArrAppend<TColladaInstance>(
-        _Instances, TColladaInstanceGeometry.Create(Node, Self)
+        _Instances, InstGeometry
       );
     end
     else if NodeName = 'instance_controller' then
     begin
+      InstController := TColladaInstanceController.Create(Node, Self);
       specialize UArrAppend<TColladaInstance>(
-        _Instances, TColladaInstanceController.Create(Node, Self)
+        _Instances, InstController
       );
     end
     else if NodeName = 'instance_camera' then
@@ -4291,26 +4386,24 @@ begin
 end;
 
 procedure TUSceneDataDAE.TColladaAnimationSampler.DumpData;
-  //var i, j: TVkInt32;
-  //var val_str: AnsiString;
+  var i, j: Int32;
+  var val_str: AnsiString;
 begin
   inherited DumpData;
-  (*
   if _DataType <> at_float then Exit;
-  LabLog('Keys[' + IntToStr(Length(_Keys)) + '] {', 2);
+  ULog('Keys[' + IntToStr(Length(_Keys)) + '] {', 2);
   for i := 0 to High(_Keys) do
   begin
     val_str := '{';
     for j := 0 to _DataStride - 1 do
     begin
-      val_str += ' ' + FormatFloat('0.###', PLabFloatArr(_Keys[i].Value)^[j]);
+      val_str += ' ' + FormatFloat('0.###', PUFloatArr(_Keys[i].Value)^[j]);
       if j < _DataStride - 1 then val_str += ',';
     end;
     val_str += ' }';
-    LabLog('Time = ' + FormatFloat('0.###', _Keys[i].Time) + '; Value = ' + val_str);
+    ULog('Time = ' + FormatFloat('0.###', _Keys[i].Time) + '; Value = ' + val_str);
   end;
-  LabLog('}', -2);
-  //*)
+  ULog('}', -2);
 end;
 
 procedure TUSceneDataDAE.TColladaAnimationSampler.SampleData(
@@ -4670,6 +4763,7 @@ begin
   if Assigned(Obj) and (Obj is TColladaGeometry) then
   begin
     _Geometry := TColladaGeometry(Obj);
+    WriteLn(Name, ' _Geometry = ', PtrUInt(_Geometry));
   end;
 end;
 
@@ -5271,6 +5365,7 @@ end;
 constructor TUSceneDataDAE.TMeshSubsetInterfaceCollada.Create(
   const ColladaTriangles: TColladaTriangles
 );
+  var VertexInd: Int32;
   var PositionInd: Int32;
   var TexCoordInd: Int32;
   var IndexInputStride: Int32;
@@ -5282,19 +5377,19 @@ constructor TUSceneDataDAE.TMeshSubsetInterfaceCollada.Create(
     var Pos: array[0..2] of TUVec4;
   begin
     if Length(Normals) > 0 then Exit;
-    SetLength(FaceNormals, _ColladaTriangles.Count);
-    SetLength(RemapNormals, _ColladaTriangles.Count * 3);
-    VCount := _ColladaTriangles.InputSourceCount[PositionInd];
+    SetLength(FaceNormals, ColladaTriangles.Count);
+    SetLength(RemapNormals, ColladaTriangles.Count * 3);
+    VCount := ColladaTriangles.InputSourceCount[PositionInd];
     SetLength(Normals, VCount);
     UClear(FaceNormals[0], SizeOf(FaceNormals[0]) * Length(FaceNormals));
     UClear(RemapNormals[0], SizeOf(RemapNormals[0]) * Length(RemapNormals));
     UClear(Normals[0], SizeOf(Normals[0]) * Length(Normals));
-    for i := 0 to _ColladaTriangles.Count - 1 do
+    for i := 0 to ColladaTriangles.Count - 1 do
     begin
       for j := 0 to 2 do
       begin
-        Ind := _ColladaTriangles.Indices^[IndexInputStride * (i * 3 + j) + _ColladaTriangles.Inputs[PositionInd].Offset];
-        _ColladaTriangles.CopyInputData(@Pos[j], _ColladaTriangles.Inputs[PositionInd], Ind);
+        Ind := ColladaTriangles.Indices^[IndexInputStride * (i * 3 + j) + ColladaTriangles.Inputs[PositionInd].Offset];
+        ColladaTriangles.CopyInputData(@Pos[j], ColladaTriangles.Inputs[PositionInd], Ind);
         RemapNormals[i * 3 + j] := Ind;
       end;
       FaceNormals[i] := UTriangleNormal(Pos[0].xyz, Pos[1].xyz, Pos[2].xyz);
@@ -5390,21 +5485,21 @@ constructor TUSceneDataDAE.TMeshSubsetInterfaceCollada.Create(
     if Length(Tangents) > 0 then Exit;
     GenerateNormals;
     FaceTangents := nil;
-    SetLength(FaceTangents, _ColladaTriangles.Count);
-    SetLength(Tangents, _ColladaTriangles.Count * 3);
-    SetLength(RemapTangents, _ColladaTriangles.Count * 3);
+    SetLength(FaceTangents, ColladaTriangles.Count);
+    SetLength(Tangents, ColladaTriangles.Count * 3);
+    SetLength(RemapTangents, ColladaTriangles.Count * 3);
     UClear(FaceTangents[0], SizeOf(FaceTangents[0]) * Length(FaceTangents));
     UClear(Tangents[0], SizeOf(Tangents[0]) * Length(Tangents));
     UClear(RemapTangents[0], SizeOf(RemapTangents[0]) * Length(RemapTangents));
     TangentCount := 0;
-    for i := 0 to _ColladaTriangles.Count - 1 do
+    for i := 0 to ColladaTriangles.Count - 1 do
     begin
       for j := 0 to 2 do
       begin
-        Ind := _ColladaTriangles.Indices^[IndexInputStride * (i * 3 + j) + _ColladaTriangles.Inputs[PositionInd].Offset];
-        _ColladaTriangles.CopyInputData(@Pos[j], _ColladaTriangles.Inputs[PositionInd], ind);
-        ind := _ColladaTriangles.Indices^[IndexInputStride * (i * 3 + j) + _ColladaTriangles.Inputs[TexCoordInd].Offset];
-        _ColladaTriangles.CopyInputData(@uv[j], _ColladaTriangles.Inputs[TexCoordInd], ind);
+        Ind := ColladaTriangles.Indices^[IndexInputStride * (i * 3 + j) + ColladaTriangles.Inputs[PositionInd].Offset];
+        ColladaTriangles.CopyInputData(@Pos[j], ColladaTriangles.Inputs[PositionInd], ind);
+        ind := ColladaTriangles.Indices^[IndexInputStride * (i * 3 + j) + ColladaTriangles.Inputs[TexCoordInd].Offset];
+        ColladaTriangles.CopyInputData(@uv[j], ColladaTriangles.Inputs[TexCoordInd], ind);
       end;
       FaceTangents[i] := CalculateFaceTB(
         Pos[0].xyz, Pos[1].xyz, Pos[2].xyz,
@@ -5421,7 +5516,7 @@ constructor TUSceneDataDAE.TMeshSubsetInterfaceCollada.Create(
     SetLength(Tangents, TangentCount);
   end;
   var VertexBuffer: array of array of Int32;
-  var VertexRemap: array of Int32;
+  //var VertexRemap: array of Int32;
   function AddVertex(const AttribIndices: array of Int32): Int32;
     var i, j: Int32;
     var Match: Boolean;
@@ -5457,18 +5552,19 @@ constructor TUSceneDataDAE.TMeshSubsetInterfaceCollada.Create(
   var GenTangents: Boolean;
   var AttribOffsets: array of Int32;
   var AttribIndices: array of Int32;
+  var VertexIndices: array of Int32;
   var i, j, ai, Ind: Int32;
   var Root: TColladaRoot;
 begin
-  _ColladaTriangles := ColladaTriangles;
-  Root := _ColladaTriangles.GetRoot as TColladaRoot;
-  _VertexDescriptor := _ColladaTriangles.VertexDescriptor;
+  ColladaTriangles.UserData := Self;
+  _VertexDescriptor := ColladaTriangles.VertexDescriptor;
+  Root := ColladaTriangles.GetRoot as TColladaRoot;
   PositionInd := -1;
   NormalInd := -1;
   TangentInd := -1;
   BinormalInd := -1;
   TexCoordInd := -1;
-  IndexInputStride := _ColladaTriangles.InputStride;
+  IndexInputStride := ColladaTriangles.InputStride;
   for i := 0 to High(_VertexDescriptor) do
   begin
     case _VertexDescriptor[i].Semantic of
@@ -5525,7 +5621,7 @@ begin
     AttribOffsets[i] := VertexSize;
     _VertexSize += _VertexDescriptor[i].Size;
   end;
-  if _ColladaTriangles.Count * 3 > High(UInt16) then
+  if ColladaTriangles.Count * 3 > High(UInt16) then
   begin
     _IndexSize := 4;
   end
@@ -5533,44 +5629,48 @@ begin
   begin
     _IndexSize := 2;
   end;
-  VertexRemap := nil;
-  SetLength(VertexRemap, _ColladaTriangles.Count * 3);
+  VertexIndices := nil;
+  SetLength(VertexIndices, ColladaTriangles.Count * 3);
   AttribIndices := nil;
   SetLength(AttribIndices, Length(_VertexDescriptor));
-  for i := 0 to _ColladaTriangles.Count * 3 - 1 do
+  _VertexRemap := nil;
+  SetLength(_VertexRemap, Length(VertexIndices));
+  for i := 0 to ColladaTriangles.Count * 3 - 1 do
   begin
-    for j := 0 to High(_ColladaTriangles.VertexLayout) do
+    for j := 0 to High(ColladaTriangles.VertexLayout) do
     begin
-      Ind := _ColladaTriangles.Indices^[IndexInputStride * i + _ColladaTriangles.Inputs[j].Offset];
+      Ind := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[j].Offset];
       AttribIndices[j] := Ind;
     end;
     for j := 0 to GenAttribs - 1 do
     begin
-      ai := Length(_ColladaTriangles.VertexLayout) + j;
+      ai := Length(ColladaTriangles.VertexLayout) + j;
       case _VertexDescriptor[ai].Semantic of
         as_normal: Ind := RemapNormals[i];
         as_tangent, as_binormal: Ind := RemapTangents[i];
       end;
       AttribIndices[ai] := Ind;
     end;
-    VertexRemap[i] := AddVertex(AttribIndices);
+    VertexInd := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[PositionInd].Offset];
+    VertexIndices[i] := AddVertex(AttribIndices);
+    _VertexRemap[VertexIndices[i]] := VertexInd;
   end;
   _VertexCount := Length(VertexBuffer);
   _VertexData := GetMem(VertexSize * _VertexCount);
-  _IndexCount := _ColladaTriangles.Count * 3;
+  _IndexCount := ColladaTriangles.Count * 3;
   _IndexData := GetMem(IndexSize * _IndexCount);
   for i := 0 to High(VertexBuffer) do
   begin
-    for j := 0 to High(_ColladaTriangles.VertexLayout) do
+    for j := 0 to High(ColladaTriangles.VertexLayout) do
     begin
-      _ColladaTriangles.CopyInputData(
+      ColladaTriangles.CopyInputData(
         _VertexData + i * VertexSize + AttribOffsets[j],
-        _ColladaTriangles.VertexLayout[j], VertexBuffer[i][j]
+        ColladaTriangles.VertexLayout[j], VertexBuffer[i][j]
       );
     end;
     for j := 0 to GenAttribs - 1 do
     begin
-      ai := Length(_ColladaTriangles.VertexLayout) + j;
+      ai := Length(ColladaTriangles.VertexLayout) + j;
       case _VertexDescriptor[ai].Semantic of
         as_normal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Normals[VertexBuffer[i][ai]];
         as_tangent: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][ai]].Tangent;
@@ -5580,67 +5680,140 @@ begin
   end;
   if _IndexSize = 2 then
   begin
-    for i := 0 to High(VertexRemap) do
+    for i := 0 to High(VertexIndices) do
     begin
-      PUInt16(_IndexData + i * IndexSize)^ := UInt16(VertexRemap[i]);
+      PUInt16(_IndexData + i * IndexSize)^ := UInt16(VertexIndices[i]);
     end;
   end
   else
   begin
-    for i := 0 to High(VertexRemap) do
+    for i := 0 to High(VertexIndices) do
     begin
-      PUInt32(_IndexData + i * IndexSize)^ := VertexRemap[i];
+      PUInt32(_IndexData + i * IndexSize)^ := VertexIndices[i];
     end;
   end;
 end;
 
 constructor TUSceneDataDAE.TMeshInterfaceCollada.Create(
-  const ColladaMesh: TColladaMesh
+  const ColladaGeometry: TColladaGeometry
 );
+  var Mesh: TColladaMesh;
   var Tris: TColladaTriangles;
   var Intf: TMeshSubsetInterfaceCollada;
 begin
-  ColladaMesh.UserData := Self;
-  for Tris in ColladaMesh.TrianglesList do
+  ColladaGeometry.UserData := Self;
+  for Mesh in ColladaGeometry.Meshes do
   begin
-    Intf := TMeshSubsetInterfaceCollada.Create(Tris);
-    specialize UArrAppend<TMeshSubsetInterface>(
-      _Subsets, Intf
-    );
+    for Tris in Mesh.TrianglesList do
+    begin
+      Intf := TMeshSubsetInterfaceCollada.Create(Tris);
+      specialize UArrAppend<TMeshSubsetInterface>(
+        _Subsets, Intf
+      );
+    end;
+  end;
+end;
+
+constructor TUSceneDataDAE.TSkinInterfaceCollada.Create(
+  const ColladaSkin: TColladaSkin
+);
+  type TDataIndices = array[0..3] of UInt32;
+  type PDataIndices = ^TDataIndices;
+  type TDataWeights = array[0..3] of TUFloat;
+  type PDataWeights = ^TDataWeights;
+  var i, j, w, n: Int32;
+  var tw: TUFloat;
+  var pi: PDataIndices;
+  var pw: PDataWeights;
+  var MeshSubset: TMeshSubsetInterfaceCollada;
+  var Weights: array of array of TWeight;
+  var MaxWeightCount, VertexStride, WeightsOffset: Int32;
+begin
+  ColladaSkin.UserData := Self;
+  _Mesh := TMeshInterface(ColladaSkin.Geometry.UserData);
+  SetLength(_Joints, Length(ColladaSkin.Joints.Joints));
+  for i := 0 to High(_Joints) do
+  begin
+    _Joints[i].Name := ColladaSkin.Joints.Joints[i].JointName;
+    _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose;
+  end;
+  Weights := nil;
+  SetLength(Weights, ColladaSkin.VertexWeights.VCount);
+  MaxWeightCount := 0;
+  for i := 0 to ColladaSkin.VertexWeights.VCount - 1 do
+  begin
+    MaxWeightCount := UMax(MaxWeightCount, Length(ColladaSkin.VertexWeights.Weights[i]));
+    SetLength(Weights[i], Length(ColladaSkin.VertexWeights.Weights[i]));
+    for j := 0 to High(ColladaSkin.VertexWeights.Weights[i]) do
+    begin
+      Weights[i][j].JointIndex := ColladaSkin.VertexWeights.Weights[i][j].JointIndex;
+      Weights[i][j].JointWeight := ColladaSkin.VertexWeights.Weights[i][j].JointWeight;
+    end;
+    if Length(Weights[i]) > 4 then
+    begin
+      specialize UArrSort<TWeight>(Weights[i]);
+      SetLength(Weights[i], 4);
+      tw := 0;
+      for j := 0 to High(Weights[i]) do
+      begin
+        tw += Weights[i][j].JointWeight;
+      end;
+      tw := 1 / tw;
+      for j := 0 to High(Weights[i]) do
+      begin
+        Weights[i][j].JointWeight := Weights[i][j].JointWeight * tw;
+      end;
+    end;
+  end;
+  MaxWeightCount := UMin(MaxWeightCount, 4);
+  VertexStride := MaxWeightCount * SizeOf(TWeight);
+  SetLength(_Subsets, Length(_Mesh.Subsets));
+  WeightsOffset := MaxWeightCount * SizeOf(UInt32);
+  for i := 0 to High(_Subsets) do
+  begin
+    MeshSubset := TMeshSubsetInterfaceCollada(_Mesh.Subsets[i]);
+    _Subsets[i] := TSubset.Create(MaxWeightCount, MeshSubset.VertexCount);
+    for j := 0 to MeshSubset.VertexCount - 1 do
+    begin
+      n := MeshSubset.VertexRemap[j];
+      pi := _Subsets[i].VertexData + VertexStride * j;
+      pw := PDataWeights(Pointer(pi) + WeightsOffset);
+      for w := 0 to MaxWeightCount - 1 do
+      begin
+        if Length(Weights[n]) > w then
+        begin
+          pi^[w] := Weights[n][w].JointIndex;
+          pw^[w] := Weights[n][w].JointWeight;
+        end
+        else
+        begin
+          pi^[w] := 0;
+          pw^[w] := 0;
+        end;
+      end;
+    end;
   end;
 end;
 
 constructor TUSceneDataDAE.TAttachmentMeshCollada.Create(
-  const ColladaMesh: TColladaMesh;
   const GeometryInstance: TColladaInstanceGeometry
 );
-  function FindMaterialBinding(const Material: String): TColladaInstanceMaterial;
-    var i: Int32;
-  begin
-    for i := 0 to High(GeometryInstance.MaterialBindings) do
-    if GeometryInstance.MaterialBindings[i].Symbol = Material then
-    begin
-      Exit(GeometryInstance.MaterialBindings[i]);
-    end;
-    Result := nil;
-  end;
-  var i: Int32;
-  var cm: TColladaInstanceMaterial;
 begin
-  _Mesh := TMeshInterfaceCollada(ColladaMesh.UserData);
-  SetLength(_MaterialBindings, Length(ColladaMesh.TrianglesList));
-  for i := 0 to High(ColladaMesh.TrianglesList) do
-  begin
-    _MaterialBindings[i] := TMaterialInstanceInterface.Create;
-    cm := FindMaterialBinding(ColladaMesh.TrianglesList[i].Material);
-    if not Assigned(cm) then Continue;
-    begin
-      _MaterialBindings[i].Assign(
-        TMaterialInterface(cm.Material.UserData)
-      );
-      cm.UserData := _MaterialBindings[i];
-    end;
-  end;
+  inherited Create;
+  _Mesh := TMeshInterfaceCollada(GeometryInstance.Geometry.UserData);
+  _MaterialBindings := GenerateMaterialBindings(
+    GeometryInstance.Geometry, GeometryInstance.MaterialBindings
+  );
+end;
+
+constructor TUSceneDataDAE.TAttachmentSkinCollada.Create(
+  const ControllerInstance: TColladaInstanceController
+);
+begin
+  _Skin := TSkinInterfaceCollada(ControllerInstance.Controller.AsSkin.UserData);
+  _MaterialBindings := GenerateMaterialBindings(
+    ControllerInstance.Controller.AsSkin.Geometry, ControllerInstance.MaterialBindings
+  );
 end;
 
 constructor TUSceneDataDAE.TNodeInterfaceCollada.Create(
@@ -5648,8 +5821,10 @@ constructor TUSceneDataDAE.TNodeInterfaceCollada.Create(
   const AParent: TNodeInterfaceCollada
 );
   var Child: TColladaObject;
-  var Mesh: TColladaMesh;
+  var AttachMesh: TAttachmentMeshCollada;
+  var AttachSkin: TAttachmentSkinCollada;
 begin
+  inherited Create;
   _Transform := TUMat.Identity;
   Parent := AParent;
   if Assigned(ColladaNode) then
@@ -5671,13 +5846,22 @@ begin
       end
       else if Child is TColladaInstanceGeometry then
       begin
-        for Mesh in TColladaInstanceGeometry(Child).Geometry.Meshes do
-        begin
-          specialize UArrAppend<TAttachment>(
-            _Attachments,
-            TAttachmentMeshCollada.Create(Mesh, TColladaInstanceGeometry(Child))
-          );
-        end;
+        AttachMesh := TAttachmentMeshCollada.Create(
+          TColladaInstanceGeometry(Child)
+        );
+        specialize UArrAppend<TAttachment>(
+          _Attachments, AttachMesh
+        );
+      end
+      else if (Child is TColladaInstanceController)
+      and (TColladaInstanceController(Child).Controller.ControllerType = ct_skin) then
+      begin
+        AttachSkin := TAttachmentSkinCollada.Create(
+          TColladaInstanceController(Child)
+        );
+        specialize UArrAppend<TAttachment>(
+          _Attachments, AttachSkin
+        );
       end;
     end;
   end;
@@ -5740,21 +5924,67 @@ begin
   end;
 end;
 
+class function TUSceneDataDAE.GenerateMaterialBindings(
+  const ColladaGeometry: TColladaGeometry;
+  const ColladaBindings: TColladaInstanceMaterialList
+): TMaterialInstanceInterfaceList;
+  function FindMaterialBinding(const Material: String): TColladaInstanceMaterial;
+    var i: Int32;
+  begin
+    for i := 0 to High(ColladaBindings) do
+    if ColladaBindings[i].Symbol = Material then
+    begin
+      Exit(ColladaBindings[i]);
+    end;
+    Result := nil;
+  end;
+  var i, j, n: Int32;
+  var cm: TColladaInstanceMaterial;
+begin
+  Result := nil;
+  n := 0;
+  for i := 0 to High(ColladaGeometry.Meshes) do
+  begin
+    n += Length(ColladaGeometry.Meshes[i].TrianglesList);
+  end;
+  SetLength(Result, n);
+  n := 0;
+  for j := 0 to High(ColladaGeometry.Meshes) do
+  begin
+    for i := 0 to High(ColladaGeometry.Meshes[j].TrianglesList) do
+    begin
+      Result[n] := TMaterialInstanceInterface.Create;
+      cm := FindMaterialBinding(ColladaGeometry.Meshes[j].TrianglesList[i].Material);
+      if not Assigned(cm) then Continue;
+      begin
+        Result[n].Assign(
+          TMaterialInterface(cm.Material.UserData)
+        );
+        cm.UserData := Result[n];
+      end;
+      Inc(n);
+    end;
+  end;
+end;
+
 procedure TUSceneDataDAE.Read(const XML: TUXML);
   var Image: TColladaImage;
   var Mat: TColladaMaterial;
   var Geom: TColladaGeometry;
-  var Mesh: TColladaMesh;
   var Node: TColladaNode;
+  var Controller: TColladaController;
+  var Skin: TColladaSkin;
   var IntfImage: TImageInterfaceCollada;
   var IntfMat: TMaterialInterfaceCollada;
   var IntfMesh: TMeshInterfaceCollada;
+  var IntfSkin: TSkinInterfaceCollada;
 begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
   _Root := TColladaRoot.Create(XML, _Options, _Path);
   _Root.Resolve;
   _Root.Initialize;
+  //_Root.Dump;
   for Image in _Root.LibImages.Images do
   begin
     IntfImage := TImageInterfaceCollada.Create(Image);
@@ -5771,13 +6001,20 @@ begin
   end;
   for Geom in _Root.LibGeometries.Geometries do
   begin
-    for Mesh in Geom.Meshes do
-    begin
-      IntfMesh := TMeshInterfaceCollada.Create(Mesh);
-      specialize UArrAppend<TMeshInterface>(
-        _MeshList, IntfMesh
-      );
-    end;
+    IntfMesh := TMeshInterfaceCollada.Create(Geom);
+    specialize UArrAppend<TMeshInterface>(
+      _MeshList, IntfMesh
+    );
+  end;
+  for Controller in _Root.LibControllers.Controllers do
+  if Controller.ControllerType = ct_skin then
+  begin
+    Skin := Controller.AsSkin;
+    if not Assigned(Skin) then Continue;
+    IntfSkin := TSkinInterfaceCollada.Create(Skin);
+    specialize UArrAppend<TSkinInterface>(
+      _SkinList, IntfSkin
+    );
   end;
   _RootNode := TNodeInterfaceCollada.Create(nil, nil);
   for Node in _Root.Scene.VisualScene.VisualScene.Nodes do
