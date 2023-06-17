@@ -44,16 +44,16 @@ type
   TUInt64 = UInt64;
   TUInt64Arr = array[UInt16] of TUInt64;
   PUInt64Arr = ^TUInt64Arr;
-  TInt8 = UInt8;
+  TInt8 = Int8;
   TInt8Arr = array[UInt16] of TInt8;
   PInt8Arr = ^TInt8Arr;
-  TInt16 = UInt16;
+  TInt16 = Int16;
   TInt16Arr = array[UInt16] of TInt16;
   PInt16Arr = ^TInt16Arr;
-  TInt32 = UInt32;
+  TInt32 = Int32;
   TInt32Arr = array[UInt16] of TInt32;
   PInt32Arr = ^TInt32Arr;
-  TInt64 = UInt64;
+  TInt64 = Int64;
   TInt64Arr = array[UInt16] of TInt64;
   PInt64Arr = ^TInt64Arr;
 
