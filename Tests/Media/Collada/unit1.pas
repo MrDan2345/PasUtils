@@ -93,7 +93,7 @@ end;
 procedure TForm1.InitializeData;
 begin
   Scene := TUSceneDataDAE.Create();
-  Scene.Load('Assets/Skin.dae');
+  Scene.Load('Assets/skin.dae');
   WriteLn(Length(Scene.MeshList));
 end;
 
@@ -103,11 +103,11 @@ begin
 end;
 
 procedure TForm1.Render;
-  procedure SetupTransforms;
+  procedure SetupTransforms(const Xf: TUMat);
     var W, V, P, WV: TUMat;
   begin
-    W := TUMat.RotationY(((GetTickCount mod 6000) / 6000) * 2 * Pi);
-    V := TUMat.View(TUVec3.Make(0, 5, -5), TUVec3.Make(0, 0, 0), TUVec3.Make(0, 1, 0));
+    W := Xf * TUMat.RotationY(((GetTickCount mod 6000) / 6000) * 2 * Pi);
+    V := TUMat.View(TUVec3.Make(0, 2, -5), TUVec3.Make(0, -0.5, 0), TUVec3.Make(0, 1, 0));
     P := TUMat.Proj(Pi / 4, 1, 1, 100);
     WV := W * V;
     glMatrixMode(GL_MODELVIEW);
@@ -115,44 +115,95 @@ procedure TForm1.Render;
     glMatrixMode(GL_PROJECTION);
     glLoadMatrixf(@P);
   end;
-  procedure RenderMesh(Mesh: TUSceneData.TMeshInterface);
-    procedure RenderSubset(Subset: TUSceneData.TMeshSubsetInterface);
-      var i: Int32;
-      var Vertex: PUVec3;
-    begin
-      for i := 0 to Subset.IndexCount - 1 do
+  procedure RenderNode(const Node: TUSceneData.TNodeInterface);
+    procedure RenderMesh(const MeshAttach: TUSceneData.TAttachmentMesh);
+      procedure RenderSubset(Subset: TUSceneData.TMeshInterface.TSubset);
+        var i: Int32;
+        var Vertex: PUVec3;
       begin
-        Vertex := PUVec3(Subset.VertexData + (Subset.Index[i] * Subset.VertexSize));
-        glVertex3fv(PGLFloat(Vertex));
+        for i := 0 to Subset.IndexCount - 1 do
+        begin
+          Vertex := PUVec3(Subset.VertexData + (Subset.Index[i] * Subset.VertexSize));
+          glVertex3fv(PGLFloat(Vertex));
+        end;
       end;
+      var i: Int32;
+    begin
+      glBegin(GL_TRIANGLES);
+      for i := 0 to High(MeshAttach.Mesh.Subsets) do
+      begin
+        RenderSubset(MeshAttach.Mesh.Subsets[i]);
+      end;
+      glEnd();
+    end;
+    procedure RenderSkin(const SkinAttach: TUSceneData.TAttachmentSkin);
+      procedure RenderSubset(
+        MeshSubset: TUSceneData.TMeshInterface.TSubset;
+        SkinSubset: TUSceneData.TSkinInterface.TSubset
+      );
+        var i, w: Int32;
+        var S: TUMat;
+        var WeightsOffset: UInt32;
+        var Vertex: PUVec3;
+        var JointIndices: PUInt32Arr;
+        var JointWeights: PUFloatArr;
+        var VertexSkin: TUVec3;
+        var SkinJoint: TUSceneData.TNodeInterface;
+      begin
+        WeightsOffset := SkinSubset.WeightCount * SizeOf(UInt32);
+        for i := 0 to MeshSubset.IndexCount - 1 do
+        begin
+          Vertex := PUVec3(MeshSubset.VertexData + (MeshSubset.Index[i] * MeshSubset.VertexSize));
+          JointIndices := PUInt32Arr(SkinSubset.VertexData + (MeshSubset.Index[i] * SkinSubset.VertexSize));
+          JointWeights := PUFloatArr(Pointer(JointIndices) + WeightsOffset);
+          VertexSkin := TUVec3.Zero;
+          for w := 0 to SkinSubset.WeightCount - 1 do
+          begin
+            SkinJoint := SkinAttach.JointBindings[JointIndices^[w]];
+            S := SkinAttach.Skin.Joints[JointIndices^[w]].Bind;
+            S := S * SkinJoint.Transform;
+            VertexSkin += Vertex^.Transform4x3(S) * JointWeights^[w];
+          end;
+          glVertex3fv(@VertexSkin);
+        end;
+      end;
+      var i: Int32;
+    begin
+      glBegin(GL_TRIANGLES);
+      for i := 0 to High(SkinAttach.Skin.Mesh.Subsets) do
+      begin
+        RenderSubset(SkinAttach.Skin.Mesh.Subsets[i], SkinAttach.Skin.Subsets[i]);
+      end;
+      glEnd();
     end;
     var i: Int32;
   begin
-    for i := 0 to High(Mesh.Subsets) do
+    SetupTransforms(Node.Transform);
+    for i := 0 to High(Node.Attachments) do
     begin
-      RenderSubset(Mesh.Subsets[i]);
+      if (Node.Attachments[i] is TUSceneData.TAttachmentMesh) then
+      begin
+        RenderMesh(TUSceneData.TAttachmentMesh(Node.Attachments[i]));
+      end
+      else if (Node.Attachments[i] is TUSceneData.TAttachmentSkin) then
+      begin
+        RenderSkin(TUSceneData.TAttachmentSkin(Node.Attachments[i]));
+      end;
+    end;
+    for i := 0 to High(Node.Children) do
+    begin
+      RenderNode(Node.Children[i]);
     end;
   end;
-  var i: Int32;
-  const s = 0.9;
 begin
-  SetupTransforms;
+  //SetupTransforms;
   //glEnable(GL_TEXTURE_2D);
   glShadeModel(GL_FLAT);
-  glShadeModel(GL_SMOOTH);
+  //glShadeModel(GL_SMOOTH);
   glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   glDisable(GL_CULL_FACE);
   //glEnable(GL_BLEND);
-  glBegin(GL_TRIANGLES);
-  glVertex2f(-s, -s); glVertex2f(-s, s); glVertex2f(s, s);
-  glVertex2f(-s, -s); glVertex2f(s, s); glVertex2f(s, -s);
-  glEnd();
-  glBegin(GL_TRIANGLES);
-  for i := 0 to High(Scene.MeshList) do
-  begin
-    RenderMesh(Scene.MeshList[i]);
-  end;
-  glEnd();
+  RenderNode(Scene.RootNode);
 end;
 
 end.

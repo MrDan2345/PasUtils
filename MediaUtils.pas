@@ -221,6 +221,28 @@ type
 
   type TUSceneData = class (TURefClass)
   public
+    type TAttachment = class
+    end;
+    type TAttachmentList = array of TAttachment;
+    type TNodeInterface = class
+    public
+      type TNodeList = array of TNodeInterface;
+    protected
+      var _Name: String;
+      var _Transform: TUMat;
+      var _Attachments: TAttachmentList;
+      var _Parent: TNodeInterface;
+      var _Children: TNodeList;
+      procedure SetParent(const Value: TNodeInterface);
+    public
+      property Name: String read _Name;
+      property Transform: TUMat read _Transform;
+      property Attachments: TAttachmentList read _Attachments;
+      property Children: TNodeList read _Children;
+      property Parent: TNodeInterface read _Parent write SetParent;
+      destructor Destroy; override;
+    end;
+    type TNodeInterfaceList = TNodeInterface.TNodeList;
     type TImageInterface = class
     protected
       var _FileName: String;
@@ -230,37 +252,38 @@ type
       property Path: String read _Path;
     end;
     type TImageInterfaceList = array of TImageInterface;
-    type TMeshSubsetInterface = class
-    protected
-      var _VertexData: Pointer;
-      var _IndexData: Pointer;
-      var _VertexCount: Int32;
-      var _IndexCount: Int32;
-      var _VertexSize: Int32;
-      var _IndexSize: Int32;
-      function GetVertexDescriptor: TUVertexDescriptor; virtual;
-      function GetVertexBufferSize: Int32;
-      function GetIndexBufferSize: Int32;
-      function GetIndex(const Id: Int32): UInt32;
-    public
-      property VertexDescriptor: TUVertexDescriptor read GetVertexDescriptor;
-      property VertexData: Pointer read _VertexData;
-      property IndexData: Pointer read _IndexData;
-      property VertexCount: Int32 read _VertexCount;
-      property IndexCount: Int32 read _IndexCount;
-      property VertexSize: Int32 read _VertexSize;
-      property IndexSize: Int32 read _IndexSize;
-      property VertexBufferSize: Int32 read GetVertexBufferSize;
-      property IndexBufferSize: Int32 read GetIndexBufferSize;
-      property Index[const Id: Int32]: UInt32 read GetIndex;
-      destructor Destroy; override;
-    end;
-    type TMeshSubsetInterfaceList = array of TMeshSubsetInterface;
     type TMeshInterface = class
-    private
-      var _Subsets: TMeshSubsetInterfaceList;
     public
-      property Subsets: TMeshSubsetInterfaceList read _Subsets;
+      type TSubset = class
+      protected
+        var _VertexData: Pointer;
+        var _IndexData: Pointer;
+        var _VertexCount: Int32;
+        var _IndexCount: Int32;
+        var _VertexSize: Int32;
+        var _IndexSize: Int32;
+        function GetVertexDescriptor: TUVertexDescriptor; virtual;
+        function GetVertexBufferSize: Int32;
+        function GetIndexBufferSize: Int32;
+        function GetIndex(const Id: Int32): UInt32;
+      public
+        property VertexDescriptor: TUVertexDescriptor read GetVertexDescriptor;
+        property VertexData: Pointer read _VertexData;
+        property IndexData: Pointer read _IndexData;
+        property VertexCount: Int32 read _VertexCount;
+        property IndexCount: Int32 read _IndexCount;
+        property VertexSize: Int32 read _VertexSize;
+        property IndexSize: Int32 read _IndexSize;
+        property VertexBufferSize: Int32 read GetVertexBufferSize;
+        property IndexBufferSize: Int32 read GetIndexBufferSize;
+        property Index[const Id: Int32]: UInt32 read GetIndex;
+        destructor Destroy; override;
+      end;
+      type TSubsetList = array of TSubset;
+    private
+      var _Subsets: TSubsetList;
+    public
+      property Subsets: TSubsetList read _Subsets;
       destructor Destroy; override;
     end;
     type TMeshInterfaceList = array of TMeshInterface;
@@ -280,9 +303,11 @@ type
       private
         var _VertexData: Pointer;
         var _WeightCount: Int32;
+        function GetVertexSize: UInt32;
       public
         property VertexData: Pointer read _VertexData;
         property WeightCount: Int32 read _WeightCount;
+        property VertexSize: UInt32 read GetVertexSize;
         constructor Create(const AWeightCount, AVertexCount: Int32);
         destructor Destroy; override;
       end;
@@ -396,9 +421,6 @@ type
       procedure Assign(const Material: TMaterialInterface);
     end;
     type TMaterialInstanceInterfaceList = array of TMaterialInstanceInterface;
-    type TAttachment = class
-    end;
-    type TAttachmentList = array of TAttachment;
     type TAttachmentMesh = class (TAttachment)
     protected
       var _Mesh: TMeshInterface;
@@ -411,28 +433,14 @@ type
     type TAttachmentSkin = class (TAttachment)
     protected
       var _Skin: TSkinInterface;
+      var _Skeleton: TNodeInterface;
       var _MaterialBindings: TMaterialInstanceInterfaceList;
+      var _JointBindings: TNodeInterfaceList;
     public
       property Skin: TSkinInterface read _Skin;
+      property Skeleton: TNodeInterface read _Skeleton;
       property MaterialBindings: TMaterialInstanceInterfaceList read _MaterialBindings;
-      destructor Destroy; override;
-    end;
-    type TNodeInterface = class
-    public
-      type TNodeList = array of TNodeInterface;
-    protected
-      var _Name: String;
-      var _Transform: TUMat;
-      var _Attachments: TAttachmentList;
-      var _Parent: TNodeInterface;
-      var _Children: TNodeList;
-      procedure SetParent(const Value: TNodeInterface);
-    public
-      property Name: String read _Name;
-      property Transform: TUMat read _Transform;
-      property Attachments: TAttachmentList read _Attachments;
-      property Children: TNodeList read _Children;
-      property Parent: TNodeInterface read _Parent write SetParent;
+      property JointBindings: TNodeInterfaceList read _JointBindings;
       destructor Destroy; override;
     end;
     var _ImageList: TImageInterfaceList;
@@ -1184,20 +1192,20 @@ type
     public
       constructor Create(const ColladaMaterial: TColladaMaterial);
     end;
-    type TMeshSubsetInterfaceCollada = class (TMeshSubsetInterface)
-    public
-      type TVertexRemap = array of Int32;
-    private
-      var _VertexDescriptor: TUVertexDescriptor;
-      var _VertexRemap: TVertexRemap;
-    protected
-      function GetVertexDescriptor: TUVertexDescriptor; override;
-    public
-      property VertexRemap: TVertexRemap read _VertexRemap;
-      constructor Create(const ColladaTriangles: TColladaTriangles);
-    end;
     type TMeshInterfaceCollada = class (TMeshInterface)
     public
+      type TSubsetCollada = class (TMeshInterface.TSubset)
+      public
+        type TVertexRemap = array of Int32;
+      private
+        var _VertexDescriptor: TUVertexDescriptor;
+        var _VertexRemap: TVertexRemap;
+      protected
+        function GetVertexDescriptor: TUVertexDescriptor; override;
+      public
+        property VertexRemap: TVertexRemap read _VertexRemap;
+        constructor Create(const ColladaTriangles: TColladaTriangles);
+      end;
       constructor Create(const ColladaGeometry: TColladaGeometry);
     end;
     type TSkinInterfaceCollada = class (TSkinInterface)
@@ -2443,28 +2451,53 @@ end;
 // TUVertexAttribute end
 
 // TUSceneData begin
-function TUSceneData.TMeshSubsetInterface.GetVertexDescriptor: TUVertexDescriptor;
+procedure TUSceneData.TNodeInterface.SetParent(const Value: TNodeInterface);
+begin
+  if Value = _Parent then Exit;
+  if Assigned(_Parent) then
+  begin
+    specialize UArrRemove<TNodeInterface>(
+      _Parent._Children, Self
+    );
+  end;
+  _Parent := Value;
+  if Assigned(_Parent) then
+  begin
+    specialize UArrAppend<TNodeInterface>(
+      _Parent._Children, Self
+    );
+  end;
+end;
+
+destructor TUSceneData.TNodeInterface.Destroy;
+begin
+  specialize UArrClear<TAttachment>(_Attachments);
+  specialize UArrClear<TNodeInterface>(_Children);
+  inherited Destroy;
+end;
+
+function TUSceneData.TMeshInterface.TSubset.GetVertexDescriptor: TUVertexDescriptor;
 begin
   Result := nil;
 end;
 
-function TUSceneData.TMeshSubsetInterface.GetVertexBufferSize: Int32;
+function TUSceneData.TMeshInterface.TSubset.GetVertexBufferSize: Int32;
 begin
   Result := _VertexCount * _VertexSize;
 end;
 
-function TUSceneData.TMeshSubsetInterface.GetIndexBufferSize: Int32;
+function TUSceneData.TMeshInterface.TSubset.GetIndexBufferSize: Int32;
 begin
   Result := _IndexCount * _IndexSize;
 end;
 
-function TUSceneData.TMeshSubsetInterface.GetIndex(const Id: Int32): UInt32;
+function TUSceneData.TMeshInterface.TSubset.GetIndex(const Id: Int32): UInt32;
 begin
   if (_IndexSize = 2) then Exit(PUInt16(_IndexData + Id * _IndexSize)^)
   else Exit(PUInt32(_IndexData + Id * _IndexSize)^);
 end;
 
-destructor TUSceneData.TMeshSubsetInterface.Destroy;
+destructor TUSceneData.TMeshInterface.TSubset.Destroy;
 begin
   FreeMemAndNil(_IndexData);
   FreeMemAndNil(_VertexData);
@@ -2473,7 +2506,7 @@ end;
 
 destructor TUSceneData.TMeshInterface.Destroy;
 begin
-  specialize UArrClear<TMeshSubsetInterface>(_Subsets);
+  specialize UArrClear<TMeshInterface.TSubset>(_Subsets);
   inherited Destroy;
 end;
 
@@ -2482,12 +2515,17 @@ begin
   Result := a.JointWeight > b.JointWeight;
 end;
 
+function TUSceneData.TSkinInterface.TSubset.GetVertexSize: UInt32;
+begin
+  Result := _WeightCount * (SizeOf(UInt32) + SizeOf(TUFloat));
+end;
+
 constructor TUSceneData.TSkinInterface.TSubset.Create(
   const AWeightCount, AVertexCount: Int32
 );
 begin
   _WeightCount := AWeightCount;
-  _VertexData := GetMemory(AVertexCount * AWeightCount * (SizeOf(UInt32) + SizeOf(TUFloat)));
+  _VertexData := GetMemory(AVertexCount * VertexSize);
 end;
 
 destructor TUSceneData.TSkinInterface.TSubset.Destroy;
@@ -2668,31 +2706,6 @@ end;
 destructor TUSceneData.TAttachmentSkin.Destroy;
 begin
   specialize UArrClear<TMaterialInstanceInterface>(_MaterialBindings);
-  inherited Destroy;
-end;
-
-procedure TUSceneData.TNodeInterface.SetParent(const Value: TNodeInterface);
-begin
-  if Value = _Parent then Exit;
-  if Assigned(_Parent) then
-  begin
-    specialize UArrRemove<TNodeInterface>(
-      _Parent._Children, Self
-    );
-  end;
-  _Parent := Value;
-  if Assigned(_Parent) then
-  begin
-    specialize UArrAppend<TNodeInterface>(
-      _Parent._Children, Self
-    );
-  end;
-end;
-
-destructor TUSceneData.TNodeInterface.Destroy;
-begin
-  specialize UArrClear<TAttachment>(_Attachments);
-  specialize UArrClear<TNodeInterface>(_Children);
   inherited Destroy;
 end;
 
@@ -5357,12 +5370,12 @@ begin
   end;
 end;
 
-function TUSceneDataDAE.TMeshSubsetInterfaceCollada.GetVertexDescriptor: TUVertexDescriptor;
+function TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.GetVertexDescriptor: TUVertexDescriptor;
 begin
   Result := _VertexDescriptor;
 end;
 
-constructor TUSceneDataDAE.TMeshSubsetInterfaceCollada.Create(
+constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
   const ColladaTriangles: TColladaTriangles
 );
   var VertexInd: Int32;
@@ -5699,15 +5712,15 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.Create(
 );
   var Mesh: TColladaMesh;
   var Tris: TColladaTriangles;
-  var Intf: TMeshSubsetInterfaceCollada;
+  var Intf: TSubsetCollada;
 begin
   ColladaGeometry.UserData := Self;
   for Mesh in ColladaGeometry.Meshes do
   begin
     for Tris in Mesh.TrianglesList do
     begin
-      Intf := TMeshSubsetInterfaceCollada.Create(Tris);
-      specialize UArrAppend<TMeshSubsetInterface>(
+      Intf := TSubsetCollada.Create(Tris);
+      specialize UArrAppend<TSubset>(
         _Subsets, Intf
       );
     end;
@@ -5725,7 +5738,7 @@ constructor TUSceneDataDAE.TSkinInterfaceCollada.Create(
   var tw: TUFloat;
   var pi: PDataIndices;
   var pw: PDataWeights;
-  var MeshSubset: TMeshSubsetInterfaceCollada;
+  var MeshSubset: TMeshInterfaceCollada.TSubsetCollada;
   var Weights: array of array of TWeight;
   var MaxWeightCount, VertexStride, WeightsOffset: Int32;
 begin
@@ -5771,7 +5784,7 @@ begin
   WeightsOffset := MaxWeightCount * SizeOf(UInt32);
   for i := 0 to High(_Subsets) do
   begin
-    MeshSubset := TMeshSubsetInterfaceCollada(_Mesh.Subsets[i]);
+    MeshSubset := TMeshInterfaceCollada.TSubsetCollada(_Mesh.Subsets[i]);
     _Subsets[i] := TSubset.Create(MaxWeightCount, MeshSubset.VertexCount);
     for j := 0 to MeshSubset.VertexCount - 1 do
     begin
@@ -5809,8 +5822,28 @@ end;
 constructor TUSceneDataDAE.TAttachmentSkinCollada.Create(
   const ControllerInstance: TColladaInstanceController
 );
+  function FindNode(const ParentNode: TColladaObject; const NodeName: String): TColladaObject;
+    var i: Int32;
+  begin
+    if (ParentNode.sid = NodeName) then Exit(ParentNode);
+    for i := 0 to High(ParentNode.Children) do
+    begin
+      Result := FindNode(ParentNode.Children[i], NodeName);
+      if Assigned(Result) then Exit;
+    end;
+    Result := nil;
+  end;
+  var i: Int32;
+  var JointObject: TColladaObject;
 begin
   _Skin := TSkinInterfaceCollada(ControllerInstance.Controller.AsSkin.UserData);
+  _Skeleton := TNodeInterface(ControllerInstance.Skeleton.UserData);
+  SetLength(_JointBindings, Length(_Skin.Joints));
+  for i := 0 to High(_JointBindings) do
+  begin
+    JointObject := FindNode(ControllerInstance.Skeleton, _Skin.Joints[i].Name);
+    _JointBindings[i] := TNodeInterface(JointObject.UserData);
+  end;
   _MaterialBindings := GenerateMaterialBindings(
     ControllerInstance.Controller.AsSkin.Geometry, ControllerInstance.MaterialBindings
   );
