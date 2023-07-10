@@ -9,6 +9,8 @@ unit CommonUtils;
 {$warn 5024 off}
 {$warn 3123 off}
 {$warn 3124 off}
+{$WARN 5026 off}
+{$WARN 6018 off}
 interface
 
 uses
@@ -2980,6 +2982,7 @@ begin
     end;
     tkAString: Result := specialize GetDynArrayLength<String>(Index);
     tkClass: Result := specialize GetDynArrayLength<TObject>(Index);
+    else Result := 0;
   end;
 end;
 
@@ -3030,6 +3033,7 @@ begin
         PropArrayClass[Index, i] := tde^.ClassType.Create;
       end;
     end;
+    else begin end;
   end;
 end;
 
@@ -3297,6 +3301,7 @@ begin
         begin
           SetFloatProp(Self, _PropList[i], 0);
         end;
+        else begin end;
       end;
     end;
   end;
@@ -3439,6 +3444,7 @@ begin
             end;
           end;
         end;
+        else begin end;
       end;
       s := sh.Position - sp;
       sh.PosPush;
@@ -3591,6 +3597,7 @@ begin
             sh.Skip(s);
           end;
         end;
+        else begin end;
       end;
     end;
   finally
@@ -3690,10 +3697,12 @@ begin
                   );
                 end;
               end;
+              else begin end;
             end;
           end;
         end;
       end;
+      else begin end;
     end;
   end;
 end;
@@ -3847,6 +3856,10 @@ begin
               TUSerializable(PropArrayClass[i, j]).Dump(Offset + '    ');
               WriteLn(Offset + '  }');
             end;
+          end;
+          else
+          begin
+            WriteLn(Offset, 'Unhandled property');
           end;
         end;
       end;
@@ -4327,7 +4340,7 @@ end;
 
 function TUParser.NextToken(out TokenType: TUTokenType): String;
   var IndArr: array[0..4 * 2 - 1] of Integer;
-  function FilterIndex(const Index, Size: Integer): Boolean;
+  function FilterIndex(const Size: Integer): Boolean;
     var i: Integer;
   begin
     for i := 0 to Length(IndArr) div 2 - 1 do
@@ -4364,7 +4377,7 @@ begin
     if i > -1 then
     begin
       j := Length(_Syntax^.Comment[i][0]);
-      if FilterIndex(i, j) then
+      if FilterIndex(j) then
       begin
         IndComment := i;
         PIntegerArray(@IndComment)^[1] := j;
@@ -4374,7 +4387,7 @@ begin
     if i > -1 then
     begin
       j := Length(_Syntax^.CommentLine[i]);
-      if FilterIndex(i, j) then
+      if FilterIndex(j) then
       begin
         IndCommentLine := i;
         PIntegerArray(@IndCommentLine)^[1] := j;
@@ -4384,7 +4397,7 @@ begin
     if i > -1 then
     begin
       j := Length(_Syntax^.Strings[i]);
-      if FilterIndex(i, j) then
+      if FilterIndex(j) then
       begin
         IndString := i;
         PIntegerArray(@IndString)^[1] := j;
@@ -4394,7 +4407,7 @@ begin
     if i > -1 then
     begin
       j := Length(_Syntax^.Symbols[i]);
-      if FilterIndex(i, j) then
+      if FilterIndex(j) then
       begin
         IndSymbol := i;
         PIntegerArray(@IndSymbol)^[1] := j;
@@ -5090,19 +5103,17 @@ procedure TUJson.SetNodeType(const Value: TNodeType);
   var i: Int32;
 begin
   if _NodeType = Value then Exit;
-  case _NodeType of
-    nt_object:
+  if (_NodeType = nt_object) then
+  begin
+    for i := 0 to High(_Content) do
     begin
-      for i := 0 to High(_Content) do
-      begin
-        FreeAndNil(_Content[i].Node);
-      end;
-      _Content := nil;
+      FreeAndNil(_Content[i].Node);
     end;
-    nt_array:
-    begin
-      specialize UArrClear<TUJson>(_Elements);
-    end;
+    _Content := nil;
+  end
+  else if (_NodeType =  nt_array) then
+  begin
+    specialize UArrClear<TUJson>(_Elements);
   end;
   _NodeType := Value;
   if (_NodeType = nt_object) then _Value := '';
@@ -5149,6 +5160,7 @@ begin
       end;
       Result += ']';
     end;
+    else Result := _Value;
   end;
 end;
 
@@ -5194,6 +5206,7 @@ begin
       if (Index < 0) or (Index > High(_Content)) then Exit(nil);
       Result := _Content[Index].Node;
     end;
+    else Result := nil;
   end;
 end;
 
@@ -5277,6 +5290,7 @@ begin
       end;
       Result += #$D#$A + Offset + ']';
     end;
+    else Result := '';
   end;
 end;
 
@@ -6363,6 +6377,7 @@ begin
   if Offset < 0 then LogOffset += Offset;
   if LogOffset > 0 then
   begin
+    Spaces := '';
     SetLength(Spaces, LogOffset);
     FillChar(Spaces[1], LogOffset, ' ');
     //WriteLn(LogFile, Spaces + Msg);
