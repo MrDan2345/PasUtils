@@ -9,6 +9,8 @@ unit MediaUtils;
 {$warn 5024 off}
 {$warn 3123 off}
 {$warn 3124 off}
+{$WARN 5026 off}
+{$WARN 6018 off}
 
 interface
 
@@ -421,6 +423,35 @@ type
       procedure Assign(const Material: TMaterialInterface);
     end;
     type TMaterialInstanceInterfaceList = array of TMaterialInstanceInterface;
+    type TAnimationInterface = class
+    public
+      type TTrack = class
+      public
+        type TKey = class
+        private
+          var _Time: TUFloat;
+          var _Value: TUMat;
+        public
+          property Time: TUFloat read _Time;
+          property Value: TUMat read _Value;
+        end;
+        type TKeyList = array of TKey;
+      private
+        var _Keys: TKeyList;
+        var _Target: TNodeInterface;
+      public
+        property Keys: TKeyList read _Keys;
+        property Target: TNodeInterface read _Target;
+      end;
+      type TTrackList = array of TTrack;
+    protected
+      var _Name: String;
+      var _Tracks: TTrackList;
+    public
+      property Name: String read _Name;
+      destructor Destroy; override;
+    end;
+    type TAnimationInterfaceList = array of TAnimationInterface;
     type TAttachmentMesh = class (TAttachment)
     protected
       var _Mesh: TMeshInterface;
@@ -447,6 +478,7 @@ type
     var _MaterialList: TMaterialInterfaceList;
     var _MeshList: TMeshInterfaceList;
     var _SkinList: TSkinInterfaceList;
+    var _AnimationList: TAnimationInterfaceList;
     var _RootNode: TNodeInterface;
   protected
     var _Options: TSceneDataOptionsSet;
@@ -455,6 +487,7 @@ type
     property MaterialList: TMaterialInterfaceList read _MaterialList;
     property MeshList: TMeshInterfaceList read _MeshList;
     property SkinList: TSkinInterfaceList read _SkinList;
+    property AnimationList: TAnimationInterfaceList read _AnimationList;
     property RootNode: TNodeInterface read _RootNode;
     property Options: TSceneDataOptionsSet read _Options;
     class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
@@ -1211,6 +1244,10 @@ type
     type TSkinInterfaceCollada = class (TSkinInterface)
     public
       constructor Create(const ColladaSkin: TColladaSkin);
+    end;
+    type TAnimationInterfaceCollada = class (TAnimationInterface)
+    public
+      constructor Create(const ColladaAnimation: TColladaAnimation);
     end;
     type TAttachmentMeshCollada = class (TAttachmentMesh)
     public
@@ -2136,6 +2173,7 @@ begin
               SetFormat(uif_r8g8b8a8);
             end;
             ctGrayscaleAlpha, ctTrueColorAlpha: Exit;
+            else Exit;
           end;
         end;
       end;
@@ -2203,6 +2241,7 @@ begin
               flPaeth:
               for i := 0 to ScanlineSize - 1 do
               ScanlineCur^[i] := FilterPaeth(ScanlineCur^[i], i);
+              else begin end;
             end;
             if ChunkIHDR.ColorType = ctIndexedColor then
             begin
@@ -2697,6 +2736,11 @@ begin
   end;
 end;
 
+destructor TUSceneData.TAnimationInterface.Destroy;
+begin
+  inherited Destroy;
+end;
+
 destructor TUSceneData.TAttachmentMesh.Destroy;
 begin
   specialize UArrClear<TMaterialInstanceInterface>(_MaterialBindings);
@@ -2744,8 +2788,12 @@ end;
 
 destructor TUSceneData.Destroy;
 begin
+  if Assigned(_RootNode) then FreeAndNil(_RootNode);
   specialize UArrClear<TMeshInterface>(_MeshList);
+  specialize UArrClear<TSkinInterface>(_SkinList);
+  specialize UArrClear<TMaterialInterface>(_MaterialList);
   specialize UArrClear<TImageInterface>(_ImageList);
+  specialize UArrClear<TAnimationInterface>(_AnimationList);
   inherited Destroy;
 end;
 
@@ -3273,6 +3321,7 @@ begin
         _DataString[i] := FindNextValue(Data, p);
       end;
     end;
+    else begin end;
   end;
 end;
 
@@ -3905,6 +3954,7 @@ begin
       begin
         _Params[i].AsSurface.Image := TColladaImage(Find(_Params[i].AsSurface.InitFrom));
       end;
+      else begin end;
     end;
   end;
 end;
@@ -5366,6 +5416,7 @@ begin
       begin
         NewParamVec4(Param.id).Value := Param.AsFloat4.Value;
       end;
+      else begin end;
     end;
   end;
 end;
@@ -5586,6 +5637,7 @@ begin
       as_tangent: if (TangentInd = -1) then TangentInd := i;
       as_binormal: if (BinormalInd = -1) then BinormalInd := i;
       as_texcoord: if (TexCoordInd = -1) then TexCoordInd := i;
+      else begin end;
     end;
   end;
   GenAttribs := 0;
@@ -5661,6 +5713,7 @@ begin
       case _VertexDescriptor[ai].Semantic of
         as_normal: Ind := RemapNormals[i];
         as_tangent, as_binormal: Ind := RemapTangents[i];
+        else begin end;
       end;
       AttribIndices[ai] := Ind;
     end;
@@ -5688,6 +5741,7 @@ begin
         as_normal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Normals[VertexBuffer[i][ai]];
         as_tangent: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][ai]].Tangent;
         as_binormal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][ai]].Binormal;
+        else begin end;
       end;
     end;
   end;
@@ -5806,6 +5860,14 @@ begin
       end;
     end;
   end;
+end;
+
+constructor TUSceneDataDAE.TAnimationInterfaceCollada.Create(
+  const ColladaAnimation: TColladaAnimation
+);
+begin
+  inherited Create;
+  ColladaAnimation.Animations;
 end;
 
 constructor TUSceneDataDAE.TAttachmentMeshCollada.Create(
@@ -6007,10 +6069,12 @@ procedure TUSceneDataDAE.Read(const XML: TUXML);
   var Node: TColladaNode;
   var Controller: TColladaController;
   var Skin: TColladaSkin;
+  var Anim: TColladaAnimation;
   var IntfImage: TImageInterfaceCollada;
   var IntfMat: TMaterialInterfaceCollada;
   var IntfMesh: TMeshInterfaceCollada;
   var IntfSkin: TSkinInterfaceCollada;
+  var IntfAnim: TAnimationInterfaceCollada;
 begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
@@ -6047,6 +6111,13 @@ begin
     IntfSkin := TSkinInterfaceCollada.Create(Skin);
     specialize UArrAppend<TSkinInterface>(
       _SkinList, IntfSkin
+    );
+  end;
+  for Anim in _Root.LibAnimations.Animations do
+  begin
+    IntfAnim := TAnimationInterfaceCollada.Create(Anim);
+    specialize UArrAppend<TAnimationInterface>(
+      _AnimationList, IntfAnim
     );
   end;
   _RootNode := TNodeInterfaceCollada.Create(nil, nil);
