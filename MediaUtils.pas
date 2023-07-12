@@ -427,21 +427,24 @@ type
     public
       type TTrack = class
       public
-        type TKey = class
-        private
-          var _Time: TUFloat;
-          var _Value: TUMat;
-        public
-          property Time: TUFloat read _Time;
-          property Value: TUMat read _Value;
+        type TKeyInterpolation = (ki_step, ki_linear);
+        type TKey = record
+          var Time: TUFloat;
+          var Value: TUMat;
+          var Interpolation: TKeyInterpolation;
         end;
         type TKeyList = array of TKey;
       private
+        var _Name: String;
         var _Keys: TKeyList;
         var _Target: TNodeInterface;
+        var _MaxTime: TUFloat;
       public
+        property Name: String read _Name;
         property Keys: TKeyList read _Keys;
         property Target: TNodeInterface read _Target;
+        property MaxTime: TUFloat read _MaxTime;
+        destructor Destroy; override;
       end;
       type TTrackList = array of TTrack;
     protected
@@ -521,6 +524,7 @@ type
       procedure AddChild(const Child: TColladaObject); inline;
       procedure RemoveChild(const Child: TColladaObject); inline;
       procedure SetParent(const Value: TColladaObject); inline;
+      function GetAnyName: String;
     protected
       procedure DumpBegin;
       procedure DumpEnd;
@@ -538,6 +542,7 @@ type
       property id: String read _id;
       property sid: String read _sid;
       property Name: String read _Name;
+      property AnyName: String read GetAnyName;
       property IsScoped: Boolean read _Scoped;
       property Parent: TColladaObject read _Parent write SetParent;
       property Children: TObjectList read _Children;
@@ -1246,6 +1251,11 @@ type
       constructor Create(const ColladaSkin: TColladaSkin);
     end;
     type TAnimationInterfaceCollada = class (TAnimationInterface)
+    public
+      type TTrackCollada = class (TTrack)
+      public
+        constructor Create(const ColladaChannel: TColladaAnimationChannel);
+      end;
     public
       constructor Create(const ColladaAnimation: TColladaAnimation);
     end;
@@ -2736,8 +2746,14 @@ begin
   end;
 end;
 
+destructor TUSceneData.TAnimationInterface.TTrack.Destroy;
+begin
+  inherited Destroy;
+end;
+
 destructor TUSceneData.TAnimationInterface.Destroy;
 begin
+  specialize UArrClear<TTrack>(_Tracks);
   inherited Destroy;
 end;
 
@@ -2854,6 +2870,14 @@ begin
   if Assigned(_Parent) then _Parent.RemoveChild(Self);
   _Parent := Value;
   if Assigned(_Parent) then _Parent.AddChild(Self);
+end;
+
+function TUSceneDataDAE.TColladaObject.GetAnyName: String;
+begin
+  if Length(_Name) > 0 then Exit(_Name);
+  if Length(_id) > 0 then Exit(_id);
+  if Length(_sid) > 0 then Exit(_sid);
+  Result := _Tag;
 end;
 
 procedure TUSceneDataDAE.TColladaObject.DumpBegin;
@@ -5862,12 +5886,52 @@ begin
   end;
 end;
 
+constructor TUSceneDataDAE.TAnimationInterfaceCollada.TTrackCollada.Create(
+  const ColladaChannel: TColladaAnimationChannel
+);
+  var i: Int32;
+begin
+  inherited Create;
+  _Name := ColladaChannel.Target.AnyName;
+  _Target := TNodeInterface(ColladaChannel.Target.UserData);
+  if ColladaChannel.TargetProperty <> 'transform' then Exit;
+  if ColladaChannel.Sampler.DataType <> at_float then Exit;
+  if ColladaChannel.Sampler.SampleSize <> 16 * SizeOf(TUFloat) then Exit;
+  _MaxTime := ColladaChannel.Sampler.MaxTime;
+  SetLength(_Keys, ColladaChannel.Sampler.KeyCount);
+  for i := 0 to High(_Keys) do
+  begin
+    _Keys[i].Time := ColladaChannel.Sampler.Keys[i]^.Time;
+    _Keys[i].Value := PUMat(ColladaChannel.Sampler.Keys[i]^.Value)^;
+    case (ColladaChannel.Sampler.Keys[i]^.Interpolation) of
+      ai_step: _Keys[i].Interpolation := ki_step;
+      ai_linear, ai_bezier: _Keys[i].Interpolation := ki_linear;
+    end;
+  end;
+end;
+
 constructor TUSceneDataDAE.TAnimationInterfaceCollada.Create(
   const ColladaAnimation: TColladaAnimation
 );
+  procedure AddTrack(const Animation: TColladaAnimation);
+    var ChildAnimation: TColladaAnimation;
+    var Channel: TColladaAnimationChannel;
+  begin
+    for Channel in Animation.Channels do
+    begin
+      specialize UArrAppend<TTrack>(
+        _Tracks, TTrackCollada.Create(Channel)
+      );
+    end;
+    for ChildAnimation in ColladaAnimation.Animations do
+    begin
+      AddTrack(ChildAnimation);
+    end;
+  end;
 begin
   inherited Create;
-  ColladaAnimation.Animations;
+  _Name := ColladaAnimation.AnyName;
+  AddTrack(ColladaAnimation);
 end;
 
 constructor TUSceneDataDAE.TAttachmentMeshCollada.Create(
