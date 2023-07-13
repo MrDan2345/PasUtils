@@ -160,8 +160,7 @@ procedure TForm1.Render;
           for w := 0 to SkinSubset.WeightCount - 1 do
           begin
             SkinJoint := SkinAttach.JointBindings[JointIndices^[w]];
-            S := SkinAttach.Skin.Joints[JointIndices^[w]].Bind;
-            S := S * SkinJoint.Transform;
+            S := SkinAttach.Skin.Joints[JointIndices^[w]].Bind * SkinJoint.Transform;
             VertexSkin += Vertex^.Transform4x3(S) * JointWeights^[w];
           end;
           glVertex3fv(@VertexSkin);
@@ -196,7 +195,6 @@ procedure TForm1.Render;
     end;
   end;
 begin
-  //SetupTransforms;
   //glEnable(GL_TEXTURE_2D);
   glShadeModel(GL_FLAT);
   //glShadeModel(GL_SMOOTH);
