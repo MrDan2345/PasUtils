@@ -9,9 +9,6 @@ uses
   CommonUtils, MediaUtils, gl, Windows;
 
 type
-
-  { TForm1 }
-
   TForm1 = class(TForm)
     Timer1: TTimer;
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
@@ -21,6 +18,8 @@ type
     var DeviceContext: HDC;
     var RenderingContext: HGLRC;
     var Scene: TUSceneData;
+    var StartTime: UInt64;
+    var CurTime: UInt64;
     procedure InitializeGL;
     procedure FinalizeGL;
     procedure InitializeData;
@@ -39,6 +38,7 @@ implementation
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
+  StartTime := GetTickCount64;
   InitializeGL;
   InitializeData;
   Timer1.Enabled := True;
@@ -54,6 +54,7 @@ end;
 procedure TForm1.Timer1Timer(Sender: TObject);
   var WinRect: TRect;
 begin
+  CurTime := GetTickCount64 - StartTime;
   WinRect := ClientRect;
   glViewport(0, 0, WinRect.Right - WinRect.Left, WinRect.Bottom - WinRect.Top);
   glClearColor(0.5, 0.5, 0.5, 1);
@@ -194,7 +195,26 @@ procedure TForm1.Render;
       RenderNode(Node.Children[i]);
     end;
   end;
+  procedure UpdateAnimations(const Time: TUFloat);
+    procedure UpdateTracks(const Animation: TUSceneData.TAnimationInterface);
+      var i: Int32;
+      var Xf: TUMat;
+    begin
+      for i := 0 to High(Animation.Tracks) do
+      begin
+        Xf := Animation.Tracks[i].Sample(Time, True);
+        Animation.Tracks[i].Target.Transform := Xf;
+      end;
+    end;
+    var i: Int32;
+  begin
+    for i := 0 to High(Scene.AnimationList) do
+    begin
+      UpdateTracks(Scene.AnimationList[i]);
+    end;
+  end;
 begin
+  UpdateAnimations(TUFloat(CurTime) * 0.001);
   //glEnable(GL_TEXTURE_2D);
   glShadeModel(GL_FLAT);
   //glShadeModel(GL_SMOOTH);
