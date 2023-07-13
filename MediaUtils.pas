@@ -238,7 +238,7 @@ type
       procedure SetParent(const Value: TNodeInterface);
     public
       property Name: String read _Name;
-      property Transform: TUMat read _Transform;
+      property Transform: TUMat read _Transform write _Transform;
       property Attachments: TAttachmentList read _Attachments;
       property Children: TNodeList read _Children;
       property Parent: TNodeInterface read _Parent write SetParent;
@@ -439,11 +439,13 @@ type
         var _Keys: TKeyList;
         var _Target: TNodeInterface;
         var _MaxTime: TUFloat;
+        function FindKey(const Time: TUFloat): Int32;
       public
         property Name: String read _Name;
         property Keys: TKeyList read _Keys;
         property Target: TNodeInterface read _Target;
         property MaxTime: TUFloat read _MaxTime;
+        function Sample(const Time: TUFloat; const Loop: Boolean = True): TUMat;
         destructor Destroy; override;
       end;
       type TTrackList = array of TTrack;
@@ -452,6 +454,7 @@ type
       var _Tracks: TTrackList;
     public
       property Name: String read _Name;
+      property Tracks: TTrackList read _Tracks;
       destructor Destroy; override;
     end;
     type TAnimationInterfaceList = array of TAnimationInterface;
@@ -2746,6 +2749,50 @@ begin
   end;
 end;
 
+function TUSceneData.TAnimationInterface.TTrack.FindKey(const Time: TUFloat): Int32;
+  var i: Int32;
+begin
+  for i := 1 to High(_Keys) do
+  if _Keys[i].Time > Time then
+  begin
+    Exit(i - 1);
+  end;
+  Result := High(_Keys);
+end;
+
+function TUSceneData.TAnimationInterface.TTrack.Sample(
+  const Time: TUFloat;
+  const Loop: Boolean
+): TUMat;
+  var k0, k1: UInt32;
+  var t: TUFloat;
+begin
+  if (Length(_Keys) < 1) then Exit(TUMat.Identity);
+  if not Loop then
+  begin
+    if Time <= _Keys[0].Time then
+    begin
+      Exit(_Keys[0].Value);
+    end;
+    if Time >= _Keys[High(_Keys)].Time then
+    begin
+      Exit(_Keys[High(_Keys)].Value);
+    end;
+  end;
+  t := Time mod _Keys[High(_Keys)].Time;
+  k0 := FindKey(t);
+  case _Keys[k0].Interpolation of
+    ki_step: Exit(_Keys[k0].Value);
+    ki_linear:
+    begin
+      k1 := (k0 + 1) mod Length(_Keys);
+      if k1 < k0 then USwap(k0, k1);
+      t := (t - _Keys[k0].Time) / (_Keys[k1].Time - _Keys[k0].Time);
+      Exit(ULerp(_Keys[k0].Value, _Keys[k1].Value, t));
+    end;
+  end;
+end;
+
 destructor TUSceneData.TAnimationInterface.TTrack.Destroy;
 begin
   inherited Destroy;
@@ -4373,10 +4420,10 @@ end;
 function TUSceneDataDAE.TColladaAnimationSampler.FindKey(const Time: TUFloat): Int32;
   var i: Int32;
 begin
-  for i := 0 to High(_Keys) do
-  if _Keys[i].Time <= Time then
+  for i := 1 to High(_Keys) do
+  if _Keys[i].Time > Time then
   begin
-    Exit(i);
+    Exit(i - 1);
   end;
   Result := High(_Keys);
 end;
@@ -6139,6 +6186,7 @@ procedure TUSceneDataDAE.Read(const XML: TUXML);
   var IntfMesh: TMeshInterfaceCollada;
   var IntfSkin: TSkinInterfaceCollada;
   var IntfAnim: TAnimationInterfaceCollada;
+  var i: Int32;
 begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
@@ -6177,17 +6225,17 @@ begin
       _SkinList, IntfSkin
     );
   end;
+  _RootNode := TNodeInterfaceCollada.Create(nil, nil);
+  for Node in _Root.Scene.VisualScene.VisualScene.Nodes do
+  begin
+    TNodeInterfaceCollada.Create(Node, TNodeInterfaceCollada(_RootNode));
+  end;
   for Anim in _Root.LibAnimations.Animations do
   begin
     IntfAnim := TAnimationInterfaceCollada.Create(Anim);
     specialize UArrAppend<TAnimationInterface>(
       _AnimationList, IntfAnim
     );
-  end;
-  _RootNode := TNodeInterfaceCollada.Create(nil, nil);
-  for Node in _Root.Scene.VisualScene.VisualScene.Nodes do
-  begin
-    TNodeInterfaceCollada.Create(Node, TNodeInterfaceCollada(_RootNode));
   end;
 end;
 

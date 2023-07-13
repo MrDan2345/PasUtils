@@ -950,7 +950,12 @@ function UClamp(const v, MinV, MaxV: TUDouble): TUDouble; inline; overload;
 function UClamp(const v, MinV, MaxV: TUVec2): TUVec2; inline; overload;
 function UClamp(const v, MinV, MaxV: TUVec3): TUVec3; inline; overload;
 function UClamp(const v, MinV, MaxV: TUVec4): TUVec4; inline; overload;
-function ULerp(const a, b, s: TUFloat): TUFloat; inline;
+generic function ULerp<T>(const a, b: T; const s: TUFloat): T; inline; overload;
+function ULerp(const a, b: TUFloat; const s: TUFloat): TUFloat; inline; overload;
+function ULerp(const a, b: TUVec2; const s: TUFloat): TUVec2; inline; overload;
+function ULerp(const a, b: TUVec3; const s: TUFloat): TUVec3; inline; overload;
+function ULerp(const a, b: TUVec4; const s: TUFloat): TUVec4; inline; overload;
+function ULerp(const a, b: TUMat; const s: TUFloat): TUMat; inline; overload;
 function USmoothStep(const v, MinV, MaxV: TUFloat): TUFloat; inline;
 generic function UBezier<T>(const f0, f1, f2, f3: T; const s: TUFloat): T; inline; overload;
 function UBezier(const v0, v1, v2, v3: TUFloat; const s: TUFloat): TUFloat; inline; overload;
@@ -964,6 +969,21 @@ function UCatmullRom(const v0, v1, v2, v3: TUDouble; const s: TUFloat): TUDouble
 function UCatmullRom(const v0, v1, v2, v3: TUVec2; const s: TUFloat): TUVec2; inline; overload;
 function UCatmullRom(const v0, v1, v2, v3: TUVec3; const s: TUFloat): TUVec3; inline; overload;
 function UCatmullRom(const v0, v1, v2, v3: TUVec4; const s: TUFloat): TUVec4; inline; overload;
+generic procedure USwap<T>(var a: T; var b: T); inline; overload;
+procedure USwap(var a: Int8; var b: Int8); inline; overload;
+procedure USwap(var a: Int16; var b: Int16); inline; overload;
+procedure USwap(var a: Int32; var b: Int32); inline; overload;
+procedure USwap(var a: Int64; var b: Int64); inline; overload;
+procedure USwap(var a: UInt8; var b: UInt8); inline; overload;
+procedure USwap(var a: UInt16; var b: UInt16); inline; overload;
+procedure USwap(var a: UInt32; var b: UInt32); inline; overload;
+procedure USwap(var a: UInt64; var b: UInt64); inline; overload;
+procedure USwap(var a: TUFloat; var b: TUFloat); inline; overload;
+procedure USwap(var a: TUDouble; var b: TUDouble); inline; overload;
+procedure USwap(var a: TUVec2; var b: TUVec2); inline; overload;
+procedure USwap(var a: TUVec3; var b: TUVec3); inline; overload;
+procedure USwap(var a: TUVec4; var b: TUVec4); inline; overload;
+procedure USwap(var a: TUMat; var b: TUMat); inline; overload;
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
 generic function USelect<T>(const Cond: Boolean; constref IfTrue: T; constref IfFalse: T): T; inline;
 
@@ -1030,6 +1050,7 @@ operator - (const v: TUVec4): TUVec4;
 operator + (const m0, m1: TUMat): TUMat;
 operator - (const m0, m1: TUMat): TUMat;
 operator * (const m0, m1: TUMat): TUMat;
+operator * (const m: TUMat; const f: TUFloat): TUMat;
 operator mod (const a, b: TUDouble): TUDouble;
 operator mod (const a, b: TUFloat): TUFloat;
 
@@ -5740,7 +5761,32 @@ begin
   for i := 0 to High(TUVec4) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
 end;
 
-function ULerp(const a, b, s: TUFloat): TUFloat;
+generic function ULerp<T>(const a, b: T; const s: TUFloat): T;
+begin
+  Result := a + (b - a) * s;
+end;
+
+function ULerp(const a, b: TUFloat; const s: TUFloat): TUFloat;
+begin
+  Result := a + (b - a) * s;
+end;
+
+function ULerp(const a, b: TUVec2; const s: TUFloat): TUVec2;
+begin
+  Result := a + (b - a) * s;
+end;
+
+function ULerp(const a, b: TUVec3; const s: TUFloat): TUVec3;
+begin
+  Result := a + (b - a) * s;
+end;
+
+function ULerp(const a, b: TUVec4; const s: TUFloat): TUVec4;
+begin
+  Result := a + (b - a) * s;
+end;
+
+function ULerp(const a, b: TUMat; const s: TUFloat): TUMat;
 begin
   Result := a + (b - a) * s;
 end;
@@ -5816,6 +5862,84 @@ end;
 function UCatmullRom(const v0, v1, v2, v3: TUVec4; const s: TUFloat): TUVec4;
 begin
   Result := specialize UCatmullRom<TUVec4>(v0, v1, v2, v3, s);
+end;
+
+generic procedure USwap<T>(var a: T; var b: T);
+  var Temp: T;
+begin
+  Temp := a;
+  a := b;
+  b := Temp;
+end;
+
+procedure USwap(var a: Int8; var b: Int8);
+begin
+  specialize USwap<Int8>(a, b);
+end;
+
+procedure USwap(var a: Int16; var b: Int16); 
+begin
+  specialize USwap<Int16>(a, b);
+end;
+
+procedure USwap(var a: Int32; var b: Int32); 
+begin
+  specialize USwap<Int32>(a, b);
+end;
+
+procedure USwap(var a: Int64; var b: Int64);  
+begin
+  specialize USwap<Int64>(a, b);
+end;
+
+procedure USwap(var a: UInt8; var b: UInt8);   
+begin
+  specialize USwap<UInt8>(a, b);
+end;
+
+procedure USwap(var a: UInt16; var b: UInt16);  
+begin
+  specialize USwap<UInt16>(a, b);
+end;
+
+procedure USwap(var a: UInt32; var b: UInt32);
+begin
+  specialize USwap<UInt32>(a, b);
+end;
+
+procedure USwap(var a: UInt64; var b: UInt64);   
+begin
+  specialize USwap<UInt64>(a, b);
+end;
+
+procedure USwap(var a: TUFloat; var b: TUFloat); 
+begin
+  specialize USwap<TUFloat>(a, b);
+end;
+
+procedure USwap(var a: TUDouble; var b: TUDouble);
+begin
+  specialize USwap<TUDouble>(a, b);
+end;
+
+procedure USwap(var a: TUVec2; var b: TUVec2);    
+begin
+  specialize USwap<TUVec2>(a, b);
+end;
+
+procedure USwap(var a: TUVec3; var b: TUVec3);   
+begin
+  specialize USwap<TUVec3>(a, b);
+end;
+
+procedure USwap(var a: TUVec4; var b: TUVec4);  
+begin
+  specialize USwap<TUVec4>(a, b);
+end;
+
+procedure USwap(var a: TUMat; var b: TUMat); 
+begin
+  specialize USwap<TUMat>(a, b);
 end;
 
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
@@ -6272,6 +6396,11 @@ end;
 operator * (const m0, m1: TUMat): TUMat;
 begin
   Result := UMulMat(m0, m1);
+end;
+
+operator * (const m: TUMat; const f: TUFloat): TUMat;
+begin
+  Result := UMulMatFloat(m, f);
 end;
 
 operator mod (const a, b: TUDouble): TUDouble;
