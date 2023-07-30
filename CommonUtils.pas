@@ -969,6 +969,10 @@ function UCatmullRom(const v0, v1, v2, v3: TUDouble; const s: TUFloat): TUDouble
 function UCatmullRom(const v0, v1, v2, v3: TUVec2; const s: TUFloat): TUVec2; inline; overload;
 function UCatmullRom(const v0, v1, v2, v3: TUVec3; const s: TUFloat): TUVec3; inline; overload;
 function UCatmullRom(const v0, v1, v2, v3: TUVec4; const s: TUFloat): TUVec4; inline; overload;
+generic function UEndianSwap<T>(const v: T): T; inline; overload;
+function UEndianSwap(const v: UInt16): UInt16; inline; overload;
+function UEndianSwap(const v: UInt32): UInt32; inline; overload;
+function UEndianSwap(const v: UInt64): UInt64; inline; overload;
 generic procedure USwap<T>(var a: T; var b: T); inline; overload;
 procedure USwap(var a: Int8; var b: Int8); inline; overload;
 procedure USwap(var a: Int16; var b: Int16); inline; overload;
@@ -5862,6 +5866,31 @@ end;
 function UCatmullRom(const v0, v1, v2, v3: TUVec4; const s: TUFloat): TUVec4;
 begin
   Result := specialize UCatmullRom<TUVec4>(v0, v1, v2, v3, s);
+end;
+
+generic function UEndianSwap<T>(const v: T): T;
+  type TByteArr = array[0..SizeOf(T) - 1] of UInt8;
+  var Src: TByteArr absolute v;
+  var Dst: TByteArr absolute Result;
+  var i: Int32;
+begin
+  for i := 0 to High(TByteArr) do
+  Dst[i] := Src[High(TByteArr) - i];
+end;
+
+function UEndianSwap(const v: UInt16): UInt16;
+begin
+  Result := specialize UEndianSwap<UInt16>(v);
+end;
+
+function UEndianSwap(const v: UInt32): UInt32;
+begin
+  Result := specialize UEndianSwap<UInt32>(v);
+end;
+
+function UEndianSwap(const v: UInt64): UInt64;
+begin
+  Result := specialize UEndianSwap<UInt64>(v);
 end;
 
 generic procedure USwap<T>(var a: T; var b: T);
