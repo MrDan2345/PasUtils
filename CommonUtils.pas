@@ -24,11 +24,11 @@ type TUStrArrArr = array of array of String;
 type TUDateTimeArr = array of TDateTime;
 type TUVarRecArr = array of TVarRec;
 
-type TUFloat = Single;
+type TUFloat = type Single;
 type PUFloat = ^TUFloat;
 type TUFloatArr = array[UInt16] of TUFloat;
 type PUFloatArr = ^TUFloatArr;
-type TUDouble = Double;
+type TUDouble = type Double;
 type PUDouble = ^TUDouble;
 type TUDoubleArr = array[UInt16] of TUDouble;
 type PUDoubleArr = ^TUDoubleArr;
@@ -71,9 +71,79 @@ type PUVec4 = ^TUVec4;
 type TUQuat = array[0..3] of TUFloat;
 type PUQuat = ^TUQuat;
 
-type TUInt8Impl = type helper for TUInt8
+type TUFloatImpl = type helper for TUFloat
 public
-  function ToString: String;
+  function ToString: String; inline;
+end;
+
+type TUDpubleImpl = type helper for TUDouble
+public
+  function ToString: String; inline;
+end;
+
+type TUInt8Impl = type helper for TUInt8
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
+  function ToString: String; inline;
+end;
+
+type TUInt16Impl = type helper for TUInt16
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TUInt32Impl = type helper for TUInt32
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TUInt64Impl = type helper for TUInt64
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TInt8Impl = type helper for TInt8
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TInt16Impl = type helper for TInt16
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TInt32Impl = type helper for TInt32
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TInt64Impl = type helper for TInt64
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
 end;
 
 type TUColorImpl = type helper for TUColor
@@ -1073,12 +1143,171 @@ const URadToDeg = 180 / UPi;
 
 implementation
 
+// TUFloatImpl begin
+function TUFloatImpl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TUFloatImpl end
+
+// TUFloatImpl begin
+function TUDpubleImpl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TUFloatImpl end
+
 // TUInt8Impl begin
+function TUInt8Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TUInt8Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
 function TUInt8Impl.ToString: String;
 begin
   System.Str(Self, Result);
 end;
-// TUInt8Impl end;
+// TUInt8Impl end
+
+// TUInt16Impl begin
+function TUInt16Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TUInt16Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TUInt16Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TUInt16Impl end
+
+// TUInt32Impl begin
+function TUInt32Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TUInt32Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TUInt32Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TUInt32Impl end
+
+// TUInt64Impl begin
+function TUInt64Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TUInt64Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TUInt64Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TUInt64Impl end
+
+// TInt8Impl begin
+function TInt8Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TInt8Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TInt8Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TInt8Impl end
+
+// TInt16Impl begin
+function TInt16Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TInt16Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TInt16Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TInt16Impl end
+
+// TInt32Impl begin
+function TInt32Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TInt32Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TInt32Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TInt32Impl end
+
+// TInt64Impl begin
+function TInt64Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TInt64Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TInt64Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TInt64Impl end
 
 // TUColorImpl begin
 function TUColorImpl.GetChannel(const Index: UInt8): UInt8;
