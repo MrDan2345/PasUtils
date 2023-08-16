@@ -128,7 +128,7 @@
               <color sid="ambient">0 0 0 1</color>
             </ambient>
             <diffuse>
-              <texture texture="box_png-sampler"/>
+              <texture texture="box_png-sampler" texcoord="TEXCOORD"/>
             </diffuse>
             <specular>
               <color sid="specular">0.5 0.5 0.5 1</color>

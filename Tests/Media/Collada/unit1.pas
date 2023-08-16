@@ -92,9 +92,22 @@ begin
 end;
 
 procedure TForm1.InitializeData;
+  procedure PropagateTransform(const Node: TUSceneData.TNodeInterface);
+    var i: Int32;
+  begin
+    if Assigned(Node.Parent) then
+    begin
+      Node.Transform := Node.Transform * Node.Parent.Transform;
+    end;
+    for i := 0 to High(Node.Children) do
+    begin
+      PropagateTransform(Node.Children[i]);
+    end;
+  end;
 begin
   Scene := TUSceneDataDAE.Create();
   Scene.Load('Assets/skin.dae');
+  PropagateTransform(Scene.RootNode);
   WriteLn(Length(Scene.MeshList));
 end;
 
@@ -107,9 +120,9 @@ procedure TForm1.Render;
   procedure SetupTransforms(const Xf: TUMat);
     var W, V, P, WV: TUMat;
   begin
-    W := Xf * TUMat.RotationY(((GetTickCount mod 6000) / 6000) * 2 * Pi);
-    V := TUMat.View(TUVec3.Make(0, 2, -5), TUVec3.Make(0, -0.5, 0), TUVec3.Make(0, 1, 0));
-    P := TUMat.Proj(Pi / 4, 1, 1, 100);
+    W := Xf * TUMat.RotationZ(((GetTickCount mod 20000) / 20000) * 2 * Pi);
+    V := TUMat.View(TUVec3.Make(0, -10, 0), TUVec3.Make(0, 0, 0), TUVec3.Make(0, 0, 1));
+    P := TUMat.Proj(Pi / 4, Form1.ClientWidth / Form1.ClientHeight, 1, 100);
     WV := W * V;
     glMatrixMode(GL_MODELVIEW);
     glLoadMatrixf(@WV);
@@ -161,7 +174,7 @@ procedure TForm1.Render;
           for w := 0 to SkinSubset.WeightCount - 1 do
           begin
             SkinJoint := SkinAttach.JointBindings[JointIndices^[w]];
-            S := SkinAttach.Skin.Joints[JointIndices^[w]].Bind * SkinJoint.Transform;
+            S := SkinAttach.Skin.ShapeBind * SkinAttach.Skin.Joints[JointIndices^[w]].Bind * SkinJoint.Transform;
             VertexSkin += Vertex^.Transform4x3(S) * JointWeights^[w];
           end;
           glVertex3fv(@VertexSkin);
@@ -203,7 +216,7 @@ procedure TForm1.Render;
       for i := 0 to High(Animation.Tracks) do
       begin
         Xf := Animation.Tracks[i].Sample(Time, True);
-        Animation.Tracks[i].Target.Transform := Xf;
+        Animation.Tracks[i].Target.Transform := Xf.Transpose;
       end;
     end;
     var i: Int32;
@@ -214,7 +227,8 @@ procedure TForm1.Render;
     end;
   end;
 begin
-  UpdateAnimations(TUFloat(CurTime) * 0.001);
+  UpdateAnimations(0);//TUFloat(CurTime) * 0.001);
+  //UpdateTransforms(Scene.RootNode);
   //glEnable(GL_TEXTURE_2D);
   glShadeModel(GL_FLAT);
   //glShadeModel(GL_SMOOTH);
