@@ -316,10 +316,12 @@ type
       type TSubsetList = array of TSubset;
     protected
       var _Mesh: TMeshInterface;
+      var _ShapeBind: TUMat;
       var _Joints: TJointList;
       var _Subsets: TSubsetList;
     public
       property Mesh: TMeshInterface read _Mesh;
+      property ShapeBind: TUMat read _ShapeBind;
       property Joints: TJointList read _Joints;
       property Subsets: TSubsetList read _Subsets;
       destructor Destroy; override;
@@ -2767,6 +2769,7 @@ function TUSceneData.TAnimationInterface.TTrack.Sample(
   var k0, k1: UInt32;
   var t: TUFloat;
 begin
+  //Exit(_Keys[0].Value);
   if (Length(_Keys) < 1) then Exit(TUMat.Identity);
   if not Loop then
   begin
@@ -5868,12 +5871,13 @@ constructor TUSceneDataDAE.TSkinInterfaceCollada.Create(
   var MaxWeightCount, VertexStride, WeightsOffset: Int32;
 begin
   ColladaSkin.UserData := Self;
+  _ShapeBind := ColladaSkin.BindShapeMatrix;
   _Mesh := TMeshInterface(ColladaSkin.Geometry.UserData);
   SetLength(_Joints, Length(ColladaSkin.Joints.Joints));
   for i := 0 to High(_Joints) do
   begin
     _Joints[i].Name := ColladaSkin.Joints.Joints[i].JointName;
-    _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose;
+    _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose.Transpose;
   end;
   Weights := nil;
   SetLength(Weights, ColladaSkin.VertexWeights.VCount);
@@ -5950,6 +5954,7 @@ begin
   begin
     _Keys[i].Time := ColladaChannel.Sampler.Keys[i]^.Time;
     _Keys[i].Value := PUMat(ColladaChannel.Sampler.Keys[i]^.Value)^;
+    //_Keys[i].Value := _Keys[i].Value.Transpose;
     case (ColladaChannel.Sampler.Keys[i]^.Interpolation) of
       ai_step: _Keys[i].Interpolation := ki_step;
       ai_linear, ai_bezier: _Keys[i].Interpolation := ki_linear;
@@ -6035,7 +6040,9 @@ begin
   Parent := AParent;
   if Assigned(ColladaNode) then
   begin
+    _Transform := ColladaNode.Matrix.Transpose;// * _Parent.Transform;
     ColladaNode.UserData := Self;
+    _Transform := ColladaNode.Matrix;
     if Length(ColladaNode.Name) > 0 then
     begin
       _Name := ColladaNode.Name;
@@ -6186,7 +6193,6 @@ procedure TUSceneDataDAE.Read(const XML: TUXML);
   var IntfMesh: TMeshInterfaceCollada;
   var IntfSkin: TSkinInterfaceCollada;
   var IntfAnim: TAnimationInterfaceCollada;
-  var i: Int32;
 begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
