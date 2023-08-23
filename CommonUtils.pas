@@ -132,6 +132,7 @@ type
     class function Skew(const Amount, Axis: TUVec3; const Angle: TUFloat): TUMat; static; inline;
     class function Transpose(const m: TUMat): TUMat; static; overload;
     class function Inverse(const m: TUMat): TUMat; static; overload;
+    class function Transpose(const m: TUMat): TUMat; static; overload;
     procedure SetValue(
       const e00, e10, e20, e30: TUFloat;
       const e01, e11, e21, e31: TUFloat;
@@ -140,6 +141,7 @@ type
     ); inline;
     function Transpose: TUMat; inline;
     function Inverse: TUMat; overload; inline;
+    function Transpose: TUMat; overload; inline;
   end;
 
   type TUVec2Impl = type helper for TUVec2
@@ -1451,6 +1453,16 @@ begin
   Result[3, 3] := (m[0,0]*m[1,1]*m[2,2] + m[0,1]*m[1,2]*m[2,0] + m[0,2]*m[1,0]*m[2,1] - m[0,2]*m[1,1]*m[2,0] - m[0,1]*m[1,0]*m[2,2] - m[0,0]*m[1,2]*m[2,1]) * det;
 end;
 
+class function TUMatImpl.Transpose(const m: TUMat): TUMat;
+  var x, y: Int8;
+begin
+  for x := 0 to 3 do
+  for y := 0 to 3 do
+  begin
+    Result[x, y] := m[y, x];
+  end;
+end;
+
 procedure TUMatImpl.SetValue(
   const e00, e10, e20, e30: TUFloat;
   const e01, e11, e21, e31: TUFloat;
@@ -1472,6 +1484,11 @@ end;
 function TUMatImpl.Inverse: TUMat;
 begin
   Result := Inverse(Self);
+end;
+
+function TUMatImpl.Transpose: TUMat;
+begin
+  Result := Transpose(Self);
 end;
 // TUMatImpl end
 
