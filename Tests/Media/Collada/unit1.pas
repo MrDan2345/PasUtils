@@ -34,8 +34,6 @@ implementation
 
 {$R *.lfm}
 
-{ TForm1 }
-
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   StartTime := GetTickCount64;
@@ -92,9 +90,22 @@ begin
 end;
 
 procedure TForm1.InitializeData;
+  procedure PropagateTransforms(const Node: TUSceneData.TNodeInterface);
+    var i: Int32;
+  begin
+    if Assigned(Node.Parent) then
+    begin
+      Node.Transform := Node.Parent.Transform * Node.Transform;
+    end;
+    for i := 0 to High(Node.Children) do
+    begin
+      PropagateTransforms(Node.Children[i]);
+    end;
+  end;
 begin
   Scene := TUSceneDataDAE.Create();
   Scene.Load('Assets/skin.dae');
+  PropagateTransforms(Scene.RootNode);
   WriteLn(Length(Scene.MeshList));
 end;
 
@@ -108,7 +119,7 @@ procedure TForm1.Render;
     var W, V, P, WV: TUMat;
   begin
     W := Xf * TUMat.RotationY(((GetTickCount mod 6000) / 6000) * 2 * Pi);
-    V := TUMat.View(TUVec3.Make(0, 2, -5), TUVec3.Make(0, -0.5, 0), TUVec3.Make(0, 1, 0));
+    V := TUMat.View(TUVec3.Make(0, 8, -8), TUVec3.Make(0, 0, 0), TUVec3.Make(0, 1, 0));
     P := TUMat.Proj(Pi / 4, 1, 1, 100);
     WV := W * V;
     glMatrixMode(GL_MODELVIEW);
@@ -213,8 +224,32 @@ procedure TForm1.Render;
       UpdateTracks(Scene.AnimationList[i]);
     end;
   end;
+  procedure RenderMesh(const Mesh: TUSceneData.TMeshInterface);
+    procedure RenderSubset(const Subset: TUSceneData.TMeshInterface.TSubset);
+      var i: Int32;
+      var v: TUVec3;
+    begin
+      glBegin(GL_TRIANGLES);
+      for i := 0 to Subset.IndexCount - 1 do
+      begin
+        glColor3f(0.0, 1.0, 0.0);
+        v := PUVec3(Subset.VertexData + Subset.Index[i] * Subset.VertexSize)^;
+        glVertex3fv(@v);
+      end;
+      glEnd();
+      glColor3f(1.0, 1.0, 1.0);
+    end;
+    var i: Int32;
+  begin
+    SetupTransforms(TUMat.Identity);
+    for i := 0 to High(Mesh.Subsets) do
+    begin
+      RenderSubset(Mesh.Subsets[i]);
+    end;
+  end;
 begin
-  UpdateAnimations(TUFloat(CurTime) * 0.001);
+  //UpdateAnimations(TUFloat(CurTime) * 0.001);
+  //PropagateTransforms(Scene.RootNode);
   //glEnable(GL_TEXTURE_2D);
   glShadeModel(GL_FLAT);
   //glShadeModel(GL_SMOOTH);
@@ -222,6 +257,10 @@ begin
   glDisable(GL_CULL_FACE);
   //glEnable(GL_BLEND);
   RenderNode(Scene.RootNode);
+  if Length(Scene.MeshList) > 0 then
+  begin
+    //RenderMesh(Scene.MeshList[(CurTime div 5000) mod Length(Scene.MeshList)]);
+  end;
 end;
 
 end.
