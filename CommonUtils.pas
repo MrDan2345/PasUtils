@@ -16,892 +16,960 @@ interface
 uses
   SysUtils, Classes, TypInfo;
 
-type
-  TUProcedure = procedure of object;
-  TUFunction = function: Boolean of object;
+type TUProcedure = procedure of object;
+type TUFunction = function: Boolean of object;
 
-  TUStrArr = array of String;
-  TUStrArrArr = array of array of String;
-  TUDateTimeArr = array of TDateTime;
-  TUVarRecArr = array of TVarRec;
+type TUStrArr = array of String;
+type TUStrArrArr = array of array of String;
+type TUDateTimeArr = array of TDateTime;
+type TUVarRecArr = array of TVarRec;
 
-  TUFloat = Single;
-  PUFloat = ^TUFloat;
-  TUFloatArr = array[UInt16] of TUFloat;
-  PUFloatArr = ^TUFloatArr;
-  TUDouble = Double;
-  PUDouble = ^TUDouble;
-  TUDoubleArr = array[UInt16] of TUDouble;
-  PUDoubleArr = ^TUDoubleArr;
+type TUFloat = type Single;
+type PUFloat = ^TUFloat;
+type TUFloatArr = array[UInt16] of TUFloat;
+type PUFloatArr = ^TUFloatArr;
+type TUDouble = type Double;
+type PUDouble = ^TUDouble;
+type TUDoubleArr = array[UInt16] of TUDouble;
+type PUDoubleArr = ^TUDoubleArr;
 
-  TUInt8 = UInt8;
-  TUInt8Arr = array[UInt16] of TUInt8;
-  PUInt8Arr = ^TUInt8Arr;
-  TUInt16 = UInt16;
-  TUInt16Arr = array[UInt16] of TUInt16;
-  PUInt16Arr = ^TUInt16Arr;
-  TUInt32 = UInt32;
-  TUInt32Arr = array[UInt16] of TUInt32;
-  PUInt32Arr = ^TUInt32Arr;
-  TUInt64 = UInt64;
-  TUInt64Arr = array[UInt16] of TUInt64;
-  PUInt64Arr = ^TUInt64Arr;
-  TInt8 = Int8;
-  TInt8Arr = array[UInt16] of TInt8;
-  PInt8Arr = ^TInt8Arr;
-  TInt16 = Int16;
-  TInt16Arr = array[UInt16] of TInt16;
-  PInt16Arr = ^TInt16Arr;
-  TInt32 = Int32;
-  TInt32Arr = array[UInt16] of TInt32;
-  PInt32Arr = ^TInt32Arr;
-  TInt64 = Int64;
-  TInt64Arr = array[UInt16] of TInt64;
-  PInt64Arr = ^TInt64Arr;
+type TUInt8 = type UInt8;
+type TUInt8Arr = array[UInt16] of TUInt8;
+type PUInt8Arr = ^TUInt8Arr;
+type TUInt16 = type UInt16;
+type TUInt16Arr = array[UInt16] of TUInt16;
+type PUInt16Arr = ^TUInt16Arr;
+type TUInt32 = type UInt32;
+type TUInt32Arr = array[UInt16] of TUInt32;
+type PUInt32Arr = ^TUInt32Arr;
+type TUInt64 = type UInt64;
+type TUInt64Arr = array[UInt16] of TUInt64;
+type PUInt64Arr = ^TUInt64Arr;
+type TInt8 = type Int8;
+type TInt8Arr = array[UInt16] of TInt8;
+type PInt8Arr = ^TInt8Arr;
+type TInt16 = type Int16;
+type TInt16Arr = array[UInt16] of TInt16;
+type PInt16Arr = ^TInt16Arr;
+type TInt32 = type Int32;
+type TInt32Arr = array[UInt16] of TInt32;
+type PInt32Arr = ^TInt32Arr;
+type TInt64 = type Int64;
+type TInt64Arr = array[UInt16] of TInt64;
+type PInt64Arr = ^TInt64Arr;
 
-  TUColor = UInt32;
-  PUColor = ^TUColor;
-  TUMat = array[0..3, 0..3] of TUFloat;
-  PUMat = ^TUMat;
-  TUVec2 = array[0..1] of TUFloat;
-  PUVec2 = ^TUVec2;
-  TUVec3 = array[0..2] of TUFloat;
-  PUVec3 = ^TUVec3;
-  TUVec4 = array[0..3] of TUFloat;
-  PUVec4 = ^TUVec4;
-  TUQuat = array[0..3] of TUFloat;
-  PUQuat = ^TUQuat;
+type TUColor = UInt32;
+type PUColor = ^TUColor;
+type TUMat = array[0..3, 0..3] of TUFloat;
+type PUMat = ^TUMat;
+type TUVec2 = array[0..1] of TUFloat;
+type PUVec2 = ^TUVec2;
+type TUVec3 = array[0..2] of TUFloat;
+type PUVec3 = ^TUVec3;
+type TUVec4 = array[0..3] of TUFloat;
+type PUVec4 = ^TUVec4;
+type TUQuat = array[0..3] of TUFloat;
+type PUQuat = ^TUQuat;
 
-  type TUColorImpl = type helper for TUColor
+type TUFloatImpl = type helper for TUFloat
+public
+  function ToString: String; inline;
+end;
+
+type TUDpubleImpl = type helper for TUDouble
+public
+  function ToString: String; inline;
+end;
+
+type TUInt8Impl = type helper for TUInt8
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
+  function ToString: String; inline;
+end;
+
+type TUInt16Impl = type helper for TUInt16
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TUInt32Impl = type helper for TUInt32
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TUInt64Impl = type helper for TUInt64
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TInt8Impl = type helper for TInt8
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TInt16Impl = type helper for TInt16
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TInt32Impl = type helper for TInt32
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TInt64Impl = type helper for TInt64
+private
+  function GetBit(const Index: TUInt8): TUInt8;
+  procedure SetBit(const Index: TUInt8; const Value: TUInt8);
+public
+  function ToString: String; inline;
+end;
+
+type TUColorImpl = type helper for TUColor
+private
+  function GetChannel(const Index: UInt8): UInt8; inline;
+  procedure SetChannel(const Index: UInt8; const Value: UInt8); inline;
+  function GetR: UInt8; inline;
+  procedure SetR(const Value: UInt8); inline;
+  function GetG: UInt8; inline;
+  procedure SetG(const Value: UInt8); inline;
+  function GetB: UInt8; inline;
+  procedure SetB(const Value: UInt8); inline;
+  function GetA: UInt8; inline;
+  procedure SetA(const Value: UInt8); inline;
+public
+  property Channel[const Index: UInt8]: UInt8 read GetChannel write SetChannel; default;
+  property r: UInt8 read GetR write SetR;
+  property g: UInt8 read GetG write SetG;
+  property b: UInt8 read GetB write SetB;
+  property a: UInt8 read GetA write SetA;
+  class function Make(const Ar, Ag, Ab, Aa: UInt8): TUColor; static;
+  class function Black: TUColor; static;
+  class function White: TUColor; static;
+  class function Red: TUColor; static;
+  class function Blue: TUColor; static;
+  class function Green: TUColor; static;
+  procedure SetValue(const Ar, Ag, Ab, Aa: UInt8);
+end;
+
+type TUMatImpl = type helper for TUMat
+private
+  function GetElement(const Index: UInt32): TUFloat; inline;
+  procedure SetElement(const Index: UInt32; const Value: TUFloat); inline;
+public
+  property Element[const Index: UInt32]: TUFloat read GetElement write SetElement; default;
+  class function Make(
+    const e00, e10, e20, e30: TUFloat;
+    const e01, e11, e21, e31: TUFloat;
+    const e02, e12, e22, e32: TUFloat;
+    const e03, e13, e23, e33: TUFloat
+  ): TUMat; static;
+  class function Zero: TUMat; static; inline;
+  class function Identity: TUMat; static; inline;
+  class function Scaling(const x, y, z: TUFloat): TUMat; static; overload; inline;
+  class function Scaling(const v: TUVec3): TUMat; static; overload; inline;
+  class function Scaling(const s: TUFloat): TUMat; static; overload; inline;
+  class function Translation(const x, y, z: TUFloat): TUMat; static; overload; inline;
+  class function Translation(const v: TUVec3): TUMat; static; overload; inline;
+  class function RotationX(const a: TUFloat): TUMat; static; inline;
+  class function RotationY(const a: TUFloat): TUMat; static; inline;
+  class function RotationZ(const a: TUFloat): TUMat; static; inline;
+  class function Rotation(const x, y, z, a: TUFloat): TUMat; static; overload; inline;
+  class function Rotation(const v: TUVec3; const a: TUFloat): TUMat; static; overload; inline;
+  class function Rotation(const q: TUQuat): TUMat; static; overload; inline;
+  class function View(const Origin, Target, Up: TUVec3): TUMat; static; inline;
+  class function Proj(const FoV, Aspect, ZNear, ZFar: TUFloat): TUMat; static; inline;
+  class function Orth(const Width, Height, ZNear, ZFar: TUFloat): TUMat; static; inline;
+  class function Skew(const Amount, Axis: TUVec3; const Angle: TUFloat): TUMat; static; inline;
+  class function Inverse(const m: TUMat): TUMat; static; overload;
+  procedure SetValue(
+    const e00, e10, e20, e30: TUFloat;
+    const e01, e11, e21, e31: TUFloat;
+    const e02, e12, e22, e32: TUFloat;
+    const e03, e13, e23, e33: TUFloat
+  ); inline;
+  function Inverse: TUMat; overload; inline;
+end;
+
+type TUVec2Impl = type helper for TUVec2
+private
+  function GetX: TUFloat; inline;
+  procedure SetX(const Value: TUFloat); inline;
+  function GetY: TUFloat; inline;
+  procedure SetY(const Value: TUFloat); inline;
+public
+  property x: TUFloat read GetX write SetX;
+  property y: TUFloat read GetY write SetY;
+  class function Zero: TUVec2; static; inline;
+  class function Make(const Ax, Ay: TUFloat): TUVec2; static; overload; inline;
+  class function Make(const S: TUFloat): TUVec2; static; overload; inline;
+  class function Dot(const v0, v1: TUVec2): TUFloat; static; overload; inline;
+  class function Cross(const v0, v1: TUVec2): TUFloat; static; overload; inline;
+  class function Norm(const v: TUVec2): TUVec2; static; overload; inline;
+  procedure SetValue(const Ax, Ay: TUFloat); inline;
+  function Dot(const v: TUVec2): TUFloat; overload; inline;
+  function Cross(const v: TUVec2): TUFloat; overload; inline;
+  function Norm: TUVec2; overload; inline;
+  function IsZero: Boolean; inline;
+end;
+
+type TUVec3Impl = type helper for TUVec3
+private
+  function GetX: TUFloat; inline;
+  procedure SetX(const Value: TUFloat); inline;
+  function GetY: TUFloat; inline;
+  procedure SetY(const Value: TUFloat); inline;
+  function GetZ: TUFloat; inline;
+  procedure SetZ(const Value: TUFloat); inline;
+public
+  property x: TUFloat read GetX write SetX;
+  property y: TUFloat read GetY write SetY;
+  property z: TUFloat read GetZ write SetZ;
+  class function Zero: TUVec3; static; inline;
+  class function Make(const Ax, Ay, Az: TUFloat): TUVec3; static; overload; inline;
+  class function Make(const v2: TUVec2; const Az: TUFloat): TUVec3; static; overload; inline;
+  class function Make(const s: TUFloat): TUVec3; static; overload;
+  class function Len(const v: TUVec3): TUFloat; static; overload; inline;
+  class function LenSq(const v: TUVec3): TUFloat; static; overload; inline;
+  class function Dot(const v0, v1: TUVec3): TUFloat; static; overload; inline;
+  class function Cross(const v0, v1: TUVec3): TUVec3; static; overload; inline;
+  class function Norm(const v: TUVec3): TUVec3; static; overload; inline;
+  procedure SetValue(const Ax, Ay, Az: TUFloat); inline;
+  function Transform3x3(const m: TUMat): TUVec3;
+  function Transform4x3(const m: TUMat): TUVec3;
+  function Transform4x4(const m: TUMat): TUVec3;
+  function TransformQuat(const q: TUQuat): TUVec3; inline;
+  function Len: TUFloat;
+  function LenSq: TUFloat;
+  function Dot(const v: TUVec3): TUFloat; overload;
+  function Cross(const v: TUVec3): TUVec3; overload;
+  function Norm: TUVec3; overload;
+  function xy: TUVec2; inline;
+  function AngleTo(const v: TUVec3): TUFloat; inline;
+  function RotationTo(const v: TUVec3): TUQuat; inline;
+  function IsZero: Boolean; inline;
+end;
+
+type TUVec4Impl = type helper for TUVec4
+private
+  function GetX: TUFloat; inline;
+  procedure SetX(const Value: TUFloat); inline;
+  function GetY: TUFloat; inline;
+  procedure SetY(const Value: TUFloat); inline;
+  function GetZ: TUFloat; inline;
+  procedure SetZ(const Value: TUFloat); inline;
+  function GetW: TUFloat; inline;
+  procedure SetW(const Value: TUFloat); inline;
+public
+  property x: TUFloat read GetX write SetX;
+  property y: TUFloat read GetY write SetY;
+  property z: TUFloat read GetZ write SetZ;
+  property w: TUFloat read GetW write SetW;
+  class function Zero: TUVec4; static; inline;
+  class function Make(const Ax, Ay, Az, Aw: TUFloat): TUVec4; static; overload; inline;
+  class function Make(const v: TUVec3; const Aw: TUFloat): TUVec4; static; overload; inline;
+  class function Make(const v0, v1: TUVec2): TUVec4; static; overload; inline;
+  class function Make(const v: TUVec2; const Az, Aw: TUFloat): TUVec4; static; overload; inline;
+  class function Make(const s: TUFloat): TUVec4; static; overload; inline;
+  class function Dot(const v0, v1: TUVec4): TUFloat; static; overload; inline;
+  class function Norm(const v: TUVec4): TUVec4; static; overload; inline;
+  procedure SetValue(const Ax, Ay, Az, Aw: TUFloat); inline;
+  function Dot(const v: TUVec4): TUFloat; overload; inline;
+  function Norm: TUVec4; overload; inline;
+  function xyz: TUVec3; inline;
+  function xy: TUVec2; inline;
+  function IsZero: Boolean; inline;
+end;
+
+type TUQuatImpl = type helper for TUQuat
+private
+  function GetX: TUFloat; inline;
+  procedure SetX(const Value: TUFloat); inline;
+  function GetY: TUFloat; inline;
+  procedure SetY(const Value: TUFloat); inline;
+  function GetZ: TUFloat; inline;
+  procedure SetZ(const Value: TUFloat); inline;
+  function GetW: TUFloat; inline;
+  procedure SetW(const Value: TUFloat); inline;
+public
+  property x: TUFloat read GetX write SetX;
+  property y: TUFloat read GetY write SetY;
+  property z: TUFloat read GetZ write SetZ;
+  property w: TUFloat read GetW write SetW;
+  class function Identity: TUQuat; static; inline;
+  class function Make(const Ax, Ay, Az, Aw: TUFloat): TUQuat; static; inline;
+  class function Norm(const v: TUQuat): TUQuat; static; overload; inline;
+  function Norm: TUQuat; inline;
+end;
+
+type TUSwizzle = object
+private
+  const DefaultSwizzle: UInt8 = (0 or (1 shl 2) or (2 shl 4) or (3 shl 6));
+  var _Remap: UInt8;
+  function GetOffset(const Index: UInt8): UInt8; inline;
+  procedure SetOffset(const Index: UInt8; const Value: UInt8); inline;
+public
+  property Remap: UInt8 read _Remap;
+  property Offset[const Index: UInt8]: UInt8 read GetOffset write SetOffset; default;
+  class function Make(
+    const ord0: UInt8 = 0;
+    const ord1: UInt8 = 1;
+    const ord2: UInt8 = 2;
+    const ord3: UInt8 = 3
+  ): TUSwizzle;
+  procedure SetIdentity; inline;
+  procedure SetValue(
+    const ord0: UInt8 = 0;
+    const ord1: UInt8 = 1;
+    const ord2: UInt8 = 2;
+    const ord3: UInt8 = 3
+  );
+end;
+
+type TUCriticalSection = record
+strict private
+  var _cs: TRTLCriticalSection;
+  procedure Initialize; inline;
+  procedure Finalize; inline;
+public
+  procedure Enter; inline;
+  function TryEnter: Boolean; inline;
+  procedure Leave; inline;
+  class operator Initialize(var v: TUCriticalSection);
+  class operator Finalize(var v: TUCriticalSection);
+end;
+
+type TUAtomicLock = record
+strict private
+  var _Lock: LongWord;
+  procedure Initialize; inline;
+  procedure Finalize; inline;
+public
+  function TryLock: Boolean; inline;
+  procedure Lock; inline;
+  procedure Unlock; inline;
+  class operator Initialize(var v: TUAtomicLock);
+  class operator Finalize(var v: TUAtomicLock);
+end;
+
+type TUReadWriteLock = record
+strict private
+  var _ReadLock: TUAtomicLock;
+  var _WriteLock: TUAtomicLock;
+  var _ReadCount: LongWord;
+  procedure Initialize; inline;
+  procedure Finalize; inline;
+public
+  function TryReadLock: Boolean; inline;
+  procedure ReadLock; inline;
+  procedure ReadUnlock; inline;
+  function TryWriteLock: Boolean; inline;
+  procedure WriteLock; inline;
+  procedure WriteUnlock; inline;
+  class operator Initialize(var v: TUReadWriteLock);
+  class operator Finalize(var v: TUReadWriteLock);
+end;
+
+type TUEvent = record
+strict private
+  var _Event: PRTLEvent;
+  procedure Initialize; inline;
+  procedure Finalize; inline;
+public
+  procedure Signal; inline;
+  procedure Unsignal; inline;
+  procedure WaitFor; inline;
+  procedure WaitFor(const Timeout: LongWord); inline;
+  class operator Initialize(var v: TUEvent);
+  class operator Finalize(var v: TUEvent);
+end;
+
+type generic TUTask<T> = record
+public
+  type TRes = T;
+  type TFunc = function (const Args: array of const): TRes of object;
+strict private
+  type TTaskThread = class (TThread)
   private
-    function GetChannel(const Index: UInt8): UInt8; inline;
-    procedure SetChannel(const Index: UInt8; const Value: UInt8); inline;
-    function GetR: UInt8; inline;
-    procedure SetR(const Value: UInt8); inline;
-    function GetG: UInt8; inline;
-    procedure SetG(const Value: UInt8); inline;
-    function GetB: UInt8; inline;
-    procedure SetB(const Value: UInt8); inline;
-    function GetA: UInt8; inline;
-    procedure SetA(const Value: UInt8); inline;
+    var _StartTime: QWord;
   public
-    property Channel[const Index: UInt8]: UInt8 read GetChannel write SetChannel; default;
-    property r: UInt8 read GetR write SetR;
-    property g: UInt8 read GetG write SetG;
-    property b: UInt8 read GetB write SetB;
-    property a: UInt8 read GetA write SetA;
-    class function Make(const Ar, Ag, Ab: UInt8; const Aa: UInt8 = $ff): TUColor; static;
-    class function Black: TUColor; static;
-    class function White: TUColor; static;
-    class function Red: TUColor; static;
-    class function Blue: TUColor; static;
-    class function Green: TUColor; static;
-    procedure SetValue(const Ar, Ag, Ab, Aa: UInt8);
-    function AsVec4: TUVec4;
-    function AsVec3: TUVec3;
-  end;
-
-  type TUMatImpl = type helper for TUMat
-  private
-    function GetElement(const Index: UInt32): TUFloat; inline;
-    procedure SetElement(const Index: UInt32; const Value: TUFloat); inline;
-  public
-    property Element[const Index: UInt32]: TUFloat read GetElement write SetElement; default;
-    class function Make(
-      const e00, e10, e20, e30: TUFloat;
-      const e01, e11, e21, e31: TUFloat;
-      const e02, e12, e22, e32: TUFloat;
-      const e03, e13, e23, e33: TUFloat
-    ): TUMat; static;
-    class function Zero: TUMat; static; inline;
-    class function Identity: TUMat; static; inline;
-    class function Scaling(const x, y, z: TUFloat): TUMat; static; overload; inline;
-    class function Scaling(const v: TUVec3): TUMat; static; overload; inline;
-    class function Scaling(const s: TUFloat): TUMat; static; overload; inline;
-    class function Translation(const x, y, z: TUFloat): TUMat; static; overload; inline;
-    class function Translation(const v: TUVec3): TUMat; static; overload; inline;
-    class function RotationX(const a: TUFloat): TUMat; static; inline;
-    class function RotationY(const a: TUFloat): TUMat; static; inline;
-    class function RotationZ(const a: TUFloat): TUMat; static; inline;
-    class function Rotation(const x, y, z, a: TUFloat): TUMat; static; overload; inline;
-    class function Rotation(const v: TUVec3; const a: TUFloat): TUMat; static; overload; inline;
-    class function Rotation(const q: TUQuat): TUMat; static; overload; inline;
-    class function View(const Origin, Target, Up: TUVec3): TUMat; static; inline;
-    class function Proj(const FoV, Aspect, ZNear, ZFar: TUFloat): TUMat; static; inline;
-    class function Orth(const Width, Height, ZNear, ZFar: TUFloat): TUMat; static; inline;
-    class function Skew(const Amount, Axis: TUVec3; const Angle: TUFloat): TUMat; static; inline;
-    class function Transpose(const m: TUMat): TUMat; static; overload;
-    class function Inverse(const m: TUMat): TUMat; static; overload;
-    class function Transpose(const m: TUMat): TUMat; static; overload;
-    procedure SetValue(
-      const e00, e10, e20, e30: TUFloat;
-      const e01, e11, e21, e31: TUFloat;
-      const e02, e12, e22, e32: TUFloat;
-      const e03, e13, e23, e33: TUFloat
-    ); inline;
-    function Transpose: TUMat; inline;
-    function Inverse: TUMat; overload; inline;
-    function Transpose: TUMat; overload; inline;
-  end;
-
-  type TUVec2Impl = type helper for TUVec2
-  private
-    function GetX: TUFloat; inline;
-    procedure SetX(const Value: TUFloat); inline;
-    function GetY: TUFloat; inline;
-    procedure SetY(const Value: TUFloat); inline;
-  public
-    property x: TUFloat read GetX write SetX;
-    property y: TUFloat read GetY write SetY;
-    class function Zero: TUVec2; static; inline;
-    class function Make(const Ax, Ay: TUFloat): TUVec2; static; overload; inline;
-    class function Make(const S: TUFloat): TUVec2; static; overload; inline;
-    class function Dot(const v0, v1: TUVec2): TUFloat; static; overload; inline;
-    class function Cross(const v0, v1: TUVec2): TUFloat; static; overload; inline;
-    class function Norm(const v: TUVec2): TUVec2; static; overload; inline;
-    procedure SetValue(const Ax, Ay: TUFloat); inline;
-    function Dot(const v: TUVec2): TUFloat; overload; inline;
-    function Cross(const v: TUVec2): TUFloat; overload; inline;
-    function Norm: TUVec2; overload; inline;
-    function IsZero: Boolean; inline;
-  end;
-
-  type TUVec3Impl = type helper for TUVec3
-  private
-    function GetX: TUFloat; inline;
-    procedure SetX(const Value: TUFloat); inline;
-    function GetY: TUFloat; inline;
-    procedure SetY(const Value: TUFloat); inline;
-    function GetZ: TUFloat; inline;
-    procedure SetZ(const Value: TUFloat); inline;
-  public
-    property x: TUFloat read GetX write SetX;
-    property y: TUFloat read GetY write SetY;
-    property z: TUFloat read GetZ write SetZ;
-    class function Zero: TUVec3; static; inline;
-    class function Make(const Ax, Ay, Az: TUFloat): TUVec3; static; overload; inline;
-    class function Make(const v2: TUVec2; const Az: TUFloat): TUVec3; static; overload; inline;
-    class function Make(const s: TUFloat): TUVec3; static; overload;
-    class function Len(const v: TUVec3): TUFloat; static; overload; inline;
-    class function LenSq(const v: TUVec3): TUFloat; static; overload; inline;
-    class function Dot(const v0, v1: TUVec3): TUFloat; static; overload; inline;
-    class function Cross(const v0, v1: TUVec3): TUVec3; static; overload; inline;
-    class function Norm(const v: TUVec3): TUVec3; static; overload; inline;
-    procedure SetValue(const Ax, Ay, Az: TUFloat); inline;
-    function Transform3x3(const m: TUMat): TUVec3;
-    function Transform4x3(const m: TUMat): TUVec3;
-    function Transform4x4(const m: TUMat): TUVec3;
-    function TransformQuat(const q: TUQuat): TUVec3; inline;
-    function Len: TUFloat;
-    function LenSq: TUFloat;
-    function Dot(const v: TUVec3): TUFloat; overload;
-    function Cross(const v: TUVec3): TUVec3; overload;
-    function Norm: TUVec3; overload;
-    function xy: TUVec2; inline;
-    function AngleTo(const v: TUVec3): TUFloat; inline;
-    function RotationTo(const v: TUVec3): TUQuat; inline;
-    function IsZero: Boolean; inline;
-  end;
-
-  type TUVec4Impl = type helper for TUVec4
-  private
-    function GetX: TUFloat; inline;
-    procedure SetX(const Value: TUFloat); inline;
-    function GetY: TUFloat; inline;
-    procedure SetY(const Value: TUFloat); inline;
-    function GetZ: TUFloat; inline;
-    procedure SetZ(const Value: TUFloat); inline;
-    function GetW: TUFloat; inline;
-    procedure SetW(const Value: TUFloat); inline;
-  public
-    property x: TUFloat read GetX write SetX;
-    property y: TUFloat read GetY write SetY;
-    property z: TUFloat read GetZ write SetZ;
-    property w: TUFloat read GetW write SetW;
-    class function Zero: TUVec4; static; inline;
-    class function Make(const Ax, Ay, Az, Aw: TUFloat): TUVec4; static; overload; inline;
-    class function Make(const v: TUVec3; const Aw: TUFloat): TUVec4; static; overload; inline;
-    class function Make(const v0, v1: TUVec2): TUVec4; static; overload; inline;
-    class function Make(const v: TUVec2; const Az, Aw: TUFloat): TUVec4; static; overload; inline;
-    class function Make(const s: TUFloat): TUVec4; static; overload; inline;
-    class function Dot(const v0, v1: TUVec4): TUFloat; static; overload; inline;
-    class function Norm(const v: TUVec4): TUVec4; static; overload; inline;
-    procedure SetValue(const Ax, Ay, Az, Aw: TUFloat); inline;
-    function Dot(const v: TUVec4): TUFloat; overload; inline;
-    function Norm: TUVec4; overload; inline;
-    function xyz: TUVec3; inline;
-    function xy: TUVec2; inline;
-    function IsZero: Boolean; inline;
-  end;
-
-  type TUQuatImpl = type helper for TUQuat
-  private
-    function GetX: TUFloat; inline;
-    procedure SetX(const Value: TUFloat); inline;
-    function GetY: TUFloat; inline;
-    procedure SetY(const Value: TUFloat); inline;
-    function GetZ: TUFloat; inline;
-    procedure SetZ(const Value: TUFloat); inline;
-    function GetW: TUFloat; inline;
-    procedure SetW(const Value: TUFloat); inline;
-  public
-    property x: TUFloat read GetX write SetX;
-    property y: TUFloat read GetY write SetY;
-    property z: TUFloat read GetZ write SetZ;
-    property w: TUFloat read GetW write SetW;
-    class function Identity: TUQuat; static; inline;
-    class function Make(const Ax, Ay, Az, Aw: TUFloat): TUQuat; static; inline;
-    class function Norm(const v: TUQuat): TUQuat; static; overload; inline;
-    function Norm: TUQuat; inline;
-  end;
-
-  type TUSwizzle = object
-  private
-    const DefaultSwizzle: UInt8 = (0 or (1 shl 2) or (2 shl 4) or (3 shl 6));
-    var _Remap: UInt8;
-    function GetOffset(const Index: UInt8): UInt8; inline;
-    procedure SetOffset(const Index: UInt8; const Value: UInt8); inline;
-  public
-    property Remap: UInt8 read _Remap;
-    property Offset[const Index: UInt8]: UInt8 read GetOffset write SetOffset; default;
-    class function Make(
-      const ord0: UInt8 = 0;
-      const ord1: UInt8 = 1;
-      const ord2: UInt8 = 2;
-      const ord3: UInt8 = 3
-    ): TUSwizzle;
-    procedure SetIdentity; inline;
-    procedure SetValue(
-      const ord0: UInt8 = 0;
-      const ord1: UInt8 = 1;
-      const ord2: UInt8 = 2;
-      const ord3: UInt8 = 3
-    );
-  end;
-
-  type TUCriticalSection = record
-  strict private
-    var _cs: TRTLCriticalSection;
-    procedure Initialize; inline;
-    procedure Finalize; inline;
-  public
-    procedure Enter; inline;
-    function TryEnter: Boolean; inline;
-    procedure Leave; inline;
-    class operator Initialize(var v: TUCriticalSection);
-    class operator Finalize(var v: TUCriticalSection);
-  end;
-
-  type TUAtomicLock = record
-  strict private
-    var _Lock: LongWord;
-    procedure Initialize; inline;
-    procedure Finalize; inline;
-  public
-    function TryLock: Boolean; inline;
-    procedure Lock; inline;
-    procedure Unlock; inline;
-    class operator Initialize(var v: TUAtomicLock);
-    class operator Finalize(var v: TUAtomicLock);
-  end;
-
-  type TUReadWriteLock = record
-  strict private
-    var _ReadLock: TUAtomicLock;
-    var _WriteLock: TUAtomicLock;
-    var _ReadCount: LongWord;
-    procedure Initialize; inline;
-    procedure Finalize; inline;
-  public
-    function TryReadLock: Boolean; inline;
-    procedure ReadLock; inline;
-    procedure ReadUnlock; inline;
-    function TryWriteLock: Boolean; inline;
-    procedure WriteLock; inline;
-    procedure WriteUnlock; inline;
-    class operator Initialize(var v: TUReadWriteLock);
-    class operator Finalize(var v: TUReadWriteLock);
-  end;
-
-  type TUEvent = record
-  strict private
-    var _Event: PRTLEvent;
-    procedure Initialize; inline;
-    procedure Finalize; inline;
-  public
-    procedure Signal; inline;
-    procedure Unsignal; inline;
-    procedure WaitFor; inline;
-    procedure WaitFor(const Timeout: LongWord); inline;
-    class operator Initialize(var v: TUEvent);
-    class operator Finalize(var v: TUEvent);
-  end;
-
-  type generic TUTask<T> = record
-  public
-    type TRes = T;
-    type TFunc = function (const Args: array of const): TRes of object;
-  strict private
-    type TTaskThread = class (TThread)
-    private
-      var _StartTime: QWord;
-    public
-      var Ref: Integer;
-      var Proc: TFunc;
-      var Args: array of TVarRec;
-      var Res: TRes;
-      procedure AfterConstruction; override;
-      procedure Execute; override;
-      function TimeRunning: QWord;
-      function RefInc: Integer;
-      function RefDec: Integer;
-      function RefDecKillThread: Integer;
-    end;
-    var _Thread: TTaskThread;
-    procedure Initialize; inline;
-    procedure Finalize; inline;
-    procedure SetThread(const TaskThread: TTaskThread);
-  public
+    var Ref: Integer;
+    var Proc: TFunc;
+    var Args: array of TVarRec;
+    var Res: TRes;
+    procedure AfterConstruction; override;
+    procedure Execute; override;
     function TimeRunning: QWord;
-    function IsComplete: Boolean;
-    function IsStarted: Boolean;
-    function TaskResult: TRes;
-    procedure Reset;
-    procedure WaitFor;
-    procedure Kill;
-    procedure TimeoutKill(const Timeout: QWord);
-    class function StartTask(const Proc: TFunc; const Args: array of const): TUTask; static;
-    class operator Initialize(var v: TUTask);
-    class operator Finalize(var v: TUTask);
-    class operator Copy(constref Src: TUTask; var Dst: TUTask);
+    function RefInc: Integer;
+    function RefDec: Integer;
+    function RefDecKillThread: Integer;
   end;
-  type TUTaskString = specialize TUTask<String>;
-  type TUTaskBool = specialize TUTask<Boolean>;
-  type TUTaskInt = specialize TUTask<Integer>;
+  var _Thread: TTaskThread;
+  procedure Initialize; inline;
+  procedure Finalize; inline;
+  procedure SetThread(const TaskThread: TTaskThread);
+public
+  function TimeRunning: QWord;
+  function IsComplete: Boolean;
+  function IsStarted: Boolean;
+  function TaskResult: TRes;
+  procedure Reset;
+  procedure WaitFor;
+  procedure Kill;
+  procedure TimeoutKill(const Timeout: QWord);
+  class function StartTask(const Proc: TFunc; const Args: array of const): TUTask; static;
+  class operator Initialize(var v: TUTask);
+  class operator Finalize(var v: TUTask);
+  class operator Copy(constref Src: TUTask; var Dst: TUTask);
+end;
+type TUTaskString = specialize TUTask<String>;
+type TUTaskBool = specialize TUTask<Boolean>;
+type TUTaskInt = specialize TUTask<Integer>;
 
-  type generic TUSharedRef<T> = record
+type generic TUSharedRef<T> = record
+public
+  type TPtr = T;
+  type TSelf = specialize TUSharedRef<T>;
+private
+  var _Ptr: IInterface;
+  function GetPtr: TPtr; inline;
+  procedure SetPtr(const Value: TPtr); inline;
+  procedure Initialize;
+public
+  property Ptr: TPtr read GetPtr write SetPtr;
+  function IsValid: Boolean; inline;
+  class operator Initialize(var v: TSelf);
+  class operator := (const Value: TPtr): TSelf; inline;
+  class operator := (const Value: Pointer): TSelf; inline;
+  class operator = (v1, v2: TSelf): Boolean; inline;
+end;
+
+type generic TUWeakRef<T> = record
+public
+  type TPtr = T;
+  type TSelf = specialize TUWeakRef<T>;
+  type TShared = specialize TUSharedRef<T>;
+private
+  var _Weak: IInterface;
+  procedure Assign(const Value: TPtr);
+  function GetPtr: TPtr; inline;
+public
+  property Ptr: TPtr read GetPtr;
+  function IsValid: Boolean; inline;
+  function AsShared: TShared; inline;
+  class operator := (const Value: TPtr): TSelf; inline;
+  class operator := (const Value: TShared): TSelf; inline;
+end;
+
+type TURefClass = class;
+type TUWeakCounter = class (TInterfacedObject)
+private
+  var _Obj: TURefClass;
+public
+  property Obj: TURefClass read _Obj write _Obj;
+  constructor Create(const AObj: TURefClass);
+  destructor Destroy; override;
+end;
+
+type TURefClass = class (TObject, IUnknown)
+public
+  type TShared = specialize TUSharedRef<TURefClass>;
+protected
+  var _RefCount: UInt32;
+  var _Weak: TUWeakCounter;
+  var _References: array of TShared;
+  function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+  function _AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+  function _Release : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+protected
+  property Weak: TUWeakCounter read _Weak write _Weak;
+public
+  procedure AfterConstruction; override;
+  procedure BeforeDestruction; override;
+  class function NewInstance: TObject; override;
+  procedure AddReference(const Obj: TURefClass);
+  procedure RemoveReference(const Obj: TURefClass);
+  property RefCount: UInt32 read _RefCount;
+end;
+
+type TUStreamHelper = class (TURefClass)
+private
+  var _Stream: TStream;
+  var _PosStack: array of Int64;
+  function GetSize: Int64; inline;
+  function GetPosition: Int64; inline;
+  procedure SetPosition(const Value: Int64); inline;
+  function GetRemaining: Int64; inline;
+public
+  property Stream: TStream read _Stream;
+  property Size: Int64 read GetSize;
+  property Position: Int64 read GetPosition write SetPosition;
+  property Remaining: Int64 read GetRemaining;
+  procedure PosPush;
+  procedure PosPop;
+  procedure PosDiscard;
+  function IsEoF: Boolean; inline;
+  function ReadBuffer(const Buffer: Pointer; const Count: Int64): Int64; inline;
+  function ReadBool: Boolean; inline;
+  function ReadUInt8: UInt8; inline;
+  function ReadUInt16: UInt16; inline;
+  function ReadUInt32: UInt32; inline;
+  function ReadUInt64: UInt64; inline;
+  function ReadInt8: Int8; inline;
+  function ReadInt16: Int16; inline;
+  function ReadInt32: Int32; inline;
+  function ReadInt64: Int64; inline;
+  function ReadFloat: Single; inline;
+  function ReadDouble: Double; inline;
+  function ReadString: String; inline;
+  function ReadStringNT: String; inline;
+  generic function Read<T>: T; inline;
+  function WriteBuffer(const Buffer: Pointer; const Count: Int64): Int64; inline;
+  procedure WriteBool(const Value: Boolean); inline;
+  procedure WriteUInt8(const value: UInt8); inline;
+  procedure WriteUInt16(const value: UInt16); inline;
+  procedure WriteUInt32(const value: UInt32); inline;
+  procedure WriteUInt64(const value: UInt64); inline;
+  procedure WriteInt8(const value: Int8); inline;
+  procedure WriteInt16(const value: Int16); inline;
+  procedure WriteInt32(const value: Int32); inline;
+  procedure WriteInt64(const value: Int64); inline;
+  procedure WriteFloat(const value: Single); inline;
+  procedure WriteDouble(const value: Double); inline;
+  procedure WriteStringRaw(const Value: String); inline;
+  procedure WriteString(const Value: String); inline;
+  procedure WriteStringNT(const Value: String); inline;
+  generic procedure Write<T>(const Value: T); inline;
+  procedure Skip(const Count: Int64); inline;
+  procedure SkipString; inline;
+  function ToString: String; override;
+  constructor Create(const AStream: TStream);
+end;
+type TUStreamHelperShared = specialize TUSharedRef<TUStreamHelper>;
+
+type TUConstMemoryStream = class (TStream)
+private
+  var _Memory: Pointer;
+  var _Size: Int64;
+  var _Position: Int64;
+protected
+  function GetSize: Int64; override;
+  function GetPosition: Int64; override;
+public
+  function Read(var Buffer; Count: LongInt): LongInt; override;
+  function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; override;
+  constructor Create(const Buffer: Pointer; const BufferSize: UInt32);
+end;
+
+{$push}
+{$m+}
+type TUSerializable = class (TURefClass)
+protected
+  var _TypeInfo: PTypeInfo;
+  var _TypeData: PTypeData;
+  var _PropList: array of PPropInfo;
+  function VerifyProp(const Index: Integer; const PropType: TTypeKinds = tkAny): Boolean;
+  function VerifyArrayProp(const Index, ArrayIndex: Integer; const PropType: TTypeKinds = tkAny): Boolean;
+  function GetArrayData(const Index: Integer): Pointer;
+  function GetOrdSize(const OrdType: TOrdType): UInt32; inline;
+  function GetArrayElementTypeInfo(const Index: Integer): PTypeInfo;
+  function GetPropCount: Integer; inline;
+  function GetPropInfo(const Index: Integer): PPropInfo; inline;
+  function GetPropArrayInfo(const Index: Integer): PTypeInfo; inline;
+  function GetPropEnum(const Index: Integer): Int32; inline;
+  procedure SetPropEnum(const Index: Integer; const Value: Int32); inline;
+  function GetPropBool(const Index: Integer): Boolean; inline;
+  procedure SetPropBool(const Index: Integer; const Value: Boolean); inline;
+  function GetPropInt8(const Index: Integer): Int8; inline;
+  procedure SetPropInt8(const Index: Integer; const Value: Int8); inline;
+  function GetPropInt16(const Index: Integer): Int16; inline;
+  procedure SetPropInt16(const Index: Integer; const Value: Int16); inline;
+  function GetPropInt32(const Index: Integer): Int32; inline;
+  procedure SetPropInt32(const Index: Integer; const Value: Int32); inline;
+  function GetPropInt64(const Index: Integer): Int64; inline;
+  procedure SetPropInt64(const Index: Integer; const Value: Int64); inline;
+  function GetPropUInt8(const Index: Integer): UInt8; inline;
+  procedure SetPropUInt8(const Index: Integer; const Value: UInt8); inline;
+  function GetPropUInt16(const Index: Integer): UInt16; inline;
+  procedure SetPropUInt16(const Index: Integer; const Value: UInt16); inline;
+  function GetPropUInt32(const Index: Integer): UInt32; inline;
+  procedure SetPropUInt32(const Index: Integer; const Value: UInt32); inline;
+  function GetPropUInt64(const Index: Integer): UInt64; inline;
+  procedure SetPropUInt64(const Index: Integer; const Value: UInt64); inline;
+  function GetPropFloat(const Index: Integer): Single; inline;
+  procedure SetPropFloat(const Index: Integer; const Value: Single); inline;
+  function GetPropDouble(const Index: Integer): Double; inline;
+  procedure SetPropDouble(const Index: Integer; const Value: Double); inline;
+  function GetPropString(const Index: Integer): String; inline;
+  procedure SetPropString(const Index: Integer; const Value: String); inline;
+  function GetPropClass(const Index: Integer): TObject; inline;
+  procedure SetPropClass(const Index: Integer; const Value: TObject); inline;
+  function GetPropArrayLength(const Index: Integer): Integer; inline;
+  procedure SetPropArrayLength(const Index: Integer; const Value: Integer);
+  function GetPropArrayEnum(const Index, ArrayIndex: Integer): Int32; inline;
+  procedure SetPropArrayEnum(const Index, ArrayIndex: Integer; const Value: Int32); inline;
+  function GetPropArrayBool(const Index, ArrayIndex: Integer): Boolean; inline;
+  procedure SetPropArrayBool(const Index, ArrayIndex: Integer; const Value: Boolean); inline;
+  function GetPropArrayInt8(const Index, ArrayIndex: Integer): Int8; inline;
+  procedure SetPropArrayInt8(const Index, ArrayIndex: Integer; const Value: Int8); inline;
+  function GetPropArrayInt16(const Index, ArrayIndex: Integer): Int16; inline;
+  procedure SetPropArrayInt16(const Index, ArrayIndex: Integer; const Value: Int16); inline;
+  function GetPropArrayInt32(const Index, ArrayIndex: Integer): Int32; inline;
+  procedure SetPropArrayInt32(const Index, ArrayIndex: Integer; const Value: Int32); inline;
+  function GetPropArrayInt64(const Index, ArrayIndex: Integer): Int64; inline;
+  procedure SetPropArrayInt64(const Index, ArrayIndex: Integer; const Value: Int64); inline;
+  function GetPropArrayUInt8(const Index, ArrayIndex: Integer): UInt8; inline;
+  procedure SetPropArrayUInt8(const Index, ArrayIndex: Integer; const Value: UInt8); inline;
+  function GetPropArrayUInt16(const Index, ArrayIndex: Integer): UInt16; inline;
+  procedure SetPropArrayUInt16(const Index, ArrayIndex: Integer; const Value: UInt16); inline;
+  function GetPropArrayUInt32(const Index, ArrayIndex: Integer): UInt32; inline;
+  procedure SetPropArrayUInt32(const Index, ArrayIndex: Integer; const Value: UInt32); inline;
+  function GetPropArrayUInt64(const Index, ArrayIndex: Integer): UInt64; inline;
+  procedure SetPropArrayUInt64(const Index, ArrayIndex: Integer; const Value: UInt64); inline;
+  function GetPropArrayFloat(const Index, ArrayIndex: Integer): Single; inline;
+  procedure SetPropArrayFloat(const Index, ArrayIndex: Integer; const Value: Single); inline;
+  function GetPropArrayDouble(const Index, ArrayIndex: Integer): Double; inline;
+  procedure SetPropArrayDouble(const Index, ArrayIndex: Integer; const Value: Double); inline;
+  function GetPropArrayString(const Index, ArrayIndex: Integer): String; inline;
+  procedure SetPropArrayString(const Index, ArrayIndex: Integer; const Value: String); inline;
+  function GetPropArrayClass(const Index, ArrayIndex: Integer): TObject; inline;
+  procedure SetPropArrayClass(const Index, ArrayIndex: Integer; const Value: TObject); inline;
+  generic function GetDynArrayLength<T>(const Index: Integer): Integer;
+  generic procedure SetDynArrayLength<T>(const Index: Integer; const Value: Integer);
+  generic function GetDynArrayElement<T>(const Index, ArrayIndex: Integer): T;
+  generic procedure SetDynArrayElement<T>(const Index, ArrayIndex: Integer; const Value: T);
+public
+  property PropCount: Integer read GetPropCount;
+  property PropInfo[const Index: Integer]: PPropInfo read GetPropInfo;
+  property PropArrayInfo[const Index: Integer]: PTypeInfo read GetPropArrayInfo;
+  property PropEnum[const Index: Integer]: Int32 read GetPropEnum write SetPropEnum;
+  property PropBool[const Index: Integer]: Boolean read GetPropBool write SetPropBool;
+  property PropInt8[const Index: Integer]: Int8 read GetPropInt8 write SetPropInt8;
+  property PropInt16[const Index: Integer]: Int16 read GetPropInt16 write SetPropInt16;
+  property PropInt32[const Index: Integer]: Int32 read GetPropInt32 write SetPropInt32;
+  property PropInt64[const Index: Integer]: Int64 read GetPropInt64 write SetPropInt64;
+  property PropUInt8[const Index: Integer]: UInt8 read GetPropUInt8 write SetPropUInt8;
+  property PropUInt16[const Index: Integer]: UInt16 read GetPropUInt16 write SetPropUInt16;
+  property PropUInt32[const Index: Integer]: UInt32 read GetPropUInt32 write SetPropUInt32;
+  property PropUInt64[const Index: Integer]: UInt64 read GetPropUInt64 write SetPropUInt64;
+  property PropFloat[const Index: Integer]: Single read GetPropFloat write SetPropFloat;
+  property PropDouble[const Index: Integer]: Double read GetPropDouble write SetPropDouble;
+  property PropString[const Index: Integer]: String read GetPropString write SetPropString;
+  property PropClass[const Index: Integer]: TObject read GetPropClass write SetPropClass;
+  property PropArrayEnum[const Index, ArrayIndex: Integer]: Int32 read GetPropArrayEnum write SetPropArrayEnum;
+  property PropArrayBool[const Index, ArrayIndex: Integer]: Boolean read GetPropArrayBool write SetPropArrayBool;
+  property PropArrayInt8[const Index, ArrayIndex: Integer]: Int8 read GetPropArrayInt8 write SetPropArrayInt8;
+  property PropArrayInt16[const Index, ArrayIndex: Integer]: Int16 read GetPropArrayInt16 write SetPropArrayInt16;
+  property PropArrayInt32[const Index, ArrayIndex: Integer]: Int32 read GetPropArrayInt32 write SetPropArrayInt32;
+  property PropArrayInt64[const Index, ArrayIndex: Integer]: Int64 read GetPropArrayInt64 write SetPropArrayInt64;
+  property PropArrayUInt8[const Index, ArrayIndex: Integer]: UInt8 read GetPropArrayUInt8 write SetPropArrayUInt8;
+  property PropArrayUInt16[const Index, ArrayIndex: Integer]: UInt16 read GetPropArrayUInt16 write SetPropArrayUInt16;
+  property PropArrayUInt32[const Index, ArrayIndex: Integer]: UInt32 read GetPropArrayUInt32 write SetPropArrayUInt32;
+  property PropArrayUInt64[const Index, ArrayIndex: Integer]: UInt64 read GetPropArrayUInt64 write SetPropArrayUInt64;
+  property PropArrayFloat[const Index, ArrayIndex: Integer]: Single read GetPropArrayFloat write SetPropArrayFloat;
+  property PropArrayDouble[const Index, ArrayIndex: Integer]: Double read GetPropArrayDouble write SetPropArrayDouble;
+  property PropArrayString[const Index, ArrayIndex: Integer]: String read GetPropArrayString write SetPropArrayString;
+  property PropArrayClass[const Index, ArrayIndex: Integer]: TObject read GetPropArrayClass write SetPropArrayClass;
+  property PropArrayLength[const Index: Integer]: Integer read GetPropArrayLength write SetPropArrayLength;
+  function FindProp(const Name: String; const PropType: TTypeKinds = tkAny): Integer;
+  procedure AfterConstruction; override;
+  procedure BeforeDestruction; override;
+  procedure SerializeTo(const Stream: TStream); virtual; overload;
+  procedure SerializeTo(const FileName: String); virtual; overload;
+  procedure SerializeFrom(const Stream: TStream); virtual; overload;
+  procedure SerializeFrom(const FileName: String); virtual; overload;
+  procedure Assign(const Serializable: TUSerializable); virtual;
+  procedure Dump(const Offset: String = '');
+end;
+{$pop}
+
+type TUTokenType = (tt_eof, tt_error, tt_symbol, tt_word, tt_keyword, tt_string, tt_number);
+type TUTokenTypes = set of TUTokenType;
+type TUParserToken = record
+  Value: String;
+  TokenType: TUTokenType;
+  class operator = (a, b: TUParserToken): Boolean; inline;
+  class operator in (a: TUParserToken; b: array of TUParserToken): Boolean;
+  class operator = (a: TUParserToken; b: String): Boolean; inline;
+  class operator = (a: TUParserToken; b: array of String): Boolean;
+  class operator = (a: TUParserToken; b: TUTokenType): Boolean; inline;
+  class operator in (a: TUParserToken; b: TUTokenTypes): Boolean; inline;
+  class operator := (a: TUParserToken): String; inline;
+end;
+function UParserToken(const Value: String; const TokenType: TUTokenType): TUParserToken; inline;
+
+type TUParserSyntax = object
+public
+  Comment: array of array[0..1] of String;
+  CommentLine: array of String;
+  Strings: array of String;
+  Symbols: array of String;
+  Keywords: array of String;
+  CaseSensitive: Boolean;
+  procedure AddComment(const ACommentStart, ACommentEnd: String);
+  procedure AddCommentLine(const ACommentLine: String);
+  procedure AddString(const AStringStartEnd: String);
+  procedure AddSymbol(const ASymbol: String);
+  procedure AddSymbols(const ASymbols: array of String);
+  procedure AddKeyword(const AKeyword: String);
+  procedure AddKeywords(const AKeywords: array of String);
+  procedure Reset;
+end;
+type PUParserSyntax = ^TUParserSyntax;
+
+type TUParser = class (TURefClass)
+strict private
+  type TState = record
+    Line, Position: Int32;
+  end;
+  var _Position: Int32;
+  var _Text: array of AnsiChar;
+  var _Line: Int32;
+  var _DefaultSyntax: TUParserSyntax;
+  var _Syntax: PUParserSyntax;
+  var _States: array of TState;
+  var _SyntaxStack: array of PUParserSyntax;
+  function GetComment(const Index: Int32): String; inline;
+  function GetCommentCount: Int32; inline;
+  function GetCommentLine(const index: Int32): String; inline;
+  function GetCommentLineCount: Int32; inline;
+  function GetKeyword(const Index: Int32): String; inline;
+  function GetKeywordCount: Int32; inline;
+  function GetString(const Index: Int32): String; inline;
+  function GetStringCount: Int32; inline;
+  function GetSymbol(const Index: Int32): String; inline;
+  function GetSymbolCount: Int32; inline;
+  function GetText: String; inline;
+  function GetTextLength: Int32; inline;
+  procedure SetSyntax(const Value: PUParserSyntax); inline;
+public
+  property Text: String read GetText;
+  property TextLength: Int32 read GetTextLength;
+  property Position: Int32 read _Position write _Position;
+  property Line: Int32 read _Line;
+  property CommentCount: Int32 read GetCommentCount;
+  property Comments[const Index: Int32]: String read GetComment;
+  property CommnetLineCount: Int32 read GetCommentLineCount;
+  property CommentLines[const Index: Int32]: String read GetCommentLine;
+  property StringCount: Int32 read GetStringCount;
+  property Strings[const Index: Int32]: String read GetString;
+  property SymbolCount: Int32 read GetSymbolCount;
+  property Symbols[const Index: Int32]: String read GetSymbol;
+  property KeywordCount: Int32 read GetKeywordCount;
+  property Keywords[const Index: Int32]: String read GetKeyword;
+  property Syntax: PUParserSyntax read _Syntax write SetSyntax;
+  constructor Create;
+  constructor Create(const ParseText: String; const CaseSensitive: Boolean = False); virtual;
+  destructor Destroy; override;
+  procedure Parse(const ParseText: String);
+  procedure AddComment(const CommentStart, CommentEnd: String);
+  procedure AddCommentLine(const CommentLine: String);
+  procedure AddString(const StringStartEnd: String);
+  procedure AddSymbol(const Symbol: String);
+  procedure AddKeyword(const Keyword: String);
+  procedure SkipSpaces;
+  procedure StatePush;
+  procedure StatePop;
+  procedure StateDiscard;
+  procedure StateLoad;
+  procedure SyntaxPush;
+  procedure SyntaxPop;
+  function Read(const Count: Int32): String; overload;
+  function Read(const Pos: Int32; const Count: Int32): String; overload;
+  function IsAtSymbol: Int32;
+  function IsAtKeyword: Int32;
+  function IsAtCommentLine: Int32;
+  function IsAtCommentStart: Int32;
+  function IsAtCommentEnd: Int32;
+  function IsAtString: Int32;
+  function IsAtEoF: Boolean;
+  function IsAtNewLine: Boolean;
+  function NextToken: TUParserToken; overload;
+  function NextToken(out TokenType: TUTokenType): String; overload;
+  function CheckToken: TUParserToken;
+  function OptionalToken(const Token: String): Boolean;
+end;
+
+type TUShortStringReader = object
+private
+  var _Ptr: Pointer;
+public
+  procedure Setup(const Str: ShortString);
+  function ReadShortString: String;
+  generic function Read<T>: T;
+end;
+
+generic TUMap<TKey, TValue> = record
+public
+  type TItem = record
+    Key: TKey;
+    Value: TValue;
+  end;
+private
+  var _Items: array of TItem;
+  function GetValue(const Index: Int32): TValue; inline;
+public
+  property Get[const Index: Int32]: TValue read GetValue; default;
+  function GetKey(const Index: Int32): TKey; inline;
+  function Add(const Key: TKey; const Value: TValue): Int32;
+  function HasKey(const Key: TKey): Boolean;
+  procedure RemoveByKey(const Key: TKey);
+  procedure RemoveByValue(const Value: TValue);
+  procedure RemoveByIndex(const Index: Int32);
+  function FindIndexByKey(const Key: TKey): Int32;
+  function FindIndexByValue(const Value: TValue): Int32;
+  function FindValueByKey(const Key: TKey): TValue;
+  function FindValueByIndex(const Index: Int32): TValue;
+  function Count: Int32; inline;
+  procedure Clear;
+end;
+
+generic TUArray<T> = array of T;
+
+type TUXML = class (TURefClass)
+public
+  type TAttribute = class
   public
-    type TPtr = T;
-    type TSelf = specialize TUSharedRef<T>;
+    var Name: String;
+    var Value: String;
+  end;
+  type TEnumerator = class
   private
-    var _Ptr: IInterface;
-    function GetPtr: TPtr; inline;
-    procedure SetPtr(const Value: TPtr); inline;
-    procedure Initialize;
+    var n: TUXML;
+    var i: Int32;
+    function GetCurrent: TUXML;
   public
-    property Ptr: TPtr read GetPtr write SetPtr;
-    function IsValid: Boolean; inline;
-    class operator Initialize(var v: TSelf);
-    class operator := (const Value: TPtr): TSelf; inline;
-    class operator := (const Value: Pointer): TSelf; inline;
-    class operator = (v1, v2: TSelf): Boolean; inline;
+    constructor Create(const Node: TUXML);
+    function MoveNext: Boolean;
+    property Current: TUXML read GetCurrent;
   end;
+protected
+  class var _SyntaxTags: TUParserSyntax;
+  class var _SyntaxContent: TUParserSyntax;
+private
+  var _Name: String;
+  var _Content: String;
+  var _Attributes: array of TAttribute;
+  var _Children: array of TUXML;
+  function ReadXML(const p: TUParser): Boolean;
+  function WriteXML(const Offset: String = ''): String;
+  function GetContent: String;
+  function GetAttribute(const Index: Integer): TAttribute; inline;
+  function GetAttributeValue(const AttName: String): String;
+  function GetAttributeCount: Integer; inline;
+  function GetChild(const Index: Integer): TUXML; inline;
+  function GetChildCount: Integer; inline;
+  function GetChildContent(const NodeName: String): String; inline;
+public
+  property Name: String read _Name;
+  property Content: String read GetContent write _Content;
+  property Attributes[const Index: Integer]: TAttribute read GetAttribute;
+  property AttributeValue[const AttName: String]: String read GetAttributeValue;
+  property AttributeCount: Integer read GetAttributeCount;
+  property Children[const Index: Integer]: TUXML read GetChild; default;
+  property ChildCount: Integer read GetChildCount;
+  property ChildContent[const NodeName: String]: String read GetChildContent;
+  function GetEnumerator: TEnumerator;
+  class constructor CreateClass;
+  constructor Create(const NodeName: String);
+  destructor Destroy; override;
+  function IsPlainText: Boolean;
+  procedure AddAttribute(const AttName, AttValue: String);
+  function FindAttribute(const AttName: String): TAttribute;
+  function FindChild(const NodeName: String): TUXML;
+  class function Load(const XML: String): TUXML;
+  class function Load(const Stream: TStream): TUXML;
+  class function LoadFromFile(const FileName: String): TUXML;
+  function Save: String;
+  procedure Save(const Stream: TStream);
+  procedure SaveToFile(const FileName: String);
+end;
+type TUXMLRef = specialize TUSharedRef<TUXML>;
 
-  type generic TUWeakRef<T> = record
-  public
-    type TPtr = T;
-    type TSelf = specialize TUWeakRef<T>;
-    type TShared = specialize TUSharedRef<T>;
+type TUJson = class (TURefClass)
+public
+  type TNodeType = (nt_invalid, nt_value, nt_object, nt_array);
+  type TNamedNode = record
+    Name: String;
+    Node: TUJson;
+  end;
+  type TContent = array of TNamedNode;
+  type TElements = array of TUJson;
+  type TEnumerator = class
   private
-    var _Weak: IInterface;
-    procedure Assign(const Value: TPtr);
-    function GetPtr: TPtr; inline;
+    var n: TUJson;
+    var i: Int32;
+    function GetCurrent: TUJson;
   public
-    property Ptr: TPtr read GetPtr;
-    function IsValid: Boolean; inline;
-    function AsShared: TShared; inline;
-    class operator := (const Value: TPtr): TSelf; inline;
-    class operator := (const Value: TShared): TSelf; inline;
+    constructor Create(const Node: TUJson);
+    function MoveNext: Boolean;
+    property Current: TUJson read GetCurrent;
   end;
-
-  type TURefClass = class;
-  type TUWeakCounter = class (TInterfacedObject)
-  private
-    var _Obj: TURefClass;
-  public
-    property Obj: TURefClass read _Obj write _Obj;
-    constructor Create(const AObj: TURefClass);
-    destructor Destroy; override;
-  end;
-
-  type TURefClass = class (TObject, IUnknown)
-  public
-    type TShared = specialize TUSharedRef<TURefClass>;
-  protected
-    var _RefCount: UInt32;
-    var _Weak: TUWeakCounter;
-    var _References: array of TShared;
-    function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
-    function _AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
-    function _Release : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
-  protected
-    property Weak: TUWeakCounter read _Weak write _Weak;
-  public
-    procedure AfterConstruction; override;
-    procedure BeforeDestruction; override;
-    class function NewInstance: TObject; override;
-    procedure AddReference(const Obj: TURefClass);
-    procedure RemoveReference(const Obj: TURefClass);
-    property RefCount: UInt32 read _RefCount;
-  end;
-
-  type TUStreamHelper = class (TURefClass)
-  private
-    var _Stream: TStream;
-    var _PosStack: array of Int64;
-    function GetSize: Int64; inline;
-    function GetPosition: Int64; inline;
-    procedure SetPosition(const Value: Int64); inline;
-    function GetRemaining: Int64; inline;
-  public
-    property Stream: TStream read _Stream;
-    property Size: Int64 read GetSize;
-    property Position: Int64 read GetPosition write SetPosition;
-    property Remaining: Int64 read GetRemaining;
-    procedure PosPush;
-    procedure PosPop;
-    procedure PosDiscard;
-    function IsEoF: Boolean; inline;
-    function ReadBuffer(const Buffer: Pointer; const Count: Int64): Int64; inline;
-    function ReadBool: Boolean; inline;
-    function ReadUInt8: UInt8; inline;
-    function ReadUInt16: UInt16; inline;
-    function ReadUInt32: UInt32; inline;
-    function ReadUInt64: UInt64; inline;
-    function ReadInt8: Int8; inline;
-    function ReadInt16: Int16; inline;
-    function ReadInt32: Int32; inline;
-    function ReadInt64: Int64; inline;
-    function ReadFloat: Single; inline;
-    function ReadDouble: Double; inline;
-    function ReadString: String; inline;
-    function ReadStringNT: String; inline;
-    generic function Read<T>: T; inline;
-    function WriteBuffer(const Buffer: Pointer; const Count: Int64): Int64; inline;
-    procedure WriteBool(const Value: Boolean); inline;
-    procedure WriteUInt8(const value: UInt8); inline;
-    procedure WriteUInt16(const value: UInt16); inline;
-    procedure WriteUInt32(const value: UInt32); inline;
-    procedure WriteUInt64(const value: UInt64); inline;
-    procedure WriteInt8(const value: Int8); inline;
-    procedure WriteInt16(const value: Int16); inline;
-    procedure WriteInt32(const value: Int32); inline;
-    procedure WriteInt64(const value: Int64); inline;
-    procedure WriteFloat(const value: Single); inline;
-    procedure WriteDouble(const value: Double); inline;
-    procedure WriteStringRaw(const Value: String); inline;
-    procedure WriteString(const Value: String); inline;
-    procedure WriteStringNT(const Value: String); inline;
-    generic procedure Write<T>(const Value: T); inline;
-    procedure Skip(const Count: Int64); inline;
-    procedure SkipString; inline;
-    function ToString: String; override;
-    constructor Create(const AStream: TStream);
-  end;
-  type TUStreamHelperShared = specialize TUSharedRef<TUStreamHelper>;
-
-  type TUConstMemoryStream = class (TStream)
-  private
-    var _Memory: Pointer;
-    var _Size: Int64;
-    var _Position: Int64;
-  protected
-    function GetSize: Int64; override;
-    function GetPosition: Int64; override;
-  public
-    function Read(var Buffer; Count: LongInt): LongInt; override;
-    function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; override;
-    constructor Create(const Buffer: Pointer; const BufferSize: UInt32);
-  end;
-
-  {$push}
-  {$m+}
-  type TUSerializable = class (TURefClass)
-  protected
-    var _TypeInfo: PTypeInfo;
-    var _TypeData: PTypeData;
-    var _PropList: array of PPropInfo;
-    function VerifyProp(const Index: Integer; const PropType: TTypeKinds = tkAny): Boolean;
-    function VerifyArrayProp(const Index, ArrayIndex: Integer; const PropType: TTypeKinds = tkAny): Boolean;
-    function GetArrayData(const Index: Integer): Pointer;
-    function GetOrdSize(const OrdType: TOrdType): UInt32; inline;
-    function GetArrayElementTypeInfo(const Index: Integer): PTypeInfo;
-    function GetPropCount: Integer; inline;
-    function GetPropInfo(const Index: Integer): PPropInfo; inline;
-    function GetPropArrayInfo(const Index: Integer): PTypeInfo; inline;
-    function GetPropEnum(const Index: Integer): Int32; inline;
-    procedure SetPropEnum(const Index: Integer; const Value: Int32); inline;
-    function GetPropBool(const Index: Integer): Boolean; inline;
-    procedure SetPropBool(const Index: Integer; const Value: Boolean); inline;
-    function GetPropInt8(const Index: Integer): Int8; inline;
-    procedure SetPropInt8(const Index: Integer; const Value: Int8); inline;
-    function GetPropInt16(const Index: Integer): Int16; inline;
-    procedure SetPropInt16(const Index: Integer; const Value: Int16); inline;
-    function GetPropInt32(const Index: Integer): Int32; inline;
-    procedure SetPropInt32(const Index: Integer; const Value: Int32); inline;
-    function GetPropInt64(const Index: Integer): Int64; inline;
-    procedure SetPropInt64(const Index: Integer; const Value: Int64); inline;
-    function GetPropUInt8(const Index: Integer): UInt8; inline;
-    procedure SetPropUInt8(const Index: Integer; const Value: UInt8); inline;
-    function GetPropUInt16(const Index: Integer): UInt16; inline;
-    procedure SetPropUInt16(const Index: Integer; const Value: UInt16); inline;
-    function GetPropUInt32(const Index: Integer): UInt32; inline;
-    procedure SetPropUInt32(const Index: Integer; const Value: UInt32); inline;
-    function GetPropUInt64(const Index: Integer): UInt64; inline;
-    procedure SetPropUInt64(const Index: Integer; const Value: UInt64); inline;
-    function GetPropFloat(const Index: Integer): Single; inline;
-    procedure SetPropFloat(const Index: Integer; const Value: Single); inline;
-    function GetPropDouble(const Index: Integer): Double; inline;
-    procedure SetPropDouble(const Index: Integer; const Value: Double); inline;
-    function GetPropString(const Index: Integer): String; inline;
-    procedure SetPropString(const Index: Integer; const Value: String); inline;
-    function GetPropClass(const Index: Integer): TObject; inline;
-    procedure SetPropClass(const Index: Integer; const Value: TObject); inline;
-    function GetPropArrayLength(const Index: Integer): Integer; inline;
-    procedure SetPropArrayLength(const Index: Integer; const Value: Integer);
-    function GetPropArrayEnum(const Index, ArrayIndex: Integer): Int32; inline;
-    procedure SetPropArrayEnum(const Index, ArrayIndex: Integer; const Value: Int32); inline;
-    function GetPropArrayBool(const Index, ArrayIndex: Integer): Boolean; inline;
-    procedure SetPropArrayBool(const Index, ArrayIndex: Integer; const Value: Boolean); inline;
-    function GetPropArrayInt8(const Index, ArrayIndex: Integer): Int8; inline;
-    procedure SetPropArrayInt8(const Index, ArrayIndex: Integer; const Value: Int8); inline;
-    function GetPropArrayInt16(const Index, ArrayIndex: Integer): Int16; inline;
-    procedure SetPropArrayInt16(const Index, ArrayIndex: Integer; const Value: Int16); inline;
-    function GetPropArrayInt32(const Index, ArrayIndex: Integer): Int32; inline;
-    procedure SetPropArrayInt32(const Index, ArrayIndex: Integer; const Value: Int32); inline;
-    function GetPropArrayInt64(const Index, ArrayIndex: Integer): Int64; inline;
-    procedure SetPropArrayInt64(const Index, ArrayIndex: Integer; const Value: Int64); inline;
-    function GetPropArrayUInt8(const Index, ArrayIndex: Integer): UInt8; inline;
-    procedure SetPropArrayUInt8(const Index, ArrayIndex: Integer; const Value: UInt8); inline;
-    function GetPropArrayUInt16(const Index, ArrayIndex: Integer): UInt16; inline;
-    procedure SetPropArrayUInt16(const Index, ArrayIndex: Integer; const Value: UInt16); inline;
-    function GetPropArrayUInt32(const Index, ArrayIndex: Integer): UInt32; inline;
-    procedure SetPropArrayUInt32(const Index, ArrayIndex: Integer; const Value: UInt32); inline;
-    function GetPropArrayUInt64(const Index, ArrayIndex: Integer): UInt64; inline;
-    procedure SetPropArrayUInt64(const Index, ArrayIndex: Integer; const Value: UInt64); inline;
-    function GetPropArrayFloat(const Index, ArrayIndex: Integer): Single; inline;
-    procedure SetPropArrayFloat(const Index, ArrayIndex: Integer; const Value: Single); inline;
-    function GetPropArrayDouble(const Index, ArrayIndex: Integer): Double; inline;
-    procedure SetPropArrayDouble(const Index, ArrayIndex: Integer; const Value: Double); inline;
-    function GetPropArrayString(const Index, ArrayIndex: Integer): String; inline;
-    procedure SetPropArrayString(const Index, ArrayIndex: Integer; const Value: String); inline;
-    function GetPropArrayClass(const Index, ArrayIndex: Integer): TObject; inline;
-    procedure SetPropArrayClass(const Index, ArrayIndex: Integer; const Value: TObject); inline;
-    generic function GetDynArrayLength<T>(const Index: Integer): Integer;
-    generic procedure SetDynArrayLength<T>(const Index: Integer; const Value: Integer);
-    generic function GetDynArrayElement<T>(const Index, ArrayIndex: Integer): T;
-    generic procedure SetDynArrayElement<T>(const Index, ArrayIndex: Integer; const Value: T);
-  public
-    property PropCount: Integer read GetPropCount;
-    property PropInfo[const Index: Integer]: PPropInfo read GetPropInfo;
-    property PropArrayInfo[const Index: Integer]: PTypeInfo read GetPropArrayInfo;
-    property PropEnum[const Index: Integer]: Int32 read GetPropEnum write SetPropEnum;
-    property PropBool[const Index: Integer]: Boolean read GetPropBool write SetPropBool;
-    property PropInt8[const Index: Integer]: Int8 read GetPropInt8 write SetPropInt8;
-    property PropInt16[const Index: Integer]: Int16 read GetPropInt16 write SetPropInt16;
-    property PropInt32[const Index: Integer]: Int32 read GetPropInt32 write SetPropInt32;
-    property PropInt64[const Index: Integer]: Int64 read GetPropInt64 write SetPropInt64;
-    property PropUInt8[const Index: Integer]: UInt8 read GetPropUInt8 write SetPropUInt8;
-    property PropUInt16[const Index: Integer]: UInt16 read GetPropUInt16 write SetPropUInt16;
-    property PropUInt32[const Index: Integer]: UInt32 read GetPropUInt32 write SetPropUInt32;
-    property PropUInt64[const Index: Integer]: UInt64 read GetPropUInt64 write SetPropUInt64;
-    property PropFloat[const Index: Integer]: Single read GetPropFloat write SetPropFloat;
-    property PropDouble[const Index: Integer]: Double read GetPropDouble write SetPropDouble;
-    property PropString[const Index: Integer]: String read GetPropString write SetPropString;
-    property PropClass[const Index: Integer]: TObject read GetPropClass write SetPropClass;
-    property PropArrayEnum[const Index, ArrayIndex: Integer]: Int32 read GetPropArrayEnum write SetPropArrayEnum;
-    property PropArrayBool[const Index, ArrayIndex: Integer]: Boolean read GetPropArrayBool write SetPropArrayBool;
-    property PropArrayInt8[const Index, ArrayIndex: Integer]: Int8 read GetPropArrayInt8 write SetPropArrayInt8;
-    property PropArrayInt16[const Index, ArrayIndex: Integer]: Int16 read GetPropArrayInt16 write SetPropArrayInt16;
-    property PropArrayInt32[const Index, ArrayIndex: Integer]: Int32 read GetPropArrayInt32 write SetPropArrayInt32;
-    property PropArrayInt64[const Index, ArrayIndex: Integer]: Int64 read GetPropArrayInt64 write SetPropArrayInt64;
-    property PropArrayUInt8[const Index, ArrayIndex: Integer]: UInt8 read GetPropArrayUInt8 write SetPropArrayUInt8;
-    property PropArrayUInt16[const Index, ArrayIndex: Integer]: UInt16 read GetPropArrayUInt16 write SetPropArrayUInt16;
-    property PropArrayUInt32[const Index, ArrayIndex: Integer]: UInt32 read GetPropArrayUInt32 write SetPropArrayUInt32;
-    property PropArrayUInt64[const Index, ArrayIndex: Integer]: UInt64 read GetPropArrayUInt64 write SetPropArrayUInt64;
-    property PropArrayFloat[const Index, ArrayIndex: Integer]: Single read GetPropArrayFloat write SetPropArrayFloat;
-    property PropArrayDouble[const Index, ArrayIndex: Integer]: Double read GetPropArrayDouble write SetPropArrayDouble;
-    property PropArrayString[const Index, ArrayIndex: Integer]: String read GetPropArrayString write SetPropArrayString;
-    property PropArrayClass[const Index, ArrayIndex: Integer]: TObject read GetPropArrayClass write SetPropArrayClass;
-    property PropArrayLength[const Index: Integer]: Integer read GetPropArrayLength write SetPropArrayLength;
-    function FindProp(const Name: String; const PropType: TTypeKinds = tkAny): Integer;
-    procedure AfterConstruction; override;
-    procedure BeforeDestruction; override;
-    procedure SerializeTo(const Stream: TStream); virtual; overload;
-    procedure SerializeTo(const FileName: String); virtual; overload;
-    procedure SerializeFrom(const Stream: TStream); virtual; overload;
-    procedure SerializeFrom(const FileName: String); virtual; overload;
-    procedure Assign(const Serializable: TUSerializable); virtual;
-    procedure Dump(const Offset: String = '');
-  end;
-  {$pop}
-
-  type TUTokenType = (tt_eof, tt_error, tt_symbol, tt_word, tt_keyword, tt_string, tt_number);
-  type TUTokenTypes = set of TUTokenType;
-  type TUParserToken = record
-    Value: String;
-    TokenType: TUTokenType;
-    class operator = (a, b: TUParserToken): Boolean; inline;
-    class operator in (a: TUParserToken; b: array of TUParserToken): Boolean;
-    class operator = (a: TUParserToken; b: String): Boolean; inline;
-    class operator = (a: TUParserToken; b: array of String): Boolean;
-    class operator = (a: TUParserToken; b: TUTokenType): Boolean; inline;
-    class operator in (a: TUParserToken; b: TUTokenTypes): Boolean; inline;
-    class operator := (a: TUParserToken): String; inline;
-  end;
-  function UParserToken(const Value: String; const TokenType: TUTokenType): TUParserToken; inline;
-
-  type TUParserSyntax = object
-  public
-    Comment: array of array[0..1] of String;
-    CommentLine: array of String;
-    Strings: array of String;
-    Symbols: array of String;
-    Keywords: array of String;
-    CaseSensitive: Boolean;
-    procedure AddComment(const ACommentStart, ACommentEnd: String);
-    procedure AddCommentLine(const ACommentLine: String);
-    procedure AddString(const AStringStartEnd: String);
-    procedure AddSymbol(const ASymbol: String);
-    procedure AddSymbols(const ASymbols: array of String);
-    procedure AddKeyword(const AKeyword: String);
-    procedure AddKeywords(const AKeywords: array of String);
-    procedure Reset;
-  end;
-  type PUParserSyntax = ^TUParserSyntax;
-
-  type TUParser = class (TURefClass)
-  strict private
-    type TState = record
-      Line, Position: Int32;
-    end;
-    var _Position: Int32;
-    var _Text: array of AnsiChar;
-    var _Line: Int32;
-    var _DefaultSyntax: TUParserSyntax;
-    var _Syntax: PUParserSyntax;
-    var _States: array of TState;
-    var _SyntaxStack: array of PUParserSyntax;
-    function GetComment(const Index: Int32): String; inline;
-    function GetCommentCount: Int32; inline;
-    function GetCommentLine(const index: Int32): String; inline;
-    function GetCommentLineCount: Int32; inline;
-    function GetKeyword(const Index: Int32): String; inline;
-    function GetKeywordCount: Int32; inline;
-    function GetString(const Index: Int32): String; inline;
-    function GetStringCount: Int32; inline;
-    function GetSymbol(const Index: Int32): String; inline;
-    function GetSymbolCount: Int32; inline;
-    function GetText: String; inline;
-    function GetTextLength: Int32; inline;
-    procedure SetSyntax(const Value: PUParserSyntax); inline;
-  public
-    property Text: String read GetText;
-    property TextLength: Int32 read GetTextLength;
-    property Position: Int32 read _Position write _Position;
-    property Line: Int32 read _Line;
-    property CommentCount: Int32 read GetCommentCount;
-    property Comments[const Index: Int32]: String read GetComment;
-    property CommnetLineCount: Int32 read GetCommentLineCount;
-    property CommentLines[const Index: Int32]: String read GetCommentLine;
-    property StringCount: Int32 read GetStringCount;
-    property Strings[const Index: Int32]: String read GetString;
-    property SymbolCount: Int32 read GetSymbolCount;
-    property Symbols[const Index: Int32]: String read GetSymbol;
-    property KeywordCount: Int32 read GetKeywordCount;
-    property Keywords[const Index: Int32]: String read GetKeyword;
-    property Syntax: PUParserSyntax read _Syntax write SetSyntax;
-    constructor Create;
-    constructor Create(const ParseText: String; const CaseSensitive: Boolean = False); virtual;
-    destructor Destroy; override;
-    procedure Parse(const ParseText: String);
-    procedure AddComment(const CommentStart, CommentEnd: String);
-    procedure AddCommentLine(const CommentLine: String);
-    procedure AddString(const StringStartEnd: String);
-    procedure AddSymbol(const Symbol: String);
-    procedure AddKeyword(const Keyword: String);
-    procedure SkipSpaces;
-    procedure StatePush;
-    procedure StatePop;
-    procedure StateDiscard;
-    procedure StateLoad;
-    procedure SyntaxPush;
-    procedure SyntaxPop;
-    function Read(const Count: Int32): String; overload;
-    function Read(const Pos: Int32; const Count: Int32): String; overload;
-    function IsAtSymbol: Int32;
-    function IsAtKeyword: Int32;
-    function IsAtCommentLine: Int32;
-    function IsAtCommentStart: Int32;
-    function IsAtCommentEnd: Int32;
-    function IsAtString: Int32;
-    function IsAtEoF: Boolean;
-    function IsAtNewLine: Boolean;
-    function NextToken: TUParserToken; overload;
-    function NextToken(out TokenType: TUTokenType): String; overload;
-    function CheckToken: TUParserToken;
-    function OptionalToken(const Token: String): Boolean;
-  end;
-
-  type TUShortStringReader = object
-  private
-    var _Ptr: Pointer;
-  public
-    procedure Setup(const Str: ShortString);
-    function ReadShortString: String;
-    generic function Read<T>: T;
-  end;
-
-  generic TUMap<TKey, TValue> = record
-  public
-    type TItem = record
-      Key: TKey;
-      Value: TValue;
-    end;
-  private
-    var _Items: array of TItem;
-    function GetValue(const Index: Int32): TValue; inline;
-  public
-    property Get[const Index: Int32]: TValue read GetValue; default;
-    function GetKey(const Index: Int32): TKey; inline;
-    function Add(const Key: TKey; const Value: TValue): Int32;
-    function HasKey(const Key: TKey): Boolean;
-    procedure RemoveByKey(const Key: TKey);
-    procedure RemoveByValue(const Value: TValue);
-    procedure RemoveByIndex(const Index: Int32);
-    function FindIndexByKey(const Key: TKey): Int32;
-    function FindIndexByValue(const Value: TValue): Int32;
-    function FindValueByKey(const Key: TKey): TValue;
-    function FindValueByIndex(const Index: Int32): TValue;
-    function Count: Int32; inline;
-    procedure Clear;
-  end;
-
-  generic TUArray<T> = array of T;
-
-  type TUXML = class (TURefClass)
-  public
-    type TAttribute = class
-    public
-      var Name: String;
-      var Value: String;
-    end;
-    type TEnumerator = class
-    private
-      var n: TUXML;
-      var i: Int32;
-      function GetCurrent: TUXML;
-    public
-      constructor Create(const Node: TUXML);
-      function MoveNext: Boolean;
-      property Current: TUXML read GetCurrent;
-    end;
-  protected
-    class var _SyntaxTags: TUParserSyntax;
-    class var _SyntaxContent: TUParserSyntax;
-  private
-    var _Name: String;
-    var _Content: String;
-    var _Attributes: array of TAttribute;
-    var _Children: array of TUXML;
-    function ReadXML(const p: TUParser): Boolean;
-    function WriteXML(const Offset: String = ''): String;
-    function GetContent: String;
-    function GetAttribute(const Index: Integer): TAttribute; inline;
-    function GetAttributeValue(const AttName: String): String;
-    function GetAttributeCount: Integer; inline;
-    function GetChild(const Index: Integer): TUXML; inline;
-    function GetChildCount: Integer; inline;
-    function GetChildContent(const NodeName: String): String; inline;
-  public
-    property Name: String read _Name;
-    property Content: String read GetContent write _Content;
-    property Attributes[const Index: Integer]: TAttribute read GetAttribute;
-    property AttributeValue[const AttName: String]: String read GetAttributeValue;
-    property AttributeCount: Integer read GetAttributeCount;
-    property Children[const Index: Integer]: TUXML read GetChild; default;
-    property ChildCount: Integer read GetChildCount;
-    property ChildContent[const NodeName: String]: String read GetChildContent;
-    function GetEnumerator: TEnumerator;
-    class constructor CreateClass;
-    constructor Create(const NodeName: String);
-    destructor Destroy; override;
-    function IsPlainText: Boolean;
-    procedure AddAttribute(const AttName, AttValue: String);
-    function FindAttribute(const AttName: String): TAttribute;
-    function FindChild(const NodeName: String): TUXML;
-    class function Load(const XML: String): TUXML;
-    class function Load(const Stream: TStream): TUXML;
-    class function LoadFromFile(const FileName: String): TUXML;
-    function Save: String;
-    procedure Save(const Stream: TStream);
-    procedure SaveToFile(const FileName: String);
-  end;
-  type TUXMLRef = specialize TUSharedRef<TUXML>;
-
-  type TUJson = class (TURefClass)
-  public
-    type TNodeType = (nt_invalid, nt_value, nt_object, nt_array);
-    type TNamedNode = record
-      Name: String;
-      Node: TUJson;
-    end;
-    type TContent = array of TNamedNode;
-    type TElements = array of TUJson;
-    type TEnumerator = class
-    private
-      var n: TUJson;
-      var i: Int32;
-      function GetCurrent: TUJson;
-    public
-      constructor Create(const Node: TUJson);
-      function MoveNext: Boolean;
-      property Current: TUJson read GetCurrent;
-    end;
-  protected
-    class var _Syntax: TUParserSyntax;
-  private
-    var _NodeType: TNodeType;
-    var _Value: String;
-    var _Content: TContent;
-    var _Elements: TElements;
-    function ReadJson(const p: TUParser): Boolean;
-    procedure SetNodeType(const Value: TNodeType);
-    function GetValue: String;
-    function GetContent(const Key: String): TUJson; inline;
-    function GetName(const Index: Int32): String; inline;
-    function GetElement(const Index: Int32): TUJson; inline;
-    function GetCount: Int32; inline;
-    function GetIsSingleValue: Boolean; inline;
-    function GetIsObject: Boolean; inline;
-    function GetIsArray: Boolean; inline;
-    function GetIsNumber: Boolean; inline;
-    function GetIsNull: Boolean; inline;
-  public
-    property NodeType: TNodeType read _NodeType write SetNodeType;
-    property Value: String read GetValue;
-    property Content[const Key: String]: TUJson read GetContent; default;
-    property Name[const Index: Int32]: String read GetName;
-    property Element[const Index: Int32]: TUJson read GetElement;
-    property Count: Int32 read GetCount;
-    property IsSingleValue: Boolean read GetIsSingleValue;
-    property IsObject: Boolean read GetIsObject;
-    property IsArray: Boolean read GetIsArray;
-    property IsNumber: Boolean read GetIsNumber;
-    property IsNull: Boolean read GetIsNull;
-    function GetEnumerator: TEnumerator;
-    function FormatJson(const Offset: String = ''): String;
-    class constructor CreateClass;
-    constructor Create;
-    destructor Destroy; override;
-    class function Load(const Json: String): TUJson;
-    class function Load(const Stream: TStream): TUJson;
-    class function LoadFromFile(const FileName: String): TUJson;
-    function Save: String;
-    procedure Save(const Stream: TStream);
-    procedure SaveToFile(const FileName: String);
-  end;
-  TUJsonRef = specialize TUSharedRef<TUJson>;
+protected
+  class var _Syntax: TUParserSyntax;
+private
+  var _NodeType: TNodeType;
+  var _Value: String;
+  var _Content: TContent;
+  var _Elements: TElements;
+  function ReadJson(const p: TUParser): Boolean;
+  procedure SetNodeType(const Value: TNodeType);
+  function GetValue: String;
+  function GetContent(const Key: String): TUJson; inline;
+  function GetName(const Index: Int32): String; inline;
+  function GetElement(const Index: Int32): TUJson; inline;
+  function GetCount: Int32; inline;
+  function GetIsSingleValue: Boolean; inline;
+  function GetIsObject: Boolean; inline;
+  function GetIsArray: Boolean; inline;
+  function GetIsNumber: Boolean; inline;
+  function GetIsNull: Boolean; inline;
+public
+  property NodeType: TNodeType read _NodeType write SetNodeType;
+  property Value: String read GetValue;
+  property Content[const Key: String]: TUJson read GetContent; default;
+  property Name[const Index: Int32]: String read GetName;
+  property Element[const Index: Int32]: TUJson read GetElement;
+  property Count: Int32 read GetCount;
+  property IsSingleValue: Boolean read GetIsSingleValue;
+  property IsObject: Boolean read GetIsObject;
+  property IsArray: Boolean read GetIsArray;
+  property IsNumber: Boolean read GetIsNumber;
+  property IsNull: Boolean read GetIsNull;
+  function GetEnumerator: TEnumerator;
+  function FormatJson(const Offset: String = ''): String;
+  class constructor CreateClass;
+  constructor Create;
+  destructor Destroy; override;
+  class function Load(const Json: String): TUJson;
+  class function Load(const Stream: TStream): TUJson;
+  class function LoadFromFile(const FileName: String): TUJson;
+  function Save: String;
+  procedure Save(const Stream: TStream);
+  procedure SaveToFile(const FileName: String);
+end;
+type TUJsonRef = specialize TUSharedRef<TUJson>;
 
 procedure UClear(out x; const Size: UInt32);
 procedure UMove(out Dest; const Src; const Size: UInt32);
@@ -975,6 +1043,10 @@ function UCatmullRom(const v0, v1, v2, v3: TUDouble; const s: TUFloat): TUDouble
 function UCatmullRom(const v0, v1, v2, v3: TUVec2; const s: TUFloat): TUVec2; inline; overload;
 function UCatmullRom(const v0, v1, v2, v3: TUVec3; const s: TUFloat): TUVec3; inline; overload;
 function UCatmullRom(const v0, v1, v2, v3: TUVec4; const s: TUFloat): TUVec4; inline; overload;
+generic function UEndianSwap<T>(const v: T): T; inline; overload;
+function UEndianSwap(const v: UInt16): UInt16; inline; overload;
+function UEndianSwap(const v: UInt32): UInt32; inline; overload;
+function UEndianSwap(const v: UInt64): UInt64; inline; overload;
 generic procedure USwap<T>(var a: T; var b: T); inline; overload;
 procedure USwap(var a: Int8; var b: Int8); inline; overload;
 procedure USwap(var a: Int16; var b: Int16); inline; overload;
@@ -1060,17 +1132,182 @@ operator * (const m: TUMat; const f: TUFloat): TUMat;
 operator mod (const a, b: TUDouble): TUDouble;
 operator mod (const a, b: TUFloat): TUFloat;
 
-const
-  tt_any = [tt_error, tt_eof, tt_symbol, tt_word, tt_keyword, tt_string, tt_number];
-  UPi = 3.14159265359;
-  UTwoPi = UPi * 2;
-  UHalfPi = UPi * 0.5;
-  URcp255 = 1 / 255;
-  UEps = 1E-5;
-  UDegToRad = UPi / 180;
-  URadToDeg = 180 / UPi;
+const tt_any = [tt_error, tt_eof, tt_symbol, tt_word, tt_keyword, tt_string, tt_number];
+const UPi = 3.14159265359;
+const UTwoPi = UPi * 2;
+const UHalfPi = UPi * 0.5;
+const URcp255 = 1 / 255;
+const UEps = 1E-5;
+const UDegToRad = UPi / 180;
+const URadToDeg = 180 / UPi;
 
 implementation
+
+// TUFloatImpl begin
+function TUFloatImpl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TUFloatImpl end
+
+// TUFloatImpl begin
+function TUDpubleImpl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TUFloatImpl end
+
+// TUInt8Impl begin
+function TUInt8Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TUInt8Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TUInt8Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TUInt8Impl end
+
+// TUInt16Impl begin
+function TUInt16Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TUInt16Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TUInt16Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TUInt16Impl end
+
+// TUInt32Impl begin
+function TUInt32Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TUInt32Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TUInt32Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TUInt32Impl end
+
+// TUInt64Impl begin
+function TUInt64Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TUInt64Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TUInt64Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TUInt64Impl end
+
+// TInt8Impl begin
+function TInt8Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TInt8Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TInt8Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TInt8Impl end
+
+// TInt16Impl begin
+function TInt16Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TInt16Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TInt16Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TInt16Impl end
+
+// TInt32Impl begin
+function TInt32Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TInt32Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TInt32Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TInt32Impl end
+
+// TInt64Impl begin
+function TInt64Impl.GetBit(const Index: TUInt8): TUInt8;
+begin
+  Result := (Self shr Index) and $ff;
+end;
+
+procedure TInt64Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
+  var b: TUInt8;
+begin
+  b := Value shl Index;
+  Self := (Self and (not b)) or b;
+end;
+
+function TInt64Impl.ToString: String;
+begin
+  System.Str(Self, Result);
+end;
+// TInt64Impl end
 
 // TUColorImpl begin
 function TUColorImpl.GetChannel(const Index: UInt8): UInt8;
@@ -1125,7 +1362,7 @@ begin
   Channel[3] := Value;
 end;
 
-class function TUColorImpl.Make(const Ar, Ag, Ab: UInt8; const Aa: UInt8): TUColor;
+class function TUColorImpl.Make(const Ar, Ag, Ab, Aa: UInt8): TUColor;
 begin
   Result := Ar or (Ag shl 8) or (Ab shl 16) or (Aa shl 24);
 end;
@@ -1159,17 +1396,6 @@ procedure TUColorImpl.SetValue(const Ar, Ag, Ab, Aa: UInt8);
 begin
   Self := Ab or (Ag shl 8) or (Ar shl 16) or (Aa shl 24);
 end;
-
-function TUColorImpl.AsVec4: TUVec4;
-begin
-  Result := TUVec4.Make(r * URcp255, g * URcp255, b * URcp255, a * URcp255);
-end;
-
-function TUColorImpl.AsVec3: TUVec3;
-begin
-  Result := TUVec3.Make(r * URcp255, g * URcp255, b * URcp255);
-end;
-
 // TUColorImpl end
 
 // TUMatImpl begin
@@ -1413,16 +1639,6 @@ begin
   );
 end;
 
-class function TUMatImpl.Transpose(const m: TUMat): TUMat;
-begin
-  Result := TUMat.Make(
-    m[0, 0], m[0, 1], m[0, 2], m[0, 3],
-    m[1, 0], m[1, 1], m[1, 2], m[1, 3],
-    m[2, 0], m[2, 1], m[2, 2], m[2, 3],
-    m[3, 0], m[3, 1], m[3, 2], m[3, 3]
-  );
-end;
-
 class function TUMatImpl.Inverse(const m: TUMat): TUMat;
   var Det: TUFloat;
 begin
@@ -1453,16 +1669,6 @@ begin
   Result[3, 3] := (m[0,0]*m[1,1]*m[2,2] + m[0,1]*m[1,2]*m[2,0] + m[0,2]*m[1,0]*m[2,1] - m[0,2]*m[1,1]*m[2,0] - m[0,1]*m[1,0]*m[2,2] - m[0,0]*m[1,2]*m[2,1]) * det;
 end;
 
-class function TUMatImpl.Transpose(const m: TUMat): TUMat;
-  var x, y: Int8;
-begin
-  for x := 0 to 3 do
-  for y := 0 to 3 do
-  begin
-    Result[x, y] := m[y, x];
-  end;
-end;
-
 procedure TUMatImpl.SetValue(
   const e00, e10, e20, e30: TUFloat;
   const e01, e11, e21, e31: TUFloat;
@@ -1476,19 +1682,9 @@ begin
   Self[0, 3] := e03; Self[1, 3] := e13; Self[2, 3] := e23; Self[3, 3] := e33;
 end;
 
-function TUMatImpl.Transpose: TUMat;
-begin
-  Result := Transpose(Self);
-end;
-
 function TUMatImpl.Inverse: TUMat;
 begin
   Result := Inverse(Self);
-end;
-
-function TUMatImpl.Transpose: TUMat;
-begin
-  Result := Transpose(Self);
 end;
 // TUMatImpl end
 
@@ -5911,6 +6107,31 @@ begin
   Result := specialize UCatmullRom<TUVec4>(v0, v1, v2, v3, s);
 end;
 
+generic function UEndianSwap<T>(const v: T): T;
+  type TByteArr = array[0..SizeOf(T) - 1] of UInt8;
+  var Src: TByteArr absolute v;
+  var Dst: TByteArr absolute Result;
+  var i: Int32;
+begin
+  for i := 0 to High(TByteArr) do
+  Dst[i] := Src[High(TByteArr) - i];
+end;
+
+function UEndianSwap(const v: UInt16): UInt16;
+begin
+  Result := specialize UEndianSwap<UInt16>(v);
+end;
+
+function UEndianSwap(const v: UInt32): UInt32;
+begin
+  Result := specialize UEndianSwap<UInt32>(v);
+end;
+
+function UEndianSwap(const v: UInt64): UInt64;
+begin
+  Result := specialize UEndianSwap<UInt64>(v);
+end;
+
 generic procedure USwap<T>(var a: T; var b: T);
   var Temp: T;
 begin
@@ -6637,7 +6858,7 @@ begin
   dc := DelCount;
   if DelStart + dc > Length(Arr) then dc := Length(Arr) - DelStart;
   if (dc < 1) or (DelStart < 0) then Exit;
-  for i := DelStart to DelStart + dc - 1 do
+  for i := DelStart to High(Arr) - dc do
   begin
     Arr[i] := Arr[i + 1];
   end;
