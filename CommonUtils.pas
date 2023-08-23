@@ -90,13 +90,15 @@ type
     property g: UInt8 read GetG write SetG;
     property b: UInt8 read GetB write SetB;
     property a: UInt8 read GetA write SetA;
-    class function Make(const Ar, Ag, Ab, Aa: UInt8): TUColor; static;
+    class function Make(const Ar, Ag, Ab: UInt8; const Aa: UInt8 = $ff): TUColor; static;
     class function Black: TUColor; static;
     class function White: TUColor; static;
     class function Red: TUColor; static;
     class function Blue: TUColor; static;
     class function Green: TUColor; static;
     procedure SetValue(const Ar, Ag, Ab, Aa: UInt8);
+    function AsVec4: TUVec4;
+    function AsVec3: TUVec3;
   end;
 
   type TUMatImpl = type helper for TUMat
@@ -128,6 +130,7 @@ type
     class function Proj(const FoV, Aspect, ZNear, ZFar: TUFloat): TUMat; static; inline;
     class function Orth(const Width, Height, ZNear, ZFar: TUFloat): TUMat; static; inline;
     class function Skew(const Amount, Axis: TUVec3; const Angle: TUFloat): TUMat; static; inline;
+    class function Transpose(const m: TUMat): TUMat; static; overload;
     class function Inverse(const m: TUMat): TUMat; static; overload;
     procedure SetValue(
       const e00, e10, e20, e30: TUFloat;
@@ -135,6 +138,7 @@ type
       const e02, e12, e22, e32: TUFloat;
       const e03, e13, e23, e33: TUFloat
     ); inline;
+    function Transpose: TUMat; inline;
     function Inverse: TUMat; overload; inline;
   end;
 
@@ -1119,7 +1123,7 @@ begin
   Channel[3] := Value;
 end;
 
-class function TUColorImpl.Make(const Ar, Ag, Ab, Aa: UInt8): TUColor;
+class function TUColorImpl.Make(const Ar, Ag, Ab: UInt8; const Aa: UInt8): TUColor;
 begin
   Result := Ar or (Ag shl 8) or (Ab shl 16) or (Aa shl 24);
 end;
@@ -1153,6 +1157,17 @@ procedure TUColorImpl.SetValue(const Ar, Ag, Ab, Aa: UInt8);
 begin
   Self := Ab or (Ag shl 8) or (Ar shl 16) or (Aa shl 24);
 end;
+
+function TUColorImpl.AsVec4: TUVec4;
+begin
+  Result := TUVec4.Make(r * URcp255, g * URcp255, b * URcp255, a * URcp255);
+end;
+
+function TUColorImpl.AsVec3: TUVec3;
+begin
+  Result := TUVec3.Make(r * URcp255, g * URcp255, b * URcp255);
+end;
+
 // TUColorImpl end
 
 // TUMatImpl begin
@@ -1396,6 +1411,16 @@ begin
   );
 end;
 
+class function TUMatImpl.Transpose(const m: TUMat): TUMat;
+begin
+  Result := TUMat.Make(
+    m[0, 0], m[0, 1], m[0, 2], m[0, 3],
+    m[1, 0], m[1, 1], m[1, 2], m[1, 3],
+    m[2, 0], m[2, 1], m[2, 2], m[2, 3],
+    m[3, 0], m[3, 1], m[3, 2], m[3, 3]
+  );
+end;
+
 class function TUMatImpl.Inverse(const m: TUMat): TUMat;
   var Det: TUFloat;
 begin
@@ -1437,6 +1462,11 @@ begin
   Self[0, 1] := e01; Self[1, 1] := e11; Self[2, 1] := e21; Self[3, 1] := e31;
   Self[0, 2] := e02; Self[1, 2] := e12; Self[2, 2] := e22; Self[3, 2] := e32;
   Self[0, 3] := e03; Self[1, 3] := e13; Self[2, 3] := e23; Self[3, 3] := e33;
+end;
+
+function TUMatImpl.Transpose: TUMat;
+begin
+  Result := Transpose(Self);
 end;
 
 function TUMatImpl.Inverse: TUMat;

@@ -5873,7 +5873,7 @@ begin
   for i := 0 to High(_Joints) do
   begin
     _Joints[i].Name := ColladaSkin.Joints.Joints[i].JointName;
-    _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose;
+    _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose.Transpose;
   end;
   Weights := nil;
   SetLength(Weights, ColladaSkin.VertexWeights.VCount);
@@ -5950,6 +5950,7 @@ begin
   begin
     _Keys[i].Time := ColladaChannel.Sampler.Keys[i]^.Time;
     _Keys[i].Value := PUMat(ColladaChannel.Sampler.Keys[i]^.Value)^;
+    _Keys[i].Value := _Keys[i].Value;
     case (ColladaChannel.Sampler.Keys[i]^.Interpolation) of
       ai_step: _Keys[i].Interpolation := ki_step;
       ai_linear, ai_bezier: _Keys[i].Interpolation := ki_linear;
@@ -6035,6 +6036,7 @@ begin
   Parent := AParent;
   if Assigned(ColladaNode) then
   begin
+    _Transform := ColladaNode.Matrix.Transpose;// * _Parent.Transform;
     ColladaNode.UserData := Self;
     if Length(ColladaNode.Name) > 0 then
     begin
@@ -6186,7 +6188,6 @@ procedure TUSceneDataDAE.Read(const XML: TUXML);
   var IntfMesh: TMeshInterfaceCollada;
   var IntfSkin: TSkinInterfaceCollada;
   var IntfAnim: TAnimationInterfaceCollada;
-  var i: Int32;
 begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
