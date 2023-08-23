@@ -6042,7 +6042,6 @@ begin
   begin
     _Transform := ColladaNode.Matrix.Transpose;// * _Parent.Transform;
     ColladaNode.UserData := Self;
-    _Transform := ColladaNode.Matrix;
     if Length(ColladaNode.Name) > 0 then
     begin
       _Name := ColladaNode.Name;
