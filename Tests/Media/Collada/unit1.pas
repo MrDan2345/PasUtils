@@ -118,8 +118,8 @@ procedure TForm1.Render;
   procedure SetupTransforms(const Xf: TUMat);
     var W, V, P, WV: TUMat;
   begin
-    W := Xf * TUMat.RotationY(((GetTickCount mod 6000) / 6000) * 2 * Pi);
-    V := TUMat.View(TUVec3.Make(0, 8, -8), TUVec3.Make(0, 0, 0), TUVec3.Make(0, 1, 0));
+    W := Xf * TUMat.RotationZ(((GetTickCount mod 6000) / 6000) * 2 * Pi);
+    V := TUMat.View(TUVec3.Make(0, 8, 0), TUVec3.Make(0, 0, 0), TUVec3.Make(0, 0, 1));
     P := TUMat.Proj(Pi / 4, 1, 1, 100);
     WV := W * V;
     glMatrixMode(GL_MODELVIEW);
