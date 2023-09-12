@@ -11,6 +11,13 @@ unit CommonUtils;
 {$warn 3124 off}
 {$WARN 5026 off}
 {$WARN 6018 off}
+
+{$ifndef WINDOWS}
+  {$define call := cdecl}
+{$else}
+  {$define call := stdcall}
+{$endif}
+
 interface
 
 uses
@@ -501,9 +508,9 @@ protected
   var _RefCount: UInt32;
   var _Weak: TUWeakCounter;
   var _References: array of TShared;
-  function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
-  function _AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
-  function _Release : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+  function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint; call;
+  function _AddRef : longint; call;
+  function _Release : longint; call;
 protected
   property Weak: TUWeakCounter read _Weak write _Weak;
 public
@@ -2650,17 +2657,17 @@ end;
 // TUWeakCounter end
 
 // TURefClass begin
-function TURefClass.QueryInterface(constref IID: tguid; out Obj): Longint; stdcall;
+function TURefClass.QueryInterface(constref IID: tguid; out Obj): Longint; call;
 begin
   if GetInterface(IID, Obj) then Result := S_OK else Result := Longint(E_NOINTERFACE);
 end;
 
-function TURefClass._AddRef: Longint; stdcall;
+function TURefClass._AddRef: Longint; call;
 begin
   Result := InterlockedIncrement(_RefCount);
 end;
 
-function TURefClass._Release: Longint; stdcall;
+function TURefClass._Release: Longint; call;
 begin
    Result := InterlockedDecrement(_RefCount);
    if Result = 0 then Self.Destroy;
