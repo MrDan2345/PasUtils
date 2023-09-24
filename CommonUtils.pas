@@ -9,8 +9,8 @@ unit CommonUtils;
 {$warn 5024 off}
 {$warn 3123 off}
 {$warn 3124 off}
-{$WARN 5026 off}
-{$WARN 6018 off}
+{$warn 5026 off}
+{$warn 6018 off}
 
 {$ifndef WINDOWS}
   {$define call := cdecl}
