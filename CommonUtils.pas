@@ -102,6 +102,7 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
 end;
 
@@ -110,6 +111,7 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
 end;
 
@@ -118,6 +120,7 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
 end;
 
@@ -126,6 +129,7 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
 end;
 
@@ -134,6 +138,7 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
 end;
 
@@ -142,6 +147,7 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
 end;
 
@@ -150,6 +156,7 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
 end;
 
@@ -1169,13 +1176,13 @@ end;
 // TUInt8Impl begin
 function TUInt8Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TUInt8Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1188,13 +1195,13 @@ end;
 // TUInt16Impl begin
 function TUInt16Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TUInt16Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1207,13 +1214,13 @@ end;
 // TUInt32Impl begin
 function TUInt32Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TUInt32Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1226,13 +1233,13 @@ end;
 // TUInt64Impl begin
 function TUInt64Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TUInt64Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1245,13 +1252,13 @@ end;
 // TInt8Impl begin
 function TInt8Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TInt8Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1264,13 +1271,13 @@ end;
 // TInt16Impl begin
 function TInt16Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TInt16Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1283,13 +1290,13 @@ end;
 // TInt32Impl begin
 function TInt32Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TInt32Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1302,13 +1309,13 @@ end;
 // TInt64Impl begin
 function TInt64Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TInt64Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
