@@ -9,8 +9,15 @@ unit CommonUtils;
 {$warn 5024 off}
 {$warn 3123 off}
 {$warn 3124 off}
-{$WARN 5026 off}
-{$WARN 6018 off}
+{$warn 5026 off}
+{$warn 6018 off}
+
+{$ifndef WINDOWS}
+  {$define call := cdecl}
+{$else}
+  {$define call := stdcall}
+{$endif}
+
 interface
 
 uses
@@ -218,6 +225,7 @@ public
   class function Orth(const Width, Height, ZNear, ZFar: TUFloat): TUMat; static; inline;
   class function Skew(const Amount, Axis: TUVec3; const Angle: TUFloat): TUMat; static; inline;
   class function Inverse(const m: TUMat): TUMat; static; overload;
+  class function Transpose(const m: TUMat): TUMat; static; overload;
   procedure SetValue(
     const e00, e10, e20, e30: TUFloat;
     const e01, e11, e21, e31: TUFloat;
@@ -225,6 +233,7 @@ public
     const e03, e13, e23, e33: TUFloat
   ); inline;
   function Inverse: TUMat; overload; inline;
+  function Transpose: TUMat; overload; inline;
 end;
 
 type TUVec2Impl = type helper for TUVec2
@@ -514,9 +523,9 @@ protected
   var _RefCount: UInt32;
   var _Weak: TUWeakCounter;
   var _References: array of TShared;
-  function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
-  function _AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
-  function _Release : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+  function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint; call;
+  function _AddRef : longint; call;
+  function _Release : longint; call;
 protected
   property Weak: TUWeakCounter read _Weak write _Weak;
 public
@@ -1175,13 +1184,13 @@ end;
 // TUInt8Impl begin
 function TUInt8Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TUInt8Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1199,13 +1208,13 @@ end;
 // TUInt16Impl begin
 function TUInt16Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TUInt16Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1223,13 +1232,13 @@ end;
 // TUInt32Impl begin
 function TUInt32Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TUInt32Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1247,13 +1256,13 @@ end;
 // TUInt64Impl begin
 function TUInt64Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TUInt64Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1271,13 +1280,13 @@ end;
 // TInt8Impl begin
 function TInt8Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TInt8Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1295,13 +1304,13 @@ end;
 // TInt16Impl begin
 function TInt16Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TInt16Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1319,13 +1328,13 @@ end;
 // TInt32Impl begin
 function TInt32Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TInt32Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1343,13 +1352,13 @@ end;
 // TInt64Impl begin
 function TInt64Impl.GetBit(const Index: TUInt8): TUInt8;
 begin
-  Result := (Self shr Index) and $ff;
+  Result := (Self shr Index) and 1;
 end;
 
 procedure TInt64Impl.SetBit(const Index: TUInt8; const Value: TUInt8);
   var b: TUInt8;
 begin
-  b := Value shl Index;
+  b := (Value and 1) shl Index;
   Self := (Self and (not b)) or b;
 end;
 
@@ -1724,6 +1733,16 @@ begin
   Result[3, 3] := (m[0,0]*m[1,1]*m[2,2] + m[0,1]*m[1,2]*m[2,0] + m[0,2]*m[1,0]*m[2,1] - m[0,2]*m[1,1]*m[2,0] - m[0,1]*m[1,0]*m[2,2] - m[0,0]*m[1,2]*m[2,1]) * det;
 end;
 
+class function TUMatImpl.Transpose(const m: TUMat): TUMat;
+  var x, y: Int32;
+begin
+  for x := 0 to 3 do
+  for y := 0 to 3 do
+  begin
+    Result[x, y] := m[y, x];
+  end;
+end;
+
 procedure TUMatImpl.SetValue(
   const e00, e10, e20, e30: TUFloat;
   const e01, e11, e21, e31: TUFloat;
@@ -1740,6 +1759,11 @@ end;
 function TUMatImpl.Inverse: TUMat;
 begin
   Result := Inverse(Self);
+end;
+
+function TUMatImpl.Transpose: TUMat;
+begin
+  Result := Transpose(Self);
 end;
 // TUMatImpl end
 
@@ -2688,17 +2712,17 @@ end;
 // TUWeakCounter end
 
 // TURefClass begin
-function TURefClass.QueryInterface(constref IID: tguid; out Obj): Longint; stdcall;
+function TURefClass.QueryInterface(constref IID: tguid; out Obj): Longint; call;
 begin
   if GetInterface(IID, Obj) then Result := S_OK else Result := Longint(E_NOINTERFACE);
 end;
 
-function TURefClass._AddRef: Longint; stdcall;
+function TURefClass._AddRef: Longint; call;
 begin
   Result := InterlockedIncrement(_RefCount);
 end;
 
-function TURefClass._Release: Longint; stdcall;
+function TURefClass._Release: Longint; call;
 begin
    Result := InterlockedDecrement(_RefCount);
    if Result = 0 then Self.Destroy;
