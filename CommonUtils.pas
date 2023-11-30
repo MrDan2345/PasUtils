@@ -88,6 +88,7 @@ private
 public
   property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
+  function ToBool: Boolean; inline;
 end;
 
 type TUInt16Impl = type helper for TUInt16
@@ -95,7 +96,9 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
+  function ToBool: Boolean; inline;
 end;
 
 type TUInt32Impl = type helper for TUInt32
@@ -103,7 +106,9 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
+  function ToBool: Boolean; inline;
 end;
 
 type TUInt64Impl = type helper for TUInt64
@@ -111,7 +116,9 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
+  function ToBool: Boolean; inline;
 end;
 
 type TInt8Impl = type helper for TInt8
@@ -119,7 +126,9 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
+  function ToBool: Boolean; inline;
 end;
 
 type TInt16Impl = type helper for TInt16
@@ -127,7 +136,9 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
+  function ToBool: Boolean; inline;
 end;
 
 type TInt32Impl = type helper for TInt32
@@ -135,7 +146,9 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
+  function ToBool: Boolean; inline;
 end;
 
 type TInt64Impl = type helper for TInt64
@@ -143,7 +156,9 @@ private
   function GetBit(const Index: TUInt8): TUInt8;
   procedure SetBit(const Index: TUInt8; const Value: TUInt8);
 public
+  property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
+  function ToBool: Boolean; inline;
 end;
 
 type TUColorImpl = type helper for TUColor
@@ -1174,6 +1189,11 @@ function TUInt8Impl.ToString: String;
 begin
   System.Str(Self, Result);
 end;
+
+function TUInt8Impl.ToBool: Boolean;
+begin
+  Result := Self <> 0;
+end;
 // TUInt8Impl end
 
 // TUInt16Impl begin
@@ -1192,6 +1212,11 @@ end;
 function TUInt16Impl.ToString: String;
 begin
   System.Str(Self, Result);
+end;
+
+function TUInt16Impl.ToBool: Boolean;
+begin
+  Result := Self <> 0;
 end;
 // TUInt16Impl end
 
@@ -1212,6 +1237,11 @@ function TUInt32Impl.ToString: String;
 begin
   System.Str(Self, Result);
 end;
+
+function TUInt32Impl.ToBool: Boolean;
+begin
+  Result := Self <> 0;
+end;
 // TUInt32Impl end
 
 // TUInt64Impl begin
@@ -1230,6 +1260,11 @@ end;
 function TUInt64Impl.ToString: String;
 begin
   System.Str(Self, Result);
+end;
+
+function TUInt64Impl.ToBool: Boolean;
+begin
+  Result := Self <> 0;
 end;
 // TUInt64Impl end
 
@@ -1250,6 +1285,11 @@ function TInt8Impl.ToString: String;
 begin
   System.Str(Self, Result);
 end;
+
+function TInt8Impl.ToBool: Boolean;
+begin
+  Result := Self <> 0;
+end;
 // TInt8Impl end
 
 // TInt16Impl begin
@@ -1268,6 +1308,11 @@ end;
 function TInt16Impl.ToString: String;
 begin
   System.Str(Self, Result);
+end;
+
+function TInt16Impl.ToBool: Boolean;
+begin
+  Result := Self <> 0;
 end;
 // TInt16Impl end
 
@@ -1288,6 +1333,11 @@ function TInt32Impl.ToString: String;
 begin
   System.Str(Self, Result);
 end;
+
+function TInt32Impl.ToBool: Boolean;
+begin
+  Result := Self <> 0;
+end;
 // TInt32Impl end
 
 // TInt64Impl begin
@@ -1306,6 +1356,11 @@ end;
 function TInt64Impl.ToString: String;
 begin
   System.Str(Self, Result);
+end;
+
+function TInt64Impl.ToBool: Boolean;
+begin
+  Result := Self <> 0;
 end;
 // TInt64Impl end
 
