@@ -5975,7 +5975,7 @@ constructor TUSceneDataDAE.TAnimationInterfaceCollada.Create(
         _Tracks, TTrackCollada.Create(Channel)
       );
     end;
-    for ChildAnimation in ColladaAnimation.Animations do
+    for ChildAnimation in Animation.Animations do
     begin
       AddTrack(ChildAnimation);
     end;
