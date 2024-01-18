@@ -1780,7 +1780,12 @@ end;
 function TUMatImpl.ToString: String;
 begin
   Result := Format(
-    '{'#$A'  %0:2, %0:2, %0:2, %0:2'#$A'  %0:2, %0:2, %0:2, %0:2'#$A'  %0:2, %0:2, %0:2, %0:2'#$A'  %0:2, %0:2, %0:2, %0:2'#$A'}',
+    '{'#$A +
+    '  %0:0.2f, %1:0.2f, %2:0.2f, %3:0.2f'#$A +
+    '  %4:0.2f, %5:0.2f, %6:0.2f, %7:0.2f'#$A +
+    '  %8:0.2f, %9:0.2f, %10:0.2f, %11:0.2f'#$A +
+    '  %12:0.2f, %13:0.2f, %14:0.2f, %15:0.2f'#$A +
+    '}',
     [
       Self[0, 0], Self[1, 0], Self[2, 0], Self[3, 0],
       Self[0, 1], Self[1, 1], Self[2, 1], Self[3, 1],
@@ -1881,7 +1886,7 @@ end;
 
 function TUVec2Impl.ToString: String;
 begin
-  Result := Format('{%0:2, %0:2}', [x, y]);
+  Result := Format('{%0:0.2f, %1:0.2f}', [x, y]);
 end;
 // TUVec2Impl end
 
@@ -2059,7 +2064,7 @@ end;
 
 function TUVec3Impl.ToString: String;
 begin
-  Result := Format('{%0:2, %0:2, %0:2}', [x, y, z]);
+  Result := Format('{%0:0.2f, %1:0.2f, %2:0.2f}', [x, y, z]);
 end;
 // TUVec3Impl end
 
@@ -2195,7 +2200,7 @@ end;
 
 function TUVec4Impl.ToString: String;
 begin
-  Result := Format('{%0:2, %0:2, %0:2, %0:2}', [x, y, z, w]);
+  Result := Format('{%0:0.2f, %1:0.2f, %2:0.2f, %3:0.2f}', [x, y, z, w]);
 end;
 // TUVec4Impl end
 
@@ -2278,7 +2283,7 @@ end;
 
 function TUQuatImpl.ToString: String;
 begin
-  Result := Format('{%0:2, %0:2, %0:2, %0:2}', [x, y, z, w]);
+  Result := Format('{%0:0.2f, %1:0.2f, %2:0.2f, %3:0.2f}', [x, y, z, w]);
 end;
 // TUQuatImpl end
 
