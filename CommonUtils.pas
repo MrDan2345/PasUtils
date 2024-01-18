@@ -193,6 +193,7 @@ public
   class function Blue: TUColor; static;
   class function Green: TUColor; static;
   procedure SetValue(const Ar, Ag, Ab, Aa: UInt8);
+  function ToString: String; inline;
 end;
 
 type TUMatImpl = type helper for TUMat
@@ -234,6 +235,7 @@ public
   ); inline;
   function Inverse: TUMat; overload; inline;
   function Transpose: TUMat; overload; inline;
+  function ToString: String; inline;
 end;
 
 type TUVec2Impl = type helper for TUVec2
@@ -256,6 +258,7 @@ public
   function Cross(const v: TUVec2): TUFloat; overload; inline;
   function Norm: TUVec2; overload; inline;
   function IsZero: Boolean; inline;
+  function ToString: String; inline;
 end;
 
 type TUVec3Impl = type helper for TUVec3
@@ -293,6 +296,7 @@ public
   function AngleTo(const v: TUVec3): TUFloat; inline;
   function RotationTo(const v: TUVec3): TUQuat; inline;
   function IsZero: Boolean; inline;
+  function ToString: String; inline;
 end;
 
 type TUVec4Impl = type helper for TUVec4
@@ -324,6 +328,7 @@ public
   function xyz: TUVec3; inline;
   function xy: TUVec2; inline;
   function IsZero: Boolean; inline;
+  function ToString: String; inline;
 end;
 
 type TUQuatImpl = type helper for TUQuat
@@ -345,6 +350,7 @@ public
   class function Make(const Ax, Ay, Az, Aw: TUFloat): TUQuat; static; inline;
   class function Norm(const v: TUQuat): TUQuat; static; overload; inline;
   function Norm: TUQuat; inline;
+  function ToString: String; inline;
 end;
 
 type TUSwizzle = object
@@ -1460,6 +1466,11 @@ procedure TUColorImpl.SetValue(const Ar, Ag, Ab, Aa: UInt8);
 begin
   Self := Ab or (Ag shl 8) or (Ar shl 16) or (Aa shl 24);
 end;
+
+function TUColorImpl.ToString: String;
+begin
+  Result := '#' + IntToHex(r, 2) + IntToHex(g, 2) + IntToHex(b, 2) + IntToHex(a, 2);
+end;
 // TUColorImpl end
 
 // TUMatImpl begin
@@ -1765,6 +1776,19 @@ function TUMatImpl.Transpose: TUMat;
 begin
   Result := Transpose(Self);
 end;
+
+function TUMatImpl.ToString: String;
+begin
+  Result := Format(
+    '{'#$A'  %0:2, %0:2, %0:2, %0:2'#$A'  %0:2, %0:2, %0:2, %0:2'#$A'  %0:2, %0:2, %0:2, %0:2'#$A'  %0:2, %0:2, %0:2, %0:2'#$A'}',
+    [
+      Self[0, 0], Self[1, 0], Self[2, 0], Self[3, 0],
+      Self[0, 1], Self[1, 1], Self[2, 1], Self[3, 1],
+      Self[0, 2], Self[1, 2], Self[2, 2], Self[3, 2],
+      Self[0, 3], Self[1, 3], Self[2, 3], Self[3, 3]
+    ]
+  );
+end;
 // TUMatImpl end
 
 // TUVec2Impl begin
@@ -1853,6 +1877,11 @@ end;
 function TUVec2Impl.IsZero: Boolean;
 begin
   Result := (x = 0) and (y = 0);
+end;
+
+function TUVec2Impl.ToString: String;
+begin
+  Result := Format('{%0:2, %0:2}', [x, y]);
 end;
 // TUVec2Impl end
 
@@ -2027,6 +2056,11 @@ function TUVec3Impl.IsZero: Boolean;
 begin
   Result := (x = 0) and (y = 0) and (z = 0);
 end;
+
+function TUVec3Impl.ToString: String;
+begin
+  Result := Format('{%0:2, %0:2, %0:2}', [x, y, z]);
+end;
 // TUVec3Impl end
 
 // TUVec4Impl begin
@@ -2158,6 +2192,11 @@ function TUVec4Impl.IsZero: Boolean;
 begin
   Result := (x = 0) and (y = 0) and (z = 0) and (w = 0);
 end;
+
+function TUVec4Impl.ToString: String;
+begin
+  Result := Format('{%0:2, %0:2, %0:2, %0:2}', [x, y, z, w]);
+end;
 // TUVec4Impl end
 
 // TUQuatImpl begin
@@ -2235,6 +2274,11 @@ end;
 function TUQuatImpl.Norm: TUQuat;
 begin
   Result := Norm(Self);
+end;
+
+function TUQuatImpl.ToString: String;
+begin
+  Result := Format('{%0:2, %0:2, %0:2, %0:2}', [x, y, z, w]);
 end;
 // TUQuatImpl end
 
