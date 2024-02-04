@@ -237,6 +237,7 @@ type
       var _Children: TNodeList;
       procedure SetParent(const Value: TNodeInterface);
     public
+      var UpdateTransform: Boolean;
       property Name: String read _Name;
       property Transform: TUMat read _Transform write _Transform;
       property Attachments: TAttachmentList read _Attachments;
@@ -5877,7 +5878,7 @@ begin
   for i := 0 to High(_Joints) do
   begin
     _Joints[i].Name := ColladaSkin.Joints.Joints[i].JointName;
-    _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose.Transpose;
+    _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose;
   end;
   Weights := nil;
   SetLength(Weights, ColladaSkin.VertexWeights.VCount);
@@ -5954,7 +5955,7 @@ begin
   begin
     _Keys[i].Time := ColladaChannel.Sampler.Keys[i]^.Time;
     _Keys[i].Value := PUMat(ColladaChannel.Sampler.Keys[i]^.Value)^;
-    //_Keys[i].Value := _Keys[i].Value.Transpose;
+    _Keys[i].Value := _Keys[i].Value.Transpose;
     case (ColladaChannel.Sampler.Keys[i]^.Interpolation) of
       ai_step: _Keys[i].Interpolation := ki_step;
       ai_linear, ai_bezier: _Keys[i].Interpolation := ki_linear;
@@ -6040,9 +6041,10 @@ begin
   Parent := AParent;
   if Assigned(ColladaNode) then
   begin
-    _Transform := ColladaNode.Matrix.Transpose;// * _Parent.Transform;
     ColladaNode.UserData := Self;
     _Transform := ColladaNode.Matrix;
+    Write(ColladaNode.AnyName, ': ');
+    WriteLn(_Transform.ToString);
     if Length(ColladaNode.Name) > 0 then
     begin
       _Name := ColladaNode.Name;
@@ -6200,48 +6202,63 @@ begin
   _Root.Resolve;
   _Root.Initialize;
   //_Root.Dump;
-  for Image in _Root.LibImages.Images do
+  if Assigned(_Root.LibImages) then
   begin
-    IntfImage := TImageInterfaceCollada.Create(Image);
-    specialize UArrAppend<TImageInterface>(
-      _ImageList, IntfImage
-    );
+    for Image in _Root.LibImages.Images do
+    begin
+      IntfImage := TImageInterfaceCollada.Create(Image);
+      specialize UArrAppend<TImageInterface>(
+        _ImageList, IntfImage
+      );
+    end;
   end;
-  for Mat in _Root.LibMaterials.Materials do
+  if Assigned(_Root.LibMaterials) then
   begin
-    IntfMat := TMaterialInterfaceCollada.Create(Mat);
-    specialize UArrAppend<TMaterialInterface>(
-      _MaterialList, IntfMat
-    );
+    for Mat in _Root.LibMaterials.Materials do
+    begin
+      IntfMat := TMaterialInterfaceCollada.Create(Mat);
+      specialize UArrAppend<TMaterialInterface>(
+        _MaterialList, IntfMat
+      );
+    end;
   end;
-  for Geom in _Root.LibGeometries.Geometries do
+  if Assigned(_Root.LibGeometries) then
   begin
-    IntfMesh := TMeshInterfaceCollada.Create(Geom);
-    specialize UArrAppend<TMeshInterface>(
-      _MeshList, IntfMesh
-    );
+    for Geom in _Root.LibGeometries.Geometries do
+    begin
+      IntfMesh := TMeshInterfaceCollada.Create(Geom);
+      specialize UArrAppend<TMeshInterface>(
+        _MeshList, IntfMesh
+      );
+    end;
   end;
-  for Controller in _Root.LibControllers.Controllers do
-  if Controller.ControllerType = ct_skin then
+  if Assigned(_Root.LibControllers) then
   begin
-    Skin := Controller.AsSkin;
-    if not Assigned(Skin) then Continue;
-    IntfSkin := TSkinInterfaceCollada.Create(Skin);
-    specialize UArrAppend<TSkinInterface>(
-      _SkinList, IntfSkin
-    );
+    for Controller in _Root.LibControllers.Controllers do
+    if Controller.ControllerType = ct_skin then
+    begin
+      Skin := Controller.AsSkin;
+      if not Assigned(Skin) then Continue;
+      IntfSkin := TSkinInterfaceCollada.Create(Skin);
+      specialize UArrAppend<TSkinInterface>(
+        _SkinList, IntfSkin
+      );
+    end;
   end;
   _RootNode := TNodeInterfaceCollada.Create(nil, nil);
   for Node in _Root.Scene.VisualScene.VisualScene.Nodes do
   begin
     TNodeInterfaceCollada.Create(Node, TNodeInterfaceCollada(_RootNode));
   end;
-  for Anim in _Root.LibAnimations.Animations do
+  if Assigned(_Root.LibAnimations) then
   begin
-    IntfAnim := TAnimationInterfaceCollada.Create(Anim);
-    specialize UArrAppend<TAnimationInterface>(
-      _AnimationList, IntfAnim
-    );
+    for Anim in _Root.LibAnimations.Animations do
+    begin
+      IntfAnim := TAnimationInterfaceCollada.Create(Anim);
+      specialize UArrAppend<TAnimationInterface>(
+        _AnimationList, IntfAnim
+      );
+    end;
   end;
 end;
 
