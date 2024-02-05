@@ -236,10 +236,15 @@ type
       var _Parent: TNodeInterface;
       var _Children: TNodeList;
       procedure SetParent(const Value: TNodeInterface);
+      procedure ApplyTransform(const Value: TUMat);
+      procedure SetTransform(const Value: TUMat);
+      function GetLocalTransform: TUMat; inline;
+      procedure SetLocalTransform(const Value: TUMat);
     public
-      var UpdateTransform: Boolean;
+      //var UpdateTransform: Boolean;
       property Name: String read _Name;
-      property Transform: TUMat read _Transform write _Transform;
+      property Transform: TUMat read _Transform write SetTransform;
+      property LocalTransform: TUMat read GetLocalTransform write SetLocalTransform;
       property Attachments: TAttachmentList read _Attachments;
       property Children: TNodeList read _Children;
       property Parent: TNodeInterface read _Parent write SetParent;
@@ -2521,6 +2526,47 @@ begin
     specialize UArrAppend<TNodeInterface>(
       _Parent._Children, Self
     );
+  end;
+end;
+
+procedure TUSceneData.TNodeInterface.ApplyTransform(const Value: TUMat);
+  var i: Int32;
+begin
+  _Transform := _Transform * Value;
+  for i := 0 to High(_Children) do
+  begin
+    _Children[i].ApplyTransform(Value);
+  end;
+end;
+
+procedure TUSceneData.TNodeInterface.SetTransform(const Value: TUMat);
+  var Diff: TUMat;
+begin
+  Diff := _Transform.Inverse * Value;
+  ApplyTransform(Diff);
+end;
+
+function TUSceneData.TNodeInterface.GetLocalTransform: TUMat;
+begin
+  if Assigned(_Parent) then
+  begin
+    Result := _Parent.Transform.Inverse * _Transform;
+  end
+  else
+  begin
+    Result := _Transform;
+  end;
+end;
+
+procedure TUSceneData.TNodeInterface.SetLocalTransform(const Value: TUMat);
+begin
+  if Assigned(_Parent) then
+  begin
+    SetTransform(Value * _Parent.Transform)
+  end
+  else
+  begin
+    SetTransform(Value);
   end;
 end;
 
@@ -6042,7 +6088,7 @@ begin
   if Assigned(ColladaNode) then
   begin
     ColladaNode.UserData := Self;
-    _Transform := ColladaNode.Matrix;
+    LocalTransform := ColladaNode.Matrix;
     Write(ColladaNode.AnyName, ': ');
     WriteLn(_Transform.ToString);
     if Length(ColladaNode.Name) > 0 then
