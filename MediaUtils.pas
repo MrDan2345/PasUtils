@@ -214,7 +214,7 @@ type
       const ADataCount: UInt8;
       const ASetNumber: UInt8 = 0
     ): TUVertexAttribute; static;
-    function Size: Int32;
+    function Size: UInt32;
   end;
   type TUVertexDescriptor = array of TUVertexAttribute;
 
@@ -241,7 +241,6 @@ type
       function GetLocalTransform: TUMat; inline;
       procedure SetLocalTransform(const Value: TUMat);
     public
-      //var UpdateTransform: Boolean;
       property Name: String read _Name;
       property Transform: TUMat read _Transform write SetTransform;
       property LocalTransform: TUMat read GetLocalTransform write SetLocalTransform;
@@ -1311,6 +1310,7 @@ function ULoadImageData(const Buffer: Pointer; const Size: UInt32): TUImageDataS
 function ULoadImageData(const StreamHelper: TUStreamHelper): TUImageDataShared; overload;
 
 function UCmpVertexDescriptors(const vd0, vd1: TUVertexDescriptor): Boolean;
+function UComputeVertexSize(const vd: TUVertexDescriptor): UInt32;
 
 implementation
 
@@ -1390,6 +1390,16 @@ begin
     end;
   end;
   Result := True;
+end;
+
+function UComputeVertexSize(const vd: TUVertexDescriptor): UInt32;
+  var i: Int32;
+begin
+  Result := 0;
+  for i := 0 to High(vd) do
+  begin
+    Result += vd[i].Size;
+  end;
 end;
 
 // TUImageData begin
@@ -2500,12 +2510,12 @@ begin
   Result.SetNumber := ASetNumber;
 end;
 
-function TUVertexAttribute.Size: Int32;
+function TUVertexAttribute.Size: UInt32;
 begin
   case DataType of
     dt_bool: Result := 1 * DataCount;
     dt_int, dt_float: Result := 4 * DataCount;
-  else Result := 0;
+    else Result := 0;
   end;
 end;
 // TUVertexAttribute end
