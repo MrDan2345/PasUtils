@@ -67,16 +67,33 @@ type PInt64Arr = ^TInt64Arr;
 
 type TUColor = UInt32;
 type PUColor = ^TUColor;
+type TUColorArr = array[UInt16] of TUColor;
+type PUColorArr = ^TUColorArr;
+type TUColorArray = array of TUColor;
 type TUMat = array[0..3, 0..3] of TUFloat;
 type PUMat = ^TUMat;
+type TUMatArr = array[UInt16] of TUMat;
+type PUMatArr = ^TUMatArr;
+type TUMatArray = array of TUMat;
 type TUVec2 = array[0..1] of TUFloat;
 type PUVec2 = ^TUVec2;
+type TUVec2Arr = array[UInt16] of TUVec2;
+type PUVec2Arr = ^TUVec2Arr;
+type TUVec2Array = array of TUVec2;
 type TUVec3 = array[0..2] of TUFloat;
 type PUVec3 = ^TUVec3;
+type TUVec3Arr = array[UInt16] of TUVec3;
+type PUVec3Arr = ^TUVec3Arr;
+type TUVec3Array = array of TUVec3;
 type TUVec4 = array[0..3] of TUFloat;
 type PUVec4 = ^TUVec4;
+type TUVec4Arr = array[UInt16] of TUVec3;
+type PUVec4Arr = ^TUVec4Arr;
 type TUQuat = array[0..3] of TUFloat;
 type PUQuat = ^TUQuat;
+type TUQuatArr = array[UInt16] of TUQuat;
+type PUQuatArr = ^TUQuatArr;
+type TUQuatArray = array of TUQuat;
 
 type TUFloatImpl = type helper for TUFloat
 public
