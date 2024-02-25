@@ -432,9 +432,9 @@ type
     type TMaterialInstanceInterfaceList = array of TMaterialInstanceInterface;
     type TAnimationInterface = class
     public
+      type TKeyInterpolation = (ki_step, ki_linear);
       type TTrack = class
       public
-        type TKeyInterpolation = (ki_step, ki_linear);
         type TKey = record
           var Time: TUFloat;
           var Value: TUMat;
@@ -2826,7 +2826,6 @@ function TUSceneData.TAnimationInterface.TTrack.Sample(
   var k0, k1: UInt32;
   var t: TUFloat;
 begin
-  //Exit(_Keys[0].Value);
   if (Length(_Keys) < 1) then Exit(TUMat.Identity);
   if not Loop then
   begin

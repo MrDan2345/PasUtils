@@ -94,6 +94,10 @@ type PUQuat = ^TUQuat;
 type TUQuatArr = array[UInt16] of TUQuat;
 type PUQuatArr = ^TUQuatArr;
 type TUQuatArray = array of TUQuat;
+type TURot2 = array[0..1] of TUFloat;
+type PURot2 = ^TURot2;
+type TURot2Arr = array[UInt16] of TURot2;
+type PURot2Arr = ^TURot2;
 
 type TUFloatImpl = type helper for TUFloat
 public
@@ -217,8 +221,20 @@ type TUMatImpl = type helper for TUMat
 private
   function GetElement(const Index: UInt32): TUFloat; inline;
   procedure SetElement(const Index: UInt32; const Value: TUFloat); inline;
+  function GetAxisX: TUVec3; inline;
+  procedure SetAxisX(const Value: TUVec3); inline;
+  function GetAxisY: TUVec3; inline;
+  procedure SetAxisY(const Value: TUVec3); inline;
+  function GetAxisZ: TUVec3; inline;
+  procedure SetAxisZ(const Value: TUVec3); inline;
+  function GetPosition: TUVec3; inline;
+  procedure SetPosition(const Value: TUVec3); inline;
 public
   property Element[const Index: UInt32]: TUFloat read GetElement write SetElement; default;
+  property AxisX: TUVec3 read GetAxisX write SetAxisX;
+  property AxisY: TUVec3 read GetAxisY write SetAxisY;
+  property AxisZ: TUVec3 read GetAxisZ write SetAxisZ;
+  property Position: TUVec3 read GetPosition write SetPosition;
   class function Make(
     const e00, e10, e20, e30: TUFloat;
     const e01, e11, e21, e31: TUFloat;
@@ -244,6 +260,7 @@ public
   class function Skew(const Amount, Axis: TUVec3; const Angle: TUFloat): TUMat; static; inline;
   class function Inverse(const m: TUMat): TUMat; static; overload;
   class function Transpose(const m: TUMat): TUMat; static; overload;
+  class function Normalize(const m: TUMat): TUMat; static; overload;
   procedure SetValue(
     const e00, e10, e20, e30: TUFloat;
     const e01, e11, e21, e31: TUFloat;
@@ -252,6 +269,7 @@ public
   ); inline;
   function Inverse: TUMat; overload; inline;
   function Transpose: TUMat; overload; inline;
+  function Normalize: TUMat; overload; inline;
   function ToString: String; inline;
 end;
 
@@ -271,6 +289,8 @@ public
   class function Cross(const v0, v1: TUVec2): TUFloat; static; overload; inline;
   class function Norm(const v: TUVec2): TUVec2; static; overload; inline;
   procedure SetValue(const Ax, Ay: TUFloat); inline;
+  function Transform(const r: TURot2): TUVec2; inline;
+  function TransformInv(const r: TURot2): TUVec2; inline;
   function Dot(const v: TUVec2): TUFloat; overload; inline;
   function Cross(const v: TUVec2): TUFloat; overload; inline;
   function Norm: TUVec2; overload; inline;
@@ -392,6 +412,35 @@ public
     const ord2: UInt8 = 2;
     const ord3: UInt8 = 3
   );
+end;
+
+type TURot2Impl = type helper for TURot2
+strict private
+  function GetAngSin: TUFloat; inline;
+  function GetAngCos: TUFloat; inline;
+  function GetAngle: TUFloat; inline;
+  function GetAxisX: TUVec2; inline;
+  function GetAxisY: TUVec2; inline;
+  procedure SetAngSin(const Value: TUFloat); inline;
+  procedure SetAngCos(const Value: TUFloat); inline;
+  procedure SetAngle(const Angle: TUFloat); inline;
+  procedure SetAxisX(const Value: TUVec2); inline;
+  procedure SetAxisY(const Value: TUVec2); inline;
+public
+  property AngSin: TUFloat read GetAngSin write SetAngSin;
+  property AngCos: TUFloat read GetAngCos write SetAngCos;
+  property Angle: TUFloat read GetAngle write SetAngle;
+  property AxisX: TUVec2 read GetAxisX write SetAxisX;
+  property AxisY: TUVec2 read GetAxisY write SetAxisY;
+  class function Identity: TURot2; static; inline;
+  class function Make(const Angle: TUFloat): TURot2; static; inline;
+  class function Make(const Rc, Rs: TUFloat): TURot2; static; inline;
+  class function Norm(const Value: TURot2): TURot2; static; overload; inline;
+  procedure SetValue(const Rc, Rs: TUFloat); inline;
+  function Norm: TURot2; inline;
+  function Transform(const v: TUVec2): TUVec2; inline;
+  function TransformInv(const v: TUVec2): TUVec2; inline;
+  function ToString: String; inline;
 end;
 
 type TUCriticalSection = record
@@ -1502,6 +1551,46 @@ begin
   Self[Index shr 2, Index mod 4] := Value;
 end;
 
+function TUMatImpl.GetAxisX: TUVec3;
+begin
+  Result := PUVec3(@Self[0, 0])^;
+end;
+
+procedure TUMatImpl.SetAxisX(const Value: TUVec3);
+begin
+  PUVec3(@Self[0, 0])^ := Value;
+end;
+
+function TUMatImpl.GetAxisY: TUVec3;
+begin
+  Result := PUVec3(@Self[1, 0])^;
+end;
+
+procedure TUMatImpl.SetAxisY(const Value: TUVec3);
+begin
+  PUVec3(@Self[1, 0])^ := Value;
+end;
+
+function TUMatImpl.GetAxisZ: TUVec3;
+begin
+  Result := PUVec3(@Self[2, 0])^;
+end;
+
+procedure TUMatImpl.SetAxisZ(const Value: TUVec3);
+begin
+  PUVec3(@Self[2, 0])^ := Value;
+end;
+
+function TUMatImpl.GetPosition: TUVec3;
+begin
+  Result := PUVec3(@Self[3, 0])^;
+end;
+
+procedure TUMatImpl.SetPosition(const Value: TUVec3);
+begin
+  PUVec3(@Self[3, 0])^ := Value;
+end;
+
 class function TUMatImpl.Make(
   const e00, e10, e20, e30: TUFloat;
   const e01, e11, e21, e31: TUFloat;
@@ -1772,6 +1861,14 @@ begin
   end;
 end;
 
+class function TUMatImpl.Normalize(const m: TUMat): TUMat;
+begin
+  Result := m;
+  Result.AxisX := m.AxisX.Norm;
+  Result.AxisY := m.AxisY.Norm;
+  Result.AxisZ := m.AxisZ.Norm;
+end;
+
 procedure TUMatImpl.SetValue(
   const e00, e10, e20, e30: TUFloat;
   const e01, e11, e21, e31: TUFloat;
@@ -1793,6 +1890,11 @@ end;
 function TUMatImpl.Transpose: TUMat;
 begin
   Result := Transpose(Self);
+end;
+
+function TUMatImpl.Normalize: TUMat;
+begin
+  Result := TUMat.Normalize(Self);
 end;
 
 function TUMatImpl.ToString: String;
@@ -1880,6 +1982,16 @@ procedure TUVec2Impl.SetValue(const Ax, Ay: TUFloat);
 begin
   Self[0] := Ax;
   Self[1] := Ay;
+end;
+
+function TUVec2Impl.Transform(const r: TURot2): TUVec2;
+begin
+  Result := r.Transform(Self);
+end;
+
+function TUVec2Impl.TransformInv(const r: TURot2): TUVec2;
+begin
+  Result := r.TransformInv(Self);
 end;
 
 function TUVec2Impl.Dot(const v: TUVec2): TUFloat;
@@ -2342,6 +2454,115 @@ begin
   _Remap := ord0 or (ord1 shl 2) or (ord2 shl 4) or (ord3 shl 6);
 end;
 // TUSwizzle end
+
+// TURot2 begin
+function TURot2Impl.GetAngSin: TUFloat;
+begin
+  Result := Self[1];
+end;
+
+function TURot2Impl.GetAngCos: TUFloat;
+begin
+  Result := Self[0];
+end;
+
+function TURot2Impl.GetAngle: TUFloat;
+begin
+  Result := UArcTan2(Self[1], Self[0]);
+end;
+
+function TURot2Impl.GetAxisX: TUVec2;
+begin
+  Result := TUVec2.Make(Self[0], Self[1]);
+end;
+
+function TURot2Impl.GetAxisY: TUVec2;
+begin
+  Result := TUVec2.Make(-Self[1], Self[0]);
+end;
+
+procedure TURot2Impl.SetAngSin(const Value: TUFloat);
+begin
+  Self[0] := Value;
+end;
+
+procedure TURot2Impl.SetAngCos(const Value: TUFloat);
+begin
+  Self[1] := Value;
+end;
+
+procedure TURot2Impl.SetAngle(const Angle: TUFloat);
+begin
+  USinCos(Angle, Self[1], Self[0]);
+end;
+
+procedure TURot2Impl.SetAxisX(const Value: TUVec2);
+begin
+  Self[0] := Value.x;
+  Self[1] := Value.y;
+end;
+
+procedure TURot2Impl.SetAxisY(const Value: TUVec2);
+begin
+  Self[0] := Value.y;
+  Self[1] := -Value.x;
+end;
+
+class function TURot2Impl.Identity: TURot2;
+begin
+  Result := TURot2.Make(1, 0);
+end;
+
+class function TURot2Impl.Make(const Angle: TUFloat): TURot2;
+begin
+  USinCos(Angle, Result[1], Result[0]);
+end;
+
+class function TURot2Impl.Make(const Rc, Rs: TUFloat): TURot2;
+begin
+  Result[0] := Rc;
+  Result[1] := Rs;
+end;
+
+class function TURot2Impl.Norm(const Value: TURot2): TURot2;
+  var ValVec2: TUVec2 absolute Value;
+  var ResVec2: TUVec2 absolute Result;
+begin
+  ResVec2 := ValVec2.Norm;
+end;
+
+procedure TURot2Impl.SetValue(const Rc, Rs: TUFloat);
+begin
+  Self[0] := Rc;
+  Self[1] := Rs;
+end;
+
+function TURot2Impl.Norm: TURot2;
+begin
+  Result := Norm(Self);
+end;
+
+function TURot2Impl.Transform(const v: TUVec2): TUVec2;
+begin
+  Result := TUVec2.Make(
+    v.x * AngCos - v.y * AngSin,
+    v.x * AngSin + v.y * AngCos
+  );
+end;
+
+function TURot2Impl.TransformInv(const v: TUVec2): TUVec2;
+begin
+  Result := TUVec2.Make(
+    v.x * AngCos + v.y * AngSin,
+    v.y * AngCos - v.x * AngSin
+  );
+end;
+
+function TURot2Impl.ToString: String;
+begin
+  Result := Format('{%0:0.2f}', [Angle * URadToDeg]);
+end;
+// TURot2 end
 
 // TUCriticalSection begin
 procedure TUCriticalSection.Initialize;
