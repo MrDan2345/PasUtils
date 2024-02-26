@@ -260,7 +260,7 @@ public
   class function Skew(const Amount, Axis: TUVec3; const Angle: TUFloat): TUMat; static; inline;
   class function Inverse(const m: TUMat): TUMat; static; overload;
   class function Transpose(const m: TUMat): TUMat; static; overload;
-  class function Normalize(const m: TUMat): TUMat; static; overload;
+  class function Norm(const m: TUMat): TUMat; static; overload;
   procedure SetValue(
     const e00, e10, e20, e30: TUFloat;
     const e01, e11, e21, e31: TUFloat;
@@ -269,7 +269,7 @@ public
   ); inline;
   function Inverse: TUMat; overload; inline;
   function Transpose: TUMat; overload; inline;
-  function Normalize: TUMat; overload; inline;
+  function Norm: TUMat; overload; inline;
   function ToString: String; inline;
 end;
 
@@ -1861,7 +1861,7 @@ begin
   end;
 end;
 
-class function TUMatImpl.Normalize(const m: TUMat): TUMat;
+class function TUMatImpl.Norm(const m: TUMat): TUMat;
 begin
   Result := m;
   Result.AxisX := m.AxisX.Norm;
@@ -1892,9 +1892,9 @@ begin
   Result := Transpose(Self);
 end;
 
-function TUMatImpl.Normalize: TUMat;
+function TUMatImpl.Norm: TUMat;
 begin
-  Result := TUMat.Normalize(Self);
+  Result := TUMat.Norm(Self);
 end;
 
 function TUMatImpl.ToString: String;
