@@ -1167,7 +1167,7 @@ function UCoTan(const x: TUFloat): TUFloat;
 function UArcCos(const x: TUFloat): TUFloat;
 function UArcTan2(const y, x: TUFloat): TUFloat;
 function UPow(const b, e: TUFloat): TUFloat;
-function UPoT(const x: UInt32): UInt32;
+function UPoT(const x: UInt64): UInt64;
 function UAddMat(const m0, m1: TUMat): TUMat;
 function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 function USubMat(const m0, m1: TUMat): TUMat;
@@ -6767,7 +6767,7 @@ begin
   Result := Exp(e * Ln(b));
 end;
 
-function UPoT(const x: UInt32): UInt32;
+function UPoT(const x: UInt64): UInt64;
   var n: Int32;
 begin
   if x = 0 then Exit(0);
