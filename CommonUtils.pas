@@ -2,6 +2,7 @@ unit CommonUtils;
 
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
+{$modeswitch nestedprocvars}
 {$modeswitch typehelpers}
 {$optimization autoinline}
 {$macro on}
@@ -89,6 +90,18 @@ type TUVec4 = array[0..3] of TUFloat;
 type PUVec4 = ^TUVec4;
 type TUVec4Arr = array[UInt16] of TUVec3;
 type PUVec4Arr = ^TUVec4Arr;
+type TUVec2i = array[0..1] of Int32;
+type PUVec2i = ^TUVec2i;
+type TUVec2iArr = array[UInt16] of TUVec2i;
+type PUVec2iArr = ^TUVec2iArr;
+type TUVec3i = array[0..2] of Int32;
+type PUVec3i = ^TUVec2i;
+type TUVec3iArr = array[UInt16] of TUVec3i;
+type PUVec3iArr = ^TUVec3iArr;
+type TUVec4i = array[0..3] of Int32;
+type PUVec4i = ^TUVec4i;
+type TUVec4iArr = array[UInt16] of TUVec4i;
+type PUVec4iArr = ^TUVec4iArr;
 type TUQuat = array[0..3] of TUFloat;
 type PUQuat = ^TUQuat;
 type TUQuatArr = array[UInt16] of TUQuat;
@@ -282,9 +295,11 @@ private
 public
   property x: TUFloat read GetX write SetX;
   property y: TUFloat read GetY write SetY;
-  class function Zero: TUVec2; static; inline;
+  const AxisX: TUVec2 = (1, 0);
+  const AxisY: TUVec2 = (0, 1);
+  const Zero: TUVec2 = (0, 0);
   class function Make(const Ax, Ay: TUFloat): TUVec2; static; overload; inline;
-  class function Make(const S: TUFloat): TUVec2; static; overload; inline;
+  class function Make(const s: TUFloat): TUVec2; static; overload; inline;
   class function Dot(const v0, v1: TUVec2): TUFloat; static; overload; inline;
   class function Cross(const v0, v1: TUVec2): TUFloat; static; overload; inline;
   class function Norm(const v: TUVec2): TUVec2; static; overload; inline;
@@ -310,7 +325,10 @@ public
   property x: TUFloat read GetX write SetX;
   property y: TUFloat read GetY write SetY;
   property z: TUFloat read GetZ write SetZ;
-  class function Zero: TUVec3; static; inline;
+  const AxisX: TUVec3 = (1, 0, 0);
+  const AxisY: TUVec3 = (0, 1, 0);
+  const AxisZ: TUVec3 = (0, 0, 1);
+  const Zero: TUVec3 = (0, 0, 0);
   class function Make(const Ax, Ay, Az: TUFloat): TUVec3; static; overload; inline;
   class function Make(const v2: TUVec2; const Az: TUFloat): TUVec3; static; overload; inline;
   class function Make(const s: TUFloat): TUVec3; static; overload;
@@ -351,7 +369,11 @@ public
   property y: TUFloat read GetY write SetY;
   property z: TUFloat read GetZ write SetZ;
   property w: TUFloat read GetW write SetW;
-  class function Zero: TUVec4; static; inline;
+  const AxisX: TUVec4 = (1, 0, 0, 0);
+  const AxisY: TUVec4 = (0, 1, 0, 0);
+  const AxisZ: TUVec4 = (0, 0, 1, 0);
+  const AxisW: TUVec4 = (0, 0, 0, 1);
+  const Zero: TUVec4 = (0, 0, 0, 0);
   class function Make(const Ax, Ay, Az, Aw: TUFloat): TUVec4; static; overload; inline;
   class function Make(const v: TUVec3; const Aw: TUFloat): TUVec4; static; overload; inline;
   class function Make(const v0, v1: TUVec2): TUVec4; static; overload; inline;
@@ -364,6 +386,75 @@ public
   function Norm: TUVec4; overload; inline;
   function xyz: TUVec3; inline;
   function xy: TUVec2; inline;
+  function IsZero: Boolean; inline;
+  function ToString: String; inline;
+end;
+
+type TUVec2iImpl = type helper for TUVec2i
+private
+  function GetX: Int32; inline;
+  procedure SetX(const Value: Int32); inline;
+  function GetY: Int32; inline;
+  procedure SetY(const Value: Int32); inline;
+public
+  property x: Int32 read GetX write SetX;
+  property y: Int32 read GetY write SetY;
+  const AxisX: TUVec2i = (1, 0);
+  const AxisY: TUVec2i = (0, 1);
+  const Zero: TUVec2i = (0, 0);
+  class function Make(const Ax, Ay: Int32): TUVec2i; static; overload; inline;
+  class function Make(const s: Int32): TUVec2i; static; overload; inline;
+  procedure SetValue(const Ax, Ay: Int32); inline;
+  function IsZero: Boolean; inline;
+  function ToString: String; inline;
+end;
+
+type TUVec3iImpl = type helper for TUVec3i
+private
+  function GetX: Int32; inline;
+  procedure SetX(const Value: Int32); inline;
+  function GetY: Int32; inline;
+  procedure SetY(const Value: Int32); inline;
+  function GetZ: Int32; inline;
+  procedure SetZ(const Value: Int32); inline;
+public
+  property x: Int32 read GetX write SetX;
+  property y: Int32 read GetY write SetY;
+  property z: Int32 read GetZ write SetZ;
+  const AxisX: TUVec3i = (1, 0, 0);
+  const AxisY: TUVec3i = (0, 1, 0);
+  const AxisZ: TUVec3i = (0, 0, 1);
+  const Zero: TUVec3i = (0, 0, 0);
+  class function Make(const Ax, Ay, Az: Int32): TUVec3i; static; overload; inline;
+  class function Make(const s: Int32): TUVec3i; static; overload; inline;
+  procedure SetValue(const Ax, Ay, Az: Int32); inline;
+  function IsZero: Boolean; inline;
+  function ToString: String; inline;
+end;
+
+type TUVec4iImpl = type helper for TUVec4i
+private
+  function GetX: Int32; inline;
+  procedure SetX(const Value: Int32); inline;
+  function GetY: Int32; inline;
+  procedure SetY(const Value: Int32); inline;
+  function GetZ: Int32; inline;
+  procedure SetZ(const Value: Int32); inline;
+  function GetW: Int32; inline;
+  procedure SetW(const Value: Int32); inline;
+public
+  property x: Int32 read GetX write SetX;
+  property y: Int32 read GetY write SetY;
+  property z: Int32 read GetZ write SetZ;
+  property w: Int32 read GetW write SetW;
+  const AxisX: TUVec4i = (1, 0, 0, 0);
+  const AxisY: TUVec4i = (0, 1, 0, 0);
+  const AxisZ: TUVec4i = (0, 0, 1, 0);
+  const AxisW: TUVec4i = (0, 0, 0, 1);
+  const Zero: TUVec4i = (0, 0, 0, 0);
+  class function Make(const Ax, Ay, Az, Aw: Int32): TUVec4i; static; overload; inline;
+  class function Make(const s: Int32): TUVec4i; static; overload; inline;
+  procedure SetValue(const Ax, Ay, Az, Aw: Int32); inline;
   function IsZero: Boolean; inline;
   function ToString: String; inline;
 end;
@@ -433,7 +524,7 @@ public
   property AxisX: TUVec2 read GetAxisX write SetAxisX;
   property AxisY: TUVec2 read GetAxisY write SetAxisY;
   class function Identity: TURot2; static; inline;
-  class function Make(const Angle: TUFloat): TURot2; static; inline;
+  class function Make(const AAngle: TUFloat): TURot2; static; inline;
   class function Make(const Rc, Rs: TUFloat): TURot2; static; inline;
   class function Norm(const Value: TURot2): TURot2; static; overload; inline;
   procedure SetValue(const Rc, Rs: TUFloat); inline;
@@ -1937,18 +2028,13 @@ begin
   Self[1] := Value;
 end;
 
-class function TUVec2Impl.Zero: TUVec2;
-begin
-  Result := Make(0);
-end;
-
 class function TUVec2Impl.Make(const Ax, Ay: TUFloat): TUVec2;
 begin
   Result[0] := Ax;
   Result[1] := Ay;
 end;
 
-class function TUVec2Impl.Make(const S: TUFloat): TUVec2;
+class function TUVec2Impl.Make(const s: TUFloat): TUVec2;
 begin
   Result := Make(s, s);
 end;
@@ -2049,11 +2135,6 @@ end;
 procedure TUVec3Impl.SetZ(const Value: TUFloat);
 begin
   Self[2] := Value;
-end;
-
-class function TUVec3Impl.Zero: TUVec3;
-begin
-  Result := Make(0);
 end;
 
 class function TUVec3Impl.Make(const Ax, Ay, Az: TUFloat): TUVec3;
@@ -2239,11 +2320,6 @@ begin
   Self[3] := Value;
 end;
 
-class function TUVec4Impl.Zero: TUVec4;
-begin
-  Result := Make(0);
-end;
-
 class function TUVec4Impl.Make(const Ax, Ay, Az, Aw: TUFloat): TUVec4;
 begin
   Result[0] := Ax;
@@ -2333,6 +2409,189 @@ begin
   Result := Format('{%0:0.2f, %1:0.2f, %2:0.2f, %3:0.2f}', [x, y, z, w]);
 end;
 // TUVec4Impl end
+
+// TUVec2iImpl begin
+function TUVec2iImpl.GetX: Int32;
+begin
+  Result := Self[0];
+end;
+
+procedure TUVec2iImpl.SetX(const Value: Int32);
+begin
+  Self[0] := Value;
+end;
+
+function TUVec2iImpl.GetY: Int32;
+begin
+  Result := Self[1];
+end;
+
+procedure TUVec2iImpl.SetY(const Value: Int32);
+begin
+  Self[1] := Value;
+end;
+
+class function TUVec2iImpl.Make(const Ax, Ay: Int32): TUVec2i;
+begin
+  Result[0] := Ax;
+  Result[1] := Ay;
+end;
+
+class function TUVec2iImpl.Make(const s: Int32): TUVec2i;
+begin
+  Result := Make(s, s);
+end;
+
+procedure TUVec2iImpl.SetValue(const Ax, Ay: Int32);
+begin
+  Self[0] := Ax;
+  Self[1] := Ay;
+end;
+
+function TUVec2iImpl.IsZero: Boolean;
+begin
+  Result := (Self[0] = 0) and (Self[1] = 0);
+end;
+
+function TUVec2iImpl.ToString: String;
+begin
+  Result :=  Format('{%0:d, %1:d}', [x, y]);
+end;
+// TUVec2iImpl end
+
+// TUVec3iImpl begin
+function TUVec3iImpl.GetX: Int32;
+begin
+  Result := Self[0];
+end;
+
+procedure TUVec3iImpl.SetX(const Value: Int32);
+begin
+   Self[0] := Value;
+end;
+
+function TUVec3iImpl.GetY: Int32;
+begin
+  Result := Self[1];
+end;
+
+procedure TUVec3iImpl.SetY(const Value: Int32);
+begin
+  Self[1] := Value;
+end;
+
+function TUVec3iImpl.GetZ: Int32;
+begin
+  Result := Self[2];
+end;
+
+procedure TUVec3iImpl.SetZ(const Value: Int32);
+begin
+  Self[2] := Value;
+end;
+
+class function TUVec3iImpl.Make(const Ax, Ay, Az: Int32): TUVec3i;
+begin
+  Result[0] := Ax;
+  Result[1] := Ay;
+  Result[2] := Az;
+end;
+
+class function TUVec3iImpl.Make(const s: Int32): TUVec3i;
+begin
+  Result := Make(s, s, s);
+end;
+
+procedure TUVec3iImpl.SetValue(const Ax, Ay, Az: Int32);
+begin
+  Self[0] := Ax;
+  Self[1] := Ay;
+  Self[2] := Az;
+end;
+
+function TUVec3iImpl.IsZero: Boolean;
+begin
+  Result := (Self[0] = 0) and (Self[1] = 0) and (Self[2] = 0);
+end;
+
+function TUVec3iImpl.ToString: String;
+begin
+  Result :=  Format('{%0:d, %1:d, %2:d}', [x, y, z]);
+end;
+// TUVec3iImpl end
+
+// TUVec4iImpl begin
+function TUVec4iImpl.GetX: Int32;
+begin
+  Result := Self[0];
+end;
+
+procedure TUVec4iImpl.SetX(const Value: Int32);
+begin
+  Self[0] := Value;
+end;
+
+function TUVec4iImpl.GetY: Int32;
+begin
+  Result := Self[1];
+end;
+
+procedure TUVec4iImpl.SetY(const Value: Int32);
+begin
+  Self[1] := Value;
+end;
+
+function TUVec4iImpl.GetZ: Int32;
+begin
+  Result := Self[2];
+end;
+
+procedure TUVec4iImpl.SetZ(const Value: Int32);
+begin
+  Self[2] := Value;
+end;
+
+function TUVec4iImpl.GetW: Int32;
+begin
+  Result := Self[3];
+end;
+
+procedure TUVec4iImpl.SetW(const Value: Int32);
+begin
+  Self[3] := Value;
+end;
+
+class function TUVec4iImpl.Make(const Ax, Ay, Az, Aw: Int32): TUVec4i;
+begin
+  Result[0] := Ax;
+  Result[1] := Ay;
+  Result[2] := Az;
+  Result[3] := Aw;
+end;
+
+class function TUVec4iImpl.Make(const s: Int32): TUVec4i;
+begin
+  Result := Make(s, s, s, s);
+end;
+
+procedure TUVec4iImpl.SetValue(const Ax, Ay, Az, Aw: Int32);
+begin
+  Self[0] := Ax;
+  Self[1] := Ay;
+  Self[2] := Az;
+  Self[3] := Aw;
+end;
+
+function TUVec4iImpl.IsZero: Boolean;
+begin
+  Result := (Self[0] = 0) and (Self[1] = 0) and (Self[2] = 0) and (Self[3] = 0);
+end;
+
+function TUVec4iImpl.ToString: String;
+begin
+  Result :=  Format('{%0:d, %1:d, %2:d, %3:d}', [x, y, z, w]);
+end;
+// TUVec4iImpl end
 
 // TUQuatImpl begin
 function TUQuatImpl.GetX: TUFloat;
@@ -2513,9 +2772,9 @@ begin
   Result := TURot2.Make(1, 0);
 end;
 
-class function TURot2Impl.Make(const Angle: TUFloat): TURot2;
+class function TURot2Impl.Make(const AAngle: TUFloat): TURot2;
 begin
-  USinCos(Angle, Result[1], Result[0]);
+  USinCos(AAngle, Result[1], Result[0]);
 end;
 
 class function TURot2Impl.Make(const Rc, Rs: TUFloat): TURot2;
@@ -3682,7 +3941,7 @@ begin
     otUWord: Result := specialize GetDynArrayElement<UInt16>(Index, ArrayIndex);
     otULong: Result := specialize GetDynArrayElement<UInt32>(Index, ArrayIndex);
     otUQWord: Result := specialize GetDynArrayElement<UInt64>(Index, ArrayIndex);
-    else Result := 0;
+    //else Result := 0;
   end;
 end;
 

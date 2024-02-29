@@ -2,6 +2,7 @@ unit MediaUtils;
 
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
+{$modeswitch nestedprocvars}
 {$modeswitch typehelpers}
 {$optimization autoinline}
 {$macro on}
@@ -5525,7 +5526,7 @@ begin
               st_2d: ImageType := it_2d;
               st_3d: ImageType := it_3d;
               st_cube: ImageType := it_cube;
-              else ImageType := it_2d;
+              //else ImageType := it_2d;
             end;
           end;
         end;
