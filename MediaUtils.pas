@@ -4957,7 +4957,6 @@ begin
   if Assigned(Obj) and (Obj is TColladaGeometry) then
   begin
     _Geometry := TColladaGeometry(Obj);
-    WriteLn(Name, ' _Geometry = ', PtrUInt(_Geometry));
   end;
 end;
 
@@ -6099,8 +6098,6 @@ begin
   begin
     ColladaNode.UserData := Self;
     LocalTransform := ColladaNode.Matrix;
-    Write(ColladaNode.AnyName, ': ');
-    WriteLn(_Transform.ToString);
     if Length(ColladaNode.Name) > 0 then
     begin
       _Name := ColladaNode.Name;
