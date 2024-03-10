@@ -7446,7 +7446,7 @@ begin
   Result := a - b * Int(a / b);
 end;
 
-function UStrExplode(const Str: String; const Separator: String): TUStrArr;
+function UStrExplode(const Str: String; const Separator: String): TUStrArray;
   var i, j: Int32;
   var CurElement: Int32;
   var PrevParamIndex: Int32;
