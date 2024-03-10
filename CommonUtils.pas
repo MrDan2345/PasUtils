@@ -2,6 +2,7 @@ unit CommonUtils;
 
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
+{$modeswitch nestedprocvars}
 {$modeswitch typehelpers}
 {$optimization autoinline}
 {$macro on}
@@ -97,14 +98,29 @@ type PUVec3Arr = ^TUVec3Arr;
 type TUVec3Array = array of TUVec3;
 type TUVec4 = array[0..3] of TUFloat;
 type PUVec4 = ^TUVec4;
-type TUVec4Arr = array[UInt16] of TUVec4;
+type TUVec4Arr = array[UInt16] of TUVec3;
 type PUVec4Arr = ^TUVec4Arr;
-type TUVec4Array = array of TUVec4;
+type TUVec2i = array[0..1] of Int32;
+type PUVec2i = ^TUVec2i;
+type TUVec2iArr = array[UInt16] of TUVec2i;
+type PUVec2iArr = ^TUVec2iArr;
+type TUVec3i = array[0..2] of Int32;
+type PUVec3i = ^TUVec2i;
+type TUVec3iArr = array[UInt16] of TUVec3i;
+type PUVec3iArr = ^TUVec3iArr;
+type TUVec4i = array[0..3] of Int32;
+type PUVec4i = ^TUVec4i;
+type TUVec4iArr = array[UInt16] of TUVec4i;
+type PUVec4iArr = ^TUVec4iArr;
 type TUQuat = array[0..3] of TUFloat;
 type PUQuat = ^TUQuat;
 type TUQuatArr = array[UInt16] of TUQuat;
 type PUQuatArr = ^TUQuatArr;
 type TUQuatArray = array of TUQuat;
+type TURot2 = array[0..1] of TUFloat;
+type PURot2 = ^TURot2;
+type TURot2Arr = array[UInt16] of TURot2;
+type PURot2Arr = ^TURot2;
 
 type TUFloatImpl = type helper for TUFloat
 public
@@ -228,8 +244,20 @@ type TUMatImpl = type helper for TUMat
 private
   function GetElement(const Index: UInt32): TUFloat; inline;
   procedure SetElement(const Index: UInt32; const Value: TUFloat); inline;
+  function GetAxisX: TUVec3; inline;
+  procedure SetAxisX(const Value: TUVec3); inline;
+  function GetAxisY: TUVec3; inline;
+  procedure SetAxisY(const Value: TUVec3); inline;
+  function GetAxisZ: TUVec3; inline;
+  procedure SetAxisZ(const Value: TUVec3); inline;
+  function GetPosition: TUVec3; inline;
+  procedure SetPosition(const Value: TUVec3); inline;
 public
   property Element[const Index: UInt32]: TUFloat read GetElement write SetElement; default;
+  property AxisX: TUVec3 read GetAxisX write SetAxisX;
+  property AxisY: TUVec3 read GetAxisY write SetAxisY;
+  property AxisZ: TUVec3 read GetAxisZ write SetAxisZ;
+  property Position: TUVec3 read GetPosition write SetPosition;
   class function Make(
     const e00, e10, e20, e30: TUFloat;
     const e01, e11, e21, e31: TUFloat;
@@ -255,6 +283,7 @@ public
   class function Skew(const Amount, Axis: TUVec3; const Angle: TUFloat): TUMat; static; inline;
   class function Inverse(const m: TUMat): TUMat; static; overload;
   class function Transpose(const m: TUMat): TUMat; static; overload;
+  class function Norm(const m: TUMat): TUMat; static; overload;
   procedure SetValue(
     const e00, e10, e20, e30: TUFloat;
     const e01, e11, e21, e31: TUFloat;
@@ -263,6 +292,7 @@ public
   ); inline;
   function Inverse: TUMat; overload; inline;
   function Transpose: TUMat; overload; inline;
+  function Norm: TUMat; overload; inline;
   function ToString: String; inline;
 end;
 
@@ -275,13 +305,17 @@ private
 public
   property x: TUFloat read GetX write SetX;
   property y: TUFloat read GetY write SetY;
-  class function Zero: TUVec2; static; inline;
+  const AxisX: TUVec2 = (1, 0);
+  const AxisY: TUVec2 = (0, 1);
+  const Zero: TUVec2 = (0, 0);
   class function Make(const Ax, Ay: TUFloat): TUVec2; static; overload; inline;
-  class function Make(const S: TUFloat): TUVec2; static; overload; inline;
+  class function Make(const s: TUFloat): TUVec2; static; overload; inline;
   class function Dot(const v0, v1: TUVec2): TUFloat; static; overload; inline;
   class function Cross(const v0, v1: TUVec2): TUFloat; static; overload; inline;
   class function Norm(const v: TUVec2): TUVec2; static; overload; inline;
   procedure SetValue(const Ax, Ay: TUFloat); inline;
+  function Transform(const r: TURot2): TUVec2; inline;
+  function TransformInv(const r: TURot2): TUVec2; inline;
   function Dot(const v: TUVec2): TUFloat; overload; inline;
   function Cross(const v: TUVec2): TUFloat; overload; inline;
   function Norm: TUVec2; overload; inline;
@@ -301,7 +335,10 @@ public
   property x: TUFloat read GetX write SetX;
   property y: TUFloat read GetY write SetY;
   property z: TUFloat read GetZ write SetZ;
-  class function Zero: TUVec3; static; inline;
+  const AxisX: TUVec3 = (1, 0, 0);
+  const AxisY: TUVec3 = (0, 1, 0);
+  const AxisZ: TUVec3 = (0, 0, 1);
+  const Zero: TUVec3 = (0, 0, 0);
   class function Make(const Ax, Ay, Az: TUFloat): TUVec3; static; overload; inline;
   class function Make(const v2: TUVec2; const Az: TUFloat): TUVec3; static; overload; inline;
   class function Make(const s: TUFloat): TUVec3; static; overload;
@@ -342,7 +379,11 @@ public
   property y: TUFloat read GetY write SetY;
   property z: TUFloat read GetZ write SetZ;
   property w: TUFloat read GetW write SetW;
-  class function Zero: TUVec4; static; inline;
+  const AxisX: TUVec4 = (1, 0, 0, 0);
+  const AxisY: TUVec4 = (0, 1, 0, 0);
+  const AxisZ: TUVec4 = (0, 0, 1, 0);
+  const AxisW: TUVec4 = (0, 0, 0, 1);
+  const Zero: TUVec4 = (0, 0, 0, 0);
   class function Make(const Ax, Ay, Az, Aw: TUFloat): TUVec4; static; overload; inline;
   class function Make(const v: TUVec3; const Aw: TUFloat): TUVec4; static; overload; inline;
   class function Make(const v0, v1: TUVec2): TUVec4; static; overload; inline;
@@ -355,6 +396,75 @@ public
   function Norm: TUVec4; overload; inline;
   function xyz: TUVec3; inline;
   function xy: TUVec2; inline;
+  function IsZero: Boolean; inline;
+  function ToString: String; inline;
+end;
+
+type TUVec2iImpl = type helper for TUVec2i
+private
+  function GetX: Int32; inline;
+  procedure SetX(const Value: Int32); inline;
+  function GetY: Int32; inline;
+  procedure SetY(const Value: Int32); inline;
+public
+  property x: Int32 read GetX write SetX;
+  property y: Int32 read GetY write SetY;
+  const AxisX: TUVec2i = (1, 0);
+  const AxisY: TUVec2i = (0, 1);
+  const Zero: TUVec2i = (0, 0);
+  class function Make(const Ax, Ay: Int32): TUVec2i; static; overload; inline;
+  class function Make(const s: Int32): TUVec2i; static; overload; inline;
+  procedure SetValue(const Ax, Ay: Int32); inline;
+  function IsZero: Boolean; inline;
+  function ToString: String; inline;
+end;
+
+type TUVec3iImpl = type helper for TUVec3i
+private
+  function GetX: Int32; inline;
+  procedure SetX(const Value: Int32); inline;
+  function GetY: Int32; inline;
+  procedure SetY(const Value: Int32); inline;
+  function GetZ: Int32; inline;
+  procedure SetZ(const Value: Int32); inline;
+public
+  property x: Int32 read GetX write SetX;
+  property y: Int32 read GetY write SetY;
+  property z: Int32 read GetZ write SetZ;
+  const AxisX: TUVec3i = (1, 0, 0);
+  const AxisY: TUVec3i = (0, 1, 0);
+  const AxisZ: TUVec3i = (0, 0, 1);
+  const Zero: TUVec3i = (0, 0, 0);
+  class function Make(const Ax, Ay, Az: Int32): TUVec3i; static; overload; inline;
+  class function Make(const s: Int32): TUVec3i; static; overload; inline;
+  procedure SetValue(const Ax, Ay, Az: Int32); inline;
+  function IsZero: Boolean; inline;
+  function ToString: String; inline;
+end;
+
+type TUVec4iImpl = type helper for TUVec4i
+private
+  function GetX: Int32; inline;
+  procedure SetX(const Value: Int32); inline;
+  function GetY: Int32; inline;
+  procedure SetY(const Value: Int32); inline;
+  function GetZ: Int32; inline;
+  procedure SetZ(const Value: Int32); inline;
+  function GetW: Int32; inline;
+  procedure SetW(const Value: Int32); inline;
+public
+  property x: Int32 read GetX write SetX;
+  property y: Int32 read GetY write SetY;
+  property z: Int32 read GetZ write SetZ;
+  property w: Int32 read GetW write SetW;
+  const AxisX: TUVec4i = (1, 0, 0, 0);
+  const AxisY: TUVec4i = (0, 1, 0, 0);
+  const AxisZ: TUVec4i = (0, 0, 1, 0);
+  const AxisW: TUVec4i = (0, 0, 0, 1);
+  const Zero: TUVec4i = (0, 0, 0, 0);
+  class function Make(const Ax, Ay, Az, Aw: Int32): TUVec4i; static; overload; inline;
+  class function Make(const s: Int32): TUVec4i; static; overload; inline;
+  procedure SetValue(const Ax, Ay, Az, Aw: Int32); inline;
   function IsZero: Boolean; inline;
   function ToString: String; inline;
 end;
@@ -403,6 +513,35 @@ public
     const ord2: UInt8 = 2;
     const ord3: UInt8 = 3
   );
+end;
+
+type TURot2Impl = type helper for TURot2
+strict private
+  function GetAngSin: TUFloat; inline;
+  function GetAngCos: TUFloat; inline;
+  function GetAngle: TUFloat; inline;
+  function GetAxisX: TUVec2; inline;
+  function GetAxisY: TUVec2; inline;
+  procedure SetAngSin(const Value: TUFloat); inline;
+  procedure SetAngCos(const Value: TUFloat); inline;
+  procedure SetAngle(const Angle: TUFloat); inline;
+  procedure SetAxisX(const Value: TUVec2); inline;
+  procedure SetAxisY(const Value: TUVec2); inline;
+public
+  property AngSin: TUFloat read GetAngSin write SetAngSin;
+  property AngCos: TUFloat read GetAngCos write SetAngCos;
+  property Angle: TUFloat read GetAngle write SetAngle;
+  property AxisX: TUVec2 read GetAxisX write SetAxisX;
+  property AxisY: TUVec2 read GetAxisY write SetAxisY;
+  class function Identity: TURot2; static; inline;
+  class function Make(const AAngle: TUFloat): TURot2; static; inline;
+  class function Make(const Rc, Rs: TUFloat): TURot2; static; inline;
+  class function Norm(const Value: TURot2): TURot2; static; overload; inline;
+  procedure SetValue(const Rc, Rs: TUFloat); inline;
+  function Norm: TURot2; inline;
+  function Transform(const v: TUVec2): TUVec2; inline;
+  function TransformInv(const v: TUVec2): TUVec2; inline;
+  function ToString: String; inline;
 end;
 
 type TUCriticalSection = record
@@ -1122,12 +1261,14 @@ procedure USwap(var a: TUVec4; var b: TUVec4); inline; overload;
 procedure USwap(var a: TUMat; var b: TUMat); inline; overload;
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
 generic function USelect<T>(const Cond: Boolean; constref IfTrue: T; constref IfFalse: T): T; inline;
-
+function UCRC32(const CRC: UInt32; const Value: Pointer; const Count: UInt32): UInt32;
+function UCRC64(const CRC: UInt64; const Value: Pointer; const Count: UInt32): UInt64;
 procedure USinCos(const a: TUFloat; out s: TUFloat; out c: TUFloat);
 function UCoTan(const x: TUFloat): TUFloat;
 function UArcCos(const x: TUFloat): TUFloat;
 function UArcTan2(const y, x: TUFloat): TUFloat;
 function UPow(const b, e: TUFloat): TUFloat;
+function UPoT(const x: UInt64): UInt64;
 function UAddMat(const m0, m1: TUMat): TUMat;
 function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 function USubMat(const m0, m1: TUMat): TUMat;
@@ -1512,6 +1653,46 @@ begin
   Self[Index shr 2, Index mod 4] := Value;
 end;
 
+function TUMatImpl.GetAxisX: TUVec3;
+begin
+  Result := PUVec3(@Self[0, 0])^;
+end;
+
+procedure TUMatImpl.SetAxisX(const Value: TUVec3);
+begin
+  PUVec3(@Self[0, 0])^ := Value;
+end;
+
+function TUMatImpl.GetAxisY: TUVec3;
+begin
+  Result := PUVec3(@Self[1, 0])^;
+end;
+
+procedure TUMatImpl.SetAxisY(const Value: TUVec3);
+begin
+  PUVec3(@Self[1, 0])^ := Value;
+end;
+
+function TUMatImpl.GetAxisZ: TUVec3;
+begin
+  Result := PUVec3(@Self[2, 0])^;
+end;
+
+procedure TUMatImpl.SetAxisZ(const Value: TUVec3);
+begin
+  PUVec3(@Self[2, 0])^ := Value;
+end;
+
+function TUMatImpl.GetPosition: TUVec3;
+begin
+  Result := PUVec3(@Self[3, 0])^;
+end;
+
+procedure TUMatImpl.SetPosition(const Value: TUVec3);
+begin
+  PUVec3(@Self[3, 0])^ := Value;
+end;
+
 class function TUMatImpl.Make(
   const e00, e10, e20, e30: TUFloat;
   const e01, e11, e21, e31: TUFloat;
@@ -1782,6 +1963,14 @@ begin
   end;
 end;
 
+class function TUMatImpl.Norm(const m: TUMat): TUMat;
+begin
+  Result := m;
+  Result.AxisX := m.AxisX.Norm;
+  Result.AxisY := m.AxisY.Norm;
+  Result.AxisZ := m.AxisZ.Norm;
+end;
+
 procedure TUMatImpl.SetValue(
   const e00, e10, e20, e30: TUFloat;
   const e01, e11, e21, e31: TUFloat;
@@ -1803,6 +1992,11 @@ end;
 function TUMatImpl.Transpose: TUMat;
 begin
   Result := Transpose(Self);
+end;
+
+function TUMatImpl.Norm: TUMat;
+begin
+  Result := TUMat.Norm(Self);
 end;
 
 function TUMatImpl.ToString: String;
@@ -1845,18 +2039,13 @@ begin
   Self[1] := Value;
 end;
 
-class function TUVec2Impl.Zero: TUVec2;
-begin
-  Result := Make(0);
-end;
-
 class function TUVec2Impl.Make(const Ax, Ay: TUFloat): TUVec2;
 begin
   Result[0] := Ax;
   Result[1] := Ay;
 end;
 
-class function TUVec2Impl.Make(const S: TUFloat): TUVec2;
+class function TUVec2Impl.Make(const s: TUFloat): TUVec2;
 begin
   Result := Make(s, s);
 end;
@@ -1890,6 +2079,16 @@ procedure TUVec2Impl.SetValue(const Ax, Ay: TUFloat);
 begin
   Self[0] := Ax;
   Self[1] := Ay;
+end;
+
+function TUVec2Impl.Transform(const r: TURot2): TUVec2;
+begin
+  Result := r.Transform(Self);
+end;
+
+function TUVec2Impl.TransformInv(const r: TURot2): TUVec2;
+begin
+  Result := r.TransformInv(Self);
 end;
 
 function TUVec2Impl.Dot(const v: TUVec2): TUFloat;
@@ -1947,11 +2146,6 @@ end;
 procedure TUVec3Impl.SetZ(const Value: TUFloat);
 begin
   Self[2] := Value;
-end;
-
-class function TUVec3Impl.Zero: TUVec3;
-begin
-  Result := Make(0);
 end;
 
 class function TUVec3Impl.Make(const Ax, Ay, Az: TUFloat): TUVec3;
@@ -2137,11 +2331,6 @@ begin
   Self[3] := Value;
 end;
 
-class function TUVec4Impl.Zero: TUVec4;
-begin
-  Result := Make(0);
-end;
-
 class function TUVec4Impl.Make(const Ax, Ay, Az, Aw: TUFloat): TUVec4;
 begin
   Result[0] := Ax;
@@ -2231,6 +2420,189 @@ begin
   Result := Format('{%0:0.2f, %1:0.2f, %2:0.2f, %3:0.2f}', [x, y, z, w]);
 end;
 // TUVec4Impl end
+
+// TUVec2iImpl begin
+function TUVec2iImpl.GetX: Int32;
+begin
+  Result := Self[0];
+end;
+
+procedure TUVec2iImpl.SetX(const Value: Int32);
+begin
+  Self[0] := Value;
+end;
+
+function TUVec2iImpl.GetY: Int32;
+begin
+  Result := Self[1];
+end;
+
+procedure TUVec2iImpl.SetY(const Value: Int32);
+begin
+  Self[1] := Value;
+end;
+
+class function TUVec2iImpl.Make(const Ax, Ay: Int32): TUVec2i;
+begin
+  Result[0] := Ax;
+  Result[1] := Ay;
+end;
+
+class function TUVec2iImpl.Make(const s: Int32): TUVec2i;
+begin
+  Result := Make(s, s);
+end;
+
+procedure TUVec2iImpl.SetValue(const Ax, Ay: Int32);
+begin
+  Self[0] := Ax;
+  Self[1] := Ay;
+end;
+
+function TUVec2iImpl.IsZero: Boolean;
+begin
+  Result := (Self[0] = 0) and (Self[1] = 0);
+end;
+
+function TUVec2iImpl.ToString: String;
+begin
+  Result :=  Format('{%0:d, %1:d}', [x, y]);
+end;
+// TUVec2iImpl end
+
+// TUVec3iImpl begin
+function TUVec3iImpl.GetX: Int32;
+begin
+  Result := Self[0];
+end;
+
+procedure TUVec3iImpl.SetX(const Value: Int32);
+begin
+   Self[0] := Value;
+end;
+
+function TUVec3iImpl.GetY: Int32;
+begin
+  Result := Self[1];
+end;
+
+procedure TUVec3iImpl.SetY(const Value: Int32);
+begin
+  Self[1] := Value;
+end;
+
+function TUVec3iImpl.GetZ: Int32;
+begin
+  Result := Self[2];
+end;
+
+procedure TUVec3iImpl.SetZ(const Value: Int32);
+begin
+  Self[2] := Value;
+end;
+
+class function TUVec3iImpl.Make(const Ax, Ay, Az: Int32): TUVec3i;
+begin
+  Result[0] := Ax;
+  Result[1] := Ay;
+  Result[2] := Az;
+end;
+
+class function TUVec3iImpl.Make(const s: Int32): TUVec3i;
+begin
+  Result := Make(s, s, s);
+end;
+
+procedure TUVec3iImpl.SetValue(const Ax, Ay, Az: Int32);
+begin
+  Self[0] := Ax;
+  Self[1] := Ay;
+  Self[2] := Az;
+end;
+
+function TUVec3iImpl.IsZero: Boolean;
+begin
+  Result := (Self[0] = 0) and (Self[1] = 0) and (Self[2] = 0);
+end;
+
+function TUVec3iImpl.ToString: String;
+begin
+  Result :=  Format('{%0:d, %1:d, %2:d}', [x, y, z]);
+end;
+// TUVec3iImpl end
+
+// TUVec4iImpl begin
+function TUVec4iImpl.GetX: Int32;
+begin
+  Result := Self[0];
+end;
+
+procedure TUVec4iImpl.SetX(const Value: Int32);
+begin
+  Self[0] := Value;
+end;
+
+function TUVec4iImpl.GetY: Int32;
+begin
+  Result := Self[1];
+end;
+
+procedure TUVec4iImpl.SetY(const Value: Int32);
+begin
+  Self[1] := Value;
+end;
+
+function TUVec4iImpl.GetZ: Int32;
+begin
+  Result := Self[2];
+end;
+
+procedure TUVec4iImpl.SetZ(const Value: Int32);
+begin
+  Self[2] := Value;
+end;
+
+function TUVec4iImpl.GetW: Int32;
+begin
+  Result := Self[3];
+end;
+
+procedure TUVec4iImpl.SetW(const Value: Int32);
+begin
+  Self[3] := Value;
+end;
+
+class function TUVec4iImpl.Make(const Ax, Ay, Az, Aw: Int32): TUVec4i;
+begin
+  Result[0] := Ax;
+  Result[1] := Ay;
+  Result[2] := Az;
+  Result[3] := Aw;
+end;
+
+class function TUVec4iImpl.Make(const s: Int32): TUVec4i;
+begin
+  Result := Make(s, s, s, s);
+end;
+
+procedure TUVec4iImpl.SetValue(const Ax, Ay, Az, Aw: Int32);
+begin
+  Self[0] := Ax;
+  Self[1] := Ay;
+  Self[2] := Az;
+  Self[3] := Aw;
+end;
+
+function TUVec4iImpl.IsZero: Boolean;
+begin
+  Result := (Self[0] = 0) and (Self[1] = 0) and (Self[2] = 0) and (Self[3] = 0);
+end;
+
+function TUVec4iImpl.ToString: String;
+begin
+  Result :=  Format('{%0:d, %1:d, %2:d, %3:d}', [x, y, z, w]);
+end;
+// TUVec4iImpl end
 
 // TUQuatImpl begin
 function TUQuatImpl.GetX: TUFloat;
@@ -2352,6 +2724,115 @@ begin
   _Remap := ord0 or (ord1 shl 2) or (ord2 shl 4) or (ord3 shl 6);
 end;
 // TUSwizzle end
+
+// TURot2 begin
+function TURot2Impl.GetAngSin: TUFloat;
+begin
+  Result := Self[1];
+end;
+
+function TURot2Impl.GetAngCos: TUFloat;
+begin
+  Result := Self[0];
+end;
+
+function TURot2Impl.GetAngle: TUFloat;
+begin
+  Result := UArcTan2(Self[1], Self[0]);
+end;
+
+function TURot2Impl.GetAxisX: TUVec2;
+begin
+  Result := TUVec2.Make(Self[0], Self[1]);
+end;
+
+function TURot2Impl.GetAxisY: TUVec2;
+begin
+  Result := TUVec2.Make(-Self[1], Self[0]);
+end;
+
+procedure TURot2Impl.SetAngSin(const Value: TUFloat);
+begin
+  Self[0] := Value;
+end;
+
+procedure TURot2Impl.SetAngCos(const Value: TUFloat);
+begin
+  Self[1] := Value;
+end;
+
+procedure TURot2Impl.SetAngle(const Angle: TUFloat);
+begin
+  USinCos(Angle, Self[1], Self[0]);
+end;
+
+procedure TURot2Impl.SetAxisX(const Value: TUVec2);
+begin
+  Self[0] := Value.x;
+  Self[1] := Value.y;
+end;
+
+procedure TURot2Impl.SetAxisY(const Value: TUVec2);
+begin
+  Self[0] := Value.y;
+  Self[1] := -Value.x;
+end;
+
+class function TURot2Impl.Identity: TURot2;
+begin
+  Result := TURot2.Make(1, 0);
+end;
+
+class function TURot2Impl.Make(const AAngle: TUFloat): TURot2;
+begin
+  USinCos(AAngle, Result[1], Result[0]);
+end;
+
+class function TURot2Impl.Make(const Rc, Rs: TUFloat): TURot2;
+begin
+  Result[0] := Rc;
+  Result[1] := Rs;
+end;
+
+class function TURot2Impl.Norm(const Value: TURot2): TURot2;
+  var ValVec2: TUVec2 absolute Value;
+  var ResVec2: TUVec2 absolute Result;
+begin
+  ResVec2 := ValVec2.Norm;
+end;
+
+procedure TURot2Impl.SetValue(const Rc, Rs: TUFloat);
+begin
+  Self[0] := Rc;
+  Self[1] := Rs;
+end;
+
+function TURot2Impl.Norm: TURot2;
+begin
+  Result := Norm(Self);
+end;
+
+function TURot2Impl.Transform(const v: TUVec2): TUVec2;
+begin
+  Result := TUVec2.Make(
+    v.x * AngCos - v.y * AngSin,
+    v.x * AngSin + v.y * AngCos
+  );
+end;
+
+function TURot2Impl.TransformInv(const v: TUVec2): TUVec2;
+begin
+  Result := TUVec2.Make(
+    v.x * AngCos + v.y * AngSin,
+    v.y * AngCos - v.x * AngSin
+  );
+end;
+
+function TURot2Impl.ToString: String;
+begin
+  Result := Format('{%0:0.2f}', [Angle * URadToDeg]);
+end;
+// TURot2 end
 
 // TUCriticalSection begin
 procedure TUCriticalSection.Initialize;
@@ -3471,7 +3952,7 @@ begin
     otUWord: Result := specialize GetDynArrayElement<UInt16>(Index, ArrayIndex);
     otULong: Result := specialize GetDynArrayElement<UInt32>(Index, ArrayIndex);
     otUQWord: Result := specialize GetDynArrayElement<UInt64>(Index, ArrayIndex);
-    else Result := 0;
+    //else Result := 0;
   end;
 end;
 
@@ -6400,6 +6881,122 @@ begin
   if Cond then Exit(IfTrue) else Exit(IfFalse);
 end;
 
+function UCRC32(
+  const CRC: UInt32;
+  const Value: Pointer;
+  const Count: UInt32
+): UInt32;
+  const CRC32Table: array[0..255] of UInt32 = (
+    $00000000, $77073096, $ee0e612c, $990951ba, $076dc419, $706af48f, $e963a535,
+    $9e6495a3, $0edb8832, $79dcb8a4, $e0d5e91e, $97d2d988, $09b64c2b, $7eb17cbd,
+    $e7b82d07, $90bf1d91, $1db71064, $6ab020f2, $f3b97148, $84be41de, $1adad47d,
+    $6ddde4eb, $f4d4b551, $83d385c7, $136c9856, $646ba8c0, $fd62f97a, $8a65c9ec,
+    $14015c4f, $63066cd9, $fa0f3d63, $8d080df5, $3b6e20c8, $4c69105e, $d56041e4,
+    $a2677172, $3c03e4d1, $4b04d447, $d20d85fd, $a50ab56b, $35b5a8fa, $42b2986c,
+    $dbbbc9d6, $acbcf940, $32d86ce3, $45df5c75, $dcd60dcf, $abd13d59, $26d930ac,
+    $51de003a, $c8d75180, $bfd06116, $21b4f4b5, $56b3c423, $cfba9599, $b8bda50f,
+    $2802b89e, $5f058808, $c60cd9b2, $b10be924, $2f6f7c87, $58684c11, $c1611dab,
+    $b6662d3d, $76dc4190, $01db7106, $98d220bc, $efd5102a, $71b18589, $06b6b51f,
+    $9fbfe4a5, $e8b8d433, $7807c9a2, $0f00f934, $9609a88e, $e10e9818, $7f6a0dbb,
+    $086d3d2d, $91646c97, $e6635c01, $6b6b51f4, $1c6c6162, $856530d8, $f262004e,
+    $6c0695ed, $1b01a57b, $8208f4c1, $f50fc457, $65b0d9c6, $12b7e950, $8bbeb8ea,
+    $fcb9887c, $62dd1ddf, $15da2d49, $8cd37cf3, $fbd44c65, $4db26158, $3ab551ce,
+    $a3bc0074, $d4bb30e2, $4adfa541, $3dd895d7, $a4d1c46d, $d3d6f4fb, $4369e96a,
+    $346ed9fc, $ad678846, $da60b8d0, $44042d73, $33031de5, $aa0a4c5f, $dd0d7cc9,
+    $5005713c, $270241aa, $be0b1010, $c90c2086, $5768b525, $206f85b3, $b966d409,
+    $ce61e49f, $5edef90e, $29d9c998, $b0d09822, $c7d7a8b4, $59b33d17, $2eb40d81,
+    $b7bd5c3b, $c0ba6cad, $edb88320, $9abfb3b6, $03b6e20c, $74b1d29a, $ead54739,
+    $9dd277af, $04db2615, $73dc1683, $e3630b12, $94643b84, $0d6d6a3e, $7a6a5aa8,
+    $e40ecf0b, $9309ff9d, $0a00ae27, $7d079eb1, $f00f9344, $8708a3d2, $1e01f268,
+    $6906c2fe, $f762575d, $806567cb, $196c3671, $6e6b06e7, $fed41b76, $89d32be0,
+    $10da7a5a, $67dd4acc, $f9b9df6f, $8ebeeff9, $17b7be43, $60b08ed5, $d6d6a3e8,
+    $a1d1937e, $38d8c2c4, $4fdff252, $d1bb67f1, $a6bc5767, $3fb506dd, $48b2364b,
+    $d80d2bda, $af0a1b4c, $36034af6, $41047a60, $df60efc3, $a867df55, $316e8eef,
+    $4669be79, $cb61b38c, $bc66831a, $256fd2a0, $5268e236, $cc0c7795, $bb0b4703,
+    $220216b9, $5505262f, $c5ba3bbe, $b2bd0b28, $2bb45a92, $5cb36a04, $c2d7ffa7,
+    $b5d0cf31, $2cd99e8b, $5bdeae1d, $9b64c2b0, $ec63f226, $756aa39c, $026d930a,
+    $9c0906a9, $eb0e363f, $72076785, $05005713, $95bf4a82, $e2b87a14, $7bb12bae,
+    $0cb61b38, $92d28e9b, $e5d5be0d, $7cdcefb7, $0bdbdf21, $86d3d2d4, $f1d4e242,
+    $68ddb3f8, $1fda836e, $81be16cd, $f6b9265b, $6fb077e1, $18b74777, $88085ae6,
+    $ff0f6a70, $66063bca, $11010b5c, $8f659eff, $f862ae69, $616bffd3, $166ccf45,
+    $a00ae278, $d70dd2ee, $4e048354, $3903b3c2, $a7672661, $d06016f7, $4969474d,
+    $3e6e77db, $aed16a4a, $d9d65adc, $40df0b66, $37d83bf0, $a9bcae53, $debb9ec5,
+    $47b2cf7f, $30b5ffe9, $bdbdf21c, $cabac28a, $53b39330, $24b4a3a6, $bad03605,
+    $cdd70693, $54de5729, $23d967bf, $b3667a2e, $c4614ab8, $5d681b02, $2a6f2b94,
+    $b40bbe37, $c30c8ea1, $5a05df1b, $2d02ef8d
+  );
+  var i: Int32;
+  var pb: PUInt8Arr absolute Value;
+begin
+  Result := CRC xor $ffffffff;
+  for i := 0 to Count - 1 do
+  begin
+    Result := ((Result shr 8) and $00ffffff) xor CRC32Table[(Result xor pb^[i]) and $ff];
+  end;
+  Result := Result xor $ffffffff;
+end;
+
+function UCRC64(
+  const CRC: UInt64;
+  const Value: Pointer;
+  const Count: UInt32
+): UInt64;
+  const CRC64Table: array[0..255] of UInt64 = (
+    UInt64($0000000000000000), UInt64($7AD870C830358979), UInt64($F5B0E190606B12F2), UInt64($8F689158505E9B8B), UInt64($C038E5739841B68F), UInt64($BAE095BBA8743FF6),
+    UInt64($358804E3F82AA47D), UInt64($4F50742BC81F2D04), UInt64($AB28ECB46814FE75), UInt64($D1F09C7C5821770C), UInt64($5E980D24087FEC87), UInt64($24407DEC384A65FE),
+    UInt64($6B1009C7F05548FA), UInt64($11C8790FC060C183), UInt64($9EA0E857903E5A08), UInt64($E478989FA00BD371), UInt64($7D08FF3B88BE6F81), UInt64($07D08FF3B88BE6F8),
+    UInt64($88B81EABE8D57D73), UInt64($F2606E63D8E0F40A), UInt64($BD301A4810FFD90E), UInt64($C7E86A8020CA5077), UInt64($4880FBD87094CBFC), UInt64($32588B1040A14285),
+    UInt64($D620138FE0AA91F4), UInt64($ACF86347D09F188D), UInt64($2390F21F80C18306), UInt64($594882D7B0F40A7F), UInt64($1618F6FC78EB277B), UInt64($6CC0863448DEAE02),
+    UInt64($E3A8176C18803589), UInt64($997067A428B5BCF0), UInt64($FA11FE77117CDF02), UInt64($80C98EBF2149567B), UInt64($0FA11FE77117CDF0), UInt64($75796F2F41224489),
+    UInt64($3A291B04893D698D), UInt64($40F16BCCB908E0F4), UInt64($CF99FA94E9567B7F), UInt64($B5418A5CD963F206), UInt64($513912C379682177), UInt64($2BE1620B495DA80E),
+    UInt64($A489F35319033385), UInt64($DE51839B2936BAFC), UInt64($9101F7B0E12997F8), UInt64($EBD98778D11C1E81), UInt64($64B116208142850A), UInt64($1E6966E8B1770C73),
+    UInt64($8719014C99C2B083), UInt64($FDC17184A9F739FA), UInt64($72A9E0DCF9A9A271), UInt64($08719014C99C2B08), UInt64($4721E43F0183060C), UInt64($3DF994F731B68F75),
+    UInt64($B29105AF61E814FE), UInt64($C849756751DD9D87), UInt64($2C31EDF8F1D64EF6), UInt64($56E99D30C1E3C78F), UInt64($D9810C6891BD5C04), UInt64($A3597CA0A188D57D),
+    UInt64($EC09088B6997F879), UInt64($96D1784359A27100), UInt64($19B9E91B09FCEA8B), UInt64($636199D339C963F2), UInt64($DF7ADABD7A6E2D6F), UInt64($A5A2AA754A5BA416),
+    UInt64($2ACA3B2D1A053F9D), UInt64($50124BE52A30B6E4), UInt64($1F423FCEE22F9BE0), UInt64($659A4F06D21A1299), UInt64($EAF2DE5E82448912), UInt64($902AAE96B271006B),
+    UInt64($74523609127AD31A), UInt64($0E8A46C1224F5A63), UInt64($81E2D7997211C1E8), UInt64($FB3AA75142244891), UInt64($B46AD37A8A3B6595), UInt64($CEB2A3B2BA0EECEC),
+    UInt64($41DA32EAEA507767), UInt64($3B024222DA65FE1E), UInt64($A2722586F2D042EE), UInt64($D8AA554EC2E5CB97), UInt64($57C2C41692BB501C), UInt64($2D1AB4DEA28ED965),
+    UInt64($624AC0F56A91F461), UInt64($1892B03D5AA47D18), UInt64($97FA21650AFAE693), UInt64($ED2251AD3ACF6FEA), UInt64($095AC9329AC4BC9B), UInt64($7382B9FAAAF135E2),
+    UInt64($FCEA28A2FAAFAE69), UInt64($8632586ACA9A2710), UInt64($C9622C4102850A14), UInt64($B3BA5C8932B0836D), UInt64($3CD2CDD162EE18E6), UInt64($460ABD1952DB919F),
+    UInt64($256B24CA6B12F26D), UInt64($5FB354025B277B14), UInt64($D0DBC55A0B79E09F), UInt64($AA03B5923B4C69E6), UInt64($E553C1B9F35344E2), UInt64($9F8BB171C366CD9B),
+    UInt64($10E3202993385610), UInt64($6A3B50E1A30DDF69), UInt64($8E43C87E03060C18), UInt64($F49BB8B633338561), UInt64($7BF329EE636D1EEA), UInt64($012B592653589793),
+    UInt64($4E7B2D0D9B47BA97), UInt64($34A35DC5AB7233EE), UInt64($BBCBCC9DFB2CA865), UInt64($C113BC55CB19211C), UInt64($5863DBF1E3AC9DEC), UInt64($22BBAB39D3991495),
+    UInt64($ADD33A6183C78F1E), UInt64($D70B4AA9B3F20667), UInt64($985B3E827BED2B63), UInt64($E2834E4A4BD8A21A), UInt64($6DEBDF121B863991), UInt64($1733AFDA2BB3B0E8),
+    UInt64($F34B37458BB86399), UInt64($8993478DBB8DEAE0), UInt64($06FBD6D5EBD3716B), UInt64($7C23A61DDBE6F812), UInt64($3373D23613F9D516), UInt64($49ABA2FE23CC5C6F),
+    UInt64($C6C333A67392C7E4), UInt64($BC1B436E43A74E9D), UInt64($95AC9329AC4BC9B5), UInt64($EF74E3E19C7E40CC), UInt64($601C72B9CC20DB47), UInt64($1AC40271FC15523E),
+    UInt64($5594765A340A7F3A), UInt64($2F4C0692043FF643), UInt64($A02497CA54616DC8), UInt64($DAFCE7026454E4B1), UInt64($3E847F9DC45F37C0), UInt64($445C0F55F46ABEB9),
+    UInt64($CB349E0DA4342532), UInt64($B1ECEEC59401AC4B), UInt64($FEBC9AEE5C1E814F), UInt64($8464EA266C2B0836), UInt64($0B0C7B7E3C7593BD), UInt64($71D40BB60C401AC4),
+    UInt64($E8A46C1224F5A634), UInt64($927C1CDA14C02F4D), UInt64($1D148D82449EB4C6), UInt64($67CCFD4A74AB3DBF), UInt64($289C8961BCB410BB), UInt64($5244F9A98C8199C2),
+    UInt64($DD2C68F1DCDF0249), UInt64($A7F41839ECEA8B30), UInt64($438C80A64CE15841), UInt64($3954F06E7CD4D138), UInt64($B63C61362C8A4AB3), UInt64($CCE411FE1CBFC3CA),
+    UInt64($83B465D5D4A0EECE), UInt64($F96C151DE49567B7), UInt64($76048445B4CBFC3C), UInt64($0CDCF48D84FE7545), UInt64($6FBD6D5EBD3716B7), UInt64($15651D968D029FCE),
+    UInt64($9A0D8CCEDD5C0445), UInt64($E0D5FC06ED698D3C), UInt64($AF85882D2576A038), UInt64($D55DF8E515432941), UInt64($5A3569BD451DB2CA), UInt64($20ED197575283BB3),
+    UInt64($C49581EAD523E8C2), UInt64($BE4DF122E51661BB), UInt64($3125607AB548FA30), UInt64($4BFD10B2857D7349), UInt64($04AD64994D625E4D), UInt64($7E7514517D57D734),
+    UInt64($F11D85092D094CBF), UInt64($8BC5F5C11D3CC5C6), UInt64($12B5926535897936), UInt64($686DE2AD05BCF04F), UInt64($E70573F555E26BC4), UInt64($9DDD033D65D7E2BD),
+    UInt64($D28D7716ADC8CFB9), UInt64($A85507DE9DFD46C0), UInt64($273D9686CDA3DD4B), UInt64($5DE5E64EFD965432), UInt64($B99D7ED15D9D8743), UInt64($C3450E196DA80E3A),
+    UInt64($4C2D9F413DF695B1), UInt64($36F5EF890DC31CC8), UInt64($79A59BA2C5DC31CC), UInt64($037DEB6AF5E9B8B5), UInt64($8C157A32A5B7233E), UInt64($F6CD0AFA9582AA47),
+    UInt64($4AD64994D625E4DA), UInt64($300E395CE6106DA3), UInt64($BF66A804B64EF628), UInt64($C5BED8CC867B7F51), UInt64($8AEEACE74E645255), UInt64($F036DC2F7E51DB2C),
+    UInt64($7F5E4D772E0F40A7), UInt64($05863DBF1E3AC9DE), UInt64($E1FEA520BE311AAF), UInt64($9B26D5E88E0493D6), UInt64($144E44B0DE5A085D), UInt64($6E963478EE6F8124),
+    UInt64($21C640532670AC20), UInt64($5B1E309B16452559), UInt64($D476A1C3461BBED2), UInt64($AEAED10B762E37AB), UInt64($37DEB6AF5E9B8B5B), UInt64($4D06C6676EAE0222),
+    UInt64($C26E573F3EF099A9), UInt64($B8B627F70EC510D0), UInt64($F7E653DCC6DA3DD4), UInt64($8D3E2314F6EFB4AD), UInt64($0256B24CA6B12F26), UInt64($788EC2849684A65F),
+    UInt64($9CF65A1B368F752E), UInt64($E62E2AD306BAFC57), UInt64($6946BB8B56E467DC), UInt64($139ECB4366D1EEA5), UInt64($5CCEBF68AECEC3A1), UInt64($2616CFA09EFB4AD8),
+    UInt64($A97E5EF8CEA5D153), UInt64($D3A62E30FE90582A), UInt64($B0C7B7E3C7593BD8), UInt64($CA1FC72BF76CB2A1), UInt64($45775673A732292A), UInt64($3FAF26BB9707A053),
+    UInt64($70FF52905F188D57), UInt64($0A2722586F2D042E), UInt64($854FB3003F739FA5), UInt64($FF97C3C80F4616DC), UInt64($1BEF5B57AF4DC5AD), UInt64($61372B9F9F784CD4),
+    UInt64($EE5FBAC7CF26D75F), UInt64($9487CA0FFF135E26), UInt64($DBD7BE24370C7322), UInt64($A10FCEEC0739FA5B), UInt64($2E675FB4576761D0), UInt64($54BF2F7C6752E8A9),
+    UInt64($CDCF48D84FE75459), UInt64($B71738107FD2DD20), UInt64($387FA9482F8C46AB), UInt64($42A7D9801FB9CFD2), UInt64($0DF7ADABD7A6E2D6), UInt64($772FDD63E7936BAF),
+    UInt64($F8474C3BB7CDF024), UInt64($829F3CF387F8795D), UInt64($66E7A46C27F3AA2C), UInt64($1C3FD4A417C62355), UInt64($935745FC4798B8DE), UInt64($E98F353477AD31A7),
+    UInt64($A6DF411FBFB21CA3), UInt64($DC0731D78F8795DA), UInt64($536FA08FDFD90E51), UInt64($29B7D047EFEC8728)
+  );
+  var i: Int32;
+  var pb: PUInt8Arr absolute Value;
+begin
+  Result := CRC xor UInt64($ffffffffffffffff);
+  for i := 0 to Count - 1 do
+  begin
+    Result := ((Result shr 8) and UINt64($00ffffffffffffff)) xor CRC64Table[(Result xor pb^[i]) and $ff];
+  end;
+  Result := Result xor UInt64($ffffffffffffffff);
+end;
+
 procedure USinCos(const a: TUFloat; out s: TUFloat; out c: TUFloat);
 begin
   s := Sin(a);
@@ -6437,6 +7034,18 @@ end;
 function UPow(const b, e: TUFloat): TUFloat;
 begin
   Result := Exp(e * Ln(b));
+end;
+
+function UPoT(const x: UInt64): UInt64;
+  var n: Int32;
+begin
+  if x = 0 then Exit(0);
+  Result := x - 1;
+  for n := 0 to 5 do
+  begin
+    Result := Result or (Result shr (1 shl n));
+  end;
+  Result += 1;
 end;
 
 function UAddMat(const m0, m1: TUMat): TUMat;
