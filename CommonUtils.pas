@@ -27,44 +27,54 @@ uses
 type TUProcedure = procedure of object;
 type TUFunction = function: Boolean of object;
 
-type TUStrArr = array of String;
-type TUStrArrArr = array of array of String;
-type TUDateTimeArr = array of TDateTime;
-type TUVarRecArr = array of TVarRec;
+type TUStrArray = array of String;
+type TUStrArrayArray = array of array of String;
+type TUDateTimeArray = array of TDateTime;
+type TUVarRecArray = array of TVarRec;
 
 type TUFloat = type Single;
 type PUFloat = ^TUFloat;
 type TUFloatArr = array[UInt16] of TUFloat;
 type PUFloatArr = ^TUFloatArr;
+type TUFloatArray = array of TUFloat;
 type TUDouble = type Double;
 type PUDouble = ^TUDouble;
 type TUDoubleArr = array[UInt16] of TUDouble;
 type PUDoubleArr = ^TUDoubleArr;
+type TUDoubleArray = array of TUDouble;
 
 type TUInt8 = type UInt8;
 type TUInt8Arr = array[UInt16] of TUInt8;
 type PUInt8Arr = ^TUInt8Arr;
+type TUInt8Array = array of TUInt8;
 type TUInt16 = type UInt16;
 type TUInt16Arr = array[UInt16] of TUInt16;
 type PUInt16Arr = ^TUInt16Arr;
+type TUInt16Array = array of TUInt16;
 type TUInt32 = type UInt32;
 type TUInt32Arr = array[UInt16] of TUInt32;
 type PUInt32Arr = ^TUInt32Arr;
+type TUInt32Array = array of TUInt32;
 type TUInt64 = type UInt64;
 type TUInt64Arr = array[UInt16] of TUInt64;
 type PUInt64Arr = ^TUInt64Arr;
+type TUInt64Array = array of TUInt64;
 type TInt8 = type Int8;
 type TInt8Arr = array[UInt16] of TInt8;
 type PInt8Arr = ^TInt8Arr;
+type TInt8Array = array of TInt8;
 type TInt16 = type Int16;
 type TInt16Arr = array[UInt16] of TInt16;
 type PInt16Arr = ^TInt16Arr;
+type TInt16Array = array of TInt16;
 type TInt32 = type Int32;
 type TInt32Arr = array[UInt16] of TInt32;
 type PInt32Arr = ^TInt32Arr;
+type TInt32Array = array of TInt32;
 type TInt64 = type Int64;
 type TInt64Arr = array[UInt16] of TInt64;
 type PInt64Arr = ^TInt64Arr;
+type TInt64Array = array of TInt64;
 
 type TUColor = UInt32;
 type PUColor = ^TUColor;
@@ -88,7 +98,7 @@ type PUVec3Arr = ^TUVec3Arr;
 type TUVec3Array = array of TUVec3;
 type TUVec4 = array[0..3] of TUFloat;
 type PUVec4 = ^TUVec4;
-type TUVec4Arr = array[UInt16] of TUVec3;
+type TUVec4Arr = array[UInt16] of TUVec4;
 type PUVec4Arr = ^TUVec4Arr;
 type TUVec2i = array[0..1] of Int32;
 type PUVec2i = ^TUVec2i;
@@ -1163,7 +1173,7 @@ procedure UMove(out Dest; const Src; const Size: UInt32);
 function USignOf(const v: Int64): Int64;
 function UIntToPtr(const i: PtrUInt): Pointer;
 function UCopyVarRec(constref src: TVarRec): TVarRec;
-function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArr;
+function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArray;
 procedure UFinalizeVarRec(var vr: TVarRec);
 procedure UFinalizeVarRecArr(var arr: array of TVarRec);
 function UIntToBool(const i: Integer): Boolean;
@@ -1276,7 +1286,7 @@ function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4;
 function UTriangleNormal(const v0, v1, v2: TUVec3): TUVec3;
 function UXc2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
 
-function UStrExplode(const Str: String; const Separator: String): TUStrArr;
+function UStrExplode(const Str: String; const Separator: String): TUStrArray;
 function UStrIsNumber(const Str: String): Boolean;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UFileToStr(const FileName: String): String;
@@ -5911,7 +5921,7 @@ end;
 function TUJson.ReadJson(const p: TUParser): Boolean;
   var t: TUParserToken;
   var NamedNode: TNamedNode;
-  var StrArr: TUStrArr;
+  var StrArr: TUStrArray;
   var Json: TUJson;
 begin
   Result := False;
@@ -6347,7 +6357,7 @@ begin
   end;
 end;
 
-function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArr;
+function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArray;
   var i: Integer;
 begin
   Result := nil;

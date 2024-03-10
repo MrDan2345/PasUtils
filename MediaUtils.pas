@@ -242,6 +242,7 @@ type
       function GetLocalTransform: TUMat; inline;
       procedure SetLocalTransform(const Value: TUMat);
     public
+      //var UpdateTransform: Boolean;
       property Name: String read _Name;
       property Transform: TUMat read _Transform write SetTransform;
       property LocalTransform: TUMat read GetLocalTransform write SetLocalTransform;
@@ -582,13 +583,13 @@ type
       type TNodeList = array of TColladaNode;
     private
       var _NodeType: TColladaNodeType;
-      var _Layers: TUStrArr;
+      var _Layers: TUStrArray;
       var _Nodes: TNodeList;
       var _Instances: TColladaInstanceList;
     public
       var Matrix: TUMat;
       property NodeType: TColladaNodeType read _NodeType;
-      property Layers: TUStrArr read _Layers;
+      property Layers: TUStrArray read _Layers;
       property Nodes: TNodeList read _Nodes;
       property Instances: TColladaInstanceList read _Instances;
       constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
@@ -1287,6 +1288,7 @@ type
     end;
     var _Root: TColladaRoot;
     var _Path: String;
+    class function ParseStrToIntArray(const Str: String; const ItemCount: Int32 = 0): TInt32Array;
     class function FindNextValue(const Str: String; var CurPos: Int32): String;
     class function LoadMatrix(
       const Node: TUXML
@@ -3081,7 +3083,7 @@ end;
 function TUSceneDataDAE.TColladaObject.Find(const Path: String): TColladaObject;
   var SearchPath: String;
   var i: Int32;
-  var PathArr: TUStrArr;
+  var PathArr: TUStrArray;
 begin
   if Length(Path) = 0 then Exit(nil);
   SearchPath := Path;
@@ -3799,7 +3801,8 @@ constructor TUSceneDataDAE.TColladaTriangles.Create(
   var Node: TUXML;
   var NodeName: String;
   var IndexStr: String;
-  var i, p, MaxOffset: Int32;
+  var i, j, t, p, MaxOffset: Int32;
+  var vcount: TInt32Array;
 begin
   inherited Create(XMLNode, AParent);
   _MaterialRef := XMLNode.AttributeValue['material'];
@@ -3817,6 +3820,10 @@ begin
     else if NodeName = 'p' then
     begin
       IndexStr += Node.Content;
+    end
+    else if NodeName = 'vcount' then
+    begin
+      vcount := ParseStrToIntArray(Node.Content, _Count);
     end;
   end;
   MaxOffset := 0;
@@ -3828,11 +3835,35 @@ begin
   _InputStride := MaxOffset + 1;
   if Length(IndexStr) > 0 then
   begin
-    SetLength(_Indices, _Count * 3 * (_InputStride));
-    p := 1;
-    for i := 0 to High(_Indices) do
+    if Length(vcount) > 0 then
     begin
-      _Indices[i] := StrToIntDef(FindNextValue(IndexStr, p), 0);
+      p := 0;
+      for i := 0 to High(vcount) do
+      begin
+        p += (vcount[i] - 2);
+      end;
+      SetLength(_Indices, p * 3 * _InputStride);
+      p := 1;
+      t := 0;
+      for i := 0 to High(vcount) do
+      begin
+        for j := 0 to vcount[i] - 2 do
+        begin
+          _Indices[t * 3 + 0] := StrToIntDef(FindNextValue(IndexStr, p), 0);
+          _Indices[t * 3 + 1] := StrToIntDef(FindNextValue(IndexStr, p), 0);
+          _Indices[t * 3 + 2] := StrToIntDef(FindNextValue(IndexStr, p), 0);
+          Inc(t);
+        end;
+      end;
+    end
+    else
+    begin
+      SetLength(_Indices, _Count * 3 * _InputStride);
+      p := 1;
+      for i := 0 to High(_Indices) do
+      begin
+        _Indices[i] := StrToIntDef(FindNextValue(IndexStr, p), 0);
+      end;
     end;
   end;
 end;
@@ -3903,7 +3934,9 @@ begin
         _Vertices := TColladaVertices.Create(Node, Self);
       end;
     end
-    else if (NodeName = 'triangles') or (NodeName = 'polygons') then
+    else if (NodeName = 'triangles')
+    or (NodeName = 'polygons')
+    or (NodeName = 'polylist') then
     begin
       specialize UArrAppend<TColladaTriangles>(
         _TrianglesList, TColladaTriangles.Create(Node, Self)
@@ -4855,7 +4888,7 @@ constructor TUSceneDataDAE.TColladaLight.Create(
 );
   var Node, NodeLight, NodeParams: TUXML;
   var NodeName: String;
-  var NodeValue: TUStrArr;
+  var NodeValue: TUStrArray;
   var i: Int32;
 begin
   inherited Create(XMLNode, AParent);
@@ -6154,6 +6187,40 @@ begin
   for i := 0 to High(_Children) do
   begin
     TNodeInterfaceCollada(_Children[i]).ProcessAttachments;
+  end;
+end;
+
+class function TUSceneDataDAE.ParseStrToIntArray(const Str: String; const ItemCount: Int32): TInt32Array;
+  var i, p: Int32;
+  var s: String;
+begin
+  Result := nil;
+  if ItemCount <> 0 then
+  begin
+    SetLength(Result, Length(Str));
+  end
+  else
+  begin
+    SetLength(Result, ItemCount);
+  end;
+  p := 1;
+  i := 0;
+  repeat
+    s := FindNextValue(Str, p);
+    if Length(s) > 0 then
+    begin
+      if High(Result) < i then
+      begin
+        SetLength(Result, i + 1);
+      end;
+      Result[i] := StrToIntDef(s, 0);
+      if Result[i] < 3 then RunError;
+    end;
+    Inc(i);
+  until (Length(s) = 0) or (i = ItemCount);
+  if (ItemCount = 0) and (Length(Result) <> i) then
+  begin
+    SetLength(Result, i);
   end;
 end;
 
