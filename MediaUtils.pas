@@ -236,9 +236,15 @@ type
       var _Parent: TNodeInterface;
       var _Children: TNodeList;
       procedure SetParent(const Value: TNodeInterface);
+      procedure ApplyTransform(const Value: TUMat);
+      procedure SetTransform(const Value: TUMat);
+      function GetLocalTransform: TUMat; inline;
+      procedure SetLocalTransform(const Value: TUMat);
     public
+      //var UpdateTransform: Boolean;
       property Name: String read _Name;
-      property Transform: TUMat read _Transform write _Transform;
+      property Transform: TUMat read _Transform write SetTransform;
+      property LocalTransform: TUMat read GetLocalTransform write SetLocalTransform;
       property Attachments: TAttachmentList read _Attachments;
       property Children: TNodeList read _Children;
       property Parent: TNodeInterface read _Parent write SetParent;
@@ -576,13 +582,13 @@ type
       type TNodeList = array of TColladaNode;
     private
       var _NodeType: TColladaNodeType;
-      var _Layers: TUStrArr;
+      var _Layers: TUStrArray;
       var _Nodes: TNodeList;
       var _Instances: TColladaInstanceList;
     public
       var Matrix: TUMat;
       property NodeType: TColladaNodeType read _NodeType;
-      property Layers: TUStrArr read _Layers;
+      property Layers: TUStrArray read _Layers;
       property Nodes: TNodeList read _Nodes;
       property Instances: TColladaInstanceList read _Instances;
       constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
@@ -1278,6 +1284,7 @@ type
     end;
     var _Root: TColladaRoot;
     var _Path: String;
+    class function ParseStrToIntArray(const Str: String; const ItemCount: Int32 = 0): TInt32Array;
     class function FindNextValue(const Str: String; var CurPos: Int32): String;
     class function LoadMatrix(
       const Node: TUXML
@@ -2523,6 +2530,47 @@ begin
   end;
 end;
 
+procedure TUSceneData.TNodeInterface.ApplyTransform(const Value: TUMat);
+  var i: Int32;
+begin
+  _Transform := _Transform * Value;
+  for i := 0 to High(_Children) do
+  begin
+    _Children[i].ApplyTransform(Value);
+  end;
+end;
+
+procedure TUSceneData.TNodeInterface.SetTransform(const Value: TUMat);
+  var Diff: TUMat;
+begin
+  Diff := _Transform.Inverse * Value;
+  ApplyTransform(Diff);
+end;
+
+function TUSceneData.TNodeInterface.GetLocalTransform: TUMat;
+begin
+  if Assigned(_Parent) then
+  begin
+    Result := _Parent.Transform.Inverse * _Transform;
+  end
+  else
+  begin
+    Result := _Transform;
+  end;
+end;
+
+procedure TUSceneData.TNodeInterface.SetLocalTransform(const Value: TUMat);
+begin
+  if Assigned(_Parent) then
+  begin
+    SetTransform(Value * _Parent.Transform)
+  end
+  else
+  begin
+    SetTransform(Value);
+  end;
+end;
+
 destructor TUSceneData.TNodeInterface.Destroy;
 begin
   specialize UArrClear<TAttachment>(_Attachments);
@@ -3021,7 +3069,7 @@ end;
 function TUSceneDataDAE.TColladaObject.Find(const Path: String): TColladaObject;
   var SearchPath: String;
   var i: Int32;
-  var PathArr: TUStrArr;
+  var PathArr: TUStrArray;
 begin
   if Length(Path) = 0 then Exit(nil);
   SearchPath := Path;
@@ -3739,7 +3787,8 @@ constructor TUSceneDataDAE.TColladaTriangles.Create(
   var Node: TUXML;
   var NodeName: String;
   var IndexStr: String;
-  var i, p, MaxOffset: Int32;
+  var i, j, t, p, MaxOffset: Int32;
+  var vcount: TInt32Array;
 begin
   inherited Create(XMLNode, AParent);
   _MaterialRef := XMLNode.AttributeValue['material'];
@@ -3757,6 +3806,10 @@ begin
     else if NodeName = 'p' then
     begin
       IndexStr += Node.Content;
+    end
+    else if NodeName = 'vcount' then
+    begin
+      vcount := ParseStrToIntArray(Node.Content, _Count);
     end;
   end;
   MaxOffset := 0;
@@ -3768,11 +3821,35 @@ begin
   _InputStride := MaxOffset + 1;
   if Length(IndexStr) > 0 then
   begin
-    SetLength(_Indices, _Count * 3 * (_InputStride));
-    p := 1;
-    for i := 0 to High(_Indices) do
+    if Length(vcount) > 0 then
     begin
-      _Indices[i] := StrToIntDef(FindNextValue(IndexStr, p), 0);
+      p := 0;
+      for i := 0 to High(vcount) do
+      begin
+        p += (vcount[i] - 2);
+      end;
+      SetLength(_Indices, p * 3 * _InputStride);
+      p := 1;
+      t := 0;
+      for i := 0 to High(vcount) do
+      begin
+        for j := 0 to vcount[i] - 2 do
+        begin
+          _Indices[t * 3 + 0] := StrToIntDef(FindNextValue(IndexStr, p), 0);
+          _Indices[t * 3 + 1] := StrToIntDef(FindNextValue(IndexStr, p), 0);
+          _Indices[t * 3 + 2] := StrToIntDef(FindNextValue(IndexStr, p), 0);
+          Inc(t);
+        end;
+      end;
+    end
+    else
+    begin
+      SetLength(_Indices, _Count * 3 * _InputStride);
+      p := 1;
+      for i := 0 to High(_Indices) do
+      begin
+        _Indices[i] := StrToIntDef(FindNextValue(IndexStr, p), 0);
+      end;
     end;
   end;
 end;
@@ -3843,7 +3920,9 @@ begin
         _Vertices := TColladaVertices.Create(Node, Self);
       end;
     end
-    else if (NodeName = 'triangles') or (NodeName = 'polygons') then
+    else if (NodeName = 'triangles')
+    or (NodeName = 'polygons')
+    or (NodeName = 'polylist') then
     begin
       specialize UArrAppend<TColladaTriangles>(
         _TrianglesList, TColladaTriangles.Create(Node, Self)
@@ -4795,7 +4874,7 @@ constructor TUSceneDataDAE.TColladaLight.Create(
 );
   var Node, NodeLight, NodeParams: TUXML;
   var NodeName: String;
-  var NodeValue: TUStrArr;
+  var NodeValue: TUStrArray;
   var i: Int32;
 begin
   inherited Create(XMLNode, AParent);
@@ -5877,7 +5956,7 @@ begin
   for i := 0 to High(_Joints) do
   begin
     _Joints[i].Name := ColladaSkin.Joints.Joints[i].JointName;
-    _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose.Transpose;
+    _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose;
   end;
   Weights := nil;
   SetLength(Weights, ColladaSkin.VertexWeights.VCount);
@@ -5954,7 +6033,7 @@ begin
   begin
     _Keys[i].Time := ColladaChannel.Sampler.Keys[i]^.Time;
     _Keys[i].Value := PUMat(ColladaChannel.Sampler.Keys[i]^.Value)^;
-    //_Keys[i].Value := _Keys[i].Value.Transpose;
+    _Keys[i].Value := _Keys[i].Value.Transpose;
     case (ColladaChannel.Sampler.Keys[i]^.Interpolation) of
       ai_step: _Keys[i].Interpolation := ki_step;
       ai_linear, ai_bezier: _Keys[i].Interpolation := ki_linear;
@@ -5975,7 +6054,7 @@ constructor TUSceneDataDAE.TAnimationInterfaceCollada.Create(
         _Tracks, TTrackCollada.Create(Channel)
       );
     end;
-    for ChildAnimation in ColladaAnimation.Animations do
+    for ChildAnimation in Animation.Animations do
     begin
       AddTrack(ChildAnimation);
     end;
@@ -6040,9 +6119,10 @@ begin
   Parent := AParent;
   if Assigned(ColladaNode) then
   begin
-    _Transform := ColladaNode.Matrix.Transpose;// * _Parent.Transform;
     ColladaNode.UserData := Self;
-    _Transform := ColladaNode.Matrix;
+    LocalTransform := ColladaNode.Matrix;
+    Write(ColladaNode.AnyName, ': ');
+    WriteLn(_Transform.ToString);
     if Length(ColladaNode.Name) > 0 then
     begin
       _Name := ColladaNode.Name;
@@ -6077,6 +6157,40 @@ begin
         );
       end;
     end;
+  end;
+end;
+
+class function TUSceneDataDAE.ParseStrToIntArray(const Str: String; const ItemCount: Int32): TInt32Array;
+  var i, p: Int32;
+  var s: String;
+begin
+  Result := nil;
+  if ItemCount <> 0 then
+  begin
+    SetLength(Result, Length(Str));
+  end
+  else
+  begin
+    SetLength(Result, ItemCount);
+  end;
+  p := 1;
+  i := 0;
+  repeat
+    s := FindNextValue(Str, p);
+    if Length(s) > 0 then
+    begin
+      if High(Result) < i then
+      begin
+        SetLength(Result, i + 1);
+      end;
+      Result[i] := StrToIntDef(s, 0);
+      if Result[i] < 3 then RunError;
+    end;
+    Inc(i);
+  until (Length(s) = 0) or (i = ItemCount);
+  if (ItemCount = 0) and (Length(Result) <> i) then
+  begin
+    SetLength(Result, i);
   end;
 end;
 
@@ -6200,48 +6314,63 @@ begin
   _Root.Resolve;
   _Root.Initialize;
   //_Root.Dump;
-  for Image in _Root.LibImages.Images do
+  if Assigned(_Root.LibImages) then
   begin
-    IntfImage := TImageInterfaceCollada.Create(Image);
-    specialize UArrAppend<TImageInterface>(
-      _ImageList, IntfImage
-    );
+    for Image in _Root.LibImages.Images do
+    begin
+      IntfImage := TImageInterfaceCollada.Create(Image);
+      specialize UArrAppend<TImageInterface>(
+        _ImageList, IntfImage
+      );
+    end;
   end;
-  for Mat in _Root.LibMaterials.Materials do
+  if Assigned(_Root.LibMaterials) then
   begin
-    IntfMat := TMaterialInterfaceCollada.Create(Mat);
-    specialize UArrAppend<TMaterialInterface>(
-      _MaterialList, IntfMat
-    );
+    for Mat in _Root.LibMaterials.Materials do
+    begin
+      IntfMat := TMaterialInterfaceCollada.Create(Mat);
+      specialize UArrAppend<TMaterialInterface>(
+        _MaterialList, IntfMat
+      );
+    end;
   end;
-  for Geom in _Root.LibGeometries.Geometries do
+  if Assigned(_Root.LibGeometries) then
   begin
-    IntfMesh := TMeshInterfaceCollada.Create(Geom);
-    specialize UArrAppend<TMeshInterface>(
-      _MeshList, IntfMesh
-    );
+    for Geom in _Root.LibGeometries.Geometries do
+    begin
+      IntfMesh := TMeshInterfaceCollada.Create(Geom);
+      specialize UArrAppend<TMeshInterface>(
+        _MeshList, IntfMesh
+      );
+    end;
   end;
-  for Controller in _Root.LibControllers.Controllers do
-  if Controller.ControllerType = ct_skin then
+  if Assigned(_Root.LibControllers) then
   begin
-    Skin := Controller.AsSkin;
-    if not Assigned(Skin) then Continue;
-    IntfSkin := TSkinInterfaceCollada.Create(Skin);
-    specialize UArrAppend<TSkinInterface>(
-      _SkinList, IntfSkin
-    );
+    for Controller in _Root.LibControllers.Controllers do
+    if Controller.ControllerType = ct_skin then
+    begin
+      Skin := Controller.AsSkin;
+      if not Assigned(Skin) then Continue;
+      IntfSkin := TSkinInterfaceCollada.Create(Skin);
+      specialize UArrAppend<TSkinInterface>(
+        _SkinList, IntfSkin
+      );
+    end;
   end;
   _RootNode := TNodeInterfaceCollada.Create(nil, nil);
   for Node in _Root.Scene.VisualScene.VisualScene.Nodes do
   begin
     TNodeInterfaceCollada.Create(Node, TNodeInterfaceCollada(_RootNode));
   end;
-  for Anim in _Root.LibAnimations.Animations do
+  if Assigned(_Root.LibAnimations) then
   begin
-    IntfAnim := TAnimationInterfaceCollada.Create(Anim);
-    specialize UArrAppend<TAnimationInterface>(
-      _AnimationList, IntfAnim
-    );
+    for Anim in _Root.LibAnimations.Animations do
+    begin
+      IntfAnim := TAnimationInterfaceCollada.Create(Anim);
+      specialize UArrAppend<TAnimationInterface>(
+        _AnimationList, IntfAnim
+      );
+    end;
   end;
 end;
 
