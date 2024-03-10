@@ -1279,8 +1279,11 @@ type
       constructor Create(const ControllerInstance: TColladaInstanceController);
     end;
     type TNodeInterfaceCollada = class (TNodeInterface)
+    private
+      var _ColladaNode: TColladaNode;
     public
-      constructor Create(const ColladaNode: TColladaNode; const AParent: TNodeInterfaceCollada);
+      constructor Create(const AColladaNode: TColladaNode; const AParent: TNodeInterfaceCollada);
+      procedure ProcessAttachments;
     end;
     var _Root: TColladaRoot;
     var _Path: String;
@@ -6077,6 +6080,7 @@ begin
   begin
     JointObject := FindNode(ControllerInstance.Skeleton, _Skin.Joints[i].Name);
     _JointBindings[i] := TNodeInterface(JointObject.UserData);
+    WriteLn(_JointBindings[i].Name);
   end;
   _MaterialBindings := GenerateMaterialBindings(
     ControllerInstance.Controller.AsSkin.Geometry, ControllerInstance.MaterialBindings
@@ -6084,54 +6088,72 @@ begin
 end;
 
 constructor TUSceneDataDAE.TNodeInterfaceCollada.Create(
-  const ColladaNode: TColladaNode;
+  const AColladaNode: TColladaNode;
   const AParent: TNodeInterfaceCollada
 );
   var Child: TColladaObject;
-  var AttachMesh: TAttachmentMeshCollada;
-  var AttachSkin: TAttachmentSkinCollada;
 begin
   inherited Create;
   _Transform := TUMat.Identity;
+  _ColladaNode := AColladaNode;
   Parent := AParent;
-  if Assigned(ColladaNode) then
+  if Assigned(_ColladaNode) then
   begin
-    ColladaNode.UserData := Self;
-    LocalTransform := ColladaNode.Matrix;
-    if Length(ColladaNode.Name) > 0 then
+    _ColladaNode.UserData := Self;
+    LocalTransform := _ColladaNode.Matrix;
+    if Length(_ColladaNode.Name) > 0 then
     begin
-      _Name := ColladaNode.Name;
+      _Name := _ColladaNode.Name;
     end
     else
     begin
-      _Name := ColladaNode.id;
+      _Name := _ColladaNode.id;
     end;
-    for Child in ColladaNode.Children do
+    WriteLn(_ColladaNode.AnyName, ' ', PtrUInt(_ColladaNode.UserData));
+    for Child in _ColladaNode.Children do
     begin
       if Child is TColladaNode then
       begin
         TNodeInterfaceCollada.Create(TColladaNode(Child), Self);
       end
-      else if Child is TColladaInstanceGeometry then
+    end;
+  end;
+end;
+
+procedure TUSceneDataDAE.TNodeInterfaceCollada.ProcessAttachments;
+  var ColladaChild: TColladaObject;
+  var AttachMesh: TAttachmentMeshCollada;
+  var AttachSkin: TAttachmentSkinCollada;
+  var i: Int32;
+begin
+  if Assigned(_ColladaNode) then
+  begin
+    for ColladaChild in _ColladaNode.Children do
+    begin
+      if ColladaChild is TColladaInstanceGeometry then
       begin
         AttachMesh := TAttachmentMeshCollada.Create(
-          TColladaInstanceGeometry(Child)
+          TColladaInstanceGeometry(ColladaChild)
         );
         specialize UArrAppend<TAttachment>(
           _Attachments, AttachMesh
         );
       end
-      else if (Child is TColladaInstanceController)
-      and (TColladaInstanceController(Child).Controller.ControllerType = ct_skin) then
+      else if (ColladaChild is TColladaInstanceController)
+      and (TColladaInstanceController(ColladaChild).Controller.ControllerType = ct_skin) then
       begin
         AttachSkin := TAttachmentSkinCollada.Create(
-          TColladaInstanceController(Child)
+          TColladaInstanceController(ColladaChild)
         );
         specialize UArrAppend<TAttachment>(
           _Attachments, AttachSkin
         );
       end;
     end;
+  end;
+  for i := 0 to High(_Children) do
+  begin
+    TNodeInterfaceCollada(_Children[i]).ProcessAttachments;
   end;
 end;
 
@@ -6303,6 +6325,7 @@ begin
   begin
     TNodeInterfaceCollada.Create(Node, TNodeInterfaceCollada(_RootNode));
   end;
+  TNodeInterfaceCollada(_RootNode).ProcessAttachments;
   if Assigned(_Root.LibAnimations) then
   begin
     for Anim in _Root.LibAnimations.Animations do
