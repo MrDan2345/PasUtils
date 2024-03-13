@@ -121,6 +121,8 @@ type TURot2 = array[0..1] of TUFloat;
 type PURot2 = ^TURot2;
 type TURot2Arr = array[UInt16] of TURot2;
 type PURot2Arr = ^TURot2;
+type TUBounds2f = array[0..1] of TUVec2;
+type TUBounds3f = array[0..1] of TUVec3;
 
 type TUFloatImpl = type helper for TUFloat
 public
@@ -347,6 +349,8 @@ public
   class function Dot(const v0, v1: TUVec3): TUFloat; static; overload; inline;
   class function Cross(const v0, v1: TUVec3): TUVec3; static; overload; inline;
   class function Norm(const v: TUVec3): TUVec3; static; overload; inline;
+  class function RandomUnit: TUVec3; static;
+  class function RandomInRadius(const RadiusMin, RadiusMax: TUFloat): TUVec3; static;
   procedure SetValue(const Ax, Ay, Az: TUFloat); inline;
   function Transform3x3(const m: TUMat): TUVec3;
   function Transform4x3(const m: TUMat): TUVec3;
@@ -542,6 +546,39 @@ public
   function Transform(const v: TUVec2): TUVec2; inline;
   function TransformInv(const v: TUVec2): TUVec2; inline;
   function ToString: String; inline;
+end;
+
+type TUBounds2fImpl = type helper for TUBounds2f
+strict private
+  function GetMin: TUVec2;
+  procedure SetMin(const Value: TUVec2);
+  function GetMax: TUVec2;
+  procedure SetMax(const Value: TUVec2);
+public
+  const Zero: TUBounds2f = ((0, 0), (0, 0));
+  property Min: TUVec2 read GetMin write SetMin;
+  property Max: TUVec2 read GetMax write SetMax;
+end;
+
+type TUBounds3fImpl = type helper for TUBounds3f
+strict private
+  function GetMin: TUVec3;
+  procedure SetMin(const Value: TUVec3);
+  function GetMax: TUVec3;
+  procedure SetMax(const Value: TUVec3);
+  function GetCenter: TUVec3;
+  function GetExtent: TUVec3;
+  function GetMajorExtent: TUVec3;
+public
+  const Zero: TUBounds3f = ((0, 0, 0), (0, 0, 0));
+  class function Make(const AMin, AMax: TUVec3): TUBounds3f; static;
+  class function Make(const ACenter: TUVec3): TUBounds3f; static;
+  class function Make(const AVertices: TUVec3Array): TUBounds3f; static;
+  property Min: TUVec3 read GetMin write SetMin;
+  property Max: TUVec3 read GetMax write SetMax;
+  property Center: TUVec3 read GetCenter;
+  property Extent: TUVec3 read GetExtent;
+  property MajorExtent: TUVec3 read GetMajorExtent;
 end;
 
 type TUCriticalSection = record
@@ -1259,6 +1296,26 @@ procedure USwap(var a: TUVec2; var b: TUVec2); inline; overload;
 procedure USwap(var a: TUVec3; var b: TUVec3); inline; overload;
 procedure USwap(var a: TUVec4; var b: TUVec4); inline; overload;
 procedure USwap(var a: TUMat; var b: TUMat); inline; overload;
+function UMaxValue(out v: TUInt8): TUInt8; inline; overload;
+function UMaxValue(out v: TUInt16): TUInt16; inline; overload;
+function UMaxValue(out v: TUInt32): TUInt32; inline; overload;
+function UMaxValue(out v: TUInt64): TUInt64; inline; overload;
+function UMaxValue(out v: TInt8): TInt8; inline; overload;
+function UMaxValue(out v: TInt16): TInt16; inline; overload;
+function UMaxValue(out v: TInt32): TInt32; inline; overload;
+function UMaxValue(out v: TInt64): TInt64; inline; overload;
+function UMaxValue(out v: TUFloat): TUFloat; inline; overload;
+function UMaxValue(out v: TUDouble): TUDouble; inline; overload;
+function UMinValue(out v: TUInt8): TUInt8; inline; overload;
+function UMinValue(out v: TUInt16): TUInt16; inline; overload;
+function UMinValue(out v: TUInt32): TUInt32; inline; overload;
+function UMinValue(out v: TUInt64): TUInt64; inline; overload;
+function UMinValue(out v: TInt8): TInt8; inline; overload;
+function UMinValue(out v: TInt16): TInt16; inline; overload;
+function UMinValue(out v: TInt32): TInt32; inline; overload;
+function UMinValue(out v: TInt64): TInt64; inline; overload;
+function UMinValue(out v: TUFloat): TUFloat; inline; overload;
+function UMinValue(out v: TUDouble): TUDouble; inline; overload;
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
 generic function USelect<T>(const Cond: Boolean; constref IfTrue: T; constref IfFalse: T): T; inline;
 function UCRC32(const CRC: UInt32; const Value: Pointer; const Count: UInt32): UInt32;
@@ -1269,6 +1326,8 @@ function UArcCos(const x: TUFloat): TUFloat;
 function UArcTan2(const y, x: TUFloat): TUFloat;
 function UPow(const b, e: TUFloat): TUFloat;
 function UPoT(const x: UInt64): UInt64;
+function URandomPi: TUFloat;
+function URandom2Pi: TUFloat;
 function UAddMat(const m0, m1: TUMat): TUMat;
 function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 function USubMat(const m0, m1: TUMat): TUMat;
@@ -2202,6 +2261,21 @@ begin
   end;
 end;
 
+class function TUVec3Impl.RandomUnit: TUVec3;
+  var a1, a2, s1, s2, c1, c2: TUFloat;
+begin
+  a1 := URandom2Pi;
+  a2 := URandom2Pi;
+  USinCos(a1, s1, c1);
+  USinCos(a2, s2, c2);
+  Result := TUVec3.Make(c1 * c2, s2, s1 * c2);
+end;
+
+class function TUVec3Impl.RandomInRadius(const RadiusMin, RadiusMax: TUFloat): TUVec3;
+begin
+  Result := RandomUnit * (RadiusMin + Random * (RadiusMax - RadiusMin));
+end;
+
 procedure TUVec3Impl.SetValue(const Ax, Ay, Az: TUFloat);
 begin
   Self[0] := Ax;
@@ -2833,6 +2907,103 @@ begin
   Result := Format('{%0:0.2f}', [Angle * URadToDeg]);
 end;
 // TURot2 end
+
+// TUBounds2f begin
+function TUBounds2fImpl.GetMin: TUVec2;
+begin
+  Result := Self[0];
+end;
+
+procedure TUBounds2fImpl.SetMin(const Value: TUVec2);
+begin
+  Self[0] := Value;
+end;
+
+function TUBounds2fImpl.GetMax: TUVec2;
+begin
+  Result := Self[1];
+end;
+
+procedure TUBounds2fImpl.SetMax(const Value: TUVec2);
+begin
+  Self[1] := Value;
+end;
+// TUBounds2f end
+
+// TUBounds3f begin
+function TUBounds3fImpl.GetMin: TUVec3;
+begin
+  Result := Self[0];
+end;
+
+procedure TUBounds3fImpl.SetMin(const Value: TUVec3);
+begin
+  Self[0] := Value;
+end;
+
+function TUBounds3fImpl.GetMax: TUVec3;
+begin
+  Result := Self[1];
+end;
+
+procedure TUBounds3fImpl.SetMax(const Value: TUVec3);
+begin
+  Self[1] := Value;
+end;
+
+function TUBounds3fImpl.GetCenter: TUVec3;
+begin
+  Result := (Self[0] + Self[1]) * 0.5;
+end;
+
+function TUBounds3fImpl.GetExtent: TUVec3;
+begin
+  Result := Self[1] - Self[0];
+end;
+
+function TUBounds3fImpl.GetMajorExtent: TUVec3;
+  var e: TUVec3;
+begin
+  e := Extent;
+  if e.x > e.y then
+  begin
+    if e.x > e.z then
+    begin
+      Exit(TUVec3.AxisX);
+    end;
+    Exit(TUVec3.AxisZ);
+  end;
+  if e.y > e.z then
+  begin
+    Exit(TUVec3.AxisY);
+  end;
+  Exit(TUVec3.AxisZ);
+end;
+
+class function TUBounds3fImpl.Make(const AMin, AMax: TUVec3): TUBounds3f;
+begin
+  Result[0] := UMin(AMin, AMax);
+  Result[1] := UMax(AMin, AMax);
+end;
+
+class function TUBounds3fImpl.Make(const ACenter: TUVec3): TUBounds3f;
+begin
+  Result[0] := ACenter;
+  Result[1] := ACenter;
+end;
+
+class function TUBounds3fImpl.Make(const AVertices: TUVec3Array): TUBounds3f;
+  var i: Int32;
+begin
+  if Length(AVertices) = 0 then Exit(Make(TUVec3.Zero));
+  Result := Make(AVertices[0]);
+  for i := 1 to High(AVertices) do
+  begin
+    Result[0] := UMin(Result[0], AVertices[i]);
+    Result[1] := UMax(Result[1], AVertices[i]);
+  end;
+end;
+// TUBounds3f end
 
 // TUCriticalSection begin
 procedure TUCriticalSection.Initialize;
@@ -6847,6 +7018,106 @@ begin
   specialize USwap<TUMat>(a, b);
 end;
 
+function UMaxValue(out v: TUInt8): TUInt8;
+begin
+  Result := $ff;
+end;
+
+function UMaxValue(out v: TUInt16): TUInt16;
+begin
+  Result := $ffff;
+end;
+
+function UMaxValue(out v: TUInt32): TUInt32;
+begin
+  Result := $ffffffff;
+end;
+
+function UMaxValue(out v: TUInt64): TUInt64;
+begin
+  Result := $ffffffffffffffff;
+end;
+
+function UMaxValue(out v: TInt8): TInt8;
+begin
+  Result := $7f;
+end;
+
+function UMaxValue(out v: TInt16): TInt16;
+begin
+  Result := $7fff;
+end;
+
+function UMaxValue(out v: TInt32): TInt32;
+begin
+  Result := $7fffffff;
+end;
+
+function UMaxValue(out v: TInt64): TInt64;
+begin
+  Result := $7fffffffffffffff;
+end;
+
+function UMaxValue(out v: TUFloat): TUFloat;
+begin
+  Result := 3.4E38;
+end;
+
+function UMaxValue(out v: TUDouble): TUDouble;
+begin
+  Result := 1.7E308;
+end;
+
+function UMinValue(out v: TUInt8): TUInt8;
+begin
+  Result := 0;
+end;
+
+function UMinValue(out v: TUInt16): TUInt16;
+begin
+  Result := 0;
+end;
+
+function UMinValue(out v: TUInt32): TUInt32;
+begin
+  Result := 0;
+end;
+
+function UMinValue(out v: TUInt64): TUInt64;
+begin
+  Result := 0;
+end;
+
+function UMinValue(out v: TInt8): TInt8;
+begin
+  Result := -$80;
+end;
+
+function UMinValue(out v: TInt16): TInt16;
+begin
+  Result := -$8000;
+end;
+
+function UMinValue(out v: TInt32): TInt32;
+begin
+  Result := -$80000000;
+end;
+
+function UMinValue(out v: TInt64): TInt64;
+begin
+  Result := -$8000000000000000;
+end;
+
+function UMinValue(out v: TUFloat): TUFloat;
+begin
+  Result := 1.5E-45;
+end;
+
+function UMinValue(out v: TUDouble): TUDouble;
+begin
+  Result := 5.0E-324;
+end;
+
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
   var i: Integer;
   var ti, eti: PTypeInfo;
@@ -7046,6 +7317,16 @@ begin
     Result := Result or (Result shr (1 shl n));
   end;
   Result += 1;
+end;
+
+function URandomPi: TUFloat;
+begin
+  Result := Random * Pi;
+end;
+
+function URandom2Pi: TUFloat;
+begin
+  Result := Random * 2 * Pi;
 end;
 
 function UAddMat(const m0, m1: TUMat): TUMat;
