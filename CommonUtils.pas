@@ -121,6 +121,7 @@ type TURot2 = array[0..1] of TUFloat;
 type PURot2 = ^TURot2;
 type TURot2Arr = array[UInt16] of TURot2;
 type PURot2Arr = ^TURot2;
+type TUBounds1f = array[0..1] of TUFloat;
 type TUBounds2f = array[0..1] of TUVec2;
 type TUBounds3f = array[0..1] of TUVec3;
 
@@ -546,6 +547,19 @@ public
   function Transform(const v: TUVec2): TUVec2; inline;
   function TransformInv(const v: TUVec2): TUVec2; inline;
   function ToString: String; inline;
+end;
+
+type TUBounds1fImpl = type helper for TUBounds1f
+strict private
+  function GetMin: TUFloat;
+  procedure SetMin(const Value: TUFloat);
+  function GetMax: TUFloat;
+  procedure SetMax(const Value: TUFloat);
+public
+  const Zero: TUBounds1f = (0, 0);
+  property Min: TUFloat read GetMin write SetMin;
+  property Max: TUFloat read GetMax write SetMax;
+  class function Overlap(const a, b: TUBounds1f): Boolean; static; inline;
 end;
 
 type TUBounds2fImpl = type helper for TUBounds2f
@@ -2907,6 +2921,33 @@ begin
   Result := Format('{%0:0.2f}', [Angle * URadToDeg]);
 end;
 // TURot2 end
+
+// TUBounds1f begin
+function TUBounds1fImpl.GetMin: TUFloat;
+begin
+  Result := Self[0];
+end;
+
+procedure TUBounds1fImpl.SetMin(const Value: TUFloat);
+begin
+  Self[0] := Value;
+end;
+
+function TUBounds1fImpl.GetMax: TUFloat;
+begin
+  Result := Self[1];
+end;
+
+procedure TUBounds1fImpl.SetMax(const Value: TUFloat);
+begin
+  Self[1] := Value;
+end;
+
+class function TUBounds1fImpl.Overlap(const a, b: TUBounds1f): Boolean;
+begin
+  Result := (a.Min <= b.Max) and (b.Min <= a.Max);
+end;
+// TUBounds1f end
 
 // TUBounds2f begin
 function TUBounds2fImpl.GetMin: TUVec2;
