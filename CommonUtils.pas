@@ -557,9 +557,13 @@ strict private
   procedure SetMax(const Value: TUFloat);
 public
   const Zero: TUBounds1f = (0, 0);
+  class function Make(const AMin, AMax: TUFLoat): TUBounds1f; static; overload;
+  class function Make(const ACenter: TUFLoat): TUBounds1f; static; overload;
+  class function Overlap(const a, b: TUBounds1f): Boolean; static; inline;
   property Min: TUFloat read GetMin write SetMin;
   property Max: TUFloat read GetMax write SetMax;
-  class function Overlap(const a, b: TUBounds1f): Boolean; static; inline;
+  function Overlap(const Other: TUBounds1f): Boolean;
+  procedure Add(const v: TUFloat);
 end;
 
 type TUBounds2fImpl = type helper for TUBounds2f
@@ -570,6 +574,8 @@ strict private
   procedure SetMax(const Value: TUVec2);
 public
   const Zero: TUBounds2f = ((0, 0), (0, 0));
+  class function Make(const AMin, AMax: TUVec2): TUBounds2f; static; overload;
+  class function Make(const ACenter: TUVec2): TUBounds2f; static; overload;
   property Min: TUVec2 read GetMin write SetMin;
   property Max: TUVec2 read GetMax write SetMax;
 end;
@@ -585,9 +591,9 @@ strict private
   function GetMajorExtent: TUVec3;
 public
   const Zero: TUBounds3f = ((0, 0, 0), (0, 0, 0));
-  class function Make(const AMin, AMax: TUVec3): TUBounds3f; static;
-  class function Make(const ACenter: TUVec3): TUBounds3f; static;
-  class function Make(const AVertices: TUVec3Array): TUBounds3f; static;
+  class function Make(const AMin, AMax: TUVec3): TUBounds3f; static; overload;
+  class function Make(const ACenter: TUVec3): TUBounds3f; static; overload;
+  class function Make(const AVertices: TUVec3Array): TUBounds3f; static; overload;
   property Min: TUVec3 read GetMin write SetMin;
   property Max: TUVec3 read GetMax write SetMax;
   property Center: TUVec3 read GetCenter;
@@ -2943,10 +2949,34 @@ begin
   Self[1] := Value;
 end;
 
+class function TUBounds1fImpl.Make(const AMin, AMax: TUFLoat): TUBounds1f;
+begin
+  Result[0] := UMin(AMin, AMax);
+  Result[1] := UMax(AMin, AMax);
+end;
+
+class function TUBounds1fImpl.Make(const ACenter: TUFLoat): TUBounds1f;
+begin
+  Result[0] := ACenter;
+  Result[1] := ACenter;
+end;
+
 class function TUBounds1fImpl.Overlap(const a, b: TUBounds1f): Boolean;
 begin
   Result := (a.Min <= b.Max) and (b.Min <= a.Max);
 end;
+
+function TUBounds1fImpl.Overlap(const Other: TUBounds1f): Boolean;
+begin
+  Result := Overlap(Self, Other);
+end;
+
+procedure TUBounds1fImpl.Add(const v: TUFloat);
+begin
+  if v < Self[0] then Self[0] := v
+  else if v > Self[1] then Self[1] := v;
+end;
+
 // TUBounds1f end
 
 // TUBounds2f begin
@@ -2969,6 +2999,19 @@ procedure TUBounds2fImpl.SetMax(const Value: TUVec2);
 begin
   Self[1] := Value;
 end;
+
+class function TUBounds2fImpl.Make(const AMin, AMax: TUVec2): TUBounds2f;
+begin
+  Result[0] := UMin(AMin, AMax);
+  Result[1] := UMax(AMin, AMax);
+end;
+
+class function TUBounds2fImpl.Make(const ACenter: TUVec2): TUBounds2f;
+begin
+  Result[0] := ACenter;
+  Result[1] := ACenter;
+end;
+
 // TUBounds2f end
 
 // TUBounds3f begin
