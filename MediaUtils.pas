@@ -699,7 +699,7 @@ type
       destructor Destroy; override;
     end;
     type TColladaTriangles = class (TColladaObject)
-    private
+    protected
       var _MaterialRef: String;
       var _Count: Int32;
       var _Inputs: TColladaInputList;
@@ -710,7 +710,7 @@ type
       function GetIndices: PUInt32Arr; inline;
       function GetVertexDescriptor: TUVertexDescriptor;
       function GetInputSourceCount(const Index: UInt32): UInt32; inline;
-    protected
+      procedure Load(const XMLNode: TUXML); virtual;
       procedure InitializeObject; override;
     public
       property Count: Int32 read _Count;
@@ -725,6 +725,22 @@ type
       constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
       destructor Destroy; override;
       function CopyInputData(const Target: Pointer; const Input: TColladaInput; const Index: Int32): Pointer;
+    end;
+    type TColladaPolygons = class (TColladaTriangles)
+    protected
+      procedure Load(const XMLNode: TUXML); override;
+    end;
+    type TColladaPolylist = class (TColladaTriangles)
+    protected
+      procedure Load(const XMLNode: TUXML); override;
+    end;
+    type TColladaTrifans = class (TColladaTriangles)
+    protected
+      procedure Load(const XMLNode: TUXML); override;
+    end;
+    type TColladaTristrips = class (TColladaTriangles)
+    protected
+      procedure Load(const XMLNode: TUXML); override;
     end;
     type TColladaTrianglesList = array of TColladaTriangles;
     type TColladaMesh = class (TColladaObject)
@@ -1288,7 +1304,7 @@ type
     end;
     var _Root: TColladaRoot;
     var _Path: String;
-    class function ParseStrToIntArray(const Str: String; const ItemCount: Int32 = 0): TInt32Array;
+    class function ParseStrToIntArray(const Str: String): TInt32Array;
     class function FindNextValue(const Str: String; var CurPos: Int32): String;
     class function LoadMatrix(
       const Node: TUXML
@@ -3707,6 +3723,36 @@ begin
   Result := Source.Accessor.Count;
 end;
 
+procedure TUSceneDataDAE.TColladaTriangles.Load(const XMLNode: TUXML);
+  var Node: TUXML;
+  var NodeName: String;
+  var i, MaxOffset: Int32;
+begin
+  _MaterialRef := XMLNode.AttributeValue['material'];
+  _Count := StrToIntDef(XMLNode.AttributeValue['count'], 0);
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'input' then
+    begin
+      specialize UArrAppend<TColladaInput>(
+        _Inputs, TColladaInput.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'p' then
+    begin
+      _Indices := ParseStrToIntArray(Node.Content);
+    end;
+  end;
+  MaxOffset := 0;
+  for i := 0 to High(_Inputs) do
+  if _Inputs[i].Offset > MaxOffset then
+  begin
+    MaxOffset := _Inputs[i].Offset;
+  end;
+  _InputStride := MaxOffset + 1;
+end;
+
 procedure TUSceneDataDAE.TColladaTriangles.InitializeObject;
   procedure ProcessInput(const Input: TColladaInput);
     var i: Int32;
@@ -3798,74 +3844,9 @@ constructor TUSceneDataDAE.TColladaTriangles.Create(
   const XMLNode: TUXML;
   const AParent: TColladaObject
 );
-  var Node: TUXML;
-  var NodeName: String;
-  var IndexStr: String;
-  var i, j, t, p, MaxOffset: Int32;
-  var vcount: TInt32Array;
 begin
   inherited Create(XMLNode, AParent);
-  _MaterialRef := XMLNode.AttributeValue['material'];
-  _Count := StrToIntDef(XMLNode.AttributeValue['count'], 0);
-  IndexStr := '';
-  for Node in XMLNode do
-  begin
-    NodeName := LowerCase(Node.Name);
-    if NodeName = 'input' then
-    begin
-      specialize UArrAppend<TColladaInput>(
-        _Inputs, TColladaInput.Create(Node, Self)
-      );
-    end
-    else if NodeName = 'p' then
-    begin
-      IndexStr += Node.Content;
-    end
-    else if NodeName = 'vcount' then
-    begin
-      vcount := ParseStrToIntArray(Node.Content, _Count);
-    end;
-  end;
-  MaxOffset := 0;
-  for i := 0 to High(_Inputs) do
-  if _Inputs[i].Offset > MaxOffset then
-  begin
-    MaxOffset := _Inputs[i].Offset;
-  end;
-  _InputStride := MaxOffset + 1;
-  if Length(IndexStr) > 0 then
-  begin
-    if Length(vcount) > 0 then
-    begin
-      p := 0;
-      for i := 0 to High(vcount) do
-      begin
-        p += (vcount[i] - 2);
-      end;
-      SetLength(_Indices, p * 3 * _InputStride);
-      p := 1;
-      t := 0;
-      for i := 0 to High(vcount) do
-      begin
-        for j := 0 to vcount[i] - 2 do
-        begin
-          _Indices[t * 3 + 0] := StrToIntDef(FindNextValue(IndexStr, p), 0);
-          _Indices[t * 3 + 1] := StrToIntDef(FindNextValue(IndexStr, p), 0);
-          _Indices[t * 3 + 2] := StrToIntDef(FindNextValue(IndexStr, p), 0);
-          Inc(t);
-        end;
-      end;
-    end
-    else
-    begin
-      SetLength(_Indices, _Count * 3 * _InputStride);
-      p := 1;
-      for i := 0 to High(_Indices) do
-      begin
-        _Indices[i] := StrToIntDef(FindNextValue(IndexStr, p), 0);
-      end;
-    end;
-  end;
+  Load(XMLNode);
 end;
 
 destructor TUSceneDataDAE.TColladaTriangles.Destroy;
@@ -3909,6 +3890,221 @@ begin
   Result := Dest;
 end;
 
+procedure TUSceneDataDAE.TColladaPolygons.Load(const XMLNode: TUXML);
+  var Node: TUXML;
+  var NodeName: String;
+  var i, j, s, t, MaxOffset: Int32;
+  var Polys: array of TInt32Array;
+begin
+  _MaterialRef := XMLNode.AttributeValue['material'];
+  Polys := nil;
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'input' then
+    begin
+      specialize UArrAppend<TColladaInput>(
+        _Inputs, TColladaInput.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'p' then
+    begin
+      specialize UArrAppend<TInt32Array>(
+        Polys, ParseStrToIntArray(Node.Content)
+      );
+    end;
+  end;
+  MaxOffset := 0;
+  for i := 0 to High(_Inputs) do
+  if _Inputs[i].Offset > MaxOffset then
+  begin
+    MaxOffset := _Inputs[i].Offset;
+  end;
+  _InputStride := MaxOffset + 1;
+  _Count := 0;
+  for i := 0 to High(Polys) do
+  begin
+    _Count += ((Length(Polys[i]) div _InputStride) - 2) * 3;
+  end;
+  SetLength(_Indices, _Count * 3 * _InputStride);
+  t := 0;
+  for i := 0 to High(Polys) do
+  begin
+    for j := 0 to ((Length(Polys[i]) div _InputStride) - 2) - 1 do
+    begin
+      for s := 0 to _InputStride - 1 do
+      begin
+        _Indices[(t * 3 + 0) * _InputStride + s] := Polys[i][0 * _InputStride + s];
+        _Indices[(t * 3 + 1) * _InputStride + s] := Polys[i][(j + 0) * _InputStride + s];
+        _Indices[(t * 3 + 2) * _InputStride + s] := Polys[i][(j + 1) * _InputStride + s];
+        Inc(t);
+      end;
+    end;
+  end;
+end;
+
+procedure TUSceneDataDAE.TColladaPolylist.Load(const XMLNode: TUXML);
+  var Node: TUXML;
+  var NodeName: String;
+  var VCount, Poly: TInt32Array;
+  var i, j, t, p, s, MaxOffset: Int32;
+begin
+  _MaterialRef := XMLNode.AttributeValue['material'];
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'input' then
+    begin
+      specialize UArrAppend<TColladaInput>(
+        _Inputs, TColladaInput.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'vcount' then
+    begin
+      VCount := ParseStrToIntArray(Node.Content);
+    end
+    else if NodeName = 'p' then
+    begin
+      Poly := ParseStrToIntArray(Node.Content);
+    end;
+  end;
+  MaxOffset := 0;
+  for i := 0 to High(_Inputs) do
+  if _Inputs[i].Offset > MaxOffset then
+  begin
+    MaxOffset := _Inputs[i].Offset;
+  end;
+  _InputStride := MaxOffset + 1;
+  _Count := 0;
+  for i := 0 to High(VCount) - 1 do
+  begin
+    _Count += (VCount[i] - 2) * 3;
+  end;
+  SetLength(_Indices, _Count * 3 * _InputStride);
+  t := 0;
+  j := 0;
+  for i := 0 to High(VCount) do
+  begin
+     for p := 0 to (VCount[i] - 2) - 1 do
+     begin
+       for s := 0 to _InputStride - 1 do
+       begin
+         _Indices[(t * 3 + 0) * _InputStride + s] := Poly[j];
+         _Indices[(t * 3 + 1) * _InputStride + s] := Poly[j + (p + 1) * _InputStride + s];
+         _Indices[(t * 3 + 2) * _InputStride + s] := Poly[j + (p + 2) * _InputStride + s];
+       end;
+       Inc(t);
+     end;
+     Inc(j, VCount[i] * _InputStride);
+  end;
+end;
+
+procedure TUSceneDataDAE.TColladaTrifans.Load(const XMLNode: TUXML);
+  var Node: TUXML;
+  var NodeName: String;
+  var i, j, s, t, MaxOffset: Int32;
+  var Trifans: array of TInt32Array;
+begin
+  _MaterialRef := XMLNode.AttributeValue['material'];
+  Trifans := nil;
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'input' then
+    begin
+      specialize UArrAppend<TColladaInput>(
+        _Inputs, TColladaInput.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'p' then
+    begin
+      specialize UArrAppend<TInt32Array>(
+        Trifans, ParseStrToIntArray(Node.Content)
+      );
+    end;
+  end;
+  MaxOffset := 0;
+  for i := 0 to High(_Inputs) do
+  if _Inputs[i].Offset > MaxOffset then
+  begin
+    MaxOffset := _Inputs[i].Offset;
+  end;
+  _InputStride := MaxOffset + 1;
+  _Count := 0;
+  for i := 0 to High(Trifans) do
+  begin
+    _Count += ((Length(Trifans[i]) div _InputStride) - 2) * 3;
+  end;
+  SetLength(_Indices, _Count * 3 * _InputStride);
+  t := 0;
+  for i := 0 to High(Trifans) do
+  begin
+    for j := 0 to ((Length(Trifans[i]) div _InputStride) - 2) - 1 do
+    begin
+      for s := 0 to _InputStride - 1 do
+      begin
+        _Indices[(t * 3 + 0) * _InputStride + s] := Trifans[i][0 * _InputStride + s];
+        _Indices[(t * 3 + 1) * _InputStride + s] := Trifans[i][(j + 0) * _InputStride + s];
+        _Indices[(t * 3 + 2) * _InputStride + s] := Trifans[i][(j + 1) * _InputStride + s];
+        Inc(t);
+      end;
+    end;
+  end;
+end;
+
+procedure TUSceneDataDAE.TColladaTristrips.Load(const XMLNode: TUXML);
+  var Node: TUXML;
+  var NodeName: String;
+  var i, j, s, t, MaxOffset: Int32;
+  var Tristrips: array of TInt32Array;
+begin
+  _MaterialRef := XMLNode.AttributeValue['material'];
+  Tristrips := nil;
+  for Node in XMLNode do
+  begin
+    NodeName := LowerCase(Node.Name);
+    if NodeName = 'input' then
+    begin
+      specialize UArrAppend<TColladaInput>(
+        _Inputs, TColladaInput.Create(Node, Self)
+      );
+    end
+    else if NodeName = 'p' then
+    begin
+      specialize UArrAppend<TInt32Array>(
+        Tristrips, ParseStrToIntArray(Node.Content)
+      );
+    end;
+  end;
+  MaxOffset := 0;
+  for i := 0 to High(_Inputs) do
+  if _Inputs[i].Offset > MaxOffset then
+  begin
+    MaxOffset := _Inputs[i].Offset;
+  end;
+  _InputStride := MaxOffset + 1;
+  _Count := 0;
+  for i := 0 to High(Tristrips) do
+  begin
+    _Count += ((Length(Tristrips[i]) div _InputStride) - 2) * 3;
+  end;
+  SetLength(_Indices, _Count * 3 * _InputStride);
+  t := 0;
+  for i := 0 to High(Tristrips) do
+  begin
+    for j := 0 to ((Length(Tristrips[i]) div _InputStride) - 2) - 1 do
+    begin
+      for s := 0 to _InputStride - 1 do
+      begin
+        _Indices[(t * 3 + 0) * _InputStride + s] := Tristrips[i][(j + 0) * _InputStride + s];
+        _Indices[(t * 3 + 1) * _InputStride + s] := Tristrips[i][(j + 1) * _InputStride + s];
+        _Indices[(t * 3 + 2) * _InputStride + s] := Tristrips[i][(j + 2) * _InputStride + s];
+        Inc(t);
+      end;
+    end;
+  end;
+end;
+
 constructor TUSceneDataDAE.TColladaMesh.Create(
   const XMLNode: TUXML;
   const AParent: TColladaObject
@@ -3934,12 +4130,34 @@ begin
         _Vertices := TColladaVertices.Create(Node, Self);
       end;
     end
-    else if (NodeName = 'triangles')
-    or (NodeName = 'polygons')
-    or (NodeName = 'polylist') then
+    else if (NodeName = 'triangles') then
     begin
       specialize UArrAppend<TColladaTriangles>(
         _TrianglesList, TColladaTriangles.Create(Node, Self)
+      );
+    end
+    else if (NodeName = 'polygons') then
+    begin
+      specialize UArrAppend<TColladaTriangles>(
+        _TrianglesList, TColladaPolygons.Create(Node, Self)
+      );
+    end
+    else if (NodeName = 'polylist') then
+    begin
+      specialize UArrAppend<TColladaTriangles>(
+        _TrianglesList, TColladaPolylist.Create(Node, Self)
+      );
+    end
+    else if (NodeName = 'trifans') then
+    begin
+      specialize UArrAppend<TColladaTriangles>(
+        _TrianglesList, TColladaTrifans.Create(Node, Self)
+      );
+    end
+    else if (NodeName = 'tristrips') then
+    begin
+      specialize UArrAppend<TColladaTriangles>(
+        _TrianglesList, TColladaTristrips.Create(Node, Self)
       );
     end;
   end;
@@ -6190,37 +6408,16 @@ begin
   end;
 end;
 
-class function TUSceneDataDAE.ParseStrToIntArray(const Str: String; const ItemCount: Int32): TInt32Array;
-  var i, p: Int32;
-  var s: String;
+class function TUSceneDataDAE.ParseStrToIntArray(const Str: String): TInt32Array;
+  var i: Int32;
+  var StrArr: TUStrArray;
 begin
+  StrArr := UStrExplode(Str, ' ');
   Result := nil;
-  if ItemCount <> 0 then
+  SetLength(Result, Length(StrArr));
+  for i := 0 to High(Result) do
   begin
-    SetLength(Result, Length(Str));
-  end
-  else
-  begin
-    SetLength(Result, ItemCount);
-  end;
-  p := 1;
-  i := 0;
-  repeat
-    s := FindNextValue(Str, p);
-    if Length(s) > 0 then
-    begin
-      if High(Result) < i then
-      begin
-        SetLength(Result, i + 1);
-      end;
-      Result[i] := StrToIntDef(s, 0);
-      if Result[i] < 3 then RunError;
-    end;
-    Inc(i);
-  until (Length(s) = 0) or (i = ItemCount);
-  if (ItemCount = 0) and (Length(Result) <> i) then
-  begin
-    SetLength(Result, i);
+    Result[i] := StrToIntDef(StrArr[i], 0);
   end;
 end;
 
