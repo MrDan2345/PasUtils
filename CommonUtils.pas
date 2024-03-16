@@ -7119,7 +7119,8 @@ end;
 
 function UMaxValue(out v: TUInt64): TUInt64;
 begin
-  Result := $ffffffffffffffff;
+  // $ffffffffffffffff; still does not work on all platforms)=
+  Result := $7fffffffffffffff;
 end;
 
 function UMaxValue(out v: TInt8): TInt8;
