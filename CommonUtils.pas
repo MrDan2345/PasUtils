@@ -228,33 +228,34 @@ private
   function GetA: UInt8; inline;
   procedure SetA(const Value: UInt8); inline;
 public
+  const Black = $ff000000;
+  const White = $ffffffff;
+  const Red = $ff0000ff;
+  const Green = $ff00ff00;
+  const Blue = $ffff0000;
   property Channel[const Index: UInt8]: UInt8 read GetChannel write SetChannel; default;
   property r: UInt8 read GetR write SetR;
   property g: UInt8 read GetG write SetG;
   property b: UInt8 read GetB write SetB;
   property a: UInt8 read GetA write SetA;
   class function Make(const Ar, Ag, Ab, Aa: UInt8): TUColor; static;
-  class function Black: TUColor; static;
-  class function White: TUColor; static;
-  class function Red: TUColor; static;
-  class function Blue: TUColor; static;
-  class function Green: TUColor; static;
   procedure SetValue(const Ar, Ag, Ab, Aa: UInt8);
   function ToString: String; inline;
 end;
+operator := (const v: TUVec4): TUColor;
 
 type TUMatImpl = type helper for TUMat
 private
-  function GetElement(const Index: UInt32): TUFloat; inline;
-  procedure SetElement(const Index: UInt32; const Value: TUFloat); inline;
-  function GetAxisX: TUVec3; inline;
-  procedure SetAxisX(const Value: TUVec3); inline;
-  function GetAxisY: TUVec3; inline;
-  procedure SetAxisY(const Value: TUVec3); inline;
-  function GetAxisZ: TUVec3; inline;
-  procedure SetAxisZ(const Value: TUVec3); inline;
-  function GetPosition: TUVec3; inline;
-  procedure SetPosition(const Value: TUVec3); inline;
+  function GetElement(const Index: UInt32): TUFloat;
+  procedure SetElement(const Index: UInt32; const Value: TUFloat);
+  function GetAxisX: TUVec3;
+  procedure SetAxisX(const Value: TUVec3);
+  function GetAxisY: TUVec3;
+  procedure SetAxisY(const Value: TUVec3);
+  function GetAxisZ: TUVec3;
+  procedure SetAxisZ(const Value: TUVec3);
+  function GetPosition: TUVec3;
+  procedure SetPosition(const Value: TUVec3);
 public
   property Element[const Index: UInt32]: TUFloat read GetElement write SetElement; default;
   property AxisX: TUVec3 read GetAxisX write SetAxisX;
@@ -301,10 +302,10 @@ end;
 
 type TUVec2Impl = type helper for TUVec2
 private
-  function GetX: TUFloat; inline;
-  procedure SetX(const Value: TUFloat); inline;
-  function GetY: TUFloat; inline;
-  procedure SetY(const Value: TUFloat); inline;
+  function GetX: TUFloat;
+  procedure SetX(const Value: TUFloat);
+  function GetY: TUFloat;
+  procedure SetY(const Value: TUFloat);
 public
   property x: TUFloat read GetX write SetX;
   property y: TUFloat read GetY write SetY;
@@ -328,12 +329,12 @@ end;
 
 type TUVec3Impl = type helper for TUVec3
 private
-  function GetX: TUFloat; inline;
-  procedure SetX(const Value: TUFloat); inline;
-  function GetY: TUFloat; inline;
-  procedure SetY(const Value: TUFloat); inline;
-  function GetZ: TUFloat; inline;
-  procedure SetZ(const Value: TUFloat); inline;
+  function GetX: TUFloat;
+  procedure SetX(const Value: TUFloat);
+  function GetY: TUFloat;
+  procedure SetY(const Value: TUFloat);
+  function GetZ: TUFloat;
+  procedure SetZ(const Value: TUFloat);
 public
   property x: TUFloat read GetX write SetX;
   property y: TUFloat read GetY write SetY;
@@ -371,14 +372,14 @@ end;
 
 type TUVec4Impl = type helper for TUVec4
 private
-  function GetX: TUFloat; inline;
-  procedure SetX(const Value: TUFloat); inline;
-  function GetY: TUFloat; inline;
-  procedure SetY(const Value: TUFloat); inline;
-  function GetZ: TUFloat; inline;
-  procedure SetZ(const Value: TUFloat); inline;
-  function GetW: TUFloat; inline;
-  procedure SetW(const Value: TUFloat); inline;
+  function GetX: TUFloat;
+  procedure SetX(const Value: TUFloat);
+  function GetY: TUFloat;
+  procedure SetY(const Value: TUFloat);
+  function GetZ: TUFloat;
+  procedure SetZ(const Value: TUFloat);
+  function GetW: TUFloat;
+  procedure SetW(const Value: TUFloat);
 public
   property x: TUFloat read GetX write SetX;
   property y: TUFloat read GetY write SetY;
@@ -1190,15 +1191,15 @@ private
   function ReadJson(const p: TUParser): Boolean;
   procedure SetNodeType(const Value: TNodeType);
   function GetValue: String;
-  function GetContent(const Key: String): TUJson; inline;
-  function GetName(const Index: Int32): String; inline;
-  function GetElement(const Index: Int32): TUJson; inline;
-  function GetCount: Int32; inline;
-  function GetIsSingleValue: Boolean; inline;
-  function GetIsObject: Boolean; inline;
-  function GetIsArray: Boolean; inline;
-  function GetIsNumber: Boolean; inline;
-  function GetIsNull: Boolean; inline;
+  function GetContent(const Key: String): TUJson;
+  function GetName(const Index: Int32): String;
+  function GetElement(const Index: Int32): TUJson;
+  function GetCount: Int32;
+  function GetIsSingleValue: Boolean;
+  function GetIsObject: Boolean;
+  function GetIsArray: Boolean;
+  function GetIsNumber: Boolean;
+  function GetIsNull: Boolean;
 public
   property NodeType: TNodeType read _NodeType write SetNodeType;
   property Value: String read GetValue;
@@ -1685,31 +1686,6 @@ begin
   Result := Ar or (Ag shl 8) or (Ab shl 16) or (Aa shl 24);
 end;
 
-class function TUColorImpl.Black: TUColor;
-begin
-  Result := $ff000000;
-end;
-
-class function TUColorImpl.White: TUColor;
-begin
-  Result := $ffffffff;
-end;
-
-class function TUColorImpl.Red: TUColor;
-begin
-  Result := $ff0000ff;
-end;
-
-class function TUColorImpl.Blue: TUColor;
-begin
-  Result := $ffff0000;
-end;
-
-class function TUColorImpl.Green: TUColor;
-begin
-  Result := $ff00ff00;
-end;
-
 procedure TUColorImpl.SetValue(const Ar, Ag, Ab, Aa: UInt8);
 begin
   Self := Ab or (Ag shl 8) or (Ar shl 16) or (Aa shl 24);
@@ -1718,6 +1694,16 @@ end;
 function TUColorImpl.ToString: String;
 begin
   Result := '#' + IntToHex(r, 2) + IntToHex(g, 2) + IntToHex(b, 2) + IntToHex(a, 2);
+end;
+
+operator := (const v: TUVec4): TUColor;
+begin
+  Result := TUColor.Make(
+    Round(v.x) * $ff,
+    Round(v.y) * $ff,
+    Round(v.z) * $ff,
+    Round(v.w) * $ff
+  );
 end;
 // TUColorImpl end
 

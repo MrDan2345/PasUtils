@@ -18,1313 +18,1330 @@ interface
 uses
   SysUtils, Classes, CommonUtils, ZBase, ZInflate, ZDeflate;
 
-type
-  TUImageDataFormat = (
-    uif_none,
-    uif_g8,
-    uif_g16,
-    uif_g8a8,
-    uif_g16a16,
-    uif_r8g8b8,
-    uif_r16g16b16,
-    uif_r8g8b8a8,
-    uif_r16g16b16a16,
-    uif_r32g32b32_f
-  );
+type TUImageDataFormat = (
+  uif_none,
+  uif_g8,
+  uif_g16,
+  uif_g8a8,
+  uif_g16a16,
+  uif_r8g8b8,
+  uif_r16g16b16,
+  uif_r8g8b8a8,
+  uif_r16g16b16a16,
+  uif_r32g32b32_f
+);
 
-  type TUImageData = class (TURefClass)
-  protected
-    type TPixelReadProc = function (const x, y: Integer): TUColor of object;
-    type TPixelWriteProc = procedure (const x, y: Integer; const Value: TUColor) of object;
-    var _Width: Int32;
-    var _Height: Int32;
-    var _BPP: Int32;
-    var _Data: Pointer;
-    var _DataSize: UInt32;
-    var _Format: TUImageDataFormat;
-    var _ReadProc: TPixelReadProc;
-    var _WriteProc: TPixelWriteProc;
-    procedure SetFormat(const f: TUImageDataFormat);
-    function GetPixel(const x, y: Int32): TUColor;
-    function ReadNone(const x, y: Int32): TUColor;
-    function ReadG8(const x, y: Int32): TUColor;
-    function ReadG16(const x, y: Int32): TUColor;
-    function ReadG8A8(const x, y: Int32): TUColor;
-    function ReadG16A16(const x, y: Int32): TUColor;
-    function ReadR8G8B8(const x, y: Int32): TUColor;
-    function ReadR16G16B16(const x, y: Int32): TUColor;
-    function ReadR8G8B8A8(const x, y: Int32): TUColor;
-    function ReadR16G16B16A16(const x, y: Int32): TUColor;
-    function ReadR32G32B32_F(const x, y: Int32): TUColor;
-    procedure SetPixel(const x, y: Int32; const Value: TUColor);
-    procedure WriteNone(const x, y: Int32; const Value: TUColor);
-    procedure WriteG8(const x, y: Int32; const Value: TUColor);
-    procedure WriteG16(const x, y: Int32; const Value: TUColor);
-    procedure WriteG8A8(const x, y: Int32; const Value: TUColor);
-    procedure WriteG16A16(const x, y: Int32; const Value: TUColor);
-    procedure WriteR8G8B8(const x, y: Int32; const Value: TUColor);
-    procedure WriteR16G16B16(const x, y: Int32; const Value: TUColor);
-    procedure WriteR8G8B8A8(const x, y: Int32; const Value: TUColor);
-    procedure WriteR16G16B16A16(const x, y: Int32; const Value: TUColor);
-    procedure WriteR32G32B32_F(const x, y: Int32; const Value: TUColor);
-    procedure DataAlloc; overload;
-    procedure DataAlloc(const Size: UInt32); overload;
-    procedure DataFree;
-    class procedure RegisterImageClass;
+type TUImageData = class (TURefClass)
+protected
+  type TPixelReadProc = function (const x, y: Integer): TUColor of object;
+  type TPixelWriteProc = procedure (const x, y: Integer; const Value: TUColor) of object;
+  var _Width: Int32;
+  var _Height: Int32;
+  var _BPP: Int32;
+  var _Data: Pointer;
+  var _DataSize: UInt32;
+  var _Format: TUImageDataFormat;
+  var _ReadProc: TPixelReadProc;
+  var _WriteProc: TPixelWriteProc;
+  procedure SetFormat(const f: TUImageDataFormat);
+  function GetPixel(const x, y: Int32): TUColor;
+  function ReadNone(const x, y: Int32): TUColor;
+  function ReadG8(const x, y: Int32): TUColor;
+  function ReadG16(const x, y: Int32): TUColor;
+  function ReadG8A8(const x, y: Int32): TUColor;
+  function ReadG16A16(const x, y: Int32): TUColor;
+  function ReadR8G8B8(const x, y: Int32): TUColor;
+  function ReadR16G16B16(const x, y: Int32): TUColor;
+  function ReadR8G8B8A8(const x, y: Int32): TUColor;
+  function ReadR16G16B16A16(const x, y: Int32): TUColor;
+  function ReadR32G32B32_F(const x, y: Int32): TUColor;
+  procedure SetPixel(const x, y: Int32; const Value: TUColor);
+  procedure WriteNone(const x, y: Int32; const Value: TUColor);
+  procedure WriteG8(const x, y: Int32; const Value: TUColor);
+  procedure WriteG16(const x, y: Int32; const Value: TUColor);
+  procedure WriteG8A8(const x, y: Int32; const Value: TUColor);
+  procedure WriteG16A16(const x, y: Int32; const Value: TUColor);
+  procedure WriteR8G8B8(const x, y: Int32; const Value: TUColor);
+  procedure WriteR16G16B16(const x, y: Int32; const Value: TUColor);
+  procedure WriteR8G8B8A8(const x, y: Int32; const Value: TUColor);
+  procedure WriteR16G16B16A16(const x, y: Int32; const Value: TUColor);
+  procedure WriteR32G32B32_F(const x, y: Int32; const Value: TUColor);
+  procedure DataAlloc; overload;
+  procedure DataAlloc(const Size: UInt32); overload;
+  procedure DataFree;
+  class procedure RegisterImageClass;
+public
+  property Width: Int32 read _Width;
+  property Height: Int32 read _Height;
+  property Data: Pointer read _Data;
+  property BPP: Int32 read _BPP;
+  property DataSize: UInt32 read _DataSize;
+  property Format: TUImageDataFormat read _Format;
+  property Pixels[const x, y: Int32]: TUColor read GetPixel write SetPixel; default;
+  function DataAt(const x, y: Int32): Pointer;
+  class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
+  class function CanLoad(const FileName: String): Boolean; virtual; overload;
+  class function CanLoad(const Buffer: Pointer; const Size: UInt32): Boolean; virtual; overload;
+  class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; virtual; abstract; overload;
+  procedure Load(const Stream: TStream); virtual; overload;
+  procedure Load(const FileName: String); virtual; overload;
+  procedure Load(const Buffer: Pointer; const Size: UInt32); virtual; overload;
+  procedure Load(const StreamHelper: TUStreamHelper); virtual; abstract; overload;
+  procedure Save(const Stream: TStream); virtual; overload;
+  procedure Save(const FileName: String); virtual; overload;
+  procedure Save(const StreamHelper: TUStreamHelper); virtual; abstract; overload;
+  procedure Allocate(const NewFormat: TUImageDataFormat; const NewWidth, NewHeight: Int32);
+  constructor Create; virtual;
+  destructor Destroy; override;
+end;
+type TUImageDataShared = specialize TUSharedRef<TUImageData>;
+type TUImageDataClass = class of TUImageData;
+
+type TUImageDataPNG = class(TUImageData)
+protected
+  {$push}
+  {$minenumsize 1}
+  type TColorType = (
+    ctGrayscale = 0,
+    ctTrueColor = 2,
+    ctIndexedColor = 3,
+    ctGrayscaleAlpha = 4,
+    ctTrueColorAlpha = 6
+  );
+  {$minenumsize 4}
+  type TFilter = (
+    flNone = 0,
+    flSub = 1,
+    flUp = 2,
+    flAverage = 3,
+    flPaeth = 4
+  );
+  type TInterlace = (
+    inNone = 0,
+    inAdam7 = 1
+  );
+  {$pop}
+  type TChunk = packed record
+    ChunkLength: UInt32;
+    ChunkType: array[0..3] of AnsiChar;
+    ChunkData: Pointer;
+    ChunkCRC: UInt32;
+  end;
+  type TChunkIHDR = packed record
+    Width: UInt32;
+    Height: UInt32;
+    BitDepth: UInt8;
+    ColorType: TColorType;
+    CompMethod: UInt8;
+    FilterMethod: UInt8;
+    InterlaceMethod: TInterlace;
+  end;
+  type TChunkPLTE = packed record
+    Entries: array of record r, g, b: UInt8; end;
+  end;
+  type TChunkIDAT = array of UInt8;
+  const PNGHeader: AnsiString = (#137#80#78#71#13#10#26#10);
+  const CRCTable: array[0..255] of UInt32 = (
+    $00000000, $77073096, $EE0E612C, $990951BA, $076DC419, $706AF48F, $E963A535, $9E6495A3,
+    $0EDB8832, $79DCB8A4, $E0D5E91E, $97D2D988, $09B64C2B, $7EB17CBD, $E7B82D07, $90BF1D91,
+    $1DB71064, $6AB020F2, $F3B97148, $84BE41DE, $1ADAD47D, $6DDDE4EB, $F4D4B551, $83D385C7,
+    $136C9856, $646BA8C0, $FD62F97A, $8A65C9EC, $14015C4F, $63066CD9, $FA0F3D63, $8D080DF5,
+    $3B6E20C8, $4C69105E, $D56041E4, $A2677172, $3C03E4D1, $4B04D447, $D20D85FD, $A50AB56B,
+    $35B5A8FA, $42B2986C, $DBBBC9D6, $ACBCF940, $32D86CE3, $45DF5C75, $DCD60DCF, $ABD13D59,
+    $26D930AC, $51DE003A, $C8D75180, $BFD06116, $21B4F4B5, $56B3C423, $CFBA9599, $B8BDA50F,
+    $2802B89E, $5F058808, $C60CD9B2, $B10BE924, $2F6F7C87, $58684C11, $C1611DAB, $B6662D3D,
+    $76DC4190, $01DB7106, $98D220BC, $EFD5102A, $71B18589, $06B6B51F, $9FBFE4A5, $E8B8D433,
+    $7807C9A2, $0F00F934, $9609A88E, $E10E9818, $7F6A0DBB, $086D3D2D, $91646C97, $E6635C01,
+    $6B6B51F4, $1C6C6162, $856530D8, $F262004E, $6C0695ED, $1B01A57B, $8208F4C1, $F50FC457,
+    $65B0D9C6, $12B7E950, $8BBEB8EA, $FCB9887C, $62DD1DDF, $15DA2D49, $8CD37CF3, $FBD44C65,
+    $4DB26158, $3AB551CE, $A3BC0074, $D4BB30E2, $4ADFA541, $3DD895D7, $A4D1C46D, $D3D6F4FB,
+    $4369E96A, $346ED9FC, $AD678846, $DA60B8D0, $44042D73, $33031DE5, $AA0A4C5F, $DD0D7CC9,
+    $5005713C, $270241AA, $BE0B1010, $C90C2086, $5768B525, $206F85B3, $B966D409, $CE61E49F,
+    $5EDEF90E, $29D9C998, $B0D09822, $C7D7A8B4, $59B33D17, $2EB40D81, $B7BD5C3B, $C0BA6CAD,
+    $EDB88320, $9ABFB3B6, $03B6E20C, $74B1D29A, $EAD54739, $9DD277AF, $04DB2615, $73DC1683,
+    $E3630B12, $94643B84, $0D6D6A3E, $7A6A5AA8, $E40ECF0B, $9309FF9D, $0A00AE27, $7D079EB1,
+    $F00F9344, $8708A3D2, $1E01F268, $6906C2FE, $F762575D, $806567CB, $196C3671, $6E6B06E7,
+    $FED41B76, $89D32BE0, $10DA7A5A, $67DD4ACC, $F9B9DF6F, $8EBEEFF9, $17B7BE43, $60B08ED5,
+    $D6D6A3E8, $A1D1937E, $38D8C2C4, $4FDFF252, $D1BB67F1, $A6BC5767, $3FB506DD, $48B2364B,
+    $D80D2BDA, $AF0A1B4C, $36034AF6, $41047A60, $DF60EFC3, $A867DF55, $316E8EEF, $4669BE79,
+    $CB61B38C, $BC66831A, $256FD2A0, $5268E236, $CC0C7795, $BB0B4703, $220216B9, $5505262F,
+    $C5BA3BBE, $B2BD0B28, $2BB45A92, $5CB36A04, $C2D7FFA7, $B5D0CF31, $2CD99E8B, $5BDEAE1D,
+    $9B64C2B0, $EC63F226, $756AA39C, $026D930A, $9C0906A9, $EB0E363F, $72076785, $05005713,
+    $95BF4A82, $E2B87A14, $7BB12BAE, $0CB61B38, $92D28E9B, $E5D5BE0D, $7CDCEFB7, $0BDBDF21,
+    $86D3D2D4, $F1D4E242, $68DDB3F8, $1FDA836E, $81BE16CD, $F6B9265B, $6FB077E1, $18B74777,
+    $88085AE6, $FF0F6A70, $66063BCA, $11010B5C, $8F659EFF, $F862AE69, $616BFFD3, $166CCF45,
+    $A00AE278, $D70DD2EE, $4E048354, $3903B3C2, $A7672661, $D06016F7, $4969474D, $3E6E77DB,
+    $AED16A4A, $D9D65ADC, $40DF0B66, $37D83BF0, $A9BCAE53, $DEBB9EC5, $47B2CF7F, $30B5FFE9,
+    $BDBDF21C, $CABAC28A, $53B39330, $24B4A3A6, $BAD03605, $CDD70693, $54DE5729, $23D967BF,
+    $B3667A2E, $C4614AB8, $5D681B02, $2A6F2B94, $B40BBE37, $C30C8EA1, $5A05DF1B, $2D02EF8D
+  );
+  class procedure Decompress(const Buffer: Pointer; const Size: Int32; const Output: TStream);
+  class procedure Compress(const Buffer: Pointer; const Size: Int32; const Output: TStream);
+  class function Swap16(const n: UInt16): UInt16;
+  class function Swap32(const n: UInt32): UInt32;
+  class function GetCRC(const Buffer: Pointer; const Size: Int32): UInt32;
+  class function CheckCRC(const Chunk: TChunk): Boolean;
+public
+  class constructor CreateClass;
+  class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; override;
+  procedure Load(const StreamHelper: TUStreamHelper); override;
+  procedure Save(const StreamHelper: TUStreamHelper); override;
+end;
+
+type TUVertexAttributeSemantic = (
+  as_invalid,
+  as_position,
+  as_normal,
+  as_tangent,
+  as_binormal,
+  as_color,
+  as_texcoord
+);
+type TUVertexDataType = (
+  dt_invalid,
+  dt_bool,
+  dt_int,
+  dt_float
+);
+type TUVertexAttribute = record
+  Semantic: TUVertexAttributeSemantic;
+  DataType: TUVertexDataType;
+  DataCount: UInt8;
+  SetNumber: UInt8;
+  class function Make(
+    const ASemantic: TUVertexAttributeSemantic;
+    const ADataType: TUVertexDataType;
+    const ADataCount: UInt8;
+    const ASetNumber: UInt8 = 0
+  ): TUVertexAttribute; static;
+  function Size: UInt32;
+end;
+type TUVertexDescriptor = array of TUVertexAttribute;
+
+type TSceneDataOptions = (sdo_optimize, sdo_gen_normals, sdo_gen_tangents);
+type TSceneDataOptionsSet = set of TSceneDataOptions;
+
+type TUSceneData = class (TURefClass)
+public
+  type TAttachment = class
+  end;
+  type TAttachmentList = array of TAttachment;
+  type TNodeInterface = class
   public
-    property Width: Int32 read _Width;
-    property Height: Int32 read _Height;
-    property Data: Pointer read _Data;
-    property BPP: Int32 read _BPP;
-    property DataSize: UInt32 read _DataSize;
-    property Format: TUImageDataFormat read _Format;
-    property Pixels[const x, y: Int32]: TUColor read GetPixel write SetPixel; default;
-    function DataAt(const x, y: Int32): Pointer; inline;
-    class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
-    class function CanLoad(const FileName: String): Boolean; virtual; overload;
-    class function CanLoad(const Buffer: Pointer; const Size: UInt32): Boolean; virtual; overload;
-    class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; virtual; abstract; overload;
-    procedure Load(const Stream: TStream); virtual; overload;
-    procedure Load(const FileName: String); virtual; overload;
-    procedure Load(const Buffer: Pointer; const Size: UInt32); virtual; overload;
-    procedure Load(const StreamHelper: TUStreamHelper); virtual; abstract; overload;
-    procedure Save(const Stream: TStream); virtual; overload;
-    procedure Save(const FileName: String); virtual; overload;
-    procedure Save(const StreamHelper: TUStreamHelper); virtual; abstract; overload;
-    procedure Allocate(const NewFormat: TUImageDataFormat; const NewWidth, NewHeight: Int32);
-    constructor Create; virtual;
+    type TNodeList = array of TNodeInterface;
+  protected
+    var _Name: String;
+    var _Transform: TUMat;
+    var _Attachments: TAttachmentList;
+    var _Parent: TNodeInterface;
+    var _Children: TNodeList;
+    procedure SetParent(const Value: TNodeInterface);
+    procedure ApplyTransform(const Value: TUMat);
+    procedure SetTransform(const Value: TUMat);
+    function GetLocalTransform: TUMat; inline;
+    procedure SetLocalTransform(const Value: TUMat);
+  public
+    //var UpdateTransform: Boolean;
+    property Name: String read _Name;
+    property Transform: TUMat read _Transform write SetTransform;
+    property LocalTransform: TUMat read GetLocalTransform write SetLocalTransform;
+    property Attachments: TAttachmentList read _Attachments;
+    property Children: TNodeList read _Children;
+    property Parent: TNodeInterface read _Parent write SetParent;
     destructor Destroy; override;
   end;
-  type TUImageDataShared = specialize TUSharedRef<TUImageData>;
-  type TUImageDataClass = class of TUImageData;
-
-  type TUImageDataPNG = class(TUImageData)
+  type TNodeInterfaceList = TNodeInterface.TNodeList;
+  type TImageInterface = class
   protected
-    {$push}
-    {$minenumsize 1}
-    type TColorType = (
-      ctGrayscale = 0,
-      ctTrueColor = 2,
-      ctIndexedColor = 3,
-      ctGrayscaleAlpha = 4,
-      ctTrueColorAlpha = 6
-    );
-    {$minenumsize 4}
-    type TFilter = (
-      flNone = 0,
-      flSub = 1,
-      flUp = 2,
-      flAverage = 3,
-      flPaeth = 4
-    );
-    type TInterlace = (
-      inNone = 0,
-      inAdam7 = 1
-    );
-    {$pop}
-    type TChunk = packed record
-      ChunkLength: UInt32;
-      ChunkType: array[0..3] of AnsiChar;
-      ChunkData: Pointer;
-      ChunkCRC: UInt32;
-    end;
-    type TChunkIHDR = packed record
-      Width: UInt32;
-      Height: UInt32;
-      BitDepth: UInt8;
-      ColorType: TColorType;
-      CompMethod: UInt8;
-      FilterMethod: UInt8;
-      InterlaceMethod: TInterlace;
-    end;
-    type TChunkPLTE = packed record
-      Entries: array of record r, g, b: UInt8; end;
-    end;
-    type TChunkIDAT = array of UInt8;
-    const PNGHeader: AnsiString = (#137#80#78#71#13#10#26#10);
-    const CRCTable: array[0..255] of UInt32 = (
-      $00000000, $77073096, $EE0E612C, $990951BA, $076DC419, $706AF48F, $E963A535, $9E6495A3,
-      $0EDB8832, $79DCB8A4, $E0D5E91E, $97D2D988, $09B64C2B, $7EB17CBD, $E7B82D07, $90BF1D91,
-      $1DB71064, $6AB020F2, $F3B97148, $84BE41DE, $1ADAD47D, $6DDDE4EB, $F4D4B551, $83D385C7,
-      $136C9856, $646BA8C0, $FD62F97A, $8A65C9EC, $14015C4F, $63066CD9, $FA0F3D63, $8D080DF5,
-      $3B6E20C8, $4C69105E, $D56041E4, $A2677172, $3C03E4D1, $4B04D447, $D20D85FD, $A50AB56B,
-      $35B5A8FA, $42B2986C, $DBBBC9D6, $ACBCF940, $32D86CE3, $45DF5C75, $DCD60DCF, $ABD13D59,
-      $26D930AC, $51DE003A, $C8D75180, $BFD06116, $21B4F4B5, $56B3C423, $CFBA9599, $B8BDA50F,
-      $2802B89E, $5F058808, $C60CD9B2, $B10BE924, $2F6F7C87, $58684C11, $C1611DAB, $B6662D3D,
-      $76DC4190, $01DB7106, $98D220BC, $EFD5102A, $71B18589, $06B6B51F, $9FBFE4A5, $E8B8D433,
-      $7807C9A2, $0F00F934, $9609A88E, $E10E9818, $7F6A0DBB, $086D3D2D, $91646C97, $E6635C01,
-      $6B6B51F4, $1C6C6162, $856530D8, $F262004E, $6C0695ED, $1B01A57B, $8208F4C1, $F50FC457,
-      $65B0D9C6, $12B7E950, $8BBEB8EA, $FCB9887C, $62DD1DDF, $15DA2D49, $8CD37CF3, $FBD44C65,
-      $4DB26158, $3AB551CE, $A3BC0074, $D4BB30E2, $4ADFA541, $3DD895D7, $A4D1C46D, $D3D6F4FB,
-      $4369E96A, $346ED9FC, $AD678846, $DA60B8D0, $44042D73, $33031DE5, $AA0A4C5F, $DD0D7CC9,
-      $5005713C, $270241AA, $BE0B1010, $C90C2086, $5768B525, $206F85B3, $B966D409, $CE61E49F,
-      $5EDEF90E, $29D9C998, $B0D09822, $C7D7A8B4, $59B33D17, $2EB40D81, $B7BD5C3B, $C0BA6CAD,
-      $EDB88320, $9ABFB3B6, $03B6E20C, $74B1D29A, $EAD54739, $9DD277AF, $04DB2615, $73DC1683,
-      $E3630B12, $94643B84, $0D6D6A3E, $7A6A5AA8, $E40ECF0B, $9309FF9D, $0A00AE27, $7D079EB1,
-      $F00F9344, $8708A3D2, $1E01F268, $6906C2FE, $F762575D, $806567CB, $196C3671, $6E6B06E7,
-      $FED41B76, $89D32BE0, $10DA7A5A, $67DD4ACC, $F9B9DF6F, $8EBEEFF9, $17B7BE43, $60B08ED5,
-      $D6D6A3E8, $A1D1937E, $38D8C2C4, $4FDFF252, $D1BB67F1, $A6BC5767, $3FB506DD, $48B2364B,
-      $D80D2BDA, $AF0A1B4C, $36034AF6, $41047A60, $DF60EFC3, $A867DF55, $316E8EEF, $4669BE79,
-      $CB61B38C, $BC66831A, $256FD2A0, $5268E236, $CC0C7795, $BB0B4703, $220216B9, $5505262F,
-      $C5BA3BBE, $B2BD0B28, $2BB45A92, $5CB36A04, $C2D7FFA7, $B5D0CF31, $2CD99E8B, $5BDEAE1D,
-      $9B64C2B0, $EC63F226, $756AA39C, $026D930A, $9C0906A9, $EB0E363F, $72076785, $05005713,
-      $95BF4A82, $E2B87A14, $7BB12BAE, $0CB61B38, $92D28E9B, $E5D5BE0D, $7CDCEFB7, $0BDBDF21,
-      $86D3D2D4, $F1D4E242, $68DDB3F8, $1FDA836E, $81BE16CD, $F6B9265B, $6FB077E1, $18B74777,
-      $88085AE6, $FF0F6A70, $66063BCA, $11010B5C, $8F659EFF, $F862AE69, $616BFFD3, $166CCF45,
-      $A00AE278, $D70DD2EE, $4E048354, $3903B3C2, $A7672661, $D06016F7, $4969474D, $3E6E77DB,
-      $AED16A4A, $D9D65ADC, $40DF0B66, $37D83BF0, $A9BCAE53, $DEBB9EC5, $47B2CF7F, $30B5FFE9,
-      $BDBDF21C, $CABAC28A, $53B39330, $24B4A3A6, $BAD03605, $CDD70693, $54DE5729, $23D967BF,
-      $B3667A2E, $C4614AB8, $5D681B02, $2A6F2B94, $B40BBE37, $C30C8EA1, $5A05DF1B, $2D02EF8D
-    );
-    class procedure Decompress(const Buffer: Pointer; const Size: Int32; const Output: TStream);
-    class procedure Compress(const Buffer: Pointer; const Size: Int32; const Output: TStream);
-    class function Swap16(const n: UInt16): UInt16;
-    class function Swap32(const n: UInt32): UInt32;
-    class function GetCRC(const Buffer: Pointer; const Size: Int32): UInt32;
-    class function CheckCRC(const Chunk: TChunk): Boolean;
+    var _FileName: String;
+    var _Path: String;
   public
-    class constructor CreateClass;
-    class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; override;
-    procedure Load(const StreamHelper: TUStreamHelper); override;
-    procedure Save(const StreamHelper: TUStreamHelper); override;
+    property FileName: String read _FileName;
+    property Path: String read _Path;
   end;
-
-  type TUVertexAttributeSemantic = (
-    as_invalid,
-    as_position,
-    as_normal,
-    as_tangent,
-    as_binormal,
-    as_color,
-    as_texcoord
-  );
-  type TUVertexDataType = (
-    dt_invalid,
-    dt_bool,
-    dt_int,
-    dt_float
-  );
-  type TUVertexAttribute = record
-    Semantic: TUVertexAttributeSemantic;
-    DataType: TUVertexDataType;
-    DataCount: UInt8;
-    SetNumber: UInt8;
-    class function Make(
-      const ASemantic: TUVertexAttributeSemantic;
-      const ADataType: TUVertexDataType;
-      const ADataCount: UInt8;
-      const ASetNumber: UInt8 = 0
-    ): TUVertexAttribute; static;
-    function Size: UInt32;
-  end;
-  type TUVertexDescriptor = array of TUVertexAttribute;
-
-  type TSceneDataOptions = (sdo_optimize, sdo_gen_normals, sdo_gen_tangents);
-  type TSceneDataOptionsSet = set of TSceneDataOptions;
-
-  type TUSceneData = class (TURefClass)
+  type TImageInterfaceList = array of TImageInterface;
+  type TMeshInterface = class
   public
-    type TAttachment = class
-    end;
-    type TAttachmentList = array of TAttachment;
-    type TNodeInterface = class
-    public
-      type TNodeList = array of TNodeInterface;
+    type TSubset = class
     protected
-      var _Name: String;
-      var _Transform: TUMat;
-      var _Attachments: TAttachmentList;
-      var _Parent: TNodeInterface;
-      var _Children: TNodeList;
-      procedure SetParent(const Value: TNodeInterface);
-      procedure ApplyTransform(const Value: TUMat);
-      procedure SetTransform(const Value: TUMat);
-      function GetLocalTransform: TUMat; inline;
-      procedure SetLocalTransform(const Value: TUMat);
+      var _VertexData: Pointer;
+      var _IndexData: Pointer;
+      var _VertexCount: Int32;
+      var _IndexCount: Int32;
+      var _VertexSize: Int32;
+      var _IndexSize: Int32;
+      function GetVertexDescriptor: TUVertexDescriptor; virtual;
+      function GetVertexBufferSize: Int32;
+      function GetIndexBufferSize: Int32;
+      function GetIndex(const Id: Int32): UInt32;
     public
-      //var UpdateTransform: Boolean;
-      property Name: String read _Name;
-      property Transform: TUMat read _Transform write SetTransform;
-      property LocalTransform: TUMat read GetLocalTransform write SetLocalTransform;
-      property Attachments: TAttachmentList read _Attachments;
-      property Children: TNodeList read _Children;
-      property Parent: TNodeInterface read _Parent write SetParent;
-      destructor Destroy; override;
-    end;
-    type TNodeInterfaceList = TNodeInterface.TNodeList;
-    type TImageInterface = class
-    protected
-      var _FileName: String;
-      var _Path: String;
-    public
-      property FileName: String read _FileName;
-      property Path: String read _Path;
-    end;
-    type TImageInterfaceList = array of TImageInterface;
-    type TMeshInterface = class
-    public
-      type TSubset = class
-      protected
-        var _VertexData: Pointer;
-        var _IndexData: Pointer;
-        var _VertexCount: Int32;
-        var _IndexCount: Int32;
-        var _VertexSize: Int32;
-        var _IndexSize: Int32;
-        function GetVertexDescriptor: TUVertexDescriptor; virtual;
-        function GetVertexBufferSize: Int32;
-        function GetIndexBufferSize: Int32;
-        function GetIndex(const Id: Int32): UInt32;
-      public
-        property VertexDescriptor: TUVertexDescriptor read GetVertexDescriptor;
-        property VertexData: Pointer read _VertexData;
-        property IndexData: Pointer read _IndexData;
-        property VertexCount: Int32 read _VertexCount;
-        property IndexCount: Int32 read _IndexCount;
-        property VertexSize: Int32 read _VertexSize;
-        property IndexSize: Int32 read _IndexSize;
-        property VertexBufferSize: Int32 read GetVertexBufferSize;
-        property IndexBufferSize: Int32 read GetIndexBufferSize;
-        property Index[const Id: Int32]: UInt32 read GetIndex;
-        destructor Destroy; override;
-      end;
-      type TSubsetList = array of TSubset;
-    private
-      var _Subsets: TSubsetList;
-    public
-      property Subsets: TSubsetList read _Subsets;
-      destructor Destroy; override;
-    end;
-    type TMeshInterfaceList = array of TMeshInterface;
-    type TSkinInterface = class
-    public
-      type TJoint = record
-        Name: String;
-        Bind: TUMat;
-      end;
-      type TJointList = array of TJoint;
-      type TWeight = record
-        JointIndex: UInt32;
-        JointWeight: TUFloat;
-        class operator > (const a, b: TWeight): Boolean;
-      end;
-      type TSubset = class
-      private
-        var _VertexData: Pointer;
-        var _WeightCount: Int32;
-        function GetVertexSize: UInt32;
-      public
-        property VertexData: Pointer read _VertexData;
-        property WeightCount: Int32 read _WeightCount;
-        property VertexSize: UInt32 read GetVertexSize;
-        constructor Create(const AWeightCount, AVertexCount: Int32);
-        destructor Destroy; override;
-      end;
-      type TSubsetList = array of TSubset;
-    protected
-      var _Mesh: TMeshInterface;
-      var _ShapeBind: TUMat;
-      var _Joints: TJointList;
-      var _Subsets: TSubsetList;
-    public
-      property Mesh: TMeshInterface read _Mesh;
-      property ShapeBind: TUMat read _ShapeBind;
-      property Joints: TJointList read _Joints;
-      property Subsets: TSubsetList read _Subsets;
-      destructor Destroy; override;
-    end;
-    type TSkinInterfaceList = array of TSkinInterface;
-    type TMaterialInterface = class
-    public
-      type TImageType = (it_1d, it_2d, it_3d, it_cube);
-      type TParam = class
-      public
-        type TParamClass = class of TParam;
-      private
-        var _Name: String;
-      public
-        property Name: String read _Name write _Name;
-        function ParamClass: TParamClass; virtual;
-        procedure AssignValue(const Param: TParam); virtual;
-      end;
-      type TParamImage = class (TParam)
-      private
-        var _ImageType: TImageType;
-        var _Image: TImageInterface;
-        var _Source: String;
-      public
-        property ImageType: TImageType read _ImageType write _ImageType;
-        property Image: TImageInterface read _Image write _Image;
-        property Source: String read _Source write _Source;
-        property Value: TImageInterface read _Image write _Image;
-        constructor Create;
-        procedure AssignValue(const Param: TParam); override;
-      end;
-      type TParamFloat = class (TParam)
-      private
-        var _Value: TUFloat;
-      public
-        property Value: TUFloat read _Value write _Value;
-        constructor Create;
-        procedure AssignValue(const Param: TParam); override;
-      end;
-      type TParamVec2 = class (TParam)
-      private
-        var _Value: TUVec2;
-      public
-        property Value: TUVec2 read _Value write _Value;
-        constructor Create;
-        procedure AssignValue(const Param: TParam); override;
-      end;
-      type TParamVec3 = class (TParam)
-      private
-        var _Value: TUVec3;
-      public
-        property Value: TUVec3 read _Value write _Value;
-        constructor Create;
-        procedure AssignValue(const Param: TParam); override;
-      end;
-      type TParamVec4 = class (TParam)
-      private
-        var _Value: TUVec4;
-      public
-        property Value: TUVec4 read _Value write _Value;
-        constructor Create;
-        procedure AssignValue(const Param: TParam); override;
-      end;
-      type TParamMat = class (TParam)
-      private
-        var _Dim: array[0..1] of UInt8;
-        var _Value: TUMat;
-        procedure SetValue(const Value: TUMat);
-      public
-        property DimX: UInt8 read _Dim[0] write _Dim[0];
-        property DimY: UInt8 read _Dim[1] write _Dim[1];
-        property Value: TUMat read _Value write SetValue;
-        constructor Create;
-        procedure AssignValue(const Param: TParam); override;
-      end;
-      type TParamList = array of TParam;
-    protected
-      var _MaterialId: String;
-      var _MaterialName: String;
-      var _Params: TParamList;
-    public
-      property MaterialId: String read _MaterialId;
-      property MaterialName: String read _MaterialName;
-      property Params: TParamList read _Params;
-      function FindParam(const Name: String): TParam;
-      function NewParam(const Name: String; const ParamClass: TParam.TParamClass): TParam;
-      function NewParamImage(const Name: String): TParamImage;
-      function NewParamFloat(const Name: String): TParamFloat;
-      function NewParamVec2(const Name: String): TParamVec2;
-      function NewParamVec3(const Name: String): TParamVec3;
-      function NewParamVec4(const Name: String): TParamVec4;
-      function NewParamMat(const Name: String; const DimX: UInt8 = 4; const DimY: UInt8 = 4): TParamMat;
-      destructor Destroy; override;
-    end;
-    type TMaterialInterfaceList = array of TMaterialInterface;
-    type TMaterialInstanceInterface = class (TMaterialInterface)
-    private
-      var _BaseMaterial: TMaterialInterface;
-    public
-      property BaseMaterial: TMaterialInterface read _BaseMaterial;
-      procedure Assign(const Material: TMaterialInterface);
-    end;
-    type TMaterialInstanceInterfaceList = array of TMaterialInstanceInterface;
-    type TAnimationInterface = class
-    public
-      type TKeyInterpolation = (ki_step, ki_linear);
-      type TTrack = class
-      public
-        type TKey = record
-          var Time: TUFloat;
-          var Value: TUMat;
-          var Interpolation: TKeyInterpolation;
-        end;
-        type TKeyList = array of TKey;
-      private
-        var _Name: String;
-        var _Keys: TKeyList;
-        var _Target: TNodeInterface;
-        var _MaxTime: TUFloat;
-        function FindKey(const Time: TUFloat): Int32;
-      public
-        property Name: String read _Name;
-        property Keys: TKeyList read _Keys;
-        property Target: TNodeInterface read _Target;
-        property MaxTime: TUFloat read _MaxTime;
-        function Sample(const Time: TUFloat; const Loop: Boolean = True): TUMat;
-        destructor Destroy; override;
-      end;
-      type TTrackList = array of TTrack;
-    protected
-      var _Name: String;
-      var _Tracks: TTrackList;
-    public
-      property Name: String read _Name;
-      property Tracks: TTrackList read _Tracks;
-      destructor Destroy; override;
-    end;
-    type TAnimationInterfaceList = array of TAnimationInterface;
-    type TAttachmentMesh = class (TAttachment)
-    protected
-      var _Mesh: TMeshInterface;
-      var _MaterialBindings: TMaterialInstanceInterfaceList;
-    public
-      property Mesh: TMeshInterface read _Mesh;
-      property MaterialBindings: TMaterialInstanceInterfaceList read _MaterialBindings;
-      destructor Destroy; override;
-    end;
-    type TAttachmentSkin = class (TAttachment)
-    protected
-      var _Skin: TSkinInterface;
-      var _Skeleton: TNodeInterface;
-      var _MaterialBindings: TMaterialInstanceInterfaceList;
-      var _JointBindings: TNodeInterfaceList;
-    public
-      property Skin: TSkinInterface read _Skin;
-      property Skeleton: TNodeInterface read _Skeleton;
-      property MaterialBindings: TMaterialInstanceInterfaceList read _MaterialBindings;
-      property JointBindings: TNodeInterfaceList read _JointBindings;
-      destructor Destroy; override;
-    end;
-    var _ImageList: TImageInterfaceList;
-    var _MaterialList: TMaterialInterfaceList;
-    var _MeshList: TMeshInterfaceList;
-    var _SkinList: TSkinInterfaceList;
-    var _AnimationList: TAnimationInterfaceList;
-    var _RootNode: TNodeInterface;
-  protected
-    var _Options: TSceneDataOptionsSet;
-  public
-    property ImageList: TImageInterfaceList read _ImageList;
-    property MaterialList: TMaterialInterfaceList read _MaterialList;
-    property MeshList: TMeshInterfaceList read _MeshList;
-    property SkinList: TSkinInterfaceList read _SkinList;
-    property AnimationList: TAnimationInterfaceList read _AnimationList;
-    property RootNode: TNodeInterface read _RootNode;
-    property Options: TSceneDataOptionsSet read _Options;
-    class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
-    class function CanLoad(const FileName: String): Boolean; virtual; overload;
-    class function CanLoad(const Buffer: Pointer; const Size: UInt32): Boolean; virtual; overload;
-    class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; virtual; abstract; overload;
-    destructor Destroy; override;
-    procedure Load(const Stream: TStream); virtual; overload;
-    procedure Load(const FileName: String); virtual; overload;
-    procedure Load(const Buffer: Pointer; const Size: UInt32); virtual; overload;
-    procedure Load(const StreamHelper: TUStreamHelper); virtual; abstract; overload;
-    constructor Create(const AOptions: TSceneDataOptionsSet = []);
-  end;
-
-  TUSceneDataDAE = class (TUSceneData)
-  public
-    type TColladaObject = class
-    public
-      type TObjectList = array of TColladaObject;
-      type TClass = class of TColladaObject;
-    private
-      var _Tag: String;
-      var _id: String;
-      var _sid: String;
-      var _Name: String;
-      var _Scoped: Boolean;
-      var _Parent: TColladaObject;
-      var _Children: TObjectList;
-      var _UserData: TObject;
-      var _AutoFreeUserData: Boolean;
-      procedure AddChild(const Child: TColladaObject); inline;
-      procedure RemoveChild(const Child: TColladaObject); inline;
-      procedure SetParent(const Value: TColladaObject); inline;
-      function GetAnyName: String;
-    protected
-      procedure DumpBegin;
-      procedure DumpEnd;
-      procedure DumpData; virtual;
-      procedure Resolve;
-      procedure ResolveLinks; virtual;
-      procedure Initialize;
-      procedure InitializeObject; virtual;
-      function ResolveObject(
-        const Path: String;
-        const ObjectClass: TClass
-      ): TColladaObject;
-    public
-      property Tag: String read _Tag;
-      property id: String read _id;
-      property sid: String read _sid;
-      property Name: String read _Name;
-      property AnyName: String read GetAnyName;
-      property IsScoped: Boolean read _Scoped;
-      property Parent: TColladaObject read _Parent write SetParent;
-      property Children: TObjectList read _Children;
-      property UserData: TObject read _UserData write _UserData;
-      property AutoFreeUserData: Boolean read _AutoFreeUserData write _AutoFreeUserData;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-      function GetRoot: TColladaObject;
-      function Find(const Path: String): TColladaObject;
-      function FindChild(const NodeID: String): TColladaObject;
-      function FindChildRecursive(const NodeID: String): TColladaObject;
-      procedure Dump;
-    end;
-    type TColladaInstance = class (TColladaObject)
-    private
-      var _Url: String;
-    public
-      property Url: String read _Url;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaInstanceList = array of TColladaInstance;
-    type TColladaNodeType = (nt_invalid, nt_node, nt_joint);
-    type TColladaNode = class (TColladaObject)
-    public
-      type TNodeList = array of TColladaNode;
-    private
-      var _NodeType: TColladaNodeType;
-      var _Layers: TUStrArray;
-      var _Nodes: TNodeList;
-      var _Instances: TColladaInstanceList;
-    public
-      var Matrix: TUMat;
-      property NodeType: TColladaNodeType read _NodeType;
-      property Layers: TUStrArray read _Layers;
-      property Nodes: TNodeList read _Nodes;
-      property Instances: TColladaInstanceList read _Instances;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-      class function StringToNodeType(const NodeTypeName: String): TColladaNodeType;
-    end;
-    type TColladaNodeList = TColladaNode.TNodeList;
-    type TColladaInput = class (TColladaObject)
-    private
-      var _Semantic: String;
-      var _SourceRef: String;
-      var _Source: TColladaObject;
-      var _Offset: Int32;
-      var _Set: Int32;
-      function GetSize: UInt32; inline;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property Semantic: String read _Semantic;
-      property Source: TColladaObject read _Source;
-      property Offset: Int32 read _Offset;
-      property InputSet: Int32 read _Set;
-      property Size: UInt32 read GetSize;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaInputList = array of TColladaInput;
-    type TColladaArrayType = (
-      at_invalid,
-      at_bool,
-      at_float,
-      at_idref,
-      at_int,
-      at_name,
-      at_sidref,
-      at_token
-    );
-    type TColladaDataArray = class (TColladaObject)
-    private
-      var _Data: array of UInt8;
-      var _DataString: array of String;
-      var _Count: Int32;
-      var _ItemSize: Int32;
-      var _ArrayType: TColladaArrayType;
-      function GetAsBool(const Index: Int32): PBoolean; inline;
-      function GetAsInt(const Index: Int32): PInt32; inline;
-      function GetAsFloat(const Index: Int32): PUFloat; inline;
-      function GetAsString(const Index: Int32): String; inline;
-      function GetRawData(const Offset: Int32): Pointer; inline;
-    public
-      property ArrayType: TColladaArrayType read _ArrayType;
-      property Count: Int32 read _Count;
-      property ItemSize: Int32 read _ItemSize;
-      property AsBool[const Index: Int32]: PBoolean read GetAsBool;
-      property AsInt[const Index: Int32]: PInt32 read GetAsInt;
-      property AsFloat[const Index: Int32]: PUFloat read GetAsFloat;
-      property AsString[const Index: Int32]: String read GetAsString;
-      property RawData[const Offset: Int32]: Pointer read GetRawData;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-      class function NodeNameToArrayType(const NodeName: String): TColladaArrayType;
-      class function TypeNameToArrayType(const TypeName: String): TColladaArrayType;
-      class function IsDataArrayNode(const XMLNode: TUXML): Boolean;
-    end;
-    type TColladaAccessor = class (TColladaObject)
-    public
-      type TParam = record
-        Name: String;
-        ParamType: TColladaArrayType;
-      end;
-      type TParamArr = array[0..High(UInt16)] of TParam;
-      type PParamArr = ^TParamArr;
-    private
-      var _SourceRef: String;
-      var _Source: TColladaDataArray;
-      var _Count: Int32;
-      var _Stride: Int32;
-      var _Params: array of TParam;
-      function GetParams: PParamArr;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property Source: TColladaDataArray read _Source;
-      property Count: Int32 read _Count;
-      property Stride: Int32 read _Stride;
-      property Params: PParamArr read GetParams;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaSource = class (TColladaObject)
-    private
-      var _DataArray: TColladaDataArray;
-      var _Accessor: TColladaAccessor;
-    public
-      property DataArray: TColladaDataArray read _DataArray;
-      property Accessor: TColladaAccessor read _Accessor;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaSourceList = array of TColladaSource;
-    type TColladaVertices = class (TColladaObject)
-    private
-      var _Inputs: TColladaInputList;
-    public
-      property Inputs: TColladaInputList read _Inputs;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaTriangles = class (TColladaObject)
-    protected
-      var _MaterialRef: String;
-      var _Count: Int32;
-      var _Inputs: TColladaInputList;
-      var _Indices: array of Int32;
-      var _VertexLayout: TColladaInputList;
-      var _InputStride: Int32;
-      function GetVertexSize: Int32;
-      function GetIndices: PUInt32Arr; inline;
-      function GetVertexDescriptor: TUVertexDescriptor;
-      function GetInputSourceCount(const Index: UInt32): UInt32; inline;
-      procedure Load(const XMLNode: TUXML); virtual;
-      procedure InitializeObject; override;
-    public
-      property Count: Int32 read _Count;
-      property Inputs: TColladaInputList read _Inputs;
-      property Indices: PUInt32Arr read GetIndices;
-      property VertexLayout: TColladaInputList read _VertexLayout;
-      property VertexSize: Int32 read GetVertexSize;
       property VertexDescriptor: TUVertexDescriptor read GetVertexDescriptor;
-      property Material: String read _MaterialRef;
-      property InputSourceCount[const Index: UInt32]: UInt32 read GetInputSourceCount;
-      property InputStride: Int32 read _InputStride;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      property VertexData: Pointer read _VertexData;
+      property IndexData: Pointer read _IndexData;
+      property VertexCount: Int32 read _VertexCount;
+      property IndexCount: Int32 read _IndexCount;
+      property VertexSize: Int32 read _VertexSize;
+      property IndexSize: Int32 read _IndexSize;
+      property VertexBufferSize: Int32 read GetVertexBufferSize;
+      property IndexBufferSize: Int32 read GetIndexBufferSize;
+      property Index[const Id: Int32]: UInt32 read GetIndex;
       destructor Destroy; override;
-      function CopyInputData(const Target: Pointer; const Input: TColladaInput; const Index: Int32): Pointer;
     end;
-    type TColladaPolygons = class (TColladaTriangles)
-    protected
-      procedure Load(const XMLNode: TUXML); override;
+    type TSubsetList = array of TSubset;
+  private
+    var _Subsets: TSubsetList;
+  public
+    property Subsets: TSubsetList read _Subsets;
+    destructor Destroy; override;
+  end;
+  type TMeshInterfaceList = array of TMeshInterface;
+  type TSkinInterface = class
+  public
+    type TJoint = record
+      Name: String;
+      Bind: TUMat;
     end;
-    type TColladaPolylist = class (TColladaTriangles)
-    protected
-      procedure Load(const XMLNode: TUXML); override;
+    type TJointList = array of TJoint;
+    type TWeight = record
+      JointIndex: UInt32;
+      JointWeight: TUFloat;
+      class operator > (const a, b: TWeight): Boolean;
     end;
-    type TColladaTrifans = class (TColladaTriangles)
-    protected
-      procedure Load(const XMLNode: TUXML); override;
-    end;
-    type TColladaTristrips = class (TColladaTriangles)
-    protected
-      procedure Load(const XMLNode: TUXML); override;
-    end;
-    type TColladaTrianglesList = array of TColladaTriangles;
-    type TColladaMesh = class (TColladaObject)
+    type TSubset = class
     private
-      var _Sources: TColladaSourceList;
-      var _Vertices: TColladaVertices;
-      var _TrianglesList: TColladaTrianglesList;
+      var _VertexData: Pointer;
+      var _WeightCount: Int32;
+      function GetVertexSize: UInt32;
     public
-      property Sources: TColladaSourceList read _Sources;
-      property Vertices: TColladaVertices read _Vertices;
-      property TrianglesList: TColladaTrianglesList read _TrianglesList;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+      property VertexData: Pointer read _VertexData;
+      property WeightCount: Int32 read _WeightCount;
+      property VertexSize: UInt32 read GetVertexSize;
+      constructor Create(const AWeightCount, AVertexCount: Int32);
       destructor Destroy; override;
     end;
-    type TColladaMeshList = array of TColladaMesh;
-    type TColladaImage = class (TColladaObject)
+    type TSubsetList = array of TSubset;
+  protected
+    var _Mesh: TMeshInterface;
+    var _ShapeBind: TUMat;
+    var _Joints: TJointList;
+    var _Subsets: TSubsetList;
+  public
+    property Mesh: TMeshInterface read _Mesh;
+    property ShapeBind: TUMat read _ShapeBind;
+    property Joints: TJointList read _Joints;
+    property Subsets: TSubsetList read _Subsets;
+    destructor Destroy; override;
+  end;
+  type TSkinInterfaceList = array of TSkinInterface;
+  type TMaterialInterface = class
+  public
+    type TImageType = (it_1d, it_2d, it_3d, it_cube);
+    type TParam = class
+    public
+      type TParamClass = class of TParam;
     private
+      var _Name: String;
+    public
+      property Name: String read _Name write _Name;
+      function ParamClass: TParamClass; virtual;
+      procedure AssignValue(const Param: TParam); virtual;
+    end;
+    type TParamImage = class (TParam)
+    private
+      var _ImageType: TImageType;
+      var _Image: TImageInterface;
       var _Source: String;
     public
-      property Source: String read _Source;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
+      property ImageType: TImageType read _ImageType write _ImageType;
+      property Image: TImageInterface read _Image write _Image;
+      property Source: String read _Source write _Source;
+      property Value: TImageInterface read _Image write _Image;
+      constructor Create;
+      procedure AssignValue(const Param: TParam); override;
     end;
-    type TColladaImageList = array of TColladaImage;
-    type TColladaEffectProfileParamType = (pt_invalid, pt_surface, pt_sampler, pt_float, pt_float2, pt_float3, pt_float4);
-    type TColladaEffectProfileParam = class (TColladaObject)
-    public
-      type TSamplerType = (st_1d, st_2d, st_3d, st_cube);
-      type TDataSurface = class
-        var InitFrom: String;
-        var Image: TColladaImage;
-      end;
-      type TDataSampler = class
-        var Source: String;
-        var Surface: TDataSurface;
-        var SamplerType: TSamplerType;
-      end;
-      type TDataFloat = class
-        var Value: TUFloat;
-      end;
-      type TDataFloat2 = class
-        var Value: TUVec2;
-      end;
-      type TDataFloat3 = class
-        var Value: TUVec3;
-      end;
-      type TDataFloat4 = class
-        var Value: TUVec4;
-      end;
+    type TParamFloat = class (TParam)
     private
-      var _ParamType: TColladaEffectProfileParamType;
-      var _Data: TObject;
+      var _Value: TUFloat;
     public
-      property ParamType: TColladaEffectProfileParamType read _ParamType;
-      function AsSurface: TDataSurface; inline;
-      function AsSampler: TDataSampler; inline;
-      function AsFloat: TDataFloat; inline;
-      function AsFloat2: TDataFloat2; inline;
-      function AsFloat3: TDataFloat3; inline;
-      function AsFloat4: TDataFloat4; inline;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
+      property Value: TUFloat read _Value write _Value;
+      constructor Create;
+      procedure AssignValue(const Param: TParam); override;
     end;
-    type TColladaEffectProfileParamList = array of TColladaEffectProfileParam;
-    type TColladaEffectProfile = class (TColladaObject)
+    type TParamVec2 = class (TParam)
     private
-      var _Params: TColladaEffectProfileParamList;
-    protected
-      procedure ResolveLinks; override;
+      var _Value: TUVec2;
     public
-      property Params: TColladaEffectProfileParamList read _Params;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
+      property Value: TUVec2 read _Value write _Value;
+      constructor Create;
+      procedure AssignValue(const Param: TParam); override;
     end;
-    type TColladaEffect = class (TColladaObject)
+    type TParamVec3 = class (TParam)
     private
-      var _Profile: TColladaEffectProfile;
+      var _Value: TUVec3;
     public
-      property Profile: TColladaEffectProfile read _Profile;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
+      property Value: TUVec3 read _Value write _Value;
+      constructor Create;
+      procedure AssignValue(const Param: TParam); override;
     end;
-    type TColladaEffectList = array of TColladaEffect;
-    type TColladaInstanceEffect = class (TColladaInstance)
+    type TParamVec4 = class (TParam)
     private
-      var _Effect: TColladaEffect;
-    protected
-      procedure ResolveLinks; override;
+      var _Value: TUVec4;
     public
-      property Effect: TColladaEffect read _Effect;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
+      property Value: TUVec4 read _Value write _Value;
+      constructor Create;
+      procedure AssignValue(const Param: TParam); override;
     end;
-    type TColladaMaterial = class (TColladaObject)
+    type TParamMat = class (TParam)
     private
-      var _InstanceEffect: TColladaInstanceEffect;
+      var _Dim: array[0..1] of UInt8;
+      var _Value: TUMat;
+      procedure SetValue(const Value: TUMat);
     public
-      property InstanceEffect: TColladaInstanceEffect read _InstanceEffect;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
+      property DimX: UInt8 read _Dim[0] write _Dim[0];
+      property DimY: UInt8 read _Dim[1] write _Dim[1];
+      property Value: TUMat read _Value write SetValue;
+      constructor Create;
+      procedure AssignValue(const Param: TParam); override;
     end;
-    type TColladaMaterialList = array of TColladaMaterial;
-    type TColladaGeometry = class (TColladaObject)
-    private
-      var _Meshes: TColladaMeshList;
-    public
-      property Meshes: TColladaMeshList read _Meshes;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaGeometryList = array of TColladaGeometry;
-    type TColladaMorph = class (TColladaObject)
-    public
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaJoints = class (TColladaObject)
-    public
-      type TJoint = record
-        JointName: String;
-        BindPose: TUMat;
-      end;
-      type TJoints = array of TJoint;
-    private
-      var _Inputs: TColladaInputList;
-      var _Joints: TJoints;
-      function FindInput(const Semantic: String): TColladaInput;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property Inputs: TColladaInputList read _Inputs;
-      property Joints: TJoints read _Joints;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaVertexWeights = class (TColladaObject)
-    public
-      type TVertexJointReference = record
-        JointIndex: Int32;
-        JointWeight: TUFloat;
-      end;
-      type TVertexJointReferenceArr = array of array of TVertexJointReference;
-    private
-      var _VCount: Int32;
-      var _Inputs: TColladaInputList;
-      var _VertexWeights: TVertexJointReferenceArr;
-      var _Indices: array of Int32;
-      function FindInput(const Semantic: String): TColladaInput;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property VCount: Int32 read _VCount;
-      property Inputs: TColladaInputList read _Inputs;
-      property Weights: TVertexJointReferenceArr read _VertexWeights;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaSkin = class (TColladaObject)
-    private
-      var _GeometryRef: String;
-      var _Geometry: TColladaGeometry;
-      var _BindShapeMatrix: TUMat;
-      var _Sources: TColladaSourceList;
-      var _Joints: TColladaJoints;
-      var _VertexWeights: TColladaVertexWeights;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property Geometry: TColladaGeometry read _Geometry;
-      property BindShapeMatrix: TUMat read _BindShapeMatrix;
-      property Joints: TColladaJoints read _Joints;
-      property VertexWeights: TColladaVertexWeights read _VertexWeights;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaControllerType = (ct_invalid, ct_skin, ct_morph);
-    type TColladaController = class (TColladaObject)
-    private
-      var _ControllerType: TColladaControllerType;
-      var _Controller: TColladaObject;
-      function GetAsSkin: TColladaSkin; inline;
-      function GetAsMorph: TColladaMorph; inline;
-    public
-      property Controller: TColladaObject read _Controller;
-      property ControllerType: TColladaControllerType read _ControllerType;
-      property AsSkin: TColladaSkin read GetAsSkin;
-      property AsMorph: TColladaMorph read GetAsMorph;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaControllerList = array of TColladaController;
-    type TColladaAnimationInterpolation = (ai_step, ai_linear, ai_bezier);
-    type TColladaAnimationSampler = class (TColladaObject)
-    public
-      type TKey = record
-        Time: TUFloat;
-        Value: Pointer;
-        TangentIn: array of TUFloat;
-        TangentOut: array of TUFloat;
-        Interpolation: TColladaAnimationInterpolation;
-      end;
-      type PKey = ^TKey;
-    private
-      var _Data: Pointer;
-      var _Inputs: TColladaInputList;
-      var _Keys: array of TKey;
-      var _DataType: TColladaArrayType;
-      var _DataStride: UInt32;
-      var _DataSize: UInt32;
-      function GetKey(const Index: Int32): PKey; inline;
-      function GetKeyCount: Int32; inline;
-      function FindKey(const Time: TUFloat): Int32;
-      function GetMaxTime: TUFloat; inline;
-      function GetSampleSize: UInt32; inline;
-    protected
-      procedure ResolveLinks; override;
-      procedure DumpData; override;
-    public
-      property Inputs: TColladaInputList read _Inputs;
-      property MaxTime: TUFloat read GetMaxTime;
-      property SampleSize: UInt32 read GetSampleSize;
-      property DataType: TColladaArrayType read _DataType;
-      property Keys[const Index: Int32]: PKey read GetKey;
-      property KeyCount: Int32 read GetKeyCount;
-      procedure SampleData(const Output: Pointer; const Time: TUFloat; const Loop: Boolean = False);
-      function SampleAsFloat(const Time: TUFloat; const Loop: Boolean = false): TUFloat;
-      function SampleAsFloat2(const Time: TUFloat; const Loop: Boolean = false): TUVec2;
-      function SampleAsFloat3(const Time: TUFloat; const Loop: Boolean = false): TUVec3;
-      function SampleAsFloat4(const Time: TUFloat; const Loop: Boolean = false): TUVec4;
-      function SampleAsMatrix(const Time: TUFloat; const Loop: Boolean = false): TUMat;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaAnimationSamplerList = array of TColladaAnimationSampler;
-    type TColladaAnimationChannel = class (TColladaObject)
-    private
-      var _SourceRef: String;
-      var _TargetRef: String;
-      var _Sampler: TColladaAnimationSampler;
-      var _Target: TColladaObject;
-      var _TargetProperty: String;
-      function GetMaxTime: TUFloat; inline;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property Sampler: TColladaAnimationSampler read _Sampler;
-      property Target: TColladaObject read _Target;
-      property TargetProperty: String read _TargetProperty;
-      property MaxTime: TUFloat read GetMaxTime;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaAnimationChannelList = array of TColladaAnimationChannel;
-    type TColladaAnimation = class (TColladaObject)
-    public
-      type TAnimationList = array of TColladaAnimation;
-    private
-      var _Animations: TAnimationList;
-      var _Sources: TColladaSourceList;
-      var _Samplers: TColladaAnimationSamplerList;
-      var _Channels: TColladaAnimationChannelList;
-    public
-      property Animations: TAnimationList read _Animations;
-      property Sources: TColladaSourceList read _Sources;
-      property Samplers: TColladaAnimationSamplerList read _Samplers;
-      property Channels: TColladaAnimationChannelList read _Channels;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaAnimationList = TColladaAnimation.TAnimationList;
-    type TColladaCamera = class (TColladaObject)
-    private
-      var _FOV: TUFloat;
-      var _Aspect: TUFloat;
-      var _Near: TUFloat;
-      var _Far: TUFloat;
-    public
-      property FOV: TUFloat read _FOV;
-      property Aspect: TUFloat read _Aspect;
-      property ClipNear: TUFloat read _Near;
-      property ClipFar: TUFloat read _Far;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaCameraList = array of TColladaCamera;
-    type TColladaLightType = (lt_ambient, lt_directional, lt_point, lt_spot);
-    type TColladaLight = class (TColladaObject)
-    private
-      var _LightType: TColladaLightType;
-      var _Color: TUVec3;
-      var _AttenuationConstant: TUFloat;
-      var _AttenuationLinear: TUFloat;
-      var _AttenuationQuadratic: TUFloat;
-      var _FalloffAngle: TUFloat;
-      var _FalloffExponent: TUFloat;
-    public
-      property LightType: TColladaLightType read _LightType;
-      property Color: TUVec3 read _Color;
-      property AttenuationConstant: TUFloat read _AttenuationConstant;
-      property AttenuationLinear: TUFloat read _AttenuationLinear;
-      property AttenuationQuadratic: TUFloat read _AttenuationQuadratic;
-      property FalloffAngle: TUFloat read _FalloffAngle;
-      property FalloffExponent: TUFloat read _FalloffExponent;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaLightList = array of TColladaLight;
-    type TColladaInstanceMaterial = class (TColladaObject)
-    private
-      var _Symbol: String;
-      var _Target: String;
-      var _Material: TColladaMaterial;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property Material: TColladaMaterial read _Material;
-      property Symbol: String read _Symbol;
-      property Target: String read _Target;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaInstanceMaterialList = array of TColladaInstanceMaterial;
-    type TColladaInstanceGeometry = class (TColladaInstance)
-    private
-      var _Geometry: TColladaGeometry;
-      var _MaterialBindings: TColladaInstanceMaterialList;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property Geometry: TColladaGeometry read _Geometry;
-      property MaterialBindings: TColladaInstanceMaterialList read _MaterialBindings;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaInstanceController = class (TColladaInstance)
-    private
-      var _SkeletonRef: String;
-      var _Skeleton: TColladaNode;
-      var _Controller: TColladaController;
-      var _MaterialBindings: TColladaInstanceMaterialList;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property Skeleton: TColladaNode read _Skeleton;
-      property Controller: TColladaController read _Controller;
-      property MaterialBindings: TColladaInstanceMaterialList read _MaterialBindings;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaInstanceCamera = class (TColladaInstance)
-    private
-      var _Camera: TColladaCamera;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property Camera: TColladaCamera read _Camera;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaInstanceLight = class (TColladaInstance)
-    private
-      var _Light: TColladaLight;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property Light: TColladaLight read _Light;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaVisualScene = class (TColladaObject)
-    private
-      var _Nodes: TColladaNodeList;
-    public
-      property Nodes: TColladaNodeList read _Nodes;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaVisualSceneList = array of TColladaVisualScene;
-    type TColladaLibraryAnimations = class (TColladaObject)
-    private
-      var _Animations: TColladaAnimationList;
-    public
-      property Animations: TColladaAnimationList read _Animations;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaLibraryMaterials = class (TColladaObject)
-    private
-      var _Materials: TColladaMaterialList;
-    public
-      property Materials: TColladaMaterialList read _Materials;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaLibraryEffects = class (TColladaObject)
-    private
-      var _Effects: TColladaEffectList;
-    public
-      property Effects: TColladaEffectList read _Effects;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaLibraryImages = class (TColladaObject)
-    private
-      var _Images: TColladaImageList;
-    public
-      property Images: TColladaImageList read _Images;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaLibraryGeometries = class (TColladaObject)
-    private
-      var _Geometries: TColladaGeometryList;
-    public
-      property Geometries: TColladaGeometryList read _Geometries;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaLibraryControllers = class (TColladaObject)
-    private
-      var _Controllers: TColladaControllerList;
-    public
-      property Controllers: TColladaControllerList read _Controllers;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaLibraryCameras = class (TColladaObject)
-    private
-      var _Cameras: TColladaCameraList;
-    public
-      property Cameras: TColladaCameraList read _Cameras;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaLibraryLights = class (TColladaObject)
-    private
-      var _Lights: TColladaLightList;
-    public
-      property Lights: TColladaLightList read _Lights;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaLibraryVisualScenes = class (TColladaObject)
-    private
-      var _VisualScenes: TColladaVisualSceneList;
-    public
-      property VisualScenes: TColladaVisualSceneList read _VisualScenes;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaInstanceVisualScene = class (TColladaInstance)
-    private
-      var _VisualScene: TColladaVisualScene;
-    protected
-      procedure ResolveLinks; override;
-    public
-      property VisualScene: TColladaVisualScene read _VisualScene;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaScene = class (TColladaObject)
-    private
-      var _VisualScene: TColladaInstanceVisualScene;
-    public
-      property VisualScene: TColladaInstanceVisualScene read _VisualScene;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaAsset = class (TColladaObject)
-    private
-      var _UpAxis: TUSwizzle;
-    public
-      property UpAxis: TUSwizzle read _UpAxis;
-      constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
-      destructor Destroy; override;
-    end;
-    type TColladaRoot = class (TColladaObject)
-    private
-      var _Asset: TColladaAsset;
-      var _LibMaterials: TColladaLibraryMaterials;
-      var _LibEffects: TColladaLibraryEffects;
-      var _LibImages: TColladaLibraryImages;
-      var _LibGeometries: TColladaLibraryGeometries;
-      var _LibControllers: TColladaLibraryControllers;
-      var _LibAnimations: TColladaLibraryAnimations;
-      var _LibCameras: TColladaLibraryCameras;
-      var _LibLights: TColladaLibraryLights;
-      var _LibVisualScenes: TColladaLibraryVisualScenes;
-      var _Scene: TColladaScene;
-      var _Options: TSceneDataOptionsSet;
-      var _RootPath: String;
-    public
-      property Asset: TColladaAsset read _Asset;
-      property LibMaterials: TColladaLibraryMaterials read _LibMaterials;
-      property LibEffects: TColladaLibraryEffects read _LibEffects;
-      property LibImages: TColladaLibraryImages read _LibImages;
-      property LibGeometries: TColladaLibraryGeometries read _LibGeometries;
-      property LibControllers: TColladaLibraryControllers read _LibControllers;
-      property LibAnimations: TColladaLibraryAnimations read _LibAnimations;
-      property LibCameras: TColladaLibraryCameras read _LibCameras;
-      property LibLights: TColladaLibraryLights read _LibLights;
-      property LibVisualScenes: TColladaLibraryVisualScenes read _LibVisualScenes;
-      property Scene: TColladaScene read _Scene;
-      property Options: TSceneDataOptionsSet read _Options;
-      property RootPath: String read _RootPath;
-      constructor Create(const XMLNode: TUXML; const AOptions: TSceneDataOptionsSet; const Path: String);
-      destructor Destroy; override;
-    end;
-  private
-    type TImageInterfaceCollada = class (TImageInterface)
-    public
-      constructor Create(const ColladaImage: TColladaImage);
-    end;
-    type TMaterialInterfaceCollada = class (TMaterialInterface)
-    public
-      constructor Create(const ColladaMaterial: TColladaMaterial);
-    end;
-    type TMeshInterfaceCollada = class (TMeshInterface)
-    public
-      type TSubsetCollada = class (TMeshInterface.TSubset)
-      public
-        type TVertexRemap = array of Int32;
-      private
-        var _VertexDescriptor: TUVertexDescriptor;
-        var _VertexRemap: TVertexRemap;
-      protected
-        function GetVertexDescriptor: TUVertexDescriptor; override;
-      public
-        property VertexRemap: TVertexRemap read _VertexRemap;
-        constructor Create(const ColladaTriangles: TColladaTriangles);
-      end;
-      constructor Create(const ColladaGeometry: TColladaGeometry);
-    end;
-    type TSkinInterfaceCollada = class (TSkinInterface)
-    public
-      constructor Create(const ColladaSkin: TColladaSkin);
-    end;
-    type TAnimationInterfaceCollada = class (TAnimationInterface)
-    public
-      type TTrackCollada = class (TTrack)
-      public
-        constructor Create(const ColladaChannel: TColladaAnimationChannel);
-      end;
-    public
-      constructor Create(const ColladaAnimation: TColladaAnimation);
-    end;
-    type TAttachmentMeshCollada = class (TAttachmentMesh)
-    public
-      constructor Create(const GeometryInstance: TColladaInstanceGeometry);
-    end;
-    type TAttachmentSkinCollada = class (TAttachmentSkin)
-    public
-      constructor Create(const ControllerInstance: TColladaInstanceController);
-    end;
-    type TNodeInterfaceCollada = class (TNodeInterface)
-    private
-      var _ColladaNode: TColladaNode;
-    public
-      constructor Create(const AColladaNode: TColladaNode; const AParent: TNodeInterfaceCollada);
-      procedure ProcessAttachments;
-    end;
-    var _Root: TColladaRoot;
-    var _Path: String;
-    class function ParseStrToIntArray(const Str: String): TInt32Array;
-    class function FindNextValue(const Str: String; var CurPos: Int32): String;
-    class function LoadMatrix(
-      const Node: TUXML
-    ): TUMat;
-    class function LoadMatrix(
-      const Src: TColladaSource;
-      const Index: Int32
-    ): TUMat;
-    class function GenerateMaterialBindings(
-      const ColladaGeometry: TColladaGeometry;
-      const ColladaBindings: TColladaInstanceMaterialList
-    ): TMaterialInstanceInterfaceList;
-    procedure Read(const XML: TUXML);
+    type TParamList = array of TParam;
+  protected
+    var _MaterialId: String;
+    var _MaterialName: String;
+    var _Params: TParamList;
   public
-    property Root: TColladaRoot read _Root;
-    class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; override;
-    procedure Load(const StreamHelper: TUStreamHelper); override;
-    procedure Load(const FileName: String); override;
+    property MaterialId: String read _MaterialId;
+    property MaterialName: String read _MaterialName;
+    property Params: TParamList read _Params;
+    function FindParam(const Name: String): TParam;
+    function NewParam(const Name: String; const ParamClass: TParam.TParamClass): TParam;
+    function NewParamImage(const Name: String): TParamImage;
+    function NewParamFloat(const Name: String): TParamFloat;
+    function NewParamVec2(const Name: String): TParamVec2;
+    function NewParamVec3(const Name: String): TParamVec3;
+    function NewParamVec4(const Name: String): TParamVec4;
+    function NewParamMat(const Name: String; const DimX: UInt8 = 4; const DimY: UInt8 = 4): TParamMat;
     destructor Destroy; override;
   end;
+  type TMaterialInterfaceList = array of TMaterialInterface;
+  type TMaterialInstanceInterface = class (TMaterialInterface)
+  private
+    var _BaseMaterial: TMaterialInterface;
+  public
+    property BaseMaterial: TMaterialInterface read _BaseMaterial;
+    procedure Assign(const Material: TMaterialInterface);
+  end;
+  type TMaterialInstanceInterfaceList = array of TMaterialInstanceInterface;
+  type TAnimationInterface = class
+  public
+    type TKeyInterpolation = (ki_step, ki_linear);
+    type TTrack = class
+    public
+      type TKey = record
+        var Time: TUFloat;
+        var Value: TUMat;
+        var Interpolation: TKeyInterpolation;
+      end;
+      type TKeyList = array of TKey;
+    private
+      var _Name: String;
+      var _Keys: TKeyList;
+      var _Target: TNodeInterface;
+      var _MaxTime: TUFloat;
+      function FindKey(const Time: TUFloat): Int32;
+    public
+      property Name: String read _Name;
+      property Keys: TKeyList read _Keys;
+      property Target: TNodeInterface read _Target;
+      property MaxTime: TUFloat read _MaxTime;
+      function Sample(const Time: TUFloat; const Loop: Boolean = True): TUMat;
+      destructor Destroy; override;
+    end;
+    type TTrackList = array of TTrack;
+  protected
+    var _Name: String;
+    var _Tracks: TTrackList;
+  public
+    property Name: String read _Name;
+    property Tracks: TTrackList read _Tracks;
+    destructor Destroy; override;
+  end;
+  type TAnimationInterfaceList = array of TAnimationInterface;
+  type TAttachmentMesh = class (TAttachment)
+  protected
+    var _Mesh: TMeshInterface;
+    var _MaterialBindings: TMaterialInstanceInterfaceList;
+  public
+    property Mesh: TMeshInterface read _Mesh;
+    property MaterialBindings: TMaterialInstanceInterfaceList read _MaterialBindings;
+    destructor Destroy; override;
+  end;
+  type TAttachmentSkin = class (TAttachment)
+  protected
+    var _Skin: TSkinInterface;
+    var _Skeleton: TNodeInterface;
+    var _MaterialBindings: TMaterialInstanceInterfaceList;
+    var _JointBindings: TNodeInterfaceList;
+  public
+    property Skin: TSkinInterface read _Skin;
+    property Skeleton: TNodeInterface read _Skeleton;
+    property MaterialBindings: TMaterialInstanceInterfaceList read _MaterialBindings;
+    property JointBindings: TNodeInterfaceList read _JointBindings;
+    destructor Destroy; override;
+  end;
+  var _ImageList: TImageInterfaceList;
+  var _MaterialList: TMaterialInterfaceList;
+  var _MeshList: TMeshInterfaceList;
+  var _SkinList: TSkinInterfaceList;
+  var _AnimationList: TAnimationInterfaceList;
+  var _RootNode: TNodeInterface;
+protected
+  var _Options: TSceneDataOptionsSet;
+public
+  property ImageList: TImageInterfaceList read _ImageList;
+  property MaterialList: TMaterialInterfaceList read _MaterialList;
+  property MeshList: TMeshInterfaceList read _MeshList;
+  property SkinList: TSkinInterfaceList read _SkinList;
+  property AnimationList: TAnimationInterfaceList read _AnimationList;
+  property RootNode: TNodeInterface read _RootNode;
+  property Options: TSceneDataOptionsSet read _Options;
+  class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
+  class function CanLoad(const FileName: String): Boolean; virtual; overload;
+  class function CanLoad(const Buffer: Pointer; const Size: UInt32): Boolean; virtual; overload;
+  class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; virtual; abstract; overload;
+  destructor Destroy; override;
+  procedure Load(const Stream: TStream); virtual; overload;
+  procedure Load(const FileName: String); virtual; overload;
+  procedure Load(const Buffer: Pointer; const Size: UInt32); virtual; overload;
+  procedure Load(const StreamHelper: TUStreamHelper); virtual; abstract; overload;
+  constructor Create(const AOptions: TSceneDataOptionsSet = []);
+end;
+
+TUSceneDataDAE = class (TUSceneData)
+public
+  type TColladaObject = class
+  public
+    type TObjectList = array of TColladaObject;
+    type TClass = class of TColladaObject;
+  private
+    var _Tag: String;
+    var _id: String;
+    var _sid: String;
+    var _Name: String;
+    var _Scoped: Boolean;
+    var _Parent: TColladaObject;
+    var _Children: TObjectList;
+    var _UserData: TObject;
+    var _AutoFreeUserData: Boolean;
+    procedure AddChild(const Child: TColladaObject); inline;
+    procedure RemoveChild(const Child: TColladaObject); inline;
+    procedure SetParent(const Value: TColladaObject); inline;
+    function GetAnyName: String;
+  protected
+    procedure DumpBegin;
+    procedure DumpEnd;
+    procedure DumpData; virtual;
+    procedure Resolve;
+    procedure ResolveLinks; virtual;
+    procedure Initialize;
+    procedure InitializeObject; virtual;
+    function ResolveObject(
+      const Path: String;
+      const ObjectClass: TClass
+    ): TColladaObject;
+  public
+    property Tag: String read _Tag;
+    property id: String read _id;
+    property sid: String read _sid;
+    property Name: String read _Name;
+    property AnyName: String read GetAnyName;
+    property IsScoped: Boolean read _Scoped;
+    property Parent: TColladaObject read _Parent write SetParent;
+    property Children: TObjectList read _Children;
+    property UserData: TObject read _UserData write _UserData;
+    property AutoFreeUserData: Boolean read _AutoFreeUserData write _AutoFreeUserData;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+    function GetRoot: TColladaObject;
+    function Find(const Path: String): TColladaObject;
+    function FindChild(const NodeID: String): TColladaObject;
+    function FindChildRecursive(const NodeID: String): TColladaObject;
+    procedure Dump;
+  end;
+  type TColladaInstance = class (TColladaObject)
+  private
+    var _Url: String;
+  public
+    property Url: String read _Url;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaInstanceList = array of TColladaInstance;
+  type TColladaNodeType = (nt_invalid, nt_node, nt_joint);
+  type TColladaNode = class (TColladaObject)
+  public
+    type TNodeList = array of TColladaNode;
+  private
+    var _NodeType: TColladaNodeType;
+    var _Layers: TUStrArray;
+    var _Nodes: TNodeList;
+    var _Instances: TColladaInstanceList;
+  public
+    var Matrix: TUMat;
+    property NodeType: TColladaNodeType read _NodeType;
+    property Layers: TUStrArray read _Layers;
+    property Nodes: TNodeList read _Nodes;
+    property Instances: TColladaInstanceList read _Instances;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+    class function StringToNodeType(const NodeTypeName: String): TColladaNodeType;
+  end;
+  type TColladaNodeList = TColladaNode.TNodeList;
+  type TColladaInput = class (TColladaObject)
+  private
+    var _Semantic: String;
+    var _SourceRef: String;
+    var _Source: TColladaObject;
+    var _Offset: Int32;
+    var _Set: Int32;
+    function GetSize: UInt32; inline;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Semantic: String read _Semantic;
+    property Source: TColladaObject read _Source;
+    property Offset: Int32 read _Offset;
+    property InputSet: Int32 read _Set;
+    property Size: UInt32 read GetSize;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaInputList = array of TColladaInput;
+  type TColladaArrayType = (
+    at_invalid,
+    at_bool,
+    at_float,
+    at_idref,
+    at_int,
+    at_name,
+    at_sidref,
+    at_token
+  );
+  type TColladaDataArray = class (TColladaObject)
+  private
+    var _Data: array of UInt8;
+    var _DataString: array of String;
+    var _Count: Int32;
+    var _ItemSize: Int32;
+    var _ArrayType: TColladaArrayType;
+    function GetAsBool(const Index: Int32): PBoolean; inline;
+    function GetAsInt(const Index: Int32): PInt32; inline;
+    function GetAsFloat(const Index: Int32): PUFloat; inline;
+    function GetAsString(const Index: Int32): String; inline;
+    function GetRawData(const Offset: Int32): Pointer; inline;
+  public
+    property ArrayType: TColladaArrayType read _ArrayType;
+    property Count: Int32 read _Count;
+    property ItemSize: Int32 read _ItemSize;
+    property AsBool[const Index: Int32]: PBoolean read GetAsBool;
+    property AsInt[const Index: Int32]: PInt32 read GetAsInt;
+    property AsFloat[const Index: Int32]: PUFloat read GetAsFloat;
+    property AsString[const Index: Int32]: String read GetAsString;
+    property RawData[const Offset: Int32]: Pointer read GetRawData;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+    class function NodeNameToArrayType(const NodeName: String): TColladaArrayType;
+    class function TypeNameToArrayType(const TypeName: String): TColladaArrayType;
+    class function IsDataArrayNode(const XMLNode: TUXML): Boolean;
+  end;
+  type TColladaAccessor = class (TColladaObject)
+  public
+    type TParam = record
+      Name: String;
+      ParamType: TColladaArrayType;
+    end;
+    type TParamArr = array[0..High(UInt16)] of TParam;
+    type PParamArr = ^TParamArr;
+  private
+    var _SourceRef: String;
+    var _Source: TColladaDataArray;
+    var _Count: Int32;
+    var _Stride: Int32;
+    var _Params: array of TParam;
+    function GetParams: PParamArr;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Source: TColladaDataArray read _Source;
+    property Count: Int32 read _Count;
+    property Stride: Int32 read _Stride;
+    property Params: PParamArr read GetParams;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaSource = class (TColladaObject)
+  private
+    var _DataArray: TColladaDataArray;
+    var _Accessor: TColladaAccessor;
+  public
+    property DataArray: TColladaDataArray read _DataArray;
+    property Accessor: TColladaAccessor read _Accessor;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaSourceList = array of TColladaSource;
+  type TColladaVertices = class (TColladaObject)
+  private
+    var _Inputs: TColladaInputList;
+  public
+    property Inputs: TColladaInputList read _Inputs;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaTriangles = class (TColladaObject)
+  protected
+    var _MaterialRef: String;
+    var _Count: Int32;
+    var _Inputs: TColladaInputList;
+    var _Indices: array of Int32;
+    var _VertexLayout: TColladaInputList;
+    var _InputStride: Int32;
+    function GetVertexSize: Int32;
+    function GetIndices: PUInt32Arr; inline;
+    function GetVertexDescriptor: TUVertexDescriptor;
+    function GetInputSourceCount(const Index: UInt32): UInt32; inline;
+    procedure Load(const XMLNode: TUXML); virtual;
+    procedure InitializeObject; override;
+  public
+    property Count: Int32 read _Count;
+    property Inputs: TColladaInputList read _Inputs;
+    property Indices: PUInt32Arr read GetIndices;
+    property VertexLayout: TColladaInputList read _VertexLayout;
+    property VertexSize: Int32 read GetVertexSize;
+    property VertexDescriptor: TUVertexDescriptor read GetVertexDescriptor;
+    property Material: String read _MaterialRef;
+    property InputSourceCount[const Index: UInt32]: UInt32 read GetInputSourceCount;
+    property InputStride: Int32 read _InputStride;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+    function CopyInputData(const Target: Pointer; const Input: TColladaInput; const Index: Int32): Pointer;
+  end;
+  type TColladaPolygons = class (TColladaTriangles)
+  protected
+    procedure Load(const XMLNode: TUXML); override;
+  end;
+  type TColladaPolylist = class (TColladaTriangles)
+  protected
+    procedure Load(const XMLNode: TUXML); override;
+  end;
+  type TColladaTrifans = class (TColladaTriangles)
+  protected
+    procedure Load(const XMLNode: TUXML); override;
+  end;
+  type TColladaTristrips = class (TColladaTriangles)
+  protected
+    procedure Load(const XMLNode: TUXML); override;
+  end;
+  type TColladaTrianglesList = array of TColladaTriangles;
+  type TColladaMesh = class (TColladaObject)
+  private
+    var _Sources: TColladaSourceList;
+    var _Vertices: TColladaVertices;
+    var _TrianglesList: TColladaTrianglesList;
+  public
+    property Sources: TColladaSourceList read _Sources;
+    property Vertices: TColladaVertices read _Vertices;
+    property TrianglesList: TColladaTrianglesList read _TrianglesList;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaMeshList = array of TColladaMesh;
+  type TColladaImage = class (TColladaObject)
+  private
+    var _Source: String;
+  public
+    property Source: String read _Source;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaImageList = array of TColladaImage;
+  type TColladaEffectProfileParamType = (pt_invalid, pt_surface, pt_sampler, pt_float, pt_float2, pt_float3, pt_float4);
+  type TColladaEffectProfileParam = class (TColladaObject)
+  public
+    type TSamplerType = (st_invalid, st_1d, st_2d, st_3d, st_cube);
+    type TDataSurface = class
+      var InitFrom: String;
+      var Image: TColladaImage;
+    end;
+    type TDataSampler = class
+      var Source: String;
+      var Surface: TDataSurface;
+      var SamplerType: TSamplerType;
+    end;
+    type TDataFloat = class
+      var Value: TUFloat;
+    end;
+    type TDataFloat2 = class
+      var Value: TUVec2;
+    end;
+    type TDataFloat3 = class
+      var Value: TUVec3;
+    end;
+    type TDataFloat4 = class
+      var Value: TUVec4;
+    end;
+  private
+    var _ParamType: TColladaEffectProfileParamType;
+    var _Data: TObject;
+  public
+    property ParamType: TColladaEffectProfileParamType read _ParamType;
+    function AsSurface: TDataSurface; inline;
+    function AsSampler: TDataSampler; inline;
+    function AsFloat: TDataFloat; inline;
+    function AsFloat2: TDataFloat2; inline;
+    function AsFloat3: TDataFloat3; inline;
+    function AsFloat4: TDataFloat4; inline;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaEffectProfileParamList = array of TColladaEffectProfileParam;
+  type TColladaEffectTechnique = class (TColladaObject)
+  private
+    type TEffectParam = class
+      var Name: String;
+      var Param: TColladaEffectProfileParam;
+    end;
+    type TEffectParamList = array of TEffectParam;
+    var _Params: TEffectParamList;
+    function FindProfileParam(const ParamName: String): TColladaEffectProfileParam;
+  public
+    property Params: TEffectParamList read _Params;
+    function FindParam(const ParamName: String): TColladaEffectProfileParam;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaEffectTechniqueList = array of TColladaEffectTechnique;
+  type TColladaEffectProfile = class (TColladaObject)
+  private
+    var _Params: TColladaEffectProfileParamList;
+    var _Techniques: TColladaEffectTechniqueList;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Params: TColladaEffectProfileParamList read _Params;
+    property Techniques: TColladaEffectTechniqueList read _Techniques;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaEffect = class (TColladaObject)
+  private
+    var _Profile: TColladaEffectProfile;
+  public
+    property Profile: TColladaEffectProfile read _Profile;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaEffectList = array of TColladaEffect;
+  type TColladaInstanceEffect = class (TColladaInstance)
+  private
+    var _Effect: TColladaEffect;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Effect: TColladaEffect read _Effect;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaMaterial = class (TColladaObject)
+  private
+    var _InstanceEffect: TColladaInstanceEffect;
+  public
+    property InstanceEffect: TColladaInstanceEffect read _InstanceEffect;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaMaterialList = array of TColladaMaterial;
+  type TColladaGeometry = class (TColladaObject)
+  private
+    var _Meshes: TColladaMeshList;
+  public
+    property Meshes: TColladaMeshList read _Meshes;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaGeometryList = array of TColladaGeometry;
+  type TColladaMorph = class (TColladaObject)
+  public
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaJoints = class (TColladaObject)
+  public
+    type TJoint = record
+      JointName: String;
+      BindPose: TUMat;
+    end;
+    type TJoints = array of TJoint;
+  private
+    var _Inputs: TColladaInputList;
+    var _Joints: TJoints;
+    function FindInput(const Semantic: String): TColladaInput;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Inputs: TColladaInputList read _Inputs;
+    property Joints: TJoints read _Joints;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaVertexWeights = class (TColladaObject)
+  public
+    type TVertexJointReference = record
+      JointIndex: Int32;
+      JointWeight: TUFloat;
+    end;
+    type TVertexJointReferenceArr = array of array of TVertexJointReference;
+  private
+    var _VCount: Int32;
+    var _Inputs: TColladaInputList;
+    var _VertexWeights: TVertexJointReferenceArr;
+    var _Indices: array of Int32;
+    function FindInput(const Semantic: String): TColladaInput;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property VCount: Int32 read _VCount;
+    property Inputs: TColladaInputList read _Inputs;
+    property Weights: TVertexJointReferenceArr read _VertexWeights;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaSkin = class (TColladaObject)
+  private
+    var _GeometryRef: String;
+    var _Geometry: TColladaGeometry;
+    var _BindShapeMatrix: TUMat;
+    var _Sources: TColladaSourceList;
+    var _Joints: TColladaJoints;
+    var _VertexWeights: TColladaVertexWeights;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Geometry: TColladaGeometry read _Geometry;
+    property BindShapeMatrix: TUMat read _BindShapeMatrix;
+    property Joints: TColladaJoints read _Joints;
+    property VertexWeights: TColladaVertexWeights read _VertexWeights;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaControllerType = (ct_invalid, ct_skin, ct_morph);
+  type TColladaController = class (TColladaObject)
+  private
+    var _ControllerType: TColladaControllerType;
+    var _Controller: TColladaObject;
+    function GetAsSkin: TColladaSkin; inline;
+    function GetAsMorph: TColladaMorph; inline;
+  public
+    property Controller: TColladaObject read _Controller;
+    property ControllerType: TColladaControllerType read _ControllerType;
+    property AsSkin: TColladaSkin read GetAsSkin;
+    property AsMorph: TColladaMorph read GetAsMorph;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaControllerList = array of TColladaController;
+  type TColladaAnimationInterpolation = (ai_step, ai_linear, ai_bezier);
+  type TColladaAnimationSampler = class (TColladaObject)
+  public
+    type TKey = record
+      Time: TUFloat;
+      Value: Pointer;
+      TangentIn: array of TUFloat;
+      TangentOut: array of TUFloat;
+      Interpolation: TColladaAnimationInterpolation;
+    end;
+    type PKey = ^TKey;
+  private
+    var _Data: Pointer;
+    var _Inputs: TColladaInputList;
+    var _Keys: array of TKey;
+    var _DataType: TColladaArrayType;
+    var _DataStride: UInt32;
+    var _DataSize: UInt32;
+    function GetKey(const Index: Int32): PKey; inline;
+    function GetKeyCount: Int32; inline;
+    function FindKey(const Time: TUFloat): Int32;
+    function GetMaxTime: TUFloat; inline;
+    function GetSampleSize: UInt32; inline;
+  protected
+    procedure ResolveLinks; override;
+    procedure DumpData; override;
+  public
+    property Inputs: TColladaInputList read _Inputs;
+    property MaxTime: TUFloat read GetMaxTime;
+    property SampleSize: UInt32 read GetSampleSize;
+    property DataType: TColladaArrayType read _DataType;
+    property Keys[const Index: Int32]: PKey read GetKey;
+    property KeyCount: Int32 read GetKeyCount;
+    procedure SampleData(const Output: Pointer; const Time: TUFloat; const Loop: Boolean = False);
+    function SampleAsFloat(const Time: TUFloat; const Loop: Boolean = false): TUFloat;
+    function SampleAsFloat2(const Time: TUFloat; const Loop: Boolean = false): TUVec2;
+    function SampleAsFloat3(const Time: TUFloat; const Loop: Boolean = false): TUVec3;
+    function SampleAsFloat4(const Time: TUFloat; const Loop: Boolean = false): TUVec4;
+    function SampleAsMatrix(const Time: TUFloat; const Loop: Boolean = false): TUMat;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaAnimationSamplerList = array of TColladaAnimationSampler;
+  type TColladaAnimationChannel = class (TColladaObject)
+  private
+    var _SourceRef: String;
+    var _TargetRef: String;
+    var _Sampler: TColladaAnimationSampler;
+    var _Target: TColladaObject;
+    var _TargetProperty: String;
+    function GetMaxTime: TUFloat; inline;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Sampler: TColladaAnimationSampler read _Sampler;
+    property Target: TColladaObject read _Target;
+    property TargetProperty: String read _TargetProperty;
+    property MaxTime: TUFloat read GetMaxTime;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaAnimationChannelList = array of TColladaAnimationChannel;
+  type TColladaAnimation = class (TColladaObject)
+  public
+    type TAnimationList = array of TColladaAnimation;
+  private
+    var _Animations: TAnimationList;
+    var _Sources: TColladaSourceList;
+    var _Samplers: TColladaAnimationSamplerList;
+    var _Channels: TColladaAnimationChannelList;
+  public
+    property Animations: TAnimationList read _Animations;
+    property Sources: TColladaSourceList read _Sources;
+    property Samplers: TColladaAnimationSamplerList read _Samplers;
+    property Channels: TColladaAnimationChannelList read _Channels;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaAnimationList = TColladaAnimation.TAnimationList;
+  type TColladaCamera = class (TColladaObject)
+  private
+    var _FOV: TUFloat;
+    var _Aspect: TUFloat;
+    var _Near: TUFloat;
+    var _Far: TUFloat;
+  public
+    property FOV: TUFloat read _FOV;
+    property Aspect: TUFloat read _Aspect;
+    property ClipNear: TUFloat read _Near;
+    property ClipFar: TUFloat read _Far;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaCameraList = array of TColladaCamera;
+  type TColladaLightType = (lt_ambient, lt_directional, lt_point, lt_spot);
+  type TColladaLight = class (TColladaObject)
+  private
+    var _LightType: TColladaLightType;
+    var _Color: TUVec3;
+    var _AttenuationConstant: TUFloat;
+    var _AttenuationLinear: TUFloat;
+    var _AttenuationQuadratic: TUFloat;
+    var _FalloffAngle: TUFloat;
+    var _FalloffExponent: TUFloat;
+  public
+    property LightType: TColladaLightType read _LightType;
+    property Color: TUVec3 read _Color;
+    property AttenuationConstant: TUFloat read _AttenuationConstant;
+    property AttenuationLinear: TUFloat read _AttenuationLinear;
+    property AttenuationQuadratic: TUFloat read _AttenuationQuadratic;
+    property FalloffAngle: TUFloat read _FalloffAngle;
+    property FalloffExponent: TUFloat read _FalloffExponent;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaLightList = array of TColladaLight;
+  type TColladaInstanceMaterial = class (TColladaObject)
+  private
+    var _Symbol: String;
+    var _Target: String;
+    var _Material: TColladaMaterial;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Material: TColladaMaterial read _Material;
+    property Symbol: String read _Symbol;
+    property Target: String read _Target;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaInstanceMaterialList = array of TColladaInstanceMaterial;
+  type TColladaInstanceGeometry = class (TColladaInstance)
+  private
+    var _Geometry: TColladaGeometry;
+    var _MaterialBindings: TColladaInstanceMaterialList;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Geometry: TColladaGeometry read _Geometry;
+    property MaterialBindings: TColladaInstanceMaterialList read _MaterialBindings;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaInstanceController = class (TColladaInstance)
+  private
+    var _SkeletonRef: String;
+    var _Skeleton: TColladaNode;
+    var _Controller: TColladaController;
+    var _MaterialBindings: TColladaInstanceMaterialList;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Skeleton: TColladaNode read _Skeleton;
+    property Controller: TColladaController read _Controller;
+    property MaterialBindings: TColladaInstanceMaterialList read _MaterialBindings;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaInstanceCamera = class (TColladaInstance)
+  private
+    var _Camera: TColladaCamera;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Camera: TColladaCamera read _Camera;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaInstanceLight = class (TColladaInstance)
+  private
+    var _Light: TColladaLight;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property Light: TColladaLight read _Light;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaVisualScene = class (TColladaObject)
+  private
+    var _Nodes: TColladaNodeList;
+  public
+    property Nodes: TColladaNodeList read _Nodes;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaVisualSceneList = array of TColladaVisualScene;
+  type TColladaLibraryAnimations = class (TColladaObject)
+  private
+    var _Animations: TColladaAnimationList;
+  public
+    property Animations: TColladaAnimationList read _Animations;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaLibraryMaterials = class (TColladaObject)
+  private
+    var _Materials: TColladaMaterialList;
+  public
+    property Materials: TColladaMaterialList read _Materials;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaLibraryEffects = class (TColladaObject)
+  private
+    var _Effects: TColladaEffectList;
+  public
+    property Effects: TColladaEffectList read _Effects;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaLibraryImages = class (TColladaObject)
+  private
+    var _Images: TColladaImageList;
+  public
+    property Images: TColladaImageList read _Images;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaLibraryGeometries = class (TColladaObject)
+  private
+    var _Geometries: TColladaGeometryList;
+  public
+    property Geometries: TColladaGeometryList read _Geometries;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaLibraryControllers = class (TColladaObject)
+  private
+    var _Controllers: TColladaControllerList;
+  public
+    property Controllers: TColladaControllerList read _Controllers;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaLibraryCameras = class (TColladaObject)
+  private
+    var _Cameras: TColladaCameraList;
+  public
+    property Cameras: TColladaCameraList read _Cameras;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaLibraryLights = class (TColladaObject)
+  private
+    var _Lights: TColladaLightList;
+  public
+    property Lights: TColladaLightList read _Lights;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaLibraryVisualScenes = class (TColladaObject)
+  private
+    var _VisualScenes: TColladaVisualSceneList;
+  public
+    property VisualScenes: TColladaVisualSceneList read _VisualScenes;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaInstanceVisualScene = class (TColladaInstance)
+  private
+    var _VisualScene: TColladaVisualScene;
+  protected
+    procedure ResolveLinks; override;
+  public
+    property VisualScene: TColladaVisualScene read _VisualScene;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaScene = class (TColladaObject)
+  private
+    var _VisualScene: TColladaInstanceVisualScene;
+  public
+    property VisualScene: TColladaInstanceVisualScene read _VisualScene;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaAsset = class (TColladaObject)
+  private
+    var _UpAxis: TUSwizzle;
+  public
+    property UpAxis: TUSwizzle read _UpAxis;
+    constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
+    destructor Destroy; override;
+  end;
+  type TColladaRoot = class (TColladaObject)
+  private
+    var _Asset: TColladaAsset;
+    var _LibMaterials: TColladaLibraryMaterials;
+    var _LibEffects: TColladaLibraryEffects;
+    var _LibImages: TColladaLibraryImages;
+    var _LibGeometries: TColladaLibraryGeometries;
+    var _LibControllers: TColladaLibraryControllers;
+    var _LibAnimations: TColladaLibraryAnimations;
+    var _LibCameras: TColladaLibraryCameras;
+    var _LibLights: TColladaLibraryLights;
+    var _LibVisualScenes: TColladaLibraryVisualScenes;
+    var _Scene: TColladaScene;
+    var _Options: TSceneDataOptionsSet;
+    var _RootPath: String;
+  public
+    property Asset: TColladaAsset read _Asset;
+    property LibMaterials: TColladaLibraryMaterials read _LibMaterials;
+    property LibEffects: TColladaLibraryEffects read _LibEffects;
+    property LibImages: TColladaLibraryImages read _LibImages;
+    property LibGeometries: TColladaLibraryGeometries read _LibGeometries;
+    property LibControllers: TColladaLibraryControllers read _LibControllers;
+    property LibAnimations: TColladaLibraryAnimations read _LibAnimations;
+    property LibCameras: TColladaLibraryCameras read _LibCameras;
+    property LibLights: TColladaLibraryLights read _LibLights;
+    property LibVisualScenes: TColladaLibraryVisualScenes read _LibVisualScenes;
+    property Scene: TColladaScene read _Scene;
+    property Options: TSceneDataOptionsSet read _Options;
+    property RootPath: String read _RootPath;
+    constructor Create(const XMLNode: TUXML; const AOptions: TSceneDataOptionsSet; const Path: String);
+    destructor Destroy; override;
+  end;
+private
+  type TImageInterfaceCollada = class (TImageInterface)
+  public
+    constructor Create(const ColladaImage: TColladaImage);
+  end;
+  type TMaterialInterfaceCollada = class (TMaterialInterface)
+  public
+    constructor Create(const ColladaMaterial: TColladaMaterial);
+  end;
+  type TMeshInterfaceCollada = class (TMeshInterface)
+  public
+    type TSubsetCollada = class (TMeshInterface.TSubset)
+    public
+      type TVertexRemap = array of Int32;
+    private
+      var _VertexDescriptor: TUVertexDescriptor;
+      var _VertexRemap: TVertexRemap;
+    protected
+      function GetVertexDescriptor: TUVertexDescriptor; override;
+    public
+      property VertexRemap: TVertexRemap read _VertexRemap;
+      constructor Create(const ColladaTriangles: TColladaTriangles);
+    end;
+    constructor Create(const ColladaGeometry: TColladaGeometry);
+  end;
+  type TSkinInterfaceCollada = class (TSkinInterface)
+  public
+    constructor Create(const ColladaSkin: TColladaSkin);
+  end;
+  type TAnimationInterfaceCollada = class (TAnimationInterface)
+  public
+    type TTrackCollada = class (TTrack)
+    public
+      constructor Create(const ColladaChannel: TColladaAnimationChannel);
+    end;
+  public
+    constructor Create(const ColladaAnimation: TColladaAnimation);
+  end;
+  type TAttachmentMeshCollada = class (TAttachmentMesh)
+  public
+    constructor Create(const GeometryInstance: TColladaInstanceGeometry);
+  end;
+  type TAttachmentSkinCollada = class (TAttachmentSkin)
+  public
+    constructor Create(const ControllerInstance: TColladaInstanceController);
+  end;
+  type TNodeInterfaceCollada = class (TNodeInterface)
+  private
+    var _ColladaNode: TColladaNode;
+  public
+    constructor Create(const AColladaNode: TColladaNode; const AParent: TNodeInterfaceCollada);
+    procedure ProcessAttachments;
+  end;
+  var _Root: TColladaRoot;
+  var _Path: String;
+  class function ParseStrToIntArray(const Str: String): TInt32Array;
+  class function FindNextValue(const Str: String; var CurPos: Int32): String;
+  class function LoadMatrix(
+    const Node: TUXML
+  ): TUMat;
+  class function LoadMatrix(
+    const Src: TColladaSource;
+    const Index: Int32
+  ): TUMat;
+  class function GenerateMaterialBindings(
+    const ColladaGeometry: TColladaGeometry;
+    const ColladaBindings: TColladaInstanceMaterialList
+  ): TMaterialInstanceInterfaceList;
+  procedure Read(const XML: TUXML);
+public
+  property Root: TColladaRoot read _Root;
+  class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; override;
+  procedure Load(const StreamHelper: TUStreamHelper); override;
+  procedure Load(const FileName: String); override;
+  destructor Destroy; override;
+end;
 
 function ULoadImageData(const Stream: TStream): TUImageDataShared; overload;
 function ULoadImageData(const FileName: String): TUImageDataShared; overload;
@@ -4298,7 +4315,7 @@ begin
       _Data := DataFloat3;
       _ParamType := pt_float3;
     end
-    else if (NodeName = 'float4') then
+    else if (NodeName = 'float4') or (NodeName = 'color') then
     begin
       DataFloat4 := TDataFloat4.Create;
       VecData := Node.Content;
@@ -4316,6 +4333,77 @@ end;
 destructor TUSceneDataDAE.TColladaEffectProfileParam.Destroy;
 begin
   FreeAndNil(_Data);
+  inherited Destroy;
+end;
+
+function TUSceneDataDAE.TColladaEffectTechnique.FindProfileParam(
+  const ParamName: String): TColladaEffectProfileParam;
+  var ParentNode: TColladaObject;
+  var Profile: TColladaEffectProfile;
+begin
+  ParentNode := Self;
+  repeat
+    ParentNode := ParentNode.Parent;
+    Profile := ParentNode as TColladaEffectProfile;
+    if Assigned(Profile) then Break;
+  until not Assigned(ParentNode);
+  if not Assigned(Profile) then Exit(nil);
+  for Result in Profile.Params do
+  begin
+    if Result.sid = ParamName then Exit;
+  end;
+  Result := nil;
+end;
+
+function TUSceneDataDAE.TColladaEffectTechnique.FindParam(
+  const ParamName: String
+): TColladaEffectProfileParam;
+  var Param: TEffectParam;
+begin
+  for Param in _Params do
+  if LowerCase(Param.Name) = LowerCase(ParamName) then
+  begin
+    Exit(Param.Param);
+  end;
+  Result := nil;
+end;
+
+constructor TUSceneDataDAE.TColladaEffectTechnique.Create(
+  const XMLNode: TUXML; const AParent: TColladaObject
+);
+  var Param: TEffectParam;
+  var Node, ValueNode: TUXML;
+  var NodeName: String;
+begin
+  inherited Create(XMLNode, AParent);
+  for Node in XMLNode do
+  begin
+    Param := TEffectParam.Create;
+    Param.Name := Node.Name;
+    for ValueNode in Node do
+    begin
+      NodeName := LowerCase(ValueNode.Name);
+      if NodeName = 'texture' then
+      begin
+        Param.Param := FindProfileParam(ValueNode.AttributeValue['texture']);
+      end
+      else if NodeName = 'param' then
+      begin
+        Param.Param := FindProfileParam(ValueNode.Content);
+      end
+      else
+      begin
+        Param.Param := TColladaEffectProfileParam.Create(Node, Self);
+      end;
+      specialize UArrAppend<TEffectParam>(_Params, Param);
+      Break;
+    end;
+  end;
+end;
+
+destructor TUSceneDataDAE.TColladaEffectTechnique.Destroy;
+begin
+  specialize UArrClear<TEffectParam>(_Params);
   inherited Destroy;
 end;
 
@@ -4348,7 +4436,7 @@ constructor TUSceneDataDAE.TColladaEffectProfile.Create(
   const XMLNode: TUXML;
   const AParent: TColladaObject
 );
-  var Node: TUXML;
+  var Node, NodeTech: TUXML;
   var NodeName: String;
 begin
   inherited Create(XMLNode, AParent);
@@ -4360,6 +4448,15 @@ begin
       specialize UArrAppend<TColladaEffectProfileParam>(
         _Params, TColladaEffectProfileParam.Create(Node, Self)
       );
+    end
+    else if NodeName = 'technique' then
+    begin
+      for NodeTech in Node do
+      begin
+        specialize UArrAppend<TColladaEffectTechnique>(
+          _Techniques, TColladaEffectTechnique.Create(NodeTech, Self)
+        );
+      end;
     end;
   end;
 end;
@@ -5744,6 +5841,7 @@ end;
 constructor TUSceneDataDAE.TMaterialInterfaceCollada.Create(
   const ColladaMaterial: TColladaMaterial
 );
+  var Technique: TColladaEffectTechnique;
   var Profile: TColladaEffectProfile;
   var i: Int32;
   var Param: TColladaEffectProfileParam;
@@ -5757,13 +5855,13 @@ begin
   or not Assigned(ColladaMaterial.InstanceEffect.Effect)
   or not Assigned(ColladaMaterial.InstanceEffect.Effect.Profile) then Exit;
   Profile := ColladaMaterial.InstanceEffect.Effect.Profile;
-  for i := 0 to High(Profile.Params) do
+  if Length(Profile.Techniques) < 1 then Exit;
+  Technique := Profile.Techniques[0];
+  for i := 0 to High(Technique.Params) do
   begin
-    Param := Profile.Params[i];
-    ParamName := Param.sid;
-    if Length(Param.id) > 0 then ParamName := Param.id;
-    if Length(Param.Name) > 0 then ParamName := Param.Name;
-    case Profile.Params[i].ParamType of
+    ParamName := Technique.Params[i].Name;
+    Param := Technique.Params[i].Param;
+    case Param.ParamType of
       pt_sampler:
       begin
         Sampler := Param.AsSampler;
@@ -5779,26 +5877,26 @@ begin
               st_2d: ImageType := it_2d;
               st_3d: ImageType := it_3d;
               st_cube: ImageType := it_cube;
-              //else ImageType := it_2d;
+              else ImageType := it_2d;
             end;
           end;
         end;
       end;
       pt_float:
       begin
-        NewParamFloat(Param.id).Value := Param.AsFloat.Value;
+        NewParamFloat(ParamName).Value := Param.AsFloat.Value;
       end;
       pt_float2:
       begin
-        NewParamVec2(Param.id).Value := Param.AsFloat2.Value;
+        NewParamVec2(ParamName).Value := Param.AsFloat2.Value;
       end;
       pt_float3:
       begin
-        NewParamVec3(Param.id).Value := Param.AsFloat3.Value;
+        NewParamVec3(ParamName).Value := Param.AsFloat3.Value;
       end;
       pt_float4:
       begin
-        NewParamVec4(Param.id).Value := Param.AsFloat4.Value;
+        NewParamVec4(ParamName).Value := Param.AsFloat4.Value;
       end;
       else begin end;
     end;
