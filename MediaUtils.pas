@@ -241,7 +241,6 @@ public
     function GetLocalTransform: TUMat; inline;
     procedure SetLocalTransform(const Value: TUMat);
   public
-    //var UpdateTransform: Boolean;
     property Name: String read _Name;
     property Transform: TUMat read _Transform write SetTransform;
     property LocalTransform: TUMat read GetLocalTransform write SetLocalTransform;
@@ -516,7 +515,7 @@ public
   constructor Create(const AOptions: TSceneDataOptionsSet = []);
 end;
 
-TUSceneDataDAE = class (TUSceneData)
+type TUSceneDataDAE = class (TUSceneData)
 public
   type TColladaObject = class
   public
@@ -809,6 +808,7 @@ public
     type TEffectParam = class
       var Name: String;
       var Param: TColladaEffectProfileParam;
+      var TexCoord: String;
     end;
     type TEffectParamList = array of TEffectParam;
     var _Params: TEffectParamList;
@@ -4006,7 +4006,7 @@ begin
      begin
        for s := 0 to _InputStride - 1 do
        begin
-         _Indices[(t * 3 + 0) * _InputStride + s] := Poly[j];
+         _Indices[(t * 3 + 0) * _InputStride + s] := Poly[j + s];
          _Indices[(t * 3 + 1) * _InputStride + s] := Poly[j + (p + 1) * _InputStride + s];
          _Indices[(t * 3 + 2) * _InputStride + s] := Poly[j + (p + 2) * _InputStride + s];
        end;
@@ -4386,6 +4386,7 @@ begin
       if NodeName = 'texture' then
       begin
         Param.Param := FindProfileParam(ValueNode.AttributeValue['texture']);
+        Param.TexCoord := ValueNode.AttributeValue['texcoord'];
       end
       else if NodeName = 'param' then
       begin
@@ -6607,7 +6608,7 @@ begin
     begin
       Result[n] := TMaterialInstanceInterface.Create;
       cm := FindMaterialBinding(ColladaGeometry.Meshes[j].TrianglesList[i].Material);
-      if not Assigned(cm) then Continue;
+      if Assigned(cm) then
       begin
         Result[n].Assign(
           TMaterialInterface(cm.Material.UserData)

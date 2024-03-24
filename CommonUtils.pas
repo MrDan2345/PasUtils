@@ -405,6 +405,7 @@ public
   function IsZero: Boolean; inline;
   function ToString: String; inline;
 end;
+operator := (const v: TUColor): TUVec4;
 
 type TUVec2iImpl = type helper for TUVec2i
 private
@@ -1703,6 +1704,16 @@ begin
     Round(v.y) * $ff,
     Round(v.z) * $ff,
     Round(v.w) * $ff
+  );
+end;
+
+operator := (const v: TUColor): TUVec4;
+begin
+  Result := TUVec4.Make(
+    v.r * URcp255,
+    v.g * URcp255,
+    v.b * URcp255,
+    v.a * URcp255
   );
 end;
 // TUColorImpl end
