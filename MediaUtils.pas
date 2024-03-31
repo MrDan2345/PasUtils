@@ -218,8 +218,9 @@ type TUVertexAttribute = record
 end;
 type TUVertexDescriptor = array of TUVertexAttribute;
 
-type TSceneDataOptions = (sdo_optimize, sdo_gen_normals, sdo_gen_tangents);
-type TSceneDataOptionsSet = set of TSceneDataOptions;
+type TUSceneDataOptions = (sdo_optimize, sdo_gen_normals, sdo_gen_tangents);
+type TUSceneDataOptionsSet = set of TUSceneDataOptions;
+type TUSceneDataUpVector = (sdu_any, sdu_x, sdu_y, sdu_z);
 
 type TUSceneData = class (TURefClass)
 public
@@ -494,7 +495,8 @@ public
   var _AnimationList: TAnimationInterfaceList;
   var _RootNode: TNodeInterface;
 protected
-  var _Options: TSceneDataOptionsSet;
+  var _Options: TUSceneDataOptionsSet;
+  var _UpVector: TUSceneDataUpVector;
 public
   property ImageList: TImageInterfaceList read _ImageList;
   property MaterialList: TMaterialInterfaceList read _MaterialList;
@@ -502,7 +504,7 @@ public
   property SkinList: TSkinInterfaceList read _SkinList;
   property AnimationList: TAnimationInterfaceList read _AnimationList;
   property RootNode: TNodeInterface read _RootNode;
-  property Options: TSceneDataOptionsSet read _Options;
+  property Options: TUSceneDataOptionsSet read _Options;
   class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
   class function CanLoad(const FileName: String): Boolean; virtual; overload;
   class function CanLoad(const Buffer: Pointer; const Size: UInt32): Boolean; virtual; overload;
@@ -512,7 +514,10 @@ public
   procedure Load(const FileName: String); virtual; overload;
   procedure Load(const Buffer: Pointer; const Size: UInt32); virtual; overload;
   procedure Load(const StreamHelper: TUStreamHelper); virtual; abstract; overload;
-  constructor Create(const AOptions: TSceneDataOptionsSet = []);
+  constructor Create(
+    const AOptions: TUSceneDataOptionsSet = [];
+    const UpVector: TUSceneDataUpVector = sdu_any
+  );
 end;
 
 type TUSceneDataDAE = class (TUSceneData)
@@ -1228,9 +1233,9 @@ public
   end;
   type TColladaAsset = class (TColladaObject)
   private
-    var _UpAxis: TUSwizzle;
+    var _UpAxis: TUSceneDataUpVector;
   public
-    property UpAxis: TUSwizzle read _UpAxis;
+    property UpAxis: TUSceneDataUpVector read _UpAxis;
     constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
     destructor Destroy; override;
   end;
@@ -1247,9 +1252,11 @@ public
     var _LibLights: TColladaLibraryLights;
     var _LibVisualScenes: TColladaLibraryVisualScenes;
     var _Scene: TColladaScene;
-    var _Options: TSceneDataOptionsSet;
+    var _Options: TUSceneDataOptionsSet;
     var _RootPath: String;
+    var _Swizzle: TUSwizzle;
   public
+    property Swizzle: TUSwizzle read _Swizzle;
     property Asset: TColladaAsset read _Asset;
     property LibMaterials: TColladaLibraryMaterials read _LibMaterials;
     property LibEffects: TColladaLibraryEffects read _LibEffects;
@@ -1261,9 +1268,9 @@ public
     property LibLights: TColladaLibraryLights read _LibLights;
     property LibVisualScenes: TColladaLibraryVisualScenes read _LibVisualScenes;
     property Scene: TColladaScene read _Scene;
-    property Options: TSceneDataOptionsSet read _Options;
+    property Options: TUSceneDataOptionsSet read _Options;
     property RootPath: String read _RootPath;
-    constructor Create(const XMLNode: TUXML; const AOptions: TSceneDataOptionsSet; const Path: String);
+    constructor Create(const XMLNode: TUXML; const Path: String);
     destructor Destroy; override;
   end;
 private
@@ -2991,10 +2998,14 @@ begin
   end;
 end;
 
-constructor TUSceneData.Create(const AOptions: TSceneDataOptionsSet);
+constructor TUSceneData.Create(
+  const AOptions: TUSceneDataOptionsSet;
+  const UpVector: TUSceneDataUpVector
+);
 begin
   inherited Create;
   _Options := AOptions;
+  _UpVector := UpVector;
 end;
 // TUSceneData end
 
@@ -5741,18 +5752,22 @@ constructor TUSceneDataDAE.TColladaAsset.Create(
   var Str: String;
 begin
   inherited Create(XMLNode, AParent);
-  _UpAxis := TUSwizzle.Identity;
+  _UpAxis := sdu_any;
   Node := XMLNode.FindChild('up_axis');
   if Assigned(Node) then
   begin
     Str := LowerCase(Node.Content);
     if Str = 'x_up' then
     begin
-      _UpAxis.SetValue(1, 0);
+      _UpAxis := sdu_x;
+    end
+    else if Str = 'y_up' then
+    begin
+      _UpAxis := sdu_y;
     end
     else if Str = 'z_up' then
     begin
-      _UpAxis.SetValue(0, 2, 1);
+      _UpAxis := sdu_z;
     end;
   end;
 end;
@@ -5764,9 +5779,23 @@ end;
 
 constructor TUSceneDataDAE.TColladaRoot.Create(
   const XMLNode: TUXML;
-  const AOptions: TSceneDataOptionsSet;
   const Path: String
 );
+  procedure PickSwizzle;
+    const Remap: array [0..2] of array [0..2] of array [0..2] of UInt8 = (
+      ((0, 1, 2), (1, 0, 2), (2, 1, 0)),
+      ((1, 0, 2), (0, 1, 2), (0, 2, 1)),
+      ((2, 1, 0), (0, 2, 1), (0, 1, 2))
+    );
+    var i, j: Int32;
+  begin
+    if _UpVector = sdu_any then Exit;
+    if not Assigned(_Asset) then Exit;
+    if _Asset.UpAxis = sdu_any then Exit;
+    i := Int32(_UpVector) - 1;
+    j := Int32(_Asset.UpAxis) - 1;
+    _Swizzle := TUSwizzle.Make(Remap[i, j][0], Remap[i, j][1], Remap[i, j][2]);
+  end;
   var Node: TUXML;
   var NodeName: String;
 begin
@@ -5776,6 +5805,7 @@ begin
   if Assigned(Node) then
   begin
     _Asset := TColladaAsset.Create(Node, Self);
+    PickSwizzle;
   end;
   for Node in XMLNode do
   begin
@@ -6091,17 +6121,41 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
     end;
     Result := i;
   end;
+  var Root: TColladaRoot;
+  var AttribOffsets: array of Int32;
+  procedure ApplySwizzle;
+    var i, j: Int32;
+    var Data: Pointer;
+    var DataVec2: PUVec2 absolute Data;
+    var DataVec3: PUVec3 absolute Data;
+  begin
+    if not Assigned(Root) then Exit;
+    if Root.Swizzle.IsIdentity then Exit;
+    for i := 0 to High(VertexBuffer) do
+    begin
+      for j := 0 to High(_VertexDescriptor) do
+      begin
+        if _VertexDescriptor[j].DataType <> dt_float then Continue;
+        Data := _VertexData + i * VertexSize + AttribOffsets[j];
+        if _VertexDescriptor[j].Semantic in [as_position, as_normal, as_tangent, as_binormal] then
+        begin
+          case _VertexDescriptor[j].DataCount of
+            2: DataVec2^ := DataVec2^.Swizzle(Root.Swizzle);
+            3: DataVec3^ := DataVec3^.Swizzle(Root.Swizzle);
+          end;
+        end;
+      end;
+    end;
+  end;
   var NormalInd: Int32;
   var TangentInd: Int32;
   var BinormalInd: Int32;
   var GenAttribs: Int32;
   var GenNormals: Boolean;
   var GenTangents: Boolean;
-  var AttribOffsets: array of Int32;
   var AttribIndices: array of Int32;
   var VertexIndices: array of Int32;
   var i, j, ai, Ind: Int32;
-  var Root: TColladaRoot;
 begin
   ColladaTriangles.UserData := Self;
   _VertexDescriptor := ColladaTriangles.VertexDescriptor;
@@ -6228,6 +6282,7 @@ begin
       end;
     end;
   end;
+  ApplySwizzle;
   if _IndexSize = 2 then
   begin
     for i := 0 to High(VertexIndices) do
@@ -6636,7 +6691,7 @@ procedure TUSceneDataDAE.Read(const XML: TUXML);
 begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
-  _Root := TColladaRoot.Create(XML, _Options, _Path);
+  _Root := TColladaRoot.Create(XML, _Path);
   _Root.Resolve;
   _Root.Initialize;
   //_Root.Dump;

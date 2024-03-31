@@ -132,11 +132,13 @@ private
   function GetOffset(const Index: UInt8): UInt8; inline;
   procedure SetOffset(const Index: UInt8; const Value: UInt8); inline;
   function GetArray: TUVec4i; inline;
+  function GetIsIdentity: Boolean; inline;
 public
   const Identity: UInt8 = (0 or (1 shl 2) or (2 shl 4) or (3 shl 6));
   property Remap: UInt8 read _Remap write _Remap;
   property Offset[const Index: UInt8]: UInt8 read GetOffset write SetOffset; default;
   property AsArray: TUVec4i read GetArray;
+  property IsIdentity: Boolean read GetIsIdentity;
   class function Make(
     const ord0: UInt8 = 0;
     const ord1: UInt8 = 1;
@@ -599,6 +601,8 @@ public
   const Zero: TUBounds2f = ((0, 0), (0, 0));
   class function Make(const AMin, AMax: TUVec2): TUBounds2f; static; overload;
   class function Make(const ACenter: TUVec2): TUBounds2f; static; overload;
+  class function Overlap(const a, b: TUBounds2f): Boolean; static; inline;
+  function Overlap(const Other: TUBounds2f): Boolean;
   property Min: TUVec2 read GetMin write SetMin;
   property Max: TUVec2 read GetMax write SetMax;
 end;
@@ -614,14 +618,16 @@ strict private
   function GetMajorExtent: TUVec3;
 public
   const Zero: TUBounds3f = ((0, 0, 0), (0, 0, 0));
-  class function Make(const AMin, AMax: TUVec3): TUBounds3f; static; overload;
-  class function Make(const ACenter: TUVec3): TUBounds3f; static; overload;
-  class function Make(const AVertices: TUVec3Array): TUBounds3f; static; overload;
   property Min: TUVec3 read GetMin write SetMin;
   property Max: TUVec3 read GetMax write SetMax;
   property Center: TUVec3 read GetCenter;
   property Extent: TUVec3 read GetExtent;
   property MajorExtent: TUVec3 read GetMajorExtent;
+  class function Make(const AMin, AMax: TUVec3): TUBounds3f; static; overload;
+  class function Make(const ACenter: TUVec3): TUBounds3f; static; overload;
+  class function Make(const AVertices: TUVec3Array): TUBounds3f; static; overload;
+  class function Overlap(const a, b: TUBounds3f): Boolean; static; inline;
+  function Overlap(const Other: TUBounds3f): Boolean;
 end;
 
 type TUCriticalSection = record
@@ -1468,6 +1474,11 @@ end;
 function TUSwizzle.GetArray: TUVec4i;
 begin
   Result := TUVec4i.Make(Offset[0], Offset[1], Offset[2], Offset[3]);
+end;
+
+function TUSwizzle.GetIsIdentity: Boolean;
+begin
+  Result := _Remap = Identity;
 end;
 
 class function TUSwizzle.Make(
@@ -3137,6 +3148,20 @@ begin
   Result[1] := ACenter;
 end;
 
+class function TUBounds2fImpl.Overlap(const a, b: TUBounds2f): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Max.x)
+    and (a.Min.y <= b.Max.y)
+    and (b.Min.x <= a.Max.x)
+    and (b.Min.y <= a.Max.y)
+  );
+end;
+
+function TUBounds2fImpl.Overlap(const Other: TUBounds2f): Boolean;
+begin
+  Result := Overlap(Self, Other);
+end;
 // TUBounds2f end
 
 // TUBounds3f begin
@@ -3211,6 +3236,23 @@ begin
     Result[0] := UMin(Result[0], AVertices[i]);
     Result[1] := UMax(Result[1], AVertices[i]);
   end;
+end;
+
+class function TUBounds3fImpl.Overlap(const a, b: TUBounds3f): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Max.x)
+    and (a.Min.y <= b.Max.y)
+    and (a.Min.z <= b.Max.z)
+    and (b.Min.x <= a.Max.x)
+    and (b.Min.y <= a.Max.y)
+    and (b.Min.z <= a.Max.z)
+  );
+end;
+
+function TUBounds3fImpl.Overlap(const Other: TUBounds3f): Boolean;
+begin
+  Result := Overlap(Self, Other);
 end;
 // TUBounds3f end
 
