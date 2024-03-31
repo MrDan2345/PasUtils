@@ -131,10 +131,12 @@ private
   var _Remap: UInt8;
   function GetOffset(const Index: UInt8): UInt8; inline;
   procedure SetOffset(const Index: UInt8; const Value: UInt8); inline;
+  function GetArray: TUVec4i; inline;
 public
   const Identity: UInt8 = (0 or (1 shl 2) or (2 shl 4) or (3 shl 6));
   property Remap: UInt8 read _Remap write _Remap;
   property Offset[const Index: UInt8]: UInt8 read GetOffset write SetOffset; default;
+  property AsArray: TUVec4i read GetArray;
   class function Make(
     const ord0: UInt8 = 0;
     const ord1: UInt8 = 1;
@@ -282,12 +284,15 @@ private
   procedure SetAxisZ(const Value: TUVec3);
   function GetPosition: TUVec3;
   procedure SetPosition(const Value: TUVec3);
+  function GetScale: TUVec3;
+  procedure SetScale(const Value: TUVec3);
 public
   property Element[const Index: UInt32]: TUFloat read GetElement write SetElement; default;
   property AxisX: TUVec3 read GetAxisX write SetAxisX;
   property AxisY: TUVec3 read GetAxisY write SetAxisY;
   property AxisZ: TUVec3 read GetAxisZ write SetAxisZ;
   property Position: TUVec3 read GetPosition write SetPosition;
+  property Scale: TUVec3 read GetScale write SetScale;
   class function Make(
     const e00, e10, e20, e30: TUFloat;
     const e01, e11, e21, e31: TUFloat;
@@ -1460,6 +1465,11 @@ begin
   _Remap := (_Remap and (not (3 shl i))) or (Value shl i);
 end;
 
+function TUSwizzle.GetArray: TUVec4i;
+begin
+  Result := TUVec4i.Make(Offset[0], Offset[1], Offset[2], Offset[3]);
+end;
+
 class function TUSwizzle.Make(
   const ord0: UInt8; const ord1: UInt8;
   const ord2: UInt8; const ord3: UInt8
@@ -1836,6 +1846,18 @@ begin
   PUVec3(@Self[3, 0])^ := Value;
 end;
 
+function TUMatImpl.GetScale: TUVec3;
+begin
+  Result := TUVec3.Make(AxisX.Len, AxisY.Len, AxisZ.Len);
+end;
+
+procedure TUMatImpl.SetScale(const Value: TUVec3);
+begin
+  AxisX := AxisX.Norm * Value.x;
+  AxisY := AxisY.Norm * Value.y;
+  AxisZ := AxisZ.Norm * Value.z;
+end;
+
 class function TUMatImpl.Make(
   const e00, e10, e20, e30: TUFloat;
   const e01, e11, e21, e31: TUFloat;
@@ -2115,12 +2137,14 @@ begin
 end;
 
 class function TUMatImpl.Swizzle(const m: TUMat; const Remap: TUSwizzle): TUMat;
+  var r: TUVec4i;
 begin
+  r := Remap.AsArray;
   Result := Make(
-    m[Remap[0], Remap[0]], m[Remap[1], Remap[0]], m[Remap[2], Remap[0]], m[Remap[3], Remap[0]],
-    m[Remap[0], Remap[1]], m[Remap[1], Remap[1]], m[Remap[2], Remap[1]], m[Remap[3], Remap[1]],
-    m[Remap[0], Remap[2]], m[Remap[1], Remap[2]], m[Remap[2], Remap[2]], m[Remap[3], Remap[2]],
-    m[Remap[0], Remap[3]], m[Remap[1], Remap[3]], m[Remap[2], Remap[3]], m[Remap[3], Remap[3]]
+    m[r[0], r[0]], m[r[1], r[0]], m[r[2], r[0]], m[r[3], r[0]],
+    m[r[0], r[1]], m[r[1], r[1]], m[r[2], r[1]], m[r[3], r[1]],
+    m[r[0], r[2]], m[r[1], r[2]], m[r[2], r[2]], m[r[3], r[2]],
+    m[r[0], r[3]], m[r[1], r[3]], m[r[2], r[3]], m[r[3], r[3]]
   );
 end;
 
