@@ -125,6 +125,31 @@ type TUBounds1f = array[0..1] of TUFloat;
 type TUBounds2f = array[0..1] of TUVec2;
 type TUBounds3f = array[0..1] of TUVec3;
 
+type TUSwizzle = record
+private
+  var _Remap: UInt8;
+  function GetOffset(const Index: UInt8): UInt8; inline;
+  procedure SetOffset(const Index: UInt8; const Value: UInt8); inline;
+public
+  const Identity: UInt8 = (0 or (1 shl 2) or (2 shl 4) or (3 shl 6));
+  property Remap: UInt8 read _Remap write _Remap;
+  property Offset[const Index: UInt8]: UInt8 read GetOffset write SetOffset; default;
+  class function Make(
+    const ord0: UInt8 = 0;
+    const ord1: UInt8 = 1;
+    const ord2: UInt8 = 2;
+    const ord3: UInt8 = 3
+  ): TUSwizzle; static;
+  procedure SetValue(
+    const ord0: UInt8 = 0;
+    const ord1: UInt8 = 1;
+    const ord2: UInt8 = 2;
+    const ord3: UInt8 = 3
+  );
+  class operator Initialize(var v: TUSwizzle);
+  class operator := (const v: Uint8): TUSwizzle;
+end;
+
 type TUFloatImpl = type helper for TUFloat
 public
   function ToString: String; inline;
@@ -288,6 +313,7 @@ public
   class function Inverse(const m: TUMat): TUMat; static; overload;
   class function Transpose(const m: TUMat): TUMat; static; overload;
   class function Norm(const m: TUMat): TUMat; static; overload;
+  class function Swizzle(const m: TUMat; const Remap: TUSwizzle): TUMat; static; overload;
   procedure SetValue(
     const e00, e10, e20, e30: TUFloat;
     const e01, e11, e21, e31: TUFloat;
@@ -297,6 +323,7 @@ public
   function Inverse: TUMat; overload; inline;
   function Transpose: TUMat; overload; inline;
   function Norm: TUMat; overload; inline;
+  function Swizzle(const Remap: TUSwizzle): TUMat; overload; inline;
   function ToString: String; inline;
 end;
 
@@ -317,6 +344,7 @@ public
   class function Dot(const v0, v1: TUVec2): TUFloat; static; overload; inline;
   class function Cross(const v0, v1: TUVec2): TUFloat; static; overload; inline;
   class function Norm(const v: TUVec2): TUVec2; static; overload; inline;
+  class function Swizzle(const v: TUVec2; const Remap: TUSwizzle): TUVec2; static; overload;
   procedure SetValue(const Ax, Ay: TUFloat); inline;
   function Transform(const r: TURot2): TUVec2; inline;
   function TransformInv(const r: TURot2): TUVec2; inline;
@@ -324,6 +352,7 @@ public
   function Cross(const v: TUVec2): TUFloat; overload; inline;
   function Norm: TUVec2; overload; inline;
   function IsZero: Boolean; inline;
+  function Swizzle(const Remap: TUSwizzle): TUVec2; overload; inline;
   function ToString: String; inline;
 end;
 
@@ -351,6 +380,7 @@ public
   class function Dot(const v0, v1: TUVec3): TUFloat; static; overload; inline;
   class function Cross(const v0, v1: TUVec3): TUVec3; static; overload; inline;
   class function Norm(const v: TUVec3): TUVec3; static; overload; inline;
+  class function Swizzle(const v: TUVec3; const Remap: TUSwizzle): TUVec3; static; overload;
   class function RandomUnit: TUVec3; static;
   class function RandomInRadius(const RadiusMin, RadiusMax: TUFloat): TUVec3; static;
   procedure SetValue(const Ax, Ay, Az: TUFloat); inline;
@@ -363,6 +393,7 @@ public
   function Dot(const v: TUVec3): TUFloat; overload;
   function Cross(const v: TUVec3): TUVec3; overload;
   function Norm: TUVec3; overload;
+  function Swizzle(const Remap: TUSwizzle): TUVec3; overload; inline;
   function xy: TUVec2; inline;
   function AngleTo(const v: TUVec3): TUFloat; inline;
   function RotationTo(const v: TUVec3): TUQuat; inline;
@@ -397,9 +428,11 @@ public
   class function Make(const s: TUFloat): TUVec4; static; overload; inline;
   class function Dot(const v0, v1: TUVec4): TUFloat; static; overload; inline;
   class function Norm(const v: TUVec4): TUVec4; static; overload; inline;
+  class function Swizzle(const v: TUVec4; const Remap: TUSwizzle): TUVec4; static; overload;
   procedure SetValue(const Ax, Ay, Az, Aw: TUFloat); inline;
   function Dot(const v: TUVec4): TUFloat; overload; inline;
   function Norm: TUVec4; overload; inline;
+  function Swizzle(const Remap: TUSwizzle): TUVec4; overload; inline;
   function xyz: TUVec3; inline;
   function xy: TUVec2; inline;
   function IsZero: Boolean; inline;
@@ -421,8 +454,10 @@ public
   const Zero: TUVec2i = (0, 0);
   class function Make(const Ax, Ay: Int32): TUVec2i; static; overload; inline;
   class function Make(const s: Int32): TUVec2i; static; overload; inline;
+  class function Swizzle(const v: TUVec2i; const Remap: TUSwizzle): TUVec2i; static; overload;
   procedure SetValue(const Ax, Ay: Int32); inline;
   function IsZero: Boolean; inline;
+  function Swizzle(const Remap: TUSwizzle): TUVec2i; overload; inline;
   function ToString: String; inline;
 end;
 
@@ -444,8 +479,10 @@ public
   const Zero: TUVec3i = (0, 0, 0);
   class function Make(const Ax, Ay, Az: Int32): TUVec3i; static; overload; inline;
   class function Make(const s: Int32): TUVec3i; static; overload; inline;
+  class function Swizzle(const v: TUVec3i; const Remap: TUSwizzle): TUVec3i; static; overload;
   procedure SetValue(const Ax, Ay, Az: Int32); inline;
   function IsZero: Boolean; inline;
+  function Swizzle(const Remap: TUSwizzle): TUVec3i; overload; inline;
   function ToString: String; inline;
 end;
 
@@ -471,8 +508,10 @@ public
   const Zero: TUVec4i = (0, 0, 0, 0);
   class function Make(const Ax, Ay, Az, Aw: Int32): TUVec4i; static; overload; inline;
   class function Make(const s: Int32): TUVec4i; static; overload; inline;
+  class function Swizzle(const v: TUVec4i; const Remap: TUSwizzle): TUVec4i; static; overload;
   procedure SetValue(const Ax, Ay, Az, Aw: Int32); inline;
   function IsZero: Boolean; inline;
+  function Swizzle(const Remap: TUSwizzle): TUVec4i; overload; inline;
   function ToString: String; inline;
 end;
 
@@ -496,30 +535,6 @@ public
   class function Norm(const v: TUQuat): TUQuat; static; overload; inline;
   function Norm: TUQuat; inline;
   function ToString: String; inline;
-end;
-
-type TUSwizzle = object
-private
-  const DefaultSwizzle: UInt8 = (0 or (1 shl 2) or (2 shl 4) or (3 shl 6));
-  var _Remap: UInt8;
-  function GetOffset(const Index: UInt8): UInt8; inline;
-  procedure SetOffset(const Index: UInt8; const Value: UInt8); inline;
-public
-  property Remap: UInt8 read _Remap;
-  property Offset[const Index: UInt8]: UInt8 read GetOffset write SetOffset; default;
-  class function Make(
-    const ord0: UInt8 = 0;
-    const ord1: UInt8 = 1;
-    const ord2: UInt8 = 2;
-    const ord3: UInt8 = 3
-  ): TUSwizzle;
-  procedure SetIdentity; inline;
-  procedure SetValue(
-    const ord0: UInt8 = 0;
-    const ord1: UInt8 = 1;
-    const ord2: UInt8 = 2;
-    const ord3: UInt8 = 3
-  );
 end;
 
 type TURot2Impl = type helper for TURot2
@@ -1423,6 +1438,49 @@ const URadToDeg = 180 / UPi;
 
 implementation
 
+// TUSwizzle begin
+function TUSwizzle.GetOffset(const Index: UInt8): UInt8;
+begin
+  Result := (_Remap shr (Index * 2)) and 3;
+end;
+
+procedure TUSwizzle.SetOffset(const Index: UInt8; const Value: UInt8);
+  var i: UInt8;
+begin
+  i := Index * 2;
+  _Remap := (_Remap and (not (3 shl i))) or (Value shl i);
+end;
+
+class function TUSwizzle.Make(
+  const ord0: UInt8; const ord1: UInt8;
+  const ord2: UInt8; const ord3: UInt8
+): TUSwizzle;
+begin
+  {$push}
+  {$warnings off}
+  Result.SetValue(ord0, ord1, ord2, ord3);
+  {$pop}
+end;
+
+procedure TUSwizzle.SetValue(
+  const ord0: UInt8; const ord1: UInt8;
+  const ord2: UInt8; const ord3: UInt8
+);
+begin
+  _Remap := ord0 or (ord1 shl 2) or (ord2 shl 4) or (ord3 shl 6);
+end;
+
+class operator TUSwizzle.Initialize(var v: TUSwizzle);
+begin
+  v.Remap := Identity;
+end;
+
+class operator TUSwizzle.:=(const v: Uint8): TUSwizzle;
+begin
+  Result.Remap := v;
+end;
+// TUSwizzle end
+
 // TUFloatImpl begin
 function TUFloatImpl.ToString: String;
 begin
@@ -2047,6 +2105,16 @@ begin
   Result.AxisZ := m.AxisZ.Norm;
 end;
 
+class function TUMatImpl.Swizzle(const m: TUMat; const Remap: TUSwizzle): TUMat;
+begin
+  Result := Make(
+    m[Remap[0], Remap[0]], m[Remap[1], Remap[0]], m[Remap[2], Remap[0]], m[Remap[3], Remap[0]],
+    m[Remap[0], Remap[1]], m[Remap[1], Remap[1]], m[Remap[2], Remap[1]], m[Remap[3], Remap[1]],
+    m[Remap[0], Remap[2]], m[Remap[1], Remap[2]], m[Remap[2], Remap[2]], m[Remap[3], Remap[2]],
+    m[Remap[0], Remap[3]], m[Remap[1], Remap[3]], m[Remap[2], Remap[3]], m[Remap[3], Remap[3]]
+  );
+end;
+
 procedure TUMatImpl.SetValue(
   const e00, e10, e20, e30: TUFloat;
   const e01, e11, e21, e31: TUFloat;
@@ -2073,6 +2141,11 @@ end;
 function TUMatImpl.Norm: TUMat;
 begin
   Result := TUMat.Norm(Self);
+end;
+
+function TUMatImpl.Swizzle(const Remap: TUSwizzle): TUMat;
+begin
+  Result := Swizzle(Self, Remap);
 end;
 
 function TUMatImpl.ToString: String;
@@ -2151,6 +2224,11 @@ begin
   end;
 end;
 
+class function TUVec2Impl.Swizzle(const v: TUVec2; const Remap: TUSwizzle): TUVec2;
+begin
+  Result := Make(v[Remap[0]], v[Remap[1]]);
+end;
+
 procedure TUVec2Impl.SetValue(const Ax, Ay: TUFloat);
 begin
   Self[0] := Ax;
@@ -2185,6 +2263,11 @@ end;
 function TUVec2Impl.IsZero: Boolean;
 begin
   Result := (x = 0) and (y = 0);
+end;
+
+function TUVec2Impl.Swizzle(const Remap: TUSwizzle): TUVec2;
+begin
+  Result := Swizzle(Self, Remap);
 end;
 
 function TUVec2Impl.ToString: String;
@@ -2278,6 +2361,11 @@ begin
   end;
 end;
 
+class function TUVec3Impl.Swizzle(const v: TUVec3; const Remap: TUSwizzle): TUVec3;
+begin
+  Result := Make(v[Remap[0]], v[Remap[1]], v[Remap[2]]);
+end;
+
 class function TUVec3Impl.RandomUnit: TUVec3;
   var a1, a2, s1, s2, c1, c2: TUFloat;
 begin
@@ -2343,6 +2431,11 @@ end;
 function TUVec3Impl.Norm: TUVec3;
 begin
   Result := Norm(Self);
+end;
+
+function TUVec3Impl.Swizzle(const Remap: TUSwizzle): TUVec3;
+begin
+  Result := Swizzle(Self, Remap);
 end;
 
 function TUVec3Impl.xy: TUVec2;
@@ -2470,6 +2563,11 @@ begin
   end;
 end;
 
+class function TUVec4Impl.Swizzle(const v: TUVec4; const Remap: TUSwizzle): TUVec4;
+begin
+  Result := Make(v[Remap[0]], v[Remap[1]], v[Remap[2]], v[Remap[3]]);
+end;
+
 procedure TUVec4Impl.SetValue(const Ax, Ay, Az, Aw: TUFloat);
 begin
   Self[0] := Ax;
@@ -2486,6 +2584,11 @@ end;
 function TUVec4Impl.Norm: TUVec4;
 begin
   Result := Norm(Self);
+end;
+
+function TUVec4Impl.Swizzle(const Remap: TUSwizzle): TUVec4;
+begin
+  Result := Swizzle(Self, Remap);
 end;
 
 function TUVec4Impl.xyz: TUVec3;
@@ -2544,6 +2647,11 @@ begin
   Result := Make(s, s);
 end;
 
+class function TUVec2iImpl.Swizzle(const v: TUVec2i; const Remap: TUSwizzle): TUVec2i;
+begin
+  Result := Make(v[Remap[0]], v[Remap[1]]);
+end;
+
 procedure TUVec2iImpl.SetValue(const Ax, Ay: Int32);
 begin
   Self[0] := Ax;
@@ -2553,6 +2661,11 @@ end;
 function TUVec2iImpl.IsZero: Boolean;
 begin
   Result := (Self[0] = 0) and (Self[1] = 0);
+end;
+
+function TUVec2iImpl.Swizzle(const Remap: TUSwizzle): TUVec2i;
+begin
+  Result := Swizzle(Self, Remap);
 end;
 
 function TUVec2iImpl.ToString: String;
@@ -2604,6 +2717,11 @@ begin
   Result := Make(s, s, s);
 end;
 
+class function TUVec3iImpl.Swizzle(const v: TUVec3i; const Remap: TUSwizzle): TUVec3i;
+begin
+  Result := Make(v[Remap[0]], v[Remap[1]], v[Remap[2]]);
+end;
+
 procedure TUVec3iImpl.SetValue(const Ax, Ay, Az: Int32);
 begin
   Self[0] := Ax;
@@ -2614,6 +2732,11 @@ end;
 function TUVec3iImpl.IsZero: Boolean;
 begin
   Result := (Self[0] = 0) and (Self[1] = 0) and (Self[2] = 0);
+end;
+
+function TUVec3iImpl.Swizzle(const Remap: TUSwizzle): TUVec3i;
+begin
+  Result := Swizzle(Self, Remap);
 end;
 
 function TUVec3iImpl.ToString: String;
@@ -2676,6 +2799,11 @@ begin
   Result := Make(s, s, s, s);
 end;
 
+class function TUVec4iImpl.Swizzle(const v: TUVec4i; const Remap: TUSwizzle): TUVec4i;
+begin
+  Result := Make(v[Remap[0]], v[Remap[1]], v[Remap[2]], v[Remap[3]]);
+end;
+
 procedure TUVec4iImpl.SetValue(const Ax, Ay, Az, Aw: Int32);
 begin
   Self[0] := Ax;
@@ -2687,6 +2815,11 @@ end;
 function TUVec4iImpl.IsZero: Boolean;
 begin
   Result := (Self[0] = 0) and (Self[1] = 0) and (Self[2] = 0) and (Self[3] = 0);
+end;
+
+function TUVec4iImpl.Swizzle(const Remap: TUSwizzle): TUVec4i;
+begin
+  Result := Swizzle(Self, Remap);
 end;
 
 function TUVec4iImpl.ToString: String;
@@ -2777,44 +2910,6 @@ begin
   Result := Format('{%0:0.2f, %1:0.2f, %2:0.2f, %3:0.2f}', [x, y, z, w]);
 end;
 // TUQuatImpl end
-
-// TUSwizzle begin
-function TUSwizzle.GetOffset(const Index: UInt8): UInt8;
-begin
-  Result := (_Remap shr (Index * 2)) and 3;
-end;
-
-procedure TUSwizzle.SetOffset(const Index: UInt8; const Value: UInt8);
-  var i: UInt8;
-begin
-  i := Index * 2;
-  _Remap := (_Remap and (not (3 shl i))) or (Value shl i);
-end;
-
-class function TUSwizzle.Make(
-  const ord0: UInt8; const ord1: UInt8;
-  const ord2: UInt8; const ord3: UInt8
-): TUSwizzle;
-begin
-  {$push}
-  {$warnings off}
-  Result.SetValue(ord0, ord1, ord2, ord3);
-  {$pop}
-end;
-
-procedure TUSwizzle.SetIdentity;
-begin
-  _Remap := DefaultSwizzle;
-end;
-
-procedure TUSwizzle.SetValue(
-  const ord0: UInt8; const ord1: UInt8;
-  const ord2: UInt8; const ord3: UInt8
-);
-begin
-  _Remap := ord0 or (ord1 shl 2) or (ord2 shl 4) or (ord3 shl 6);
-end;
-// TUSwizzle end
 
 // TURot2 begin
 function TURot2Impl.GetAngSin: TUFloat;

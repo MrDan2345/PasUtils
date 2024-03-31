@@ -5741,7 +5741,7 @@ constructor TUSceneDataDAE.TColladaAsset.Create(
   var Str: String;
 begin
   inherited Create(XMLNode, AParent);
-  _UpAxis.SetIdentity;
+  _UpAxis := TUSwizzle.Identity;
   Node := XMLNode.FindChild('up_axis');
   if Assigned(Node) then
   begin
