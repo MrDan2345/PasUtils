@@ -26,6 +26,7 @@ uses
 
 type TUProcedure = procedure of object;
 type TUFunction = function: Boolean of object;
+type TUProcedureString = procedure (const Value: String) of object;
 
 type TUStrArray = array of String;
 type TUStrArrayArray = array of array of String;
@@ -1199,6 +1200,7 @@ public
   end;
 protected
   class var _Syntax: TUParserSyntax;
+  class var _NullNode: TUJson;
 private
   var _NodeType: TNodeType;
   var _Value: String;
@@ -1211,6 +1213,7 @@ private
   function GetName(const Index: Int32): String;
   function GetElement(const Index: Int32): TUJson;
   function GetCount: Int32;
+  function GetIsValid: Boolean;
   function GetIsSingleValue: Boolean;
   function GetIsObject: Boolean;
   function GetIsArray: Boolean;
@@ -1223,6 +1226,7 @@ public
   property Name[const Index: Int32]: String read GetName;
   property Element[const Index: Int32]: TUJson read GetElement;
   property Count: Int32 read GetCount;
+  property IsValid: Boolean read GetIsValid;
   property IsSingleValue: Boolean read GetIsSingleValue;
   property IsObject: Boolean read GetIsObject;
   property IsArray: Boolean read GetIsArray;
@@ -1231,6 +1235,7 @@ public
   function GetEnumerator: TEnumerator;
   function FormatJson(const Offset: String = ''): String;
   class constructor CreateClass;
+  class destructor DestroyClass;
   constructor Create;
   destructor Destroy; override;
   class function Load(const Json: String): TUJson;
@@ -1386,6 +1391,10 @@ function UStrExplode(const Str: String; const Separator: String): TUStrArray;
 function UStrIsNumber(const Str: String): Boolean;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UFileToStr(const FileName: String): String;
+procedure UCopyFilePrepare(const BufferSize: UInt32 = 1024 * 1024 * 1024);
+procedure UCopyFileCleanup;
+procedure UCopyFile(const SrcFile, DstFile: String);
+procedure UCopyDir(const SrcDir, DstDir: String; const LogProc: TUProcedureString = nil);
 procedure ULog(const Text: String; const Offset: Int32 = 0);
 procedure ULogOffset(const Offset: Int32);
 
@@ -6249,7 +6258,7 @@ end;
 // TUJson begin
 function TUJson.TEnumerator.GetCurrent: TUJson;
 begin
-  if (i = -1) or (i >= n.Count) then Exit(nil);
+  if (i = -1) or (i >= n.Count) then Exit(_NullNode);
   Result := n.Element[i];
 end;
 
@@ -6415,13 +6424,13 @@ end;
 function TUJson.GetContent(const Key: String): TUJson;
   var i: Int32;
 begin
-  if _NodeType <> nt_object then Exit(nil);
+  if _NodeType <> nt_object then Exit(_NullNode);
   for i := 0 to High(_Content) do
   if _Content[i].Name = Key then
   begin
     Exit(_Content[i].Node);
   end;
-  Result := nil;
+  Result := _NullNode;
 end;
 
 function TUJson.GetName(const Index: Int32): String;
@@ -6446,15 +6455,15 @@ begin
   case _NodeType of
     nt_array:
     begin
-      if (Index < 0) or (Index > High(_Elements)) then Exit(nil);
+      if (Index < 0) or (Index > High(_Elements)) then Exit(_NullNode);
       Result := _Elements[Index];
     end;
     nt_object:
     begin
-      if (Index < 0) or (Index > High(_Content)) then Exit(nil);
+      if (Index < 0) or (Index > High(_Content)) then Exit(_NullNode);
       Result := _Content[Index].Node;
     end;
-    else Result := nil;
+    else Result := _NullNode;
   end;
 end;
 
@@ -6465,6 +6474,11 @@ begin
     nt_array: Result := Length(_Elements);
     else Result := 0;
   end;
+end;
+
+function TUJson.GetIsValid: Boolean;
+begin
+  Result := (Self <> _NullNode) and (_NodeType <> nt_invalid);
 end;
 
 function TUJson.GetIsSingleValue: Boolean;
@@ -6550,6 +6564,12 @@ begin
     AddString('"');
     AddKeywords(['null', 'undefined']);
   end;
+  _NullNode := TUJson.Create;
+end;
+
+class destructor TUJson.DestroyClass;
+begin
+  _NullNode.Free;
 end;
 
 constructor TUJson.Create;
@@ -6566,13 +6586,16 @@ end;
 class function TUJson.Load(const Json: String): TUJson;
   var p: TUParser;
 begin
-  Result := nil;
   p := TUParser.Create(Json);
   p.Syntax := @_Syntax;
   try
     Result := TUJson.Create;
-    if not Result.ReadJson(p) then FreeAndNil(Result);
-    if not Assigned(Result) then WriteLn('Error, line: ', p.Line);
+    if not Result.ReadJson(p) then
+    begin
+      FreeAndNil(Result);
+      Result := _NullNode;
+    end;
+    if not Result.IsValid then WriteLn('Error, line: ', p.Line);
   finally
     p.Free;
   end;
@@ -7990,7 +8013,90 @@ begin
   end;
 end;
 
+threadvar CopyFileBuffer: array of UInt8;
+
+procedure UCopyFilePrepare(const BufferSize: UInt32);
+begin
+  if Length(CopyFileBuffer) < BufferSize then
+  begin
+    SetLength(CopyFileBuffer, BufferSize);
+  end;
+end;
+
+procedure UCopyFileCleanup;
+begin
+  CopyFileBuffer := nil;
+end;
+
+procedure UCopyFile(const SrcFile, DstFile: String);
+  var FileSrc, FileDst: TFileStream;
+  var ReadSize: UInt32;
+  const BufferMinSize = 1024 * 1024 * 1024;
+begin
+  if Length(CopyFileBuffer) < BufferMinSize then
+  begin
+    SetLength(CopyFileBuffer, BufferMinSize);
+  end;
+  FileSrc := TFileStream.Create(SrcFile, fmOpenRead);
+  try
+    if FileExists(DstFile) then DeleteFile(DstFile);
+    FileDst := TFileStream.Create(DstFile, fmCreate);
+    try
+      repeat
+        ReadSize := FileSrc.Read(CopyFileBuffer[0], Length(CopyFileBuffer));
+        if ReadSize > 0 then FileDst.Write(CopyFileBuffer[0], ReadSize);
+      until ReadSize = 0;
+    finally
+      FileDst.Free;
+    end;
+  finally
+    FileSrc.Free;
+  end;
+end;
+
+procedure UCopyDir(
+  const SrcDir, DstDir: String;
+  const LogProc: TUProcedureString
+);
+  var Sep: String;
+  procedure CopyDir(const Src, Dst: String);
+    var sr: TSearchRec;
+  begin
+    if not DirectoryExists(Dst) then
+    begin
+      CreateDir(Dst);
+    end;
+    if FindFirst(Src + '/*', faAnyFile, sr) = 0 then
+    begin
+      repeat
+        if (sr.Name = '.') or (sr.Name = '..') then Continue;
+        if sr.Attr and faDirectory = faDirectory then
+        begin
+          CopyDir(Src + Sep + sr.Name, Dst + Sep + sr.Name);
+        end
+        else
+        begin
+          if (Assigned(LogProc)) then
+          begin
+            LogProc('Copy: "' + Src + Sep + sr.Name + '" to "' + Dst + Sep + sr.Name + '"');
+          end;
+          UCopyFile(Src + Sep + sr.Name, Dst + Sep + sr.Name);
+        end;
+      until FindNext(sr) <> 0;
+      FindClose(sr);
+    end;
+  end;
+begin
+  Sep := DirectorySeparator;
+  CopyDir(
+    ExpandFileName(SrcDir.TrimRight(['/', '\'])),
+    ExpandFileName(DstDir.TrimRight(['/', '\']))
+  );
+  UCopyFileCleanup;
+end;
+
 var LogOffset: Int32 = 0;
+
 procedure ULog(const Text: String; const Offset: Int32);
   var Spaces: String;
 begin
