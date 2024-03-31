@@ -517,7 +517,7 @@ public
   constructor Create(
     const AOptions: TUSceneDataOptionsSet = [];
     const UpVector: TUSceneDataUpVector = sdu_any
-  );
+  ); virtual;
 end;
 
 type TUSceneDataDAE = class (TUSceneData)
@@ -1272,6 +1272,7 @@ public
     property RootPath: String read _RootPath;
     constructor Create(const XMLNode: TUXML; const Path: String);
     destructor Destroy; override;
+    procedure ApplySwizzle(const UpVector: TUSceneDataUpVector);
   end;
 private
   type TImageInterfaceCollada = class (TImageInterface)
@@ -3315,6 +3316,7 @@ begin
       end;
     end;
   end;
+  Matrix := Matrix.Transpose;
   for Node in XMLNode do
   begin
     NodeName := LowerCase(Node.Name);
@@ -5757,6 +5759,7 @@ begin
   if Assigned(Node) then
   begin
     Str := LowerCase(Node.Content);
+    WriteLn(Str);
     if Str = 'x_up' then
     begin
       _UpAxis := sdu_x;
@@ -5781,21 +5784,6 @@ constructor TUSceneDataDAE.TColladaRoot.Create(
   const XMLNode: TUXML;
   const Path: String
 );
-  procedure PickSwizzle;
-    const Remap: array [0..2] of array [0..2] of array [0..2] of UInt8 = (
-      ((0, 1, 2), (1, 0, 2), (2, 1, 0)),
-      ((1, 0, 2), (0, 1, 2), (0, 2, 1)),
-      ((2, 1, 0), (0, 2, 1), (0, 1, 2))
-    );
-    var i, j: Int32;
-  begin
-    if _UpVector = sdu_any then Exit;
-    if not Assigned(_Asset) then Exit;
-    if _Asset.UpAxis = sdu_any then Exit;
-    i := Int32(_UpVector) - 1;
-    j := Int32(_Asset.UpAxis) - 1;
-    _Swizzle := TUSwizzle.Make(Remap[i, j][0], Remap[i, j][1], Remap[i, j][2]);
-  end;
   var Node: TUXML;
   var NodeName: String;
 begin
@@ -5805,7 +5793,6 @@ begin
   if Assigned(Node) then
   begin
     _Asset := TColladaAsset.Create(Node, Self);
-    PickSwizzle;
   end;
   for Node in XMLNode do
   begin
@@ -5856,6 +5843,24 @@ end;
 destructor TUSceneDataDAE.TColladaRoot.Destroy;
 begin
   inherited Destroy;
+end;
+
+procedure TUSceneDataDAE.TColladaRoot.ApplySwizzle(
+  const UpVector: TUSceneDataUpVector
+);
+  const Remap: array [0..2] of array [0..2] of array [0..2] of UInt8 = (
+    ((0, 1, 2), (1, 0, 2), (2, 1, 0)),
+    ((1, 0, 2), (0, 1, 2), (0, 2, 1)),
+    ((2, 1, 0), (0, 2, 1), (0, 1, 2))
+  );
+  var i, j: Int32;
+begin
+  if UpVector = sdu_any then Exit;
+  if not Assigned(_Asset) then Exit;
+  if _Asset.UpAxis = sdu_any then Exit;
+  i := Int32(UpVector) - 1;
+  j := Int32(_Asset.UpAxis) - 1;
+  _Swizzle := TUSwizzle.Make(Remap[i, j][0], Remap[i, j][1], Remap[i, j][2]);
 end;
 
 constructor TUSceneDataDAE.TImageInterfaceCollada.Create(
@@ -6137,7 +6142,9 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
       begin
         if _VertexDescriptor[j].DataType <> dt_float then Continue;
         Data := _VertexData + i * VertexSize + AttribOffsets[j];
-        if _VertexDescriptor[j].Semantic in [as_position, as_normal, as_tangent, as_binormal] then
+        if _VertexDescriptor[j].Semantic in [
+           as_position, as_normal, as_tangent, as_binormal
+        ] then
         begin
           case _VertexDescriptor[j].DataCount of
             2: DataVec2^ := DataVec2^.Swizzle(Root.Swizzle);
@@ -6405,6 +6412,7 @@ constructor TUSceneDataDAE.TAnimationInterfaceCollada.TTrackCollada.Create(
   const ColladaChannel: TColladaAnimationChannel
 );
   var i: Int32;
+  var Xf: TUMat;
 begin
   inherited Create;
   _Name := ColladaChannel.Target.AnyName;
@@ -6496,7 +6504,9 @@ constructor TUSceneDataDAE.TNodeInterfaceCollada.Create(
   const AColladaNode: TColladaNode;
   const AParent: TNodeInterfaceCollada
 );
+  var Root: TColladaRoot;
   var Child: TColladaObject;
+  var Xf: TUMat;
 begin
   inherited Create;
   _Transform := TUMat.Identity;
@@ -6504,8 +6514,14 @@ begin
   Parent := AParent;
   if Assigned(_ColladaNode) then
   begin
+    Root := AColladaNode.GetRoot as TColladaRoot;
     _ColladaNode.UserData := Self;
-    LocalTransform := _ColladaNode.Matrix;
+    Xf := _ColladaNode.Matrix;
+    if Assigned(Root) and (not Root.Swizzle.IsIdentity) then
+    begin
+      Xf := Xf.Swizzle(Root.Swizzle);
+    end;
+    LocalTransform := Xf;
     if Length(_ColladaNode.Name) > 0 then
     begin
       _Name := _ColladaNode.Name;
@@ -6692,6 +6708,7 @@ begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
   _Root := TColladaRoot.Create(XML, _Path);
+  _Root.ApplySwizzle(_UpVector);
   _Root.Resolve;
   _Root.Initialize;
   //_Root.Dump;
