@@ -4882,53 +4882,46 @@ begin
   InputInterpolation := FindInput('INTERPOLATION');
   InputTangentIn := FindInput('IN_TANGENT');
   InputTangentOut := FindInput('OUT_TANGENT');
-  if (Assigned(InputTime))
-  or (Assigned(InputValue)) then
+  if not (Assigned(InputTime) and Assigned(InputValue)) then Exit;
+  src := TColladaSource(InputValue.Source);
+  GetMemory(_Data, src.Accessor.Count * src.Accessor.Stride * src.DataArray.ItemSize);
+  _DataType := src.DataArray.ArrayType;
+  _DataStride := src.Accessor.Stride;
+  _DataSize := src.DataArray.ItemSize;
+  SetLength(_Keys, TColladaSource(InputTime.Source).Accessor.Count);
+  for i := 0 to High(_Keys) do
   begin
+    src := TColladaSource(InputTime.Source);
+    _Keys[i].Time := src.DataArray.AsFloat[src.Accessor.Stride * i]^;
     src := TColladaSource(InputValue.Source);
-    GetMemory(_Data, src.Accessor.Count * src.Accessor.Stride * src.DataArray.ItemSize);
-    _DataType := src.DataArray.ArrayType;
-    _DataStride := src.Accessor.Stride;
-    _DataSize := src.DataArray.ItemSize;
-    SetLength(_Keys, TColladaSource(InputTime.Source).Accessor.Count);
-    for i := 0 to High(_Keys) do
+    n := i * src.Accessor.Stride * src.DataArray.ItemSize;
+    _Keys[i].Value := _Data + n;
+    Move(src.DataArray.RawData[n]^, _Keys[i].Value^, src.Accessor.Stride * src.DataArray.ItemSize);
+    if Assigned(InputInterpolation) then
     begin
-      src := TColladaSource(InputTime.Source);
-      _Keys[i].Time := src.DataArray.AsFloat[src.Accessor.Stride * i]^;
-      src := TColladaSource(InputValue.Source);
-      n := i * src.Accessor.Stride * src.DataArray.ItemSize;
-      _Keys[i].Value := _Data + n;
-      Move(src.DataArray.RawData[n]^, _Keys[i].Value^, src.Accessor.Stride * src.DataArray.ItemSize);
-      if Assigned(InputInterpolation) then
+      src := TColladaSource(InputInterpolation.Source);
+      if src.DataArray.AsString[i] = 'STEP' then
       begin
-        src := TColladaSource(InputInterpolation.Source);
-        if src.DataArray.AsString[i] = 'STEP' then
+        _Keys[i].Interpolation := ai_step;
+      end
+      else if src.DataArray.AsString[i] = 'BEZIER' then
+      begin
+        if Assigned(InputTangentIn)
+        and Assigned(InputTangentOut) then
         begin
-          _Keys[i].Interpolation := ai_step;
-        end
-        else if src.DataArray.AsString[i] = 'BEZIER' then
-        begin
-          if Assigned(InputTangentIn)
-          and Assigned(InputTangentOut) then
+          src := TColladaSource(InputTangentIn.Source);
+          SetLength(_Keys[i].TangentIn, src.Accessor.Stride);
+          for j := 0 to src.Accessor.Stride - 1 do
           begin
-            src := TColladaSource(InputTangentIn.Source);
-            SetLength(_Keys[i].TangentIn, src.Accessor.Stride);
-            for j := 0 to src.Accessor.Stride - 1 do
-            begin
-              _Keys[i].TangentIn[j] := src.DataArray.AsFloat[i * src.Accessor.Stride + j]^;
-            end;
-            src := TColladaSource(InputTangentOut.Source);
-            SetLength(_Keys[i].TangentOut, src.Accessor.Stride);
-            for j := 0 to src.Accessor.Stride - 1 do
-            begin
-              _Keys[i].TangentOut[j] := src.DataArray.AsFloat[i * src.Accessor.Stride + j]^;
-            end;
-            _Keys[i].Interpolation := ai_bezier;
-          end
-          else
-          begin
-            _Keys[i].Interpolation := ai_linear;
+            _Keys[i].TangentIn[j] := src.DataArray.AsFloat[i * src.Accessor.Stride + j]^;
           end;
+          src := TColladaSource(InputTangentOut.Source);
+          SetLength(_Keys[i].TangentOut, src.Accessor.Stride);
+          for j := 0 to src.Accessor.Stride - 1 do
+          begin
+            _Keys[i].TangentOut[j] := src.DataArray.AsFloat[i * src.Accessor.Stride + j]^;
+          end;
+          _Keys[i].Interpolation := ai_bezier;
         end
         else
         begin
@@ -4939,6 +4932,10 @@ begin
       begin
         _Keys[i].Interpolation := ai_linear;
       end;
+    end
+    else
+    begin
+      _Keys[i].Interpolation := ai_linear;
     end;
   end;
 end;
@@ -6097,7 +6094,6 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
     SetLength(Tangents, TangentCount);
   end;
   var VertexBuffer: array of array of Int32;
-  //var VertexRemap: array of Int32;
   function AddVertex(const AttribIndices: array of Int32): Int32;
     var i, j: Int32;
     var Match: Boolean;
@@ -6438,7 +6434,8 @@ begin
   Root := ColladaChannel.GetRoot as TColladaRoot;
   _Name := ColladaChannel.Target.AnyName;
   _Target := TNodeInterface(ColladaChannel.Target.UserData);
-  if ColladaChannel.TargetProperty <> 'transform' then Exit;
+  if (ColladaChannel.TargetProperty <> 'transform')
+  and (ColladaChannel.TargetProperty <> 'matrix') then Exit;
   if ColladaChannel.Sampler.DataType <> at_float then Exit;
   if ColladaChannel.Sampler.SampleSize <> 16 * SizeOf(TUFloat) then Exit;
   _MaxTime := ColladaChannel.Sampler.MaxTime;
