@@ -151,6 +151,7 @@ public
     const ord2: UInt8 = 2;
     const ord3: UInt8 = 3
   );
+  function ToString: String;
   class operator Initialize(var v: TUSwizzle);
   class operator := (const v: Uint8): TUSwizzle;
 end;
@@ -1498,6 +1499,17 @@ procedure TUSwizzle.SetValue(
 );
 begin
   _Remap := ord0 or (ord1 shl 2) or (ord2 shl 4) or (ord3 shl 6);
+end;
+
+function TUSwizzle.ToString: String;
+  const Names: array[0..3] of AnsiChar = ('X', 'Y', 'Z', 'W');
+  var i: Int32;
+begin
+  SetLength(Result, 4);
+  for i := 0 to Length(Result) - 1 do
+  begin
+    Result[i + 1] := Names[Offset[i]];
+  end;
 end;
 
 class operator TUSwizzle.Initialize(var v: TUSwizzle);

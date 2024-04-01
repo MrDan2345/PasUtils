@@ -3316,7 +3316,6 @@ begin
       end;
     end;
   end;
-  Matrix := Matrix.Transpose;
   for Node in XMLNode do
   begin
     NodeName := LowerCase(Node.Name);
@@ -6133,6 +6132,8 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
     var Data: Pointer;
     var DataVec2: PUVec2 absolute Data;
     var DataVec3: PUVec3 absolute Data;
+    var v2: TUVec2;
+    var v3: TUVec3;
   begin
     if not Assigned(Root) then Exit;
     if Root.Swizzle.IsIdentity then Exit;
@@ -6147,8 +6148,16 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
         ] then
         begin
           case _VertexDescriptor[j].DataCount of
-            2: DataVec2^ := DataVec2^.Swizzle(Root.Swizzle);
-            3: DataVec3^ := DataVec3^.Swizzle(Root.Swizzle);
+            2:
+            begin
+              v2 := DataVec2^;
+              DataVec2^ := v2.Swizzle(Root.Swizzle);
+            end;
+            3:
+            begin
+              v3 := DataVec3^;
+              DataVec3^ := v3.Swizzle(Root.Swizzle);
+            end;
           end;
         end;
       end;
@@ -6333,6 +6342,7 @@ constructor TUSceneDataDAE.TSkinInterfaceCollada.Create(
   type PDataIndices = ^TDataIndices;
   type TDataWeights = array[0..3] of TUFloat;
   type PDataWeights = ^TDataWeights;
+  var Root: TColladaRoot;
   var i, j, w, n: Int32;
   var tw: TUFloat;
   var pi: PDataIndices;
@@ -6341,14 +6351,23 @@ constructor TUSceneDataDAE.TSkinInterfaceCollada.Create(
   var Weights: array of array of TWeight;
   var MaxWeightCount, VertexStride, WeightsOffset: Int32;
 begin
+  Root := ColladaSkin.GetRoot as TColladaRoot;
   ColladaSkin.UserData := Self;
   _ShapeBind := ColladaSkin.BindShapeMatrix;
+  if not Root.Swizzle.IsIdentity then
+  begin
+    _ShapeBind := _ShapeBind.Swizzle(Root.Swizzle);
+  end;
   _Mesh := TMeshInterface(ColladaSkin.Geometry.UserData);
   SetLength(_Joints, Length(ColladaSkin.Joints.Joints));
   for i := 0 to High(_Joints) do
   begin
     _Joints[i].Name := ColladaSkin.Joints.Joints[i].JointName;
     _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose;
+    if not Root.Swizzle.IsIdentity then
+    begin
+      _Joints[i].Bind := _Joints[i].Bind.Swizzle(Root.Swizzle);
+    end;
   end;
   Weights := nil;
   SetLength(Weights, ColladaSkin.VertexWeights.VCount);
@@ -6413,8 +6432,10 @@ constructor TUSceneDataDAE.TAnimationInterfaceCollada.TTrackCollada.Create(
 );
   var i: Int32;
   var Xf: TUMat;
+  var Root: TColladaRoot;
 begin
   inherited Create;
+  Root := ColladaChannel.GetRoot as TColladaRoot;
   _Name := ColladaChannel.Target.AnyName;
   _Target := TNodeInterface(ColladaChannel.Target.UserData);
   if ColladaChannel.TargetProperty <> 'transform' then Exit;
@@ -6425,8 +6446,13 @@ begin
   for i := 0 to High(_Keys) do
   begin
     _Keys[i].Time := ColladaChannel.Sampler.Keys[i]^.Time;
-    _Keys[i].Value := PUMat(ColladaChannel.Sampler.Keys[i]^.Value)^;
-    _Keys[i].Value := _Keys[i].Value.Transpose;
+    Xf := PUMat(ColladaChannel.Sampler.Keys[i]^.Value)^;
+    Xf := Xf.Transpose;
+    if not Root.Swizzle.IsIdentity then
+    begin
+      Xf := Xf.Swizzle(Root.Swizzle);
+    end;
+    _Keys[i].Value := Xf;
     case (ColladaChannel.Sampler.Keys[i]^.Interpolation) of
       ai_step: _Keys[i].Interpolation := ki_step;
       ai_linear, ai_bezier: _Keys[i].Interpolation := ki_linear;
@@ -6521,6 +6547,7 @@ begin
     begin
       Xf := Xf.Swizzle(Root.Swizzle);
     end;
+    WriteLn(Xf.ToString);
     LocalTransform := Xf;
     if Length(_ColladaNode.Name) > 0 then
     begin
