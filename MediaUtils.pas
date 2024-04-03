@@ -5755,7 +5755,6 @@ begin
   if Assigned(Node) then
   begin
     Str := LowerCase(Node.Content);
-    WriteLn(Str);
     if Str = 'x_up' then
     begin
       _UpAxis := sdu_x;
@@ -6168,6 +6167,7 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
   var AttribIndices: array of Int32;
   var VertexIndices: array of Int32;
   var i, j, ai, Ind: Int32;
+  var VertexPtr, AttribPtr: Pointer;
 begin
   ColladaTriangles.UserData := Self;
   _VertexDescriptor := ColladaTriangles.VertexDescriptor;
@@ -6276,12 +6276,19 @@ begin
   _IndexData := GetMem(IndexSize * _IndexCount);
   for i := 0 to High(VertexBuffer) do
   begin
+    VertexPtr := _VertexData + i * VertexSize;
     for j := 0 to High(ColladaTriangles.VertexLayout) do
     begin
+      AttribPtr := VertexPtr + AttribOffsets[j];
       ColladaTriangles.CopyInputData(
-        _VertexData + i * VertexSize + AttribOffsets[j],
-        ColladaTriangles.VertexLayout[j], VertexBuffer[i][j]
+        AttribPtr, ColladaTriangles.VertexLayout[j], VertexBuffer[i][j]
       );
+      if (_VertexDescriptor[j].Semantic = as_texcoord)
+      and (_VertexDescriptor[j].DataType = dt_float)
+      and (_VertexDescriptor[j].DataCount > 1) then
+      begin
+        PUVec2(AttribPtr)^[1] := 1 - PUVec2(AttribPtr)^[1];
+      end;
     end;
     for j := 0 to GenAttribs - 1 do
     begin
@@ -6516,7 +6523,6 @@ begin
   begin
     JointObject := FindNode(ControllerInstance.Skeleton, _Skin.Joints[i].Name);
     _JointBindings[i] := TNodeInterface(JointObject.UserData);
-    WriteLn(_JointBindings[i].Name);
   end;
   _MaterialBindings := GenerateMaterialBindings(
     ControllerInstance.Controller.AsSkin.Geometry, ControllerInstance.MaterialBindings
@@ -6544,7 +6550,6 @@ begin
     begin
       Xf := Xf.Swizzle(Root.Swizzle);
     end;
-    WriteLn(Xf.ToString);
     LocalTransform := Xf;
     if Length(_ColladaNode.Name) > 0 then
     begin
@@ -6554,7 +6559,6 @@ begin
     begin
       _Name := _ColladaNode.id;
     end;
-    WriteLn(_ColladaNode.AnyName, ' ', PtrUInt(_ColladaNode.UserData));
     for Child in _ColladaNode.Children do
     begin
       if Child is TColladaNode then

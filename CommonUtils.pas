@@ -333,7 +333,7 @@ public
   function Transpose: TUMat; overload; inline;
   function Norm: TUMat; overload; inline;
   function Swizzle(const Remap: TUSwizzle): TUMat; overload; inline;
-  function ToString: String; inline;
+  function ToString: String;
 end;
 
 type TUVec2Impl = type helper for TUVec2
@@ -362,7 +362,7 @@ public
   function Norm: TUVec2; overload; inline;
   function IsZero: Boolean; inline;
   function Swizzle(const Remap: TUSwizzle): TUVec2; overload; inline;
-  function ToString: String; inline;
+  function ToString: String;
 end;
 
 type TUVec3Impl = type helper for TUVec3
@@ -407,7 +407,7 @@ public
   function AngleTo(const v: TUVec3): TUFloat; inline;
   function RotationTo(const v: TUVec3): TUQuat; inline;
   function IsZero: Boolean; inline;
-  function ToString: String; inline;
+  function ToString: String;
 end;
 
 type TUVec4Impl = type helper for TUVec4
@@ -445,7 +445,7 @@ public
   function xyz: TUVec3; inline;
   function xy: TUVec2; inline;
   function IsZero: Boolean; inline;
-  function ToString: String; inline;
+  function ToString: String;
 end;
 operator := (const v: TUColor): TUVec4;
 
@@ -467,7 +467,7 @@ public
   procedure SetValue(const Ax, Ay: Int32); inline;
   function IsZero: Boolean; inline;
   function Swizzle(const Remap: TUSwizzle): TUVec2i; overload; inline;
-  function ToString: String; inline;
+  function ToString: String;
 end;
 
 type TUVec3iImpl = type helper for TUVec3i
@@ -492,7 +492,7 @@ public
   procedure SetValue(const Ax, Ay, Az: Int32); inline;
   function IsZero: Boolean; inline;
   function Swizzle(const Remap: TUSwizzle): TUVec3i; overload; inline;
-  function ToString: String; inline;
+  function ToString: String;
 end;
 
 type TUVec4iImpl = type helper for TUVec4i
@@ -521,7 +521,7 @@ public
   procedure SetValue(const Ax, Ay, Az, Aw: Int32); inline;
   function IsZero: Boolean; inline;
   function Swizzle(const Remap: TUSwizzle): TUVec4i; overload; inline;
-  function ToString: String; inline;
+  function ToString: String;
 end;
 
 type TUQuatImpl = type helper for TUQuat
@@ -2328,7 +2328,7 @@ end;
 
 function TUVec2Impl.ToString: String;
 begin
-  Result := Format('{%0:0.2f, %1:0.2f}', [x, y]);
+  Result := Format('{%0:0.2f, %1:0.2f}', [Self[0], Self[1]]);
 end;
 // TUVec2Impl end
 
@@ -2526,7 +2526,7 @@ end;
 
 function TUVec3Impl.ToString: String;
 begin
-  Result := Format('{%0:0.2f, %1:0.2f, %2:0.2f}', [x, y, z]);
+  Result := Format('{%0:0.2f, %1:0.2f, %2:0.2f}', [Self[0], Self[1], Self[2]]);
 end;
 // TUVec3Impl end
 
@@ -2667,7 +2667,10 @@ end;
 
 function TUVec4Impl.ToString: String;
 begin
-  Result := Format('{%0:0.2f, %1:0.2f, %2:0.2f, %3:0.2f}', [x, y, z, w]);
+  Result := Format(
+    '{%0:0.2f, %1:0.2f, %2:0.2f, %3:0.2f}',
+    [Self[0], Self[1], Self[2], Self[3]]
+  );
 end;
 // TUVec4Impl end
 
