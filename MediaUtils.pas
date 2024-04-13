@@ -232,11 +232,13 @@ public
     type TNodeList = array of TNodeInterface;
   protected
     var _Name: String;
+    var _Ids: TUStrArray;
     var _Transform: TUMat;
     var _Attachments: TAttachmentList;
     var _Parent: TNodeInterface;
     var _Children: TNodeList;
     procedure SetParent(const Value: TNodeInterface);
+    procedure AddId(const Id: String);
     procedure ApplyTransform(const Value: TUMat);
     procedure SetTransform(const Value: TUMat);
     function GetLocalTransform: TUMat; inline;
@@ -248,6 +250,7 @@ public
     property Attachments: TAttachmentList read _Attachments;
     property Children: TNodeList read _Children;
     property Parent: TNodeInterface read _Parent write SetParent;
+    function MatchId(const Id: String): Boolean;
     destructor Destroy; override;
   end;
   type TNodeInterfaceList = TNodeInterface.TNodeList;
@@ -2586,6 +2589,11 @@ begin
   end;
 end;
 
+procedure TUSceneData.TNodeInterface.AddId(const Id: String);
+begin
+  specialize UArrAppend<String>(_Ids, LowerCase(Id));
+end;
+
 procedure TUSceneData.TNodeInterface.ApplyTransform(const Value: TUMat);
   var i: Int32;
 begin
@@ -2625,6 +2633,18 @@ begin
   begin
     SetTransform(Value);
   end;
+end;
+
+function TUSceneData.TNodeInterface.MatchId(const Id: String): Boolean;
+  var i: Int32;
+  var IdLc: String;
+begin
+  IdLc := LowerCase(Id);
+  for i := 0 to High(_Ids) do
+  begin
+    if IdLc = _Ids[i] then Exit(True);
+  end;
+  Result := False;
 end;
 
 destructor TUSceneData.TNodeInterface.Destroy;
@@ -6367,10 +6387,11 @@ begin
   begin
     _Joints[i].Name := ColladaSkin.Joints.Joints[i].JointName;
     _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose;
-    if not Root.Swizzle.IsIdentity then
-    begin
-      _Joints[i].Bind := _Joints[i].Bind.Swizzle(Root.Swizzle);
-    end;
+  end;
+  if not Root.Swizzle.IsIdentity then
+  for i := 0 to High(_Joints) do
+  begin
+    _Joints[i].Bind := _Joints[i].Bind.Swizzle(Root.Swizzle);
   end;
   Weights := nil;
   SetLength(Weights, ColladaSkin.VertexWeights.VCount);
@@ -6543,6 +6564,9 @@ begin
   Parent := AParent;
   if Assigned(_ColladaNode) then
   begin
+    AddId(_ColladaNode.Name);
+    if Length(_ColladaNode.id) > 0 then AddId(_ColladaNode.id);
+    if Length(_ColladaNode.sid) > 0 then AddId(_ColladaNode.sid);
     Root := AColladaNode.GetRoot as TColladaRoot;
     _ColladaNode.UserData := Self;
     Xf := _ColladaNode.Matrix;
