@@ -250,6 +250,7 @@ public
     property Attachments: TAttachmentList read _Attachments;
     property Children: TNodeList read _Children;
     property Parent: TNodeInterface read _Parent write SetParent;
+    property Ids: TUStrArray read _Ids;
     function MatchId(const Id: String): Boolean;
     destructor Destroy; override;
   end;
@@ -448,12 +449,14 @@ public
     private
       var _Name: String;
       var _Keys: TKeyList;
+      var _TargetId: String;
       var _Target: TNodeInterface;
       var _MaxTime: TUFloat;
       function FindKey(const Time: TUFloat): Int32;
     public
       property Name: String read _Name;
       property Keys: TKeyList read _Keys;
+      property TargetId: String read _TargetId;
       property Target: TNodeInterface read _Target;
       property MaxTime: TUFloat read _MaxTime;
       function Sample(const Time: TUFloat; const Loop: Boolean = True): TUMat;
@@ -1013,6 +1016,7 @@ public
   public
     property Sampler: TColladaAnimationSampler read _Sampler;
     property Target: TColladaObject read _Target;
+    property TargetRef: String read _TargetRef;
     property TargetProperty: String read _TargetProperty;
     property MaxTime: TUFloat read GetMaxTime;
     constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
@@ -6462,6 +6466,7 @@ begin
   Root := ColladaChannel.GetRoot as TColladaRoot;
   _Name := ColladaChannel.Target.AnyName;
   _Target := TNodeInterface(ColladaChannel.Target.UserData);
+  _TargetId := ColladaChannel.TargetRef;
   if (ColladaChannel.TargetProperty <> 'transform')
   and (ColladaChannel.TargetProperty <> 'matrix') then Exit;
   if ColladaChannel.Sampler.DataType <> at_float then Exit;
