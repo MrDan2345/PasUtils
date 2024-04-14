@@ -614,6 +614,7 @@ public
     var _Offset: Int32;
     var _Set: Int32;
     function GetSize: UInt32; inline;
+    function GetCount: UInt32; inline;
   protected
     procedure ResolveLinks; override;
   public
@@ -622,6 +623,7 @@ public
     property Offset: Int32 read _Offset;
     property InputSet: Int32 read _Set;
     property Size: UInt32 read GetSize;
+    property Count: UInt32 read GetCount;
     constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
     destructor Destroy; override;
   end;
@@ -1277,7 +1279,11 @@ public
     property Scene: TColladaScene read _Scene;
     property Options: TUSceneDataOptionsSet read _Options;
     property RootPath: String read _RootPath;
-    constructor Create(const XMLNode: TUXML; const Path: String);
+    constructor Create(
+      const XMLNode: TUXML;
+      const Path: String;
+      const AOptions: TUSceneDataOptionsSet
+    );
     destructor Destroy; override;
     procedure ApplySwizzle(const UpVector: TUSceneDataUpVector);
   end;
@@ -3410,6 +3416,24 @@ begin
     Exit(0);
   end;
   Result := Src.DataArray.ItemSize * Src.Accessor.Stride;
+end;
+
+function TUSceneDataDAE.TColladaInput.GetCount: UInt32;
+  var Src: TColladaSource;
+begin
+  if _Source is TColladaSource then
+  begin
+    Src := TColladaSource(Source);
+  end
+  else if _Source is TColladaVertices then
+  begin
+    Src := TColladaSource(TColladaVertices(_Source).Inputs[0].Source);
+  end
+  else
+  begin
+    Exit(0);
+  end;
+  Result := Src.Accessor.Count;
 end;
 
 procedure TUSceneDataDAE.TColladaInput.ResolveLinks;
@@ -5801,13 +5825,15 @@ end;
 
 constructor TUSceneDataDAE.TColladaRoot.Create(
   const XMLNode: TUXML;
-  const Path: String
+  const Path: String;
+  const AOptions: TUSceneDataOptionsSet
 );
   var Node: TUXML;
   var NodeName: String;
 begin
   inherited Create(XMLNode, nil);
   _RootPath := Path;
+  _Options := AOptions;
   Node := XMLNode.FindChild('asset');
   if Assigned(Node) then
   begin
@@ -5973,6 +5999,7 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
   var FaceNormals: array of TUVec3;
   var Normals: array of TUVec3;
   var RemapNormals: array of Int32;
+  var AttribStride: Int32;
   procedure GenerateNormals;
     var i, j, Ind, VCount: Int32;
     var Pos: array[0..2] of TUVec4;
@@ -6116,16 +6143,17 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
     end;
     SetLength(Tangents, TangentCount);
   end;
-  var VertexBuffer: array of array of Int32;
-  function AddVertex(const AttribIndices: array of Int32): Int32;
+  var VertexBuffer: array of Int32;
+  var VertexBufferCount: Int32;
+  function AddVertex(const AttribIndices: TUInt32Array): Int32;
     var i, j: Int32;
     var Match: Boolean;
   begin
-    for i := 0 to High(VertexBuffer) do
+    for i := 0 to Length(VertexBuffer) div AttribStride - 1 do
     begin
       Match := True;
       for j := 0 to High(_VertexDescriptor) do
-      if VertexBuffer[i][j] <> AttribIndices[j] then
+      if VertexBuffer[i * AttribStride + j] <> AttribIndices[j] then
       begin
         Match := False;
         Break;
@@ -6135,12 +6163,11 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
         Exit(i);
       end;
     end;
-    i := Length(VertexBuffer);
-    SetLength(VertexBuffer, i + 1);
-    SetLength(VertexBuffer[i], Length(_VertexDescriptor));
+    i := VertexBufferCount;
+    Inc(VertexBufferCount);
     for j := 0 to High(_VertexDescriptor) do
     begin
-      VertexBuffer[i][j] := AttribIndices[j];
+      VertexBuffer[i * AttribStride + j] := AttribIndices[j];
     end;
     Result := i;
   end;
@@ -6156,27 +6183,25 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
   begin
     if not Assigned(Root) then Exit;
     if Root.Swizzle.IsIdentity then Exit;
-    for i := 0 to High(VertexBuffer) do
+    for i := 0 to Length(VertexBuffer) div AttribStride do
+    for j := 0 to High(_VertexDescriptor) do
     begin
-      for j := 0 to High(_VertexDescriptor) do
+      if _VertexDescriptor[j].DataType <> dt_float then Continue;
+      Data := _VertexData + i * VertexSize + AttribOffsets[j];
+      if _VertexDescriptor[j].Semantic in [
+         as_position, as_normal, as_tangent, as_binormal
+      ] then
       begin
-        if _VertexDescriptor[j].DataType <> dt_float then Continue;
-        Data := _VertexData + i * VertexSize + AttribOffsets[j];
-        if _VertexDescriptor[j].Semantic in [
-           as_position, as_normal, as_tangent, as_binormal
-        ] then
-        begin
-          case _VertexDescriptor[j].DataCount of
-            2:
-            begin
-              v2 := DataVec2^;
-              DataVec2^ := v2.Swizzle(Root.Swizzle);
-            end;
-            3:
-            begin
-              v3 := DataVec3^;
-              DataVec3^ := v3.Swizzle(Root.Swizzle);
-            end;
+        case _VertexDescriptor[j].DataCount of
+          2:
+          begin
+            v2 := DataVec2^;
+            DataVec2^ := v2.Swizzle(Root.Swizzle);
+          end;
+          3:
+          begin
+            v3 := DataVec3^;
+            DataVec3^ := v3.Swizzle(Root.Swizzle);
           end;
         end;
       end;
@@ -6188,8 +6213,8 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
   var GenAttribs: Int32;
   var GenNormals: Boolean;
   var GenTangents: Boolean;
-  var AttribIndices: array of Int32;
-  var VertexIndices: array of Int32;
+  var AttribIndices: TUInt32Array;
+  var VertexIndices: TUInt32Array;
   var i, j, ai, Ind: Int32;
   var VertexPtr, AttribPtr: Pointer;
 begin
@@ -6251,6 +6276,7 @@ begin
     end;
     GenerateTangents;
   end;
+  AttribStride := Length(_VertexDescriptor);
   AttribOffsets := nil;
   SetLength(AttribOffsets, Length(_VertexDescriptor));
   _VertexSize := 0;
@@ -6273,39 +6299,61 @@ begin
   SetLength(AttribIndices, Length(_VertexDescriptor));
   _VertexRemap := nil;
   SetLength(_VertexRemap, Length(VertexIndices));
-  for i := 0 to ColladaTriangles.Count * 3 - 1 do
+  VertexBuffer := nil;
+  VertexBufferCount := 0;
+  if (GenAttribs = 0) then
   begin
-    for j := 0 to High(ColladaTriangles.VertexLayout) do
+    VertexBufferCount := ColladaTriangles.Inputs[PositionInd].Count;
+    SetLength(VertexBuffer, VertexBufferCount * AttribStride);
+    for i := 0 to ColladaTriangles.Count * 3 - 1 do
     begin
-      Ind := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[j].Offset];
-      AttribIndices[j] := Ind;
-    end;
-    for j := 0 to GenAttribs - 1 do
-    begin
-      ai := Length(ColladaTriangles.VertexLayout) + j;
-      case _VertexDescriptor[ai].Semantic of
-        as_normal: Ind := RemapNormals[i];
-        as_tangent, as_binormal: Ind := RemapTangents[i];
-        else begin end;
+      VertexInd := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[PositionInd].Offset];
+      for j := 0 to High(ColladaTriangles.VertexLayout) do
+      begin
+        Ind := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[j].Offset];
+        VertexBuffer[VertexInd * AttribStride + j] := Ind;
       end;
-      AttribIndices[ai] := Ind;
+      VertexIndices[i] := VertexInd;
+      _VertexRemap[VertexIndices[i]] := VertexInd;
     end;
-    VertexInd := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[PositionInd].Offset];
-    VertexIndices[i] := AddVertex(AttribIndices);
-    _VertexRemap[VertexIndices[i]] := VertexInd;
   end;
-  _VertexCount := Length(VertexBuffer);
+  if Length(VertexBuffer) = 0 then
+  begin
+    SetLength(VertexBuffer, ColladaTriangles.Count * 3 * AttribStride);
+    for i := 0 to ColladaTriangles.Count * 3 - 1 do
+    begin
+      VertexInd := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[PositionInd].Offset];
+      for j := 0 to High(ColladaTriangles.VertexLayout) do
+      begin
+        Ind := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[j].Offset];
+        AttribIndices[j] := Ind;
+      end;
+      for j := 0 to GenAttribs - 1 do
+      begin
+        ai := Length(ColladaTriangles.VertexLayout) + j;
+        case _VertexDescriptor[ai].Semantic of
+          as_normal: Ind := RemapNormals[i];
+          as_tangent, as_binormal: Ind := RemapTangents[i];
+          else begin end;
+        end;
+        AttribIndices[ai] := Ind;
+      end;
+      VertexIndices[i] := AddVertex(AttribIndices);
+      _VertexRemap[VertexIndices[i]] := VertexInd;
+    end;
+  end;
+  _VertexCount := VertexBufferCount;
   _VertexData := GetMem(VertexSize * _VertexCount);
   _IndexCount := ColladaTriangles.Count * 3;
   _IndexData := GetMem(IndexSize * _IndexCount);
-  for i := 0 to High(VertexBuffer) do
+  for i := 0 to _VertexCount - 1 do
   begin
     VertexPtr := _VertexData + i * VertexSize;
     for j := 0 to High(ColladaTriangles.VertexLayout) do
     begin
       AttribPtr := VertexPtr + AttribOffsets[j];
       ColladaTriangles.CopyInputData(
-        AttribPtr, ColladaTriangles.VertexLayout[j], VertexBuffer[i][j]
+        AttribPtr, ColladaTriangles.VertexLayout[j], VertexBuffer[i * AttribStride + j]
       );
       if (_VertexDescriptor[j].Semantic = as_texcoord)
       and (_VertexDescriptor[j].DataType = dt_float)
@@ -6318,9 +6366,9 @@ begin
     begin
       ai := Length(ColladaTriangles.VertexLayout) + j;
       case _VertexDescriptor[ai].Semantic of
-        as_normal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Normals[VertexBuffer[i][ai]];
-        as_tangent: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][ai]].Tangent;
-        as_binormal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][ai]].Binormal;
+        as_normal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Normals[VertexBuffer[i * AttribStride + ai]];
+        as_tangent: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i * AttribStride + ai]].Tangent;
+        as_binormal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i * AttribStride + ai]].Binormal;
         else begin end;
       end;
     end;
@@ -6764,7 +6812,7 @@ procedure TUSceneDataDAE.Read(const XML: TUXML);
 begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
-  _Root := TColladaRoot.Create(XML, _Path);
+  _Root := TColladaRoot.Create(XML, _Path, Options);
   _Root.ApplySwizzle(_UpVector);
   _Root.Resolve;
   _Root.Initialize;

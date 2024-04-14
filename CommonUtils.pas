@@ -689,6 +689,20 @@ public
   class operator Finalize(var v: TUEvent);
 end;
 
+type TUTimer = record
+strict private
+  var _Name: String;
+  var _Started: Boolean;
+  var _StartTime: UInt64;
+  procedure Initialize;
+  procedure Finalize;
+public
+  procedure Start(const Name: String);
+  procedure Stop;
+  class operator Initialize(var v: TUTimer);
+  class operator Finalize(var v: TUTimer);
+end;
+
 type generic TUTask<T> = record
 public
   type TRes = T;
@@ -1447,6 +1461,7 @@ operator * (const m0, m1: TUMat): TUMat;
 operator * (const m: TUMat; const f: TUFloat): TUMat;
 operator mod (const a, b: TUDouble): TUDouble;
 operator mod (const a, b: TUFloat): TUFloat;
+operator < (const a, b: TUInt32Array): Boolean;
 
 const tt_any = [tt_error, tt_eof, tt_symbol, tt_word, tt_keyword, tt_string, tt_number];
 const UPi = 3.14159265359;
@@ -3446,6 +3461,45 @@ begin
   v.Finalize;
 end;
 // TUEvent end
+
+// TUTimer begin
+procedure TUTimer.Initialize;
+begin
+  _Name := '';
+  _Started := False;
+  _StartTime := 0;
+end;
+
+procedure TUTimer.Finalize;
+begin
+  Stop;
+end;
+
+procedure TUTimer.Start(const Name: String);
+begin
+  Stop;
+  _StartTime := GetTickCount64;
+  _Name := Name;
+  _Started := True;
+end;
+
+procedure TUTimer.Stop;
+begin
+  if not _Started then Exit;
+  _Started := False;
+  WriteLn('Timer ', _Name, ': ', Format('%0:0.3f', [(GetTickCount64 - _StartTime) * 0.001]), 's');
+end;
+
+class operator TUTimer.Initialize(var v: TUTimer);
+begin
+  v.Initialize;
+end;
+
+class operator TUTimer.Finalize(var v: TUTimer);
+begin
+  v.Finalize;
+end;
+// TUTimer end
 
 // TUTask.TTaskThread begin
 procedure TUTask.TTaskThread.AfterConstruction;
@@ -8006,6 +8060,17 @@ end;
 operator mod (const a, b: TUFloat): TUFloat;
 begin
   Result := a - b * Int(a / b);
+end;
+
+operator < (const a, b: TUInt32Array): Boolean;
+  var i: Int32;
+begin
+  if Length(a) <> Length(b) then Exit(Length(a) < Length(b));
+  for i := 0 to High(a) do
+  begin
+    if a[i] >= b[i] then Exit(False);
+  end;
+  Result := True;
 end;
 
 function UStrExplode(const Str: String; const Separator: String): TUStrArray;
