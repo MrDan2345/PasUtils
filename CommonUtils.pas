@@ -35,92 +35,102 @@ type TUVarRecArray = array of TVarRec;
 
 type TUFloat = type Single;
 type PUFloat = ^TUFloat;
-type TUFloatArr = array[UInt16] of TUFloat;
+type TUFloatArr = array[UInt32] of TUFloat;
 type PUFloatArr = ^TUFloatArr;
 type TUFloatArray = array of TUFloat;
 type TUDouble = type Double;
 type PUDouble = ^TUDouble;
-type TUDoubleArr = array[UInt16] of TUDouble;
+type TUDoubleArr = array[UInt32] of TUDouble;
 type PUDoubleArr = ^TUDoubleArr;
 type TUDoubleArray = array of TUDouble;
 
 type TUInt8 = type UInt8;
-type TUInt8Arr = array[UInt16] of TUInt8;
+type TUInt8Arr = array[UInt32] of TUInt8;
 type PUInt8Arr = ^TUInt8Arr;
 type TUInt8Array = array of TUInt8;
 type TUInt16 = type UInt16;
-type TUInt16Arr = array[UInt16] of TUInt16;
+type TUInt16Arr = array[UInt32] of TUInt16;
 type PUInt16Arr = ^TUInt16Arr;
 type TUInt16Array = array of TUInt16;
 type TUInt32 = type UInt32;
-type TUInt32Arr = array[UInt16] of TUInt32;
+type TUInt32Arr = array[UInt32] of TUInt32;
 type PUInt32Arr = ^TUInt32Arr;
 type TUInt32Array = array of TUInt32;
 type TUInt64 = type UInt64;
-type TUInt64Arr = array[UInt16] of TUInt64;
+type TUInt64Arr = array[UInt32] of TUInt64;
 type PUInt64Arr = ^TUInt64Arr;
 type TUInt64Array = array of TUInt64;
 type TInt8 = type Int8;
-type TInt8Arr = array[UInt16] of TInt8;
+type TInt8Arr = array[UInt32] of TInt8;
 type PInt8Arr = ^TInt8Arr;
 type TInt8Array = array of TInt8;
 type TInt16 = type Int16;
-type TInt16Arr = array[UInt16] of TInt16;
+type TInt16Arr = array[UInt32] of TInt16;
 type PInt16Arr = ^TInt16Arr;
 type TInt16Array = array of TInt16;
 type TInt32 = type Int32;
-type TInt32Arr = array[UInt16] of TInt32;
+type TInt32Arr = array[UInt32] of TInt32;
 type PInt32Arr = ^TInt32Arr;
 type TInt32Array = array of TInt32;
 type TInt64 = type Int64;
-type TInt64Arr = array[UInt16] of TInt64;
+type TInt64Arr = array[UInt32] of TInt64;
 type PInt64Arr = ^TInt64Arr;
 type TInt64Array = array of TInt64;
 
 type TUColor = UInt32;
 type PUColor = ^TUColor;
-type TUColorArr = array[UInt16] of TUColor;
+type TUColorArr = array[UInt32] of TUColor;
 type PUColorArr = ^TUColorArr;
 type TUColorArray = array of TUColor;
 type TUMat = array[0..3, 0..3] of TUFloat;
 type PUMat = ^TUMat;
-type TUMatArr = array[UInt16] of TUMat;
+type TUMatArr = array[UInt32] of TUMat;
 type PUMatArr = ^TUMatArr;
 type TUMatArray = array of TUMat;
 type TUVec2 = array[0..1] of TUFloat;
 type PUVec2 = ^TUVec2;
-type TUVec2Arr = array[UInt16] of TUVec2;
+type TUVec2Arr = array[UInt32] of TUVec2;
 type PUVec2Arr = ^TUVec2Arr;
 type TUVec2Array = array of TUVec2;
 type TUVec3 = array[0..2] of TUFloat;
 type PUVec3 = ^TUVec3;
-type TUVec3Arr = array[UInt16] of TUVec3;
+type TUVec3Arr = array[UInt32] of TUVec3;
 type PUVec3Arr = ^TUVec3Arr;
 type TUVec3Array = array of TUVec3;
 type TUVec4 = array[0..3] of TUFloat;
 type PUVec4 = ^TUVec4;
-type TUVec4Arr = array[UInt16] of TUVec4;
+type TUVec4Arr = array[UInt32] of TUVec4;
 type PUVec4Arr = ^TUVec4Arr;
 type TUVec2i = array[0..1] of Int32;
 type PUVec2i = ^TUVec2i;
-type TUVec2iArr = array[UInt16] of TUVec2i;
+type TUVec2iArr = array[UInt32] of TUVec2i;
 type PUVec2iArr = ^TUVec2iArr;
 type TUVec3i = array[0..2] of Int32;
 type PUVec3i = ^TUVec2i;
-type TUVec3iArr = array[UInt16] of TUVec3i;
+type TUVec3iArr = array[UInt32] of TUVec3i;
 type PUVec3iArr = ^TUVec3iArr;
 type TUVec4i = array[0..3] of Int32;
 type PUVec4i = ^TUVec4i;
-type TUVec4iArr = array[UInt16] of TUVec4i;
+type TUVec4iArr = array[UInt32] of TUVec4i;
 type PUVec4iArr = ^TUVec4iArr;
 type TUQuat = array[0..3] of TUFloat;
 type PUQuat = ^TUQuat;
-type TUQuatArr = array[UInt16] of TUQuat;
+type TUQuatArr = array[UInt32] of TUQuat;
 type PUQuatArr = ^TUQuatArr;
 type TUQuatArray = array of TUQuat;
+type TUPlane = array[0..3] of TUFloat;
+type PUPlane = ^TUPlane;
+type TUPlaneArr = array[UInt32] of TUPlane;
+type PUPlaneArr = ^TUPlaneArr;
+type TUPlaneArray = array of TUPlane;
+type TUSphere = array[0..3] of TUFloat;
+type PUSphere = ^TUSphere;
+type TUSphereArr = array[UInt32] of TUFloat;
+type PUSphereArr = ^TUSphereArr;
+type TUSpgereArray = array of TUSphere;
 type TURot2 = array[0..1] of TUFloat;
 type PURot2 = ^TURot2;
-type TURot2Arr = array[UInt16] of TURot2;
+type TURot2Arr = array[UInt32] of TURot2;
 type PURot2Arr = ^TURot2;
 type TUBounds1f = array[0..1] of TUFloat;
 type TUBounds2f = array[0..1] of TUVec2;
@@ -353,6 +363,7 @@ public
   class function Dot(const v0, v1: TUVec2): TUFloat; static; overload; inline;
   class function Cross(const v0, v1: TUVec2): TUFloat; static; overload; inline;
   class function Norm(const v: TUVec2): TUVec2; static; overload; inline;
+  class function Reflect(const v, n: TUVec2): TUVec2; static; overload; inline;
   class function Swizzle(const v: TUVec2; const Remap: TUSwizzle): TUVec2; static; overload;
   procedure SetValue(const Ax, Ay: TUFloat); inline;
   function Transform(const r: TURot2): TUVec2; inline;
@@ -360,6 +371,7 @@ public
   function Dot(const v: TUVec2): TUFloat; overload; inline;
   function Cross(const v: TUVec2): TUFloat; overload; inline;
   function Norm: TUVec2; overload; inline;
+  function Reflect(const n: TUVec2): TUVec2; overload; inline;
   function IsZero: Boolean; inline;
   function Swizzle(const Remap: TUSwizzle): TUVec2; overload; inline;
   function ToString: String;
@@ -389,6 +401,7 @@ public
   class function Dot(const v0, v1: TUVec3): TUFloat; static; overload; inline;
   class function Cross(const v0, v1: TUVec3): TUVec3; static; overload; inline;
   class function Norm(const v: TUVec3): TUVec3; static; overload; inline;
+  class function Reflect(const v, n: TUVec3): TUVec3; static; overload; inline;
   class function Swizzle(const v: TUVec3; const Remap: TUSwizzle): TUVec3; static; overload;
   class function RandomUnit: TUVec3; static;
   class function RandomInRadius(const RadiusMin, RadiusMax: TUFloat): TUVec3; static;
@@ -402,6 +415,7 @@ public
   function Dot(const v: TUVec3): TUFloat; overload;
   function Cross(const v: TUVec3): TUVec3; overload;
   function Norm: TUVec3; overload;
+  function Reflect(const n: TUVec3): TUVec3; overload;
   function Swizzle(const Remap: TUSwizzle): TUVec3; overload; inline;
   function xy: TUVec2; inline;
   function AngleTo(const v: TUVec3): TUFloat; inline;
@@ -546,6 +560,53 @@ public
   function ToString: String; inline;
 end;
 
+type TUPlaneImpl = type helper for TUPlane
+private
+  function GetN: TUVec3;
+  procedure SetN(const Value: TUVec3);
+  function GetD: TUFloat;
+  procedure SetD(const Value: TUFloat);
+  function GetA: TUFloat;
+  procedure SetA(const Value: TUFloat);
+  function GetB: TUFloat;
+  procedure SetB(const Value: TUFloat);
+  function GetC: TUFloat;
+  procedure SetC(const Value: TUFloat);
+public
+  property n: TUVec3 read GetN write SetN;
+  property d: TUFloat read GetD write SetD;
+  property a: TUFloat read GetA write SetA;
+  property b: TUFloat read GetB write SetB;
+  property c: TUFloat read GetC write SetC;
+  class function Make(const Aa, Ab, Ac, Ad: Int32): TUPlane; static; overload; inline;
+  class function Make(const An: TUVec3; const Ad: TUFloat): TUPlane; static; overload; inline;
+  class function Make(const v0, v1, v2: TUVec3): TUPlane; static; overload; inline;
+  procedure SetValue(const Aa, Ab, Ac, Ad: Int32);
+  procedure SetValue(const An: TUVec3; const Ad: TUFloat);
+  procedure SetValue(const v0, v1, v2: TUVec3);
+  function Swizzle(const Remap: TUSwizzle): TUPlane;
+  function Norm: TUPlane;
+  function DistanceToPoint(const v: TUVec3): TUFloat;
+  function DistanceToBounds(const Bounds: TUBounds3f): TUFloat;
+  function Project(const v: TUVec3): TUVec3;
+  function Reflect(const v: TUVec3): TUVec3;
+  function OverlapTri(const v0, v1, v2: TUVec3): Boolean;
+  function OverlapBounds(const Bounds: TUBounds3f): Boolean;
+  function OverlapSphere(const Sphere: TUSphere): Boolean;
+end;
+
+type TUSphereImpl = type helper for TUSphere
+strict private
+  function GetC: TUVec3;
+  procedure SetC(const Value: TUVec3);
+  function GetR: TUFloat;
+  procedure SetR(const Value: TUFloat);
+public
+  property c: TUVec3 read GetC write SetC;
+  property r: TUFloat read GetR write SetR;
+  class function Make(const Ac: TUVec3; const Ar: TUFloat): TUSphere; static;
+end;
+
 type TURot2Impl = type helper for TURot2
 strict private
   function GetAngSin: TUFloat; inline;
@@ -600,12 +661,13 @@ strict private
   procedure SetMax(const Value: TUVec2);
 public
   const Zero: TUBounds2f = ((0, 0), (0, 0));
+  property Min: TUVec2 read GetMin write SetMin;
+  property Max: TUVec2 read GetMax write SetMax;
   class function Make(const AMin, AMax: TUVec2): TUBounds2f; static; overload;
   class function Make(const ACenter: TUVec2): TUBounds2f; static; overload;
   class function Overlap(const a, b: TUBounds2f): Boolean; static; inline;
   function Overlap(const Other: TUBounds2f): Boolean;
-  property Min: TUVec2 read GetMin write SetMin;
-  property Max: TUVec2 read GetMax write SetMax;
+  function GetPoints: TUVec2Array;
 end;
 
 type TUBounds3fImpl = type helper for TUBounds3f
@@ -629,6 +691,7 @@ public
   class function Make(const AVertices: TUVec3Array): TUBounds3f; static; overload;
   class function Overlap(const a, b: TUBounds3f): Boolean; static; inline;
   function Overlap(const Other: TUBounds3f): Boolean;
+  function GetPoints: TUVec3Array;
 end;
 
 type TUCriticalSection = record
@@ -1275,7 +1338,6 @@ type TUJsonRef = specialize TUSharedRef<TUJson>;
 
 procedure UClear(out x; const Size: UInt32);
 procedure UMove(out Dest; const Src; const Size: UInt32);
-function USignOf(const v: Int64): Int64;
 function UIntToPtr(const i: PtrUInt): Pointer;
 function UCopyVarRec(constref src: TVarRec): TVarRec;
 function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArray;
@@ -1284,6 +1346,13 @@ procedure UFinalizeVarRecArr(var arr: array of TVarRec);
 function UIntToBool(const i: Integer): Boolean;
 function UBoolToInt(const b: Boolean): Integer;
 function UBoolToStr(const b: Boolean): String;
+generic function USignOf<T>(const v: T): T;
+function USignOf(const v: Int8): Int8;
+function USignOf(const v: Int16): Int16;
+function USignOf(const v: Int32): Int32;
+function USignOf(const v: Int64): Int64;
+function USignOf(const v: TUFloat): TUFloat;
+function USignOf(const v: TUDouble): TUDouble;
 generic function UMin<T>(const a, b: T): T; inline; overload;
 function UMin(const a, b: Int8): Int8; inline; overload;
 function UMin(const a, b: Int16): Int16; inline; overload;
@@ -1410,8 +1479,16 @@ function UMulVec3Mat4x3(const v: TUVec3; const m: TUMat): TUVec3;
 function UMulVec3Mat4x4(const v: TUVec3; const m: TUMat): TUVec3;
 function UMulVec3Quat(const v: TUVec3; const q: TUQuat): TUVec3;
 function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4;
+
 function UTriangleNormal(const v0, v1, v2: TUVec3): TUVec3;
-function UXc2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
+function UXt2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
+function UProj2DPointToLine(const lv0, lv1, v: TUVec2; out InSegment: Boolean): TUVec2;
+function UProj2DPointToBounds(const b: TUBounds2f; const v: TUVec2): TUVec2;
+function UProj3DPointToLine(const lv0, lv1, v: TUVec3; out InSegment: Boolean): TUVec3;
+function UProj3DPointToPlane(const v: TUVec3; const p: TUPlane): TUVec3;
+function UProj3DPointToBounds(const b: TUBounds3f; const v: TUVec3): TUVec3;
+function UDist3DPointToPlane(const v: TUVec3; const p: TUPlane): TUFloat;
+function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
 
 function UStrExplode(const Str: String; const Separator: String): TUStrArray;
 function UStrIsNumber(const Str: String): Boolean;
@@ -2295,6 +2372,11 @@ begin
   end;
 end;
 
+class function TUVec2Impl.Reflect(const v, n: TUVec2): TUVec2;
+begin
+  Result := v - 2 * (n * v.Dot(n));
+end;
+
 class function TUVec2Impl.Swizzle(const v: TUVec2; const Remap: TUSwizzle): TUVec2;
 begin
   Result := Make(v[Remap[0]], v[Remap[1]]);
@@ -2329,6 +2411,11 @@ end;
 function TUVec2Impl.Norm: TUVec2;
 begin
   Result := Norm(Self);
+end;
+
+function TUVec2Impl.Reflect(const n: TUVec2): TUVec2;
+begin
+  Result := Reflect(Self, n);
 end;
 
 function TUVec2Impl.IsZero: Boolean;
@@ -2432,6 +2519,11 @@ begin
   end;
 end;
 
+class function TUVec3Impl.Reflect(const v, n: TUVec3): TUVec3;
+begin
+  Result := v - 2 * (n * v.Dot(n));
+end;
+
 class function TUVec3Impl.Swizzle(const v: TUVec3; const Remap: TUSwizzle): TUVec3;
 begin
   Result := Make(v[Remap[0]], v[Remap[1]], v[Remap[2]]);
@@ -2502,6 +2594,11 @@ end;
 function TUVec3Impl.Norm: TUVec3;
 begin
   Result := Norm(Self);
+end;
+
+function TUVec3Impl.Reflect(const n: TUVec3): TUVec3;
+begin
+  Result := Reflect(Self, n);
 end;
 
 function TUVec3Impl.Swizzle(const Remap: TUSwizzle): TUVec3;
@@ -2985,6 +3082,209 @@ begin
 end;
 // TUQuatImpl end
 
+// TUPlane begin
+function TUPlaneImpl.GetN: TUVec3;
+begin
+  Result := PUVec3(@Self)^;
+end;
+
+procedure TUPlaneImpl.SetN(const Value: TUVec3);
+begin
+  PUVec3(@Self)^ := Value;
+end;
+
+function TUPlaneImpl.GetD: TUFloat;
+begin
+  Result := Self[3];
+end;
+
+procedure TUPlaneImpl.SetD(const Value: TUFloat);
+begin
+  Self[3] := Value;
+end;
+
+function TUPlaneImpl.GetA: TUFloat;
+begin
+  Result := Self[0];
+end;
+
+procedure TUPlaneImpl.SetA(const Value: TUFloat);
+begin
+  Self[0] := Value;
+end;
+
+function TUPlaneImpl.GetB: TUFloat;
+begin
+  Result := Self[1];
+end;
+
+procedure TUPlaneImpl.SetB(const Value: TUFloat);
+begin
+  Self[1] := Value;
+end;
+
+function TUPlaneImpl.GetC: TUFloat;
+begin
+  Result := Self[2];
+end;
+
+procedure TUPlaneImpl.SetC(const Value: TUFloat);
+begin
+  Self[2] := Value;
+end;
+
+class function TUPlaneImpl.Make(const Aa, Ab, Ac, Ad: Int32): TUPlane;
+begin
+  Result[0] := Aa;
+  Result[1] := Ab;
+  Result[2] := Ac;
+  Result[3] := Ad;
+end;
+
+class function TUPlaneImpl.Make(const An: TUVec3; const Ad: TUFloat): TUPlane;
+begin
+  Result[0] := An[0];
+  Result[1] := An[1];
+  Result[2] := An[2];
+  Result[3] := Ad;
+end;
+
+class function TUPlaneImpl.Make(const v0, v1, v2: TUVec3): TUPlane;
+  var pn: TUVec3 absolute Result;
+begin
+  pn := UTriangleNormal(v0, v1, v2);
+  Result.d := pn.Dot(v0);
+end;
+
+procedure TUPlaneImpl.SetValue(const Aa, Ab, Ac, Ad: Int32);
+begin
+  Self[0] := Aa;
+  Self[1] := Ab;
+  Self[2] := Ac;
+  Self[3] := Ad;
+end;
+
+procedure TUPlaneImpl.SetValue(const An: TUVec3; const Ad: TUFloat);
+begin
+  Self[0] := An[0];
+  Self[1] := An[1];
+  Self[2] := An[2];
+  Self[3] := Ad;
+end;
+
+procedure TUPlaneImpl.SetValue(const v0, v1, v2: TUVec3);
+begin
+  n := UTriangleNormal(v0, v1, v2);
+  d := n.Dot(v0);
+end;
+
+function TUPlaneImpl.Swizzle(const Remap: TUSwizzle): TUPlane;
+begin
+  Result := TUPlane.Make(n.Swizzle(Remap), d);
+end;
+
+function TUPlaneImpl.Norm: TUPlane;
+begin
+  Result := TUPlane.Make(n.Norm, d);
+end;
+
+function TUPlaneImpl.DistanceToPoint(const v: TUVec3): TUFloat;
+begin
+  Result := UDist3DPointToPlane(v, Self);
+end;
+
+function TUPlaneImpl.DistanceToBounds(const Bounds: TUBounds3f): TUFloat;
+begin
+  Result := UDist3DBoundsToPlane(Bounds, Self);
+end;
+
+function TUPlaneImpl.Project(const v: TUVec3): TUVec3;
+begin
+  Result := UProj3DPointToPlane(v, Self);
+end;
+
+function TUPlaneImpl.Reflect(const v: TUVec3): TUVec3;
+begin
+  Result := v.Reflect(n);
+end;
+
+function TUPlaneImpl.OverlapTri(const v0, v1, v2: TUVec3): Boolean;
+begin
+  Result := (n.Dot(v0) >= d) = (n.Dot(v1) >= d) = (n.Dot(v2) >= d);
+end;
+
+function TUPlaneImpl.OverlapBounds(const Bounds: TUBounds3f): Boolean;
+var MinV, MaxV: TUVec3;
+begin
+  if n.x > 0 then
+  begin
+    MinV.x := Bounds.Min.x;
+    MaxV.x := Bounds.Max.x;
+  end
+  else
+  begin
+    MinV.x := Bounds.Max.x;
+    MaxV.x := Bounds.Min.x;
+  end;
+  if n.y > 0 then
+  begin
+    MinV.y := Bounds.Min.y;
+    MaxV.y := Bounds.Max.y;
+  end
+  else
+  begin
+    MinV.y := Bounds.Max.y;
+    MaxV.y := Bounds.Min.y;
+  end;
+  if n.z > 0 then
+  begin
+    MinV.z := Bounds.Min.z;
+    MaxV.z := Bounds.Max.z;
+  end
+  else
+  begin
+    MinV.z := Bounds.Max.z;
+    MaxV.z := Bounds.Min.z;
+  end;
+  if n.Dot(MinV) <= d then Exit(False);
+  if n.Dot(MaxV) < d then Exit(True);
+  Result := False;
+end;
+
+function TUPlaneImpl.OverlapSphere(const Sphere: TUSphere): Boolean;
+begin
+  Result := Abs(DistanceToPoint(Sphere.c)) <= Sphere.r;
+end;
+// TUPlane end
+
+// TUSphere begin
+function TUSphereImpl.GetC: TUVec3;
+begin
+  Result := PUVec3(@Self)^;
+end;
+
+procedure TUSphereImpl.SetC(const Value: TUVec3);
+begin
+  PUVec3(@Self)^ := Value;
+end;
+
+function TUSphereImpl.GetR: TUFloat;
+begin
+  Result := Self[3];
+end;
+
+procedure TUSphereImpl.SetR(const Value: TUFloat);
+begin
+  Self[3] := Value;
+end;
+
+class function TUSphereImpl.Make(const Ac: TUVec3; const Ar: TUFloat): TUSphere;
+begin
+  PUVec3(@Result)^ := Ac;
+  Result[3] := Ar;
+end;
+// TUSphere end
+
 // TURot2 begin
 function TURot2Impl.GetAngSin: TUFloat;
 begin
@@ -3192,6 +3492,16 @@ function TUBounds2fImpl.Overlap(const Other: TUBounds2f): Boolean;
 begin
   Result := Overlap(Self, Other);
 end;
+
+function TUBounds2fImpl.GetPoints: TUVec2Array;
+begin
+  Result := nil;
+  SetLength(Result, 4);
+  Result[0] := Self[0];
+  Result[1] := TUVec2.Make(Self[0].x, Self[1].y);
+  Result[2] := TUVec2.Make(Self[1].x, Self[0].y);
+  Result[3] := Max;
+end;
 // TUBounds2f end
 
 // TUBounds3f begin
@@ -3283,6 +3593,20 @@ end;
 function TUBounds3fImpl.Overlap(const Other: TUBounds3f): Boolean;
 begin
   Result := Overlap(Self, Other);
+end;
+
+function TUBounds3fImpl.GetPoints: TUVec3Array;
+begin
+  Result := nil;
+  SetLength(Result, 8);
+  Result[0] := Self[0];
+  Result[1] := TUVec3.Make(Self[0].x, Self[0].y, Self[1].z);
+  Result[2] := TUVec3.Make(Self[0].x, Self[1].y, Self[0].z);
+  Result[3] := TUVec3.Make(Self[0].x, Self[1].y, Self[1].z);
+  Result[4] := TUVec3.Make(Self[1].x, Self[0].y, Self[0].z);
+  Result[5] := TUVec3.Make(Self[1].x, Self[0].y, Self[1].z);
+  Result[6] := TUVec3.Make(Self[1].x, Self[1].y, Self[0].z);
+  Result[7] := Self[1];
 end;
 // TUBounds3f end
 
@@ -6791,11 +7115,6 @@ begin
 {$push}{$hints off}Move(Src, Dest, Size);{$pop}
 end;
 
-function USignOf(const v: Int64): Int64;
-begin
-  if v < 0 then Result := -1 else Result := 1;
-end;
-
 function UIntToPtr(const i: PtrUInt): Pointer;
 begin
   Result := nil; Result += i;
@@ -6925,6 +7244,43 @@ end;
 function UBoolToStr(const b: Boolean): String;
 begin
   if b then Exit('True') else Exit('False');
+end;
+
+generic function USignOf<T>(const v: T): T;
+begin
+  if v < 0 then Result := T(-1) else Result := T(1);
+end;
+
+function USignOf(const v: Int8): Int8;
+begin
+  Result := specialize USignOf<Int8>(v);
+end;
+
+function USignOf(const v: Int16): Int16;
+begin
+  Result := specialize USignOf<Int16>(v);
+end;
+
+function USignOf(const v: Int32): Int32;
+begin
+  Result := specialize USignOf<Int32>(v);
+end;
+
+function USignOf(const v: Int64): Int64;
+begin
+  Result := specialize USignOf<Int64>(v);
+end;
+
+generic
+
+function USignOf(const v: TUFloat): TUFloat;
+begin
+  Result := specialize USignOf<TUFloat>(v);
+end;
+
+function USignOf(const v: TUDouble): TUDouble;
+begin
+  Result := specialize USignOf<TUDouble>(v);
 end;
 
 generic function UMin<T>(const a, b: T): T;
@@ -7863,11 +8219,7 @@ begin
   Result := (v1 - v0).Cross(v2 - v0).Norm;
 end;
 
-function UXc2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
-  function Sgn(const x: TUFloat): TUFloat;
-  begin
-    if x < 0 then Exit(-1) else Exit(1);
-  end;
+function UXt2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
   var u, v, s0, s1: TUVec2;
   var dr, d, dt, dr2_rcp: TUFloat;
 begin
@@ -7879,10 +8231,63 @@ begin
   if (dt < 0) then Exit(False);
   dr2_rcp := 1 / Sqr(dr);
   s0 := TUVec2.Make(d * v.y, -d * v.x);
-  s1 := TUVec2.Make(Sgn(v.y) * v.x, Abs(v.y)) * Sqrt(dt);
+  s1 := TUVec2.Make(USignOf(v.y) * v.x, Abs(v.y)) * Sqrt(dt);
   x0 := c + (s0 + s1) * dr2_rcp;
   x1 := c + (s0 - s1) * dr2_rcp;
   Result := True;
+end;
+
+function UProj2DPointToLine(const lv0, lv1, v: TUVec2; out InSegment: Boolean): TUVec2;
+  var u: TUFloat;
+begin
+  u := ((v.x - lv0.x) * (lv1.x - lv0.x) + (v.y - lv0.y) * (lv1.y - lv0.y)) / (Sqr(lv1.x - lv0.x) + Sqr(lv1.y - lv0.y));
+  Result := TUVec2.Make(lv0.x + u * (lv1.x - lv0.x), lv0.y + u * (lv1.y - lv0.y));
+  InSegment := (u >= 0) and (u <= 1);
+end;
+
+function UProj2DPointToBounds(const b: TUBounds2f; const v: TUVec2): TUVec2;
+begin
+  Result := UClamp(v, b.Min, b.Max);
+end;
+
+function UProj3DPointToLine(const lv0, lv1, v: TUVec3; out InSegment: Boolean): TUVec3;
+  var u: TUFloat;
+begin
+  u := (
+    ((v.x - lv0.x) * (lv1.x - lv0.x) + (v.y - lv0.y) * (lv1.y - lv0.y) + (v.z - lv0.z) * (lv1.z - lv0.z)) /
+    (Sqr(lv1.x - lv0.x) + Sqr(lv1.y - lv0.y) + Sqr(lv1.z - lv0.z))
+  );
+  Result := TUVec3.Make(lv0.x + u * (lv1.x - lv0.x), lv0.y + u * (lv1.y - lv0.y), lv0.z + u * (lv1.z - lv0.z));
+  InSegment := (u >= 0) and (u <= 1);
+end;
+
+function UProj3DPointToPlane(const v: TUVec3; const p: TUPlane): TUVec3;
+begin
+  Result := v + (p.n * (p.d - p.n.Dot(v)));
+end;
+
+function UProj3DPointToBounds(const b: TUBounds3f; const v: TUVec3): TUVec3;
+begin
+  Result := UClamp(v, b.Min, b.Max);
+end;
+
+function UDist3DPointToPlane(const v: TUVec3; const p: TUPlane): TUFloat;
+begin
+  Result := (UProj3DPointToPlane(v, p) - v).Len;
+end;
+
+function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
+  var Pts: TUVec3Array;
+  var i: Int32;
+  var d: TUFloat;
+begin
+  Pts := b.GetPoints;
+  Result := UDist3DPointToPlane(Pts[0], p);
+  for i := 1 to High(Pts) do
+  begin
+    d := UDist3DPointToPlane(Pts[i], p);
+    if d < Result then Result := d;
+  end;
 end;
 
 operator + (const v0, v1: TUVec2): TUVec2;
