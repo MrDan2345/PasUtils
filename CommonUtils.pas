@@ -82,59 +82,60 @@ type PUColor = ^TUColor;
 type TUColorArr = array[UInt32] of TUColor;
 type PUColorArr = ^TUColorArr;
 type TUColorArray = array of TUColor;
-type TUMat = array[0..3, 0..3] of TUFloat;
+type TUMat = array[0..3, 0..3] of TUFloat; // TUMatImpl
 type PUMat = ^TUMat;
 type TUMatArr = array[UInt32] of TUMat;
 type PUMatArr = ^TUMatArr;
 type TUMatArray = array of TUMat;
-type TUVec2 = array[0..1] of TUFloat;
+type TUVec2 = array[0..1] of TUFloat; // TUVec2Impl
 type PUVec2 = ^TUVec2;
 type TUVec2Arr = array[UInt32] of TUVec2;
 type PUVec2Arr = ^TUVec2Arr;
 type TUVec2Array = array of TUVec2;
-type TUVec3 = array[0..2] of TUFloat;
+type TUVec3 = array[0..2] of TUFloat; // TUVec3Impl
 type PUVec3 = ^TUVec3;
 type TUVec3Arr = array[UInt32] of TUVec3;
 type PUVec3Arr = ^TUVec3Arr;
 type TUVec3Array = array of TUVec3;
-type TUVec4 = array[0..3] of TUFloat;
+type TUVec4 = array[0..3] of TUFloat; // TUVec4Impl
 type PUVec4 = ^TUVec4;
 type TUVec4Arr = array[UInt32] of TUVec4;
 type PUVec4Arr = ^TUVec4Arr;
-type TUVec2i = array[0..1] of Int32;
+type TUVec2i = array[0..1] of Int32; // TUVec2iImpl
 type PUVec2i = ^TUVec2i;
 type TUVec2iArr = array[UInt32] of TUVec2i;
 type PUVec2iArr = ^TUVec2iArr;
-type TUVec3i = array[0..2] of Int32;
+type TUVec3i = array[0..2] of Int32; // TUVec3iImpl
 type PUVec3i = ^TUVec2i;
 type TUVec3iArr = array[UInt32] of TUVec3i;
 type PUVec3iArr = ^TUVec3iArr;
-type TUVec4i = array[0..3] of Int32;
+type TUVec4i = array[0..3] of Int32; // TUVec4iImpl
 type PUVec4i = ^TUVec4i;
 type TUVec4iArr = array[UInt32] of TUVec4i;
 type PUVec4iArr = ^TUVec4iArr;
-type TUQuat = array[0..3] of TUFloat;
+type TUQuat = array[0..3] of TUFloat; // TUQuatImpl
 type PUQuat = ^TUQuat;
 type TUQuatArr = array[UInt32] of TUQuat;
 type PUQuatArr = ^TUQuatArr;
 type TUQuatArray = array of TUQuat;
-type TUPlane = array[0..3] of TUFloat;
+type TUPlane = array[0..3] of TUFloat; // TUPlaneImpl
 type PUPlane = ^TUPlane;
 type TUPlaneArr = array[UInt32] of TUPlane;
 type PUPlaneArr = ^TUPlaneArr;
 type TUPlaneArray = array of TUPlane;
-type TUSphere = array[0..3] of TUFloat;
+type TUSphere = array[0..3] of TUFloat; // TUSphereImpl
 type PUSphere = ^TUSphere;
 type TUSphereArr = array[UInt32] of TUFloat;
 type PUSphereArr = ^TUSphereArr;
 type TUSpgereArray = array of TUSphere;
-type TURot2 = array[0..1] of TUFloat;
+type TURot2 = array[0..1] of TUFloat; // TURot2Impl
 type PURot2 = ^TURot2;
 type TURot2Arr = array[UInt32] of TURot2;
 type PURot2Arr = ^TURot2;
-type TUBounds1f = array[0..1] of TUFloat;
-type TUBounds2f = array[0..1] of TUVec2;
-type TUBounds3f = array[0..1] of TUVec3;
+type TURay3 = array[0..1] of TUVec3; // TURay3Impl
+type TUBounds1f = array[0..1] of TUFloat; // TUBounds1fImpl
+type TUBounds2f = array[0..1] of TUVec2; // TUBounds2fImpl
+type TUBounds3f = array[0..1] of TUVec3; // TUBounds3fImpl
 
 type TUSwizzle = record
 private
@@ -360,20 +361,22 @@ public
   const Zero: TUVec2 = (0, 0);
   class function Make(const Ax, Ay: TUFloat): TUVec2; static; overload; inline;
   class function Make(const s: TUFloat): TUVec2; static; overload; inline;
-  class function Dot(const v0, v1: TUVec2): TUFloat; static; overload; inline;
-  class function Cross(const v0, v1: TUVec2): TUFloat; static; overload; inline;
-  class function Norm(const v: TUVec2): TUVec2; static; overload; inline;
-  class function Reflect(const v, n: TUVec2): TUVec2; static; overload; inline;
+  class function Dot(const v0, v1: TUVec2): TUFloat; static; overload;
+  class function Cross(const v0, v1: TUVec2): TUFloat; static; overload;
+  class function Perp(const v: TUVec2): TUVec2; static; overload;
+  class function Norm(const v: TUVec2): TUVec2; static; overload;
+  class function Reflect(const v, n: TUVec2): TUVec2; static; overload;
   class function Swizzle(const v: TUVec2; const Remap: TUSwizzle): TUVec2; static; overload;
   procedure SetValue(const Ax, Ay: TUFloat); inline;
-  function Transform(const r: TURot2): TUVec2; inline;
-  function TransformInv(const r: TURot2): TUVec2; inline;
-  function Dot(const v: TUVec2): TUFloat; overload; inline;
-  function Cross(const v: TUVec2): TUFloat; overload; inline;
-  function Norm: TUVec2; overload; inline;
-  function Reflect(const n: TUVec2): TUVec2; overload; inline;
+  function Transform(const r: TURot2): TUVec2;
+  function TransformInv(const r: TURot2): TUVec2;
+  function Dot(const v: TUVec2): TUFloat; overload;
+  function Cross(const v: TUVec2): TUFloat; overload;
+  function Perp: TUVec2; overload;
+  function Norm: TUVec2; overload;
+  function Reflect(const n: TUVec2): TUVec2; overload;
   function IsZero: Boolean; inline;
-  function Swizzle(const Remap: TUSwizzle): TUVec2; overload; inline;
+  function Swizzle(const Remap: TUSwizzle): TUVec2; overload;
   function ToString: String;
 end;
 
@@ -395,7 +398,7 @@ public
   const Zero: TUVec3 = (0, 0, 0);
   class function Make(const Ax, Ay, Az: TUFloat): TUVec3; static; overload; inline;
   class function Make(const v2: TUVec2; const Az: TUFloat): TUVec3; static; overload; inline;
-  class function Make(const s: TUFloat): TUVec3; static; overload;
+  class function Make(const s: TUFloat): TUVec3; static; overload; inline;
   class function Len(const v: TUVec3): TUFloat; static; overload; inline;
   class function LenSq(const v: TUVec3): TUFloat; static; overload; inline;
   class function Dot(const v0, v1: TUVec3): TUFloat; static; overload; inline;
@@ -634,6 +637,18 @@ public
   function Transform(const v: TUVec2): TUVec2; inline;
   function TransformInv(const v: TUVec2): TUVec2; inline;
   function ToString: String; inline;
+end;
+
+type TURay3Impl = type helper for TURay3
+strict private
+  function GetO: TUVec3;
+  procedure SetO(const Value: TUVec3);
+  function GetD: TUVec3;
+  procedure SetD(const Value: TUVec3);
+public
+  property o: TUVec3 read GetO write SetO;
+  property d: TUVec3 read GetD write SetD;
+  class function Make(const Ao, Ad: TUVec3): TURay3; static;
 end;
 
 type TUBounds1fImpl = type helper for TUBounds1f
@@ -1481,7 +1496,17 @@ function UMulVec3Quat(const v: TUVec3; const q: TUQuat): TUVec3;
 function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4;
 
 function UTriangleNormal(const v0, v1, v2: TUVec3): TUVec3;
-function UXt2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
+function UXct2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
+function UXct2DLineLine(const l0v0, l0v1, l1v0, l1v1: TUVec2; out xp: TUVec2): Boolean;
+function UXct2DLineSegment(const l0, l1, s0, s1: TUVec2; out xp: TUVec2): Boolean;
+function UXct2DSegmentCircle(const lv0, lv1, cc: TUVec2; const r: TUFloat; out xp0, xp1: TUVec2; out xb0, xb1: Boolean): Boolean;
+function UXct2DLineRect(const lv0, lv1: TUVec2; const r: TUBounds2f; out xp0, xp1: TUVec2): Boolean;
+function UXct2DSegmentRect(const lv0, lv1: TUVec2; const r: TUBounds2f; out xp0, xp1: TUVec2): Boolean;
+function UXct3DLinePlane(const lv0, lv1: TUVec3; const p: TUPlane; out xp: TUVec3): Boolean;
+function UXct3DLineSphere(const lv0, lv1: TUVec3; const s: TUSphere; out xp0, xp1: TUVec3): Boolean;
+function UXct3Planes(const p1, p2, p3: TUPlane; out xp: TUVec3): Boolean;
+function UXct3DRayPlane(const r: TURay3; const p: TUPlane; out xp: TUVec3; out xd: TUFloat): Boolean;
+function UXct3DRayTriangle(const r: TURay3; const v0, v1, v2: TUVec3; out xp: TUVec3; out xd: TUFloat): Boolean;
 function UProj2DPointToLine(const lv0, lv1, v: TUVec2; out InSegment: Boolean): TUVec2;
 function UProj2DPointToBounds(const b: TUBounds2f; const v: TUVec2): TUVec2;
 function UProj3DPointToLine(const lv0, lv1, v: TUVec3; out InSegment: Boolean): TUVec3;
@@ -1515,6 +1540,7 @@ operator + (const v0, v1: TUVec2): TUVec2;
 operator - (const v0, v1: TUVec2): TUVec2;
 operator * (const v0, v1: TUVec2): TUVec2;
 operator / (const v0, v1: TUVec2): TUVec2;
+operator / (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const f: TUFloat; const v: TUVec2): TUVec2;
 operator - (const v: TUVec2): TUVec2;
@@ -1522,6 +1548,7 @@ operator + (const v0, v1: TUVec3): TUVec3;
 operator - (const v0, v1: TUVec3): TUVec3;
 operator * (const v0, v1: TUVec3): TUVec3;
 operator / (const v0, v1: TUVec3): TUVec3;
+operator / (const v: TUVec3; const f: TUFloat): TUVec3;
 operator * (const v: TUVec3; const f: TUFloat): TUVec3;
 operator * (const f: TUFloat; const v: TUVec3): TUVec3;
 operator - (const v: TUVec3): TUVec3;
@@ -1529,6 +1556,7 @@ operator + (const v0, v1: TUVec4): TUVec4;
 operator - (const v0, v1: TUVec4): TUVec4;
 operator * (const v0, v1: TUVec4): TUVec4;
 operator / (const v0, v1: TUVec4): TUVec4;
+operator / (const v: TUVec4; const f: TUFloat): TUVec4;
 operator * (const v: TUVec4; const f: TUFloat): TUVec4;
 operator * (const f: TUFloat; const v: TUVec4): TUVec4;
 operator - (const v: TUVec4): TUVec4;
@@ -2357,6 +2385,12 @@ begin
   Result := v0[0] * v1[1] - v0[1] * v1[0];
 end;
 
+class function TUVec2Impl.Perp(const v: TUVec2): TUVec2;
+begin
+  Result[0] := -v[1];
+  Result[1] := v[0];
+end;
+
 class function TUVec2Impl.Norm(const v: TUVec2): TUVec2;
   var d: TUFloat;
 begin
@@ -2408,6 +2442,11 @@ begin
   Result := Cross(Self, v);
 end;
 
+function TUVec2Impl.Perp: TUVec2;
+begin
+  Result := Perp(Self);
+end;
+
 function TUVec2Impl.Norm: TUVec2;
 begin
   Result := Norm(Self);
@@ -2420,7 +2459,7 @@ end;
 
 function TUVec2Impl.IsZero: Boolean;
 begin
-  Result := (x = 0) and (y = 0);
+  Result := (Abs(x) <= UEPS) and (Abs(y) <= UEPS);
 end;
 
 function TUVec2Impl.Swizzle(const Remap: TUSwizzle): TUVec2;
@@ -2633,7 +2672,7 @@ end;
 
 function TUVec3Impl.IsZero: Boolean;
 begin
-  Result := (x = 0) and (y = 0) and (z = 0);
+  Result := (Abs(x) <= UEPS) and (Abs(y) <= UEPS) and (Abs(z) = UEPS);
 end;
 
 function TUVec3Impl.ToString: String;
@@ -2774,7 +2813,7 @@ end;
 
 function TUVec4Impl.IsZero: Boolean;
 begin
-  Result := (x = 0) and (y = 0) and (z = 0) and (w = 0);
+  Result := (Abs(x) <= UEPS) and (Abs(y) <= UEPS) and (Abs(z) <= UEPS) and (Abs(w) <= UEPS);
 end;
 
 function TUVec4Impl.ToString: String;
@@ -3393,6 +3432,34 @@ begin
   Result := Format('{%0:0.2f}', [Angle * URadToDeg]);
 end;
 // TURot2 end
+
+// TURay3 begin
+function TURay3Impl.GetO: TUVec3;
+begin
+  Result := Self[0];
+end;
+
+procedure TURay3Impl.SetO(const Value: TUVec3);
+begin
+  Self[0] := Value;
+end;
+
+function TURay3Impl.GetD: TUVec3;
+begin
+  Result := Self[0];
+end;
+
+procedure TURay3Impl.SetD(const Value: TUVec3);
+begin
+  Self[0] := Value;
+end;
+
+class function TURay3Impl.Make(const Ao, Ad: TUVec3): TURay3;
+begin
+  Result[0] := Ao;
+  Result[1] := Ad;
+end;
+// TURay3 end
 
 // TUBounds1f begin
 function TUBounds1fImpl.GetMin: TUFloat;
@@ -8219,7 +8286,7 @@ begin
   Result := (v1 - v0).Cross(v2 - v0).Norm;
 end;
 
-function UXt2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
+function UXct2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
   var u, v, s0, s1: TUVec2;
   var dr, d, dt, dr2_rcp: TUFloat;
 begin
@@ -8237,7 +8304,223 @@ begin
   Result := True;
 end;
 
-function UProj2DPointToLine(const lv0, lv1, v: TUVec2; out InSegment: Boolean): TUVec2;
+function UXct2DLineLine(const l0v0, l0v1, l1v0, l1v1: TUVec2; out xp: TUVec2): Boolean;
+  var u: TUVec2 absolute l0v0;
+  var v, n: TUVec2;
+  var t, nv: TUFloat;
+begin
+  v := l0v1 - l0v0;
+  n := (l1v1 - l1v0).Perp;
+  nv := n.Dot(v);
+  if Abs(nv) < UEPS then Exit(False);
+  t := (n.Dot(l1v0) - n.Dot(u)) / nv;
+  xp := u + v * t;
+  Result := True;
+end;
+
+function UXct2DLineSegment(const l0, l1, s0, s1: TUVec2; out xp: TUVec2): Boolean;
+  var u: TUVec2 absolute s0;
+  var v, n: TUVec2;
+  var t, nv: TUFloat;
+begin
+  v := s1 - s0;
+  n := (l1 - l0).Perp;
+  nv := n.Dot(v);
+  if Abs(nv) < UEPS then Exit(False);
+  t := (n.Dot(l0) - n.Dot(u)) / nv;
+  xp := u + v * t;
+  Result := (t >= 0) and (t <= 1);
+end;
+
+function UXct2DSegmentCircle(
+  const lv0, lv1, cc: TUVec2; const r: TUFloat;
+  out xp0, xp1: TUVec2; out xb0, xb1: Boolean
+): Boolean;
+  var g, v: TUVec2;
+  var a, b, c, d, d_sqrt, a2, p0, p1: TUFloat;
+begin
+  g := lv0 - cc;
+  v := lv1 - lv0;
+  a := v.Dot(v);
+  b := 2 * v.Dot(g);
+  c := g.Dot(g) - (r * r);
+  d := b * b - 4 * a * c;
+  if d < 0 then Exit(False);
+  d_sqrt := Sqrt(d);
+  a2 := 2 * a;
+  p0 := (-b + d_sqrt) / a2;
+  p1 := (-b - d_sqrt) / a2;
+  xb0 := ((p0 >= 0) and (p0 <= 1));
+  xb1 := ((p1 >= 0) and (p1 <= 1));
+  xp0 := lv0 + v * p0;
+  xp1 := lv0 + v * p1;
+  Result := xb0 or xb1;
+end;
+
+function UXct2DLineRect(const lv0, lv1: TUVec2; const r: TUBounds2f; out xp0, xp1: TUVec2): Boolean;
+  var tn, tf, d, t, t0, t1: TUFloat;
+  var v: TUVec2;
+  var i: Int32;
+begin
+  tn := -1E+16;
+  tf := 1E+16;
+  v := lv1 - lv0;
+  for i := 0 to 1 do
+  begin
+    if Abs(v[i]) < UEPS then
+    begin
+      if (lv0[i] < r.Min[i])
+      or (lv0[i] > r.Max[i]) then
+      Exit(False);
+    end;
+    d := 1 / v[i];
+    t0 := (r.Min[i] - lv0[i]) * d;
+    t1 := (r.Max[i] - lv0[i]) * d;
+    if t0 > t1 then
+    begin
+      t := t1;
+      t1 := t0;
+      t0 := t;
+    end;
+    if t0 > tn then tn := t0;
+    if t1 < tf then tf := t1;
+    if (tn > tf) then Exit(False);
+  end;
+  xp0 := lv0 + v * tn;
+  xp1 := lv0 + v * tf;
+  Result := True;
+end;
+
+function UXct2DSegmentRect(
+  const lv0, lv1: TUVec2; const r: TUBounds2f;
+  out xp0, xp1: TUVec2
+): Boolean;
+  var tn, tf, d, t, t0, t1: TUFloat;
+  var v: TUVec2;
+  var i: TInt32;
+begin
+  tn := 0;
+  tf := 1;
+  v := lv1 - lv0;
+  for i := 0 to 1 do
+  begin
+    if Abs(v[i]) < UEPS then
+    begin
+      if ((lv0[i] < r.Min[i]) or (lv0[i] > r.Max[i])) then
+      Exit(False)
+      else
+      Continue;
+    end;
+    d := 1 / v[i];
+    t0 := (r.Min[i] - lv0[i]) * d;
+    t1 := (r.Max[i] - lv0[i]) * d;
+    if t0 > t1 then
+    begin
+      t := t1;
+      t1 := t0;
+      t0 := t;
+    end;
+    if t0 > tn then tn := t0;
+    if t1 < tf then tf := t1;
+    if (tn > tf) or (tf < 0) then Exit(False);
+  end;
+  xp0 := lv0 + v * tn;
+  xp1 := lv0 + v * tf;
+  Result := True;
+end;
+
+function UXct3DLinePlane(
+  const lv0, lv1: TUVec3; const p: TUPlane;
+  out xp: TUVec3
+): Boolean;
+  var u: TUVec3 absolute lv0;
+  var v: TUVec3;
+  var vn, t: TUFloat;
+begin
+  v := lv1 - lv0;
+  vn := v.Dot(p.n);
+  if Abs(vn) < UEPS then Exit(False);
+  t := (p.d - p.n.Dot(u)) / vn;
+  xp := u + v * t;
+  Result := True;
+end;
+
+function UXct3DLineSphere(
+  const lv0, lv1: TUVec3; const s: TUSphere;
+  out xp0, xp1: TUVec3
+): Boolean;
+  var g, v: TUVec3;
+  var a, b, c, d, d_sqrt, a2: TUFloat;
+begin
+  g := lv0 - s.c;
+  v := lv1 - lv0;
+  a := v.Dot(v);
+  b := 2 * v.Dot(g);
+  c := g.Dot(g) - (s.r * s.r);
+  d := b * b - 4 * a * c;
+  if d < 0 then Exit(False);
+  d_sqrt := Sqrt(d);
+  a2 := 2 * a;
+  xp0 := lv1 + v * ((-b + d_sqrt) / a2);
+  xp1 := lv1 + v * ((-b - d_sqrt) / a2);
+  Result := True;
+end;
+
+function UXct3Planes(const p1, p2, p3: TUPlane; out xp: TUVec3): Boolean;
+  var Det: TUFloat;
+begin
+  Det := -p1.n.Dot(p2.n.Cross(p3.n));
+  if Abs(Det) < UEPS then Exit(False);
+  xp := ((p2.n.Cross(p3.n) * p1.d) + (p3.n.Cross(p1.n) * p2.d) + (p1.n.Cross(p2.n) * p3.d)) / Det;
+  Result := True;
+end;
+
+function UXct3DRayPlane(
+  const r: TURay3; const p: TUPlane;
+  out xp: TUVec3; out xd: TUFloat
+): Boolean;
+  var dn: TUFloat;
+begin
+  dn := r.d.Dot(p.n);
+  if Abs(dn) < UEPS then Exit(False);
+  xd := (p.d - p.n.Dot(r.o)) / dn;
+  xp := r.o + r.d * xd;
+  Result := True;
+end;
+
+function UXct3DRayTriangle(
+  const r: TURay3; const v0, v1, v2: TUVec3;
+  out xp: TUVec3; out xd: TUFloat
+): Boolean;
+  var e1, e2, p, q, d: TUVec3;
+  var det, det_rcp, u, v, t: TUFloat;
+begin
+  e1 := v1 - v0;
+  e2 := v2 - v0;
+  p := r.d.Cross(e2);
+  det := e1.Dot(p);
+  if (det > -UEPS) and (det < UEPS) then Exit(False);
+  det_rcp := 1 / det;
+  d := r.o - v0;
+  u := d.Dot(p) * det_rcp;
+  if (u < 0) or (u > 1) then Exit(False);
+  q := d.Cross(e1);
+  v := r.d.Dot(q) * det_rcp;
+  if (v < 0) or (u + v > 1) then Exit(False);
+  t := e2.Dot(q) * det_rcp;
+  if (t > UEPS) then
+  begin
+    xd := t;
+    xp := (r.d * t) + r.o;
+    Exit(True);
+  end;
+  Result := False;
+end;
+
+function UProj2DPointToLine(
+  const lv0, lv1, v: TUVec2;
+  out InSegment: Boolean
+): TUVec2;
   var u: TUFloat;
 begin
   u := ((v.x - lv0.x) * (lv1.x - lv0.x) + (v.y - lv0.y) * (lv1.y - lv0.y)) / (Sqr(lv1.x - lv0.x) + Sqr(lv1.y - lv0.y));
@@ -8314,6 +8597,14 @@ begin
   Result[1] := v0[1] / v1[1];
 end;
 
+operator / (const v: TUVec2; const f: TUFloat): TUVec2;
+  var Rcp: TUFloat;
+begin
+  Rcp := 1 / f;
+  Result[0] := v[0] * Rcp;
+  Result[1] := v[1] * Rcp;
+end;
+
 operator * (const v: TUVec2; const f: TUFloat): TUVec2;
 begin
   Result[0] := v[0] * f;
@@ -8358,6 +8649,15 @@ begin
   Result[0] := v0[0] / v1[0];
   Result[1] := v0[1] / v1[1];
   Result[2] := v0[2] / v1[2];
+end;
+
+operator / (const v: TUVec3; const f: TUFloat): TUVec3;
+  var Rcp: TUFloat;
+begin
+  Rcp := 1 / f;
+  Result[0] := v[0] * Rcp;
+  Result[1] := v[1] * Rcp;
+  Result[2] := v[2] * Rcp;
 end;
 
 operator * (const v: TUVec3; const f: TUFloat): TUVec3;
@@ -8411,6 +8711,16 @@ begin
   Result[1] := v0[1] / v1[1];
   Result[2] := v0[2] / v1[2];
   Result[3] := v0[3] / v1[3];
+end;
+
+operator / (const v: TUVec4; const f: TUFloat): TUVec4;
+  var Rcp: TUFloat;
+begin
+  Rcp := 1 / f;
+  Result[0] := v[0] * Rcp;
+  Result[1] := v[1] * Rcp;
+  Result[2] := v[2] * Rcp;
+  Result[3] := v[3] * Rcp;
 end;
 
 operator * (const v: TUVec4; const f: TUFloat): TUVec4;
