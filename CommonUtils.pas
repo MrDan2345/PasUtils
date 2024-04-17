@@ -1527,7 +1527,7 @@ procedure ULog(const Text: String; const Offset: Int32 = 0);
 procedure ULogOffset(const Offset: Int32);
 
 generic procedure UArrSort<T>(var Arr: array of T);
-generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T); overload;
+generic function UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T): Int32; overload;
 generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Other: specialize TUArray<T>); overload;
 generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
 generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Int32; const DelCount: Int32 = 1);
@@ -9011,10 +9011,11 @@ begin
   SortRange(Low(Arr), High(Arr));
 end;
 
-generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T);
+generic function UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T): Int32;
 begin
   SetLength(Arr, Length(Arr) + 1);
-  Arr[High(Arr)] := Item;
+  Result := High(Arr);
+  Arr[Result] := Item;
 end;
 
 generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Other: specialize TUArray<T>);
