@@ -413,6 +413,9 @@ public
   function Transform4x3(const m: TUMat): TUVec3;
   function Transform4x4(const m: TUMat): TUVec3;
   function TransformQuat(const q: TUQuat): TUVec3; inline;
+  function RotateXY(const r: TURot2): TUVec3;
+  function RotateYZ(const r: TURot2): TUVec3;
+  function RotateXZ(const r: TURot2): TUVec3;
   function Len: TUFloat;
   function LenSq: TUFloat;
   function Dot(const v: TUVec3): TUFloat; overload;
@@ -2608,6 +2611,33 @@ end;
 function TUVec3Impl.TransformQuat(const q: TUQuat): TUVec3;
 begin
   Result := UMulVec3Quat(Self, q);
+end;
+
+function TUVec3Impl.RotateXY(const r: TURot2): TUVec3;
+  var v2: TUVec2;
+begin
+  v2 := r.Transform(TUVec2.Make(Self[0], Self[1]));
+  Result[0] := v2[0];
+  Result[1] := v2[1];
+  Result[2] := Self[2];
+end;
+
+function TUVec3Impl.RotateYZ(const r: TURot2): TUVec3;
+  var v2: TUVec2;
+begin
+  v2 := r.Transform(TUVec2.Make(Self[1], Self[2]));
+  Result[0] := Self[0];
+  Result[1] := v2[0];
+  Result[2] := v2[1];
+end;
+
+function TUVec3Impl.RotateXZ(const r: TURot2): TUVec3;
+  var v2: TUVec2;
+begin
+  v2 := r.Transform(TUVec2.Make(Self[0], Self[2]));
+  Result[0] := v2[0];
+  Result[1] := Self[1];
+  Result[2] := v2[1];
 end;
 
 function TUVec3Impl.Len: TUFloat;
