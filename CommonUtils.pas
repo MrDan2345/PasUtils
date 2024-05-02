@@ -1572,6 +1572,7 @@ const tt_any = [tt_error, tt_eof, tt_symbol, tt_word, tt_keyword, tt_string, tt_
 const UPi = 3.14159265359;
 const UTwoPi = UPi * 2;
 const UHalfPi = UPi * 0.5;
+const UQuatPi = UPi * 0.25;
 const URcp255 = 1 / 255;
 const UEps = 1E-5;
 const UDegToRad = UPi / 180;
