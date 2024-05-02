@@ -300,6 +300,8 @@ private
   procedure SetPosition(const Value: TUVec3);
   function GetScale: TUVec3;
   procedure SetScale(const Value: TUVec3);
+  function GetOrientation: TUQuat;
+  procedure SetOrientation(const Value: TUQuat);
 public
   property Element[const Index: UInt32]: TUFloat read GetElement write SetElement; default;
   property AxisX: TUVec3 read GetAxisX write SetAxisX;
@@ -307,6 +309,7 @@ public
   property AxisZ: TUVec3 read GetAxisZ write SetAxisZ;
   property Position: TUVec3 read GetPosition write SetPosition;
   property Scale: TUVec3 read GetScale write SetScale;
+  property Orientation: TUQuat read GetOrientation write SetOrientation;
   class function Make(
     const e00, e10, e20, e30: TUFloat;
     const e01, e11, e21, e31: TUFloat;
@@ -396,6 +399,7 @@ public
   const AxisY: TUVec3 = (0, 1, 0);
   const AxisZ: TUVec3 = (0, 0, 1);
   const Zero: TUVec3 = (0, 0, 0);
+  const One: TUVec3 = (1, 1, 1);
   class function Make(const Ax, Ay, Az: TUFloat): TUVec3; static; overload; inline;
   class function Make(const v2: TUVec2; const Az: TUFloat): TUVec3; static; overload; inline;
   class function Make(const s: TUFloat): TUVec3; static; overload; inline;
@@ -710,6 +714,23 @@ public
   class function Overlap(const a, b: TUBounds3f): Boolean; static; inline;
   function Overlap(const Other: TUBounds3f): Boolean;
   function GetPoints: TUVec3Array;
+end;
+
+type TUPlacement = record
+strict private
+  var _Rotation: TUQuat;
+  var _Scale: TUVec3;
+  var _Position: TUVec3;
+  procedure Initialize; inline;
+public
+  property Rotation: TUQuat read _Rotation write _Rotation;
+  property Scale: TUVec3 read _Scale write _Scale;
+  property Position: TUVec3 read _Position write _Position;
+  class function Make(const ARotation: TUQuat; const AScale: TUVec3; const APosition: TUVec3): TUPlacement; static;
+  class function MAke(const ATransform: TUMat): TUPlacement; static;
+  class operator Initialize(var v: TUPlacement);
+  constructor Create(const ARotation: TUQuat; const AScale: TUVec3; const APosition: TUVec3);
+  constructor Create(const ATransform: TUMat);
 end;
 
 type TUCriticalSection = record
@@ -1567,6 +1588,8 @@ operator + (const m0, m1: TUMat): TUMat;
 operator - (const m0, m1: TUMat): TUMat;
 operator * (const m0, m1: TUMat): TUMat;
 operator * (const m: TUMat; const f: TUFloat): TUMat;
+operator := (const q: TUQuat): TUMat;
+operator := (const m: TUMat): TUQuat;
 operator mod (const a, b: TUDouble): TUDouble;
 operator mod (const a, b: TUFloat): TUFloat;
 operator < (const a, b: TUInt32Array): Boolean;
@@ -2003,6 +2026,16 @@ begin
   AxisX := AxisX.Norm * Value.x;
   AxisY := AxisY.Norm * Value.y;
   AxisZ := AxisZ.Norm * Value.z;
+end;
+
+function TUMatImpl.GetOrientation: TUQuat;
+begin
+  Result := Self
+end;
+
+procedure TUMatImpl.SetOrientation(const Value: TUQuat);
+begin
+  Self := Value;
 end;
 
 class function TUMatImpl.Make(
@@ -3707,6 +3740,54 @@ begin
   Result[7] := Self[1];
 end;
 // TUBounds3f end
+
+// TUPlacement begin
+procedure TUPlacement.Initialize;
+begin
+  _Rotation := TUQuat.Identity;
+  _Scale := TUVec3.One;
+  _Position := TUVec3.Zero;
+end;
+
+class function TUPlacement.Make(
+  const ARotation: TUQuat;
+  const AScale: TUVec3;
+  const APosition: TUVec3
+): TUPlacement;
+begin
+  Result := TUPlacement.Create(ARotation, AScale, APosition);
+end;
+
+class function TUPlacement.MAke(const ATransform: TUMat): TUPlacement;
+begin
+  Result := TUPlacement.Create(ATransform);
+end;
+
+class operator TUPlacement.Initialize(var v: TUPlacement);
+begin
+  v.Initialize;
+end;
+
+constructor TUPlacement.Create(
+  const ARotation: TUQuat;
+  const AScale: TUVec3;
+  const APosition: TUVec3
+);
+begin
+  _Rotation := ARotation;
+  _Scale := AScale;
+  _Position := APosition;
+end;
+
+constructor TUPlacement.Create(const ATransform: TUMat);
+begin
+  Create(
+    ATransform.Orientation,
+    ATransform.Scale,
+    ATransform.Position
+  );
+end;
+// TUPlacement end
 
 // TUCriticalSection begin
 procedure TUCriticalSection.Initialize;
@@ -8796,6 +8877,63 @@ end;
 operator * (const m: TUMat; const f: TUFloat): TUMat;
 begin
   Result := UMulMatFloat(m, f);
+end;
+
+operator := (const q: TUQuat): TUMat;
+  var xx, yy, zz, xy, xz, yz, wx, wy, wz: TUFloat;
+begin
+  xx := 2 * q.x * q.x;
+  yy := 2 * q.y * q.y;
+  zz := 2 * q.z * q.z;
+  xy := 2 * q.x * q.y;
+  xz := 2 * q.x * q.z;
+  yz := 2 * q.y * q.z;
+  wx := 2 * q.w * q.x;
+  wy := 2 * q.w * q.y;
+  wz := 2 * q.w * q.z;
+  Result := TUMat.Make(
+    1 - yy - zz, xy - wz, xz + wy, 0,
+    xy + wz, 1 - xx - zz, yz - wx, 0,
+    xz - wy, yz + wx, 1 - xx - yy, 0,
+    0, 0, 0, 1
+  );
+end;
+
+operator := (const m: TUMat): TUQuat;
+  var mn: TUMat;
+  var Trace, SqrtTrace, RcpSqrtTrace, MaxDiag, s: TUFloat;
+  var i, a, b, c: Int32;
+begin
+  mn := m.Norm;
+  Trace := mn[0, 0] + mn[1, 1] + mn[2, 2] + 1;
+  if Trace > 0 then
+  begin
+    SqrtTrace := Sqrt(Trace);
+    RcpSqrtTrace := 0.5 / SqrtTrace;
+    Exit(
+      TUQuat.Make(
+        (mn[1, 2] - mn[2, 1]) * RcpSqrtTrace,
+        (mn[2, 0] - mn[0, 2]) * RcpSqrtTrace,
+        (mn[0, 1] - mn[1, 0]) * RcpSqrtTrace,
+        SqrtTrace * 0.5
+      )
+    );
+  end;
+  a := 0;
+  MaxDiag := mn[0, 0];
+  for i := 1 to 2 do
+  begin
+    if mn[i, i] <= MaxDiag then Continue;
+    a := i;
+    MaxDiag := mn[i, i];
+  end;
+  b := (a + 1) mod 3;
+  c := (a + 2) mod 3;
+  s := 2 * Sqrt(1 + mn[a, a] - mn[b, b] - mn[c, c]);
+  Result[a] := 0.25 * s; s := 1 / s;
+  Result[b] := (mn[a, b] + mn[b, a]) * s;
+  Result[c] := (mn[a, c] + mn[c, a]) * s;
+  Result[3] := (mn[b, c] - mn[c, b]) * s;
 end;
 
 operator mod (const a, b: TUDouble): TUDouble;
