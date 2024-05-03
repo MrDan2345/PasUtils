@@ -723,7 +723,7 @@ public
   function GetPoints: TUVec3Array;
 end;
 
-type TUPlacement = record
+type TUTransform = record
 strict private
   var _Rotation: TUQuat;
   var _Scale: TUVec3;
@@ -736,9 +736,11 @@ public
   property Scale: TUVec3 read _Scale write _Scale;
   property Position: TUVec3 read _Position write _Position;
   property Transform: TUMat read GetTransform write SetTransform;
-  class function Make(const ARotation: TUQuat; const AScale: TUVec3; const APosition: TUVec3): TUPlacement; static;
-  class function Make(const ATransform: TUMat): TUPlacement; static;
-  class operator Initialize(var v: TUPlacement);
+  class function Make(const ARotation: TUQuat; const AScale: TUVec3; const APosition: TUVec3): TUTransform; static;
+  class function Make(const ATransform: TUMat): TUTransform; static;
+  class function Identity: TUTransform; static;
+  class function Interpolate(const a, b: TUTransform; const t: TUFloat): TUTransform; static;
+  class operator Initialize(var v: TUTransform);
   constructor Create(const ARotation: TUQuat; const AScale: TUVec3; const APosition: TUVec3);
   constructor Create(const ATransform: TUMat);
 end;
@@ -1451,6 +1453,7 @@ function ULerp(const a, b: TUFloat; const s: TUFloat): TUFloat; inline; overload
 function ULerp(const a, b: TUVec2; const s: TUFloat): TUVec2; inline; overload;
 function ULerp(const a, b: TUVec3; const s: TUFloat): TUVec3; inline; overload;
 function ULerp(const a, b: TUVec4; const s: TUFloat): TUVec4; inline; overload;
+function ULerp(const a, b: TUQuat; const s: TUFloat): TUQuat; inline; overload;
 function ULerp(const a, b: TUMat; const s: TUFloat): TUMat; inline; overload;
 function UQuatSlerp(const a, b: TUQuat; const s: TUFloat): TUQuat;
 function USmoothStep(const v, MinV, MaxV: TUFloat): TUFloat; inline;
@@ -1606,6 +1609,8 @@ operator * (const a, b: TUMat): TUMat;
 operator * (const m: TUMat; const f: TUFloat): TUMat;
 operator := (const q: TUQuat): TUMat;
 operator := (const m: TUMat): TUQuat;
+operator := (const p: TUTransform): TUMat;
+operator := (const m: TUMat): TUTransform;
 operator * (const a, b: TUQuat): TUQuat;
 operator mod (const a, b: TUDouble): TUDouble;
 operator mod (const a, b: TUFloat): TUFloat;
@@ -3779,15 +3784,15 @@ begin
 end;
 // TUBounds3f end
 
-// TUPlacement begin
-procedure TUPlacement.Initialize;
+// TUTransform begin
+procedure TUTransform.Initialize;
 begin
   _Rotation := TUQuat.Identity;
   _Scale := TUVec3.One;
   _Position := TUVec3.Zero;
 end;
 
-function TUPlacement.GetTransform: TUMat;
+function TUTransform.GetTransform: TUMat;
 begin
   Result := UQuatToMat(_Rotation);
   Result.AxisX := Result.AxisX * _Scale.x;
@@ -3796,33 +3801,47 @@ begin
   Result.Position := _Position;
 end;
 
-procedure TUPlacement.SetTransform(const Value: TUMat);
+procedure TUTransform.SetTransform(const Value: TUMat);
 begin
   _Rotation := Value.Orientation;
   _Scale := Value.Scale;
   _Position := Value.Position;
 end;
 
-class function TUPlacement.Make(
+class function TUTransform.Make(
   const ARotation: TUQuat;
   const AScale: TUVec3;
   const APosition: TUVec3
-): TUPlacement;
+): TUTransform;
 begin
-  Result := TUPlacement.Create(ARotation, AScale, APosition);
+  Result := TUTransform.Create(ARotation, AScale, APosition);
 end;
 
-class function TUPlacement.Make(const ATransform: TUMat): TUPlacement;
+class function TUTransform.Make(const ATransform: TUMat): TUTransform;
 begin
-  Result := TUPlacement.Create(ATransform);
+  Result := TUTransform.Create(ATransform);
 end;
 
-class operator TUPlacement.Initialize(var v: TUPlacement);
+class function TUTransform.Identity: TUTransform;
+begin
+  Result := TUTransform.Create(TUQuat.Identity, TUVec3.One, TUVec3.Zero);
+end;
+
+class function TUTransform.Interpolate(const a, b: TUTransform; const t: TUFloat): TUTransform;
+begin
+  Result := TUTransform.Create(
+    UQuatSlerp(a.Rotation, b.Rotation, t),
+    ULerp(a.Scale, b.Scale, t),
+    ULerp(a.Position, b.Position, t)
+  );
+end;
+
+class operator TUTransform.Initialize(var v: TUTransform);
 begin
   v.Initialize;
 end;
 
-constructor TUPlacement.Create(
+constructor TUTransform.Create(
   const ARotation: TUQuat;
   const AScale: TUVec3;
   const APosition: TUVec3
@@ -3833,7 +3852,7 @@ begin
   _Position := APosition;
 end;
 
-constructor TUPlacement.Create(const ATransform: TUMat);
+constructor TUTransform.Create(const ATransform: TUMat);
 begin
   Create(
     ATransform.Orientation,
@@ -3841,7 +3860,7 @@ begin
     ATransform.Position
   );
 end;
-// TUPlacement end
+// TUTransform end
 
 // TUCriticalSection begin
 procedure TUCriticalSection.Initialize;
@@ -7819,34 +7838,38 @@ begin
   Result := a + (b - a) * s;
 end;
 
+function ULerp(const a, b: TUQuat; const s: TUFloat): TUQuat;
+begin
+  Result := a + (b - a) * s;
+end;
+
 function ULerp(const a, b: TUMat; const s: TUFloat): TUMat;
 begin
   Result := a + (b - a) * s;
 end;
 
 function UQuatSlerp(const a, b: TUQuat; const s: TUFloat): TUQuat;
-  var SinTh, CosTh, Th, ra, rb: TUFloat;
   var an, bn: TUQuat;
+  var Ang, CosAng, SinAng, RcpSinAng, wa, wb, Swap: TUFloat;
 begin
   an := a.Norm;
   bn := b.Norm;
-  CosTh := an.Dot(bn);
-  if CosTh < 0 then
+  Ang := an.Dot(bn);
+  Swap := USignOf(Ang);
+  CosAng := Ang * Swap;
+  if (CosAng < 0.999) then
   begin
-    bn[0] := -bn[0]; bn[1] := -bn[1]; bn[2] := -bn[2];
-    CosTh := -CosTh;
+    SinAng := UArcCos(CosAng);
+    RcpSinAng := 1 / Sin(SinAng);
+    wa := Sin((1 - s) * SinAng) * RcpSinAng;
+    wb := Sin(s * SinAng) * RcpSinAng * Swap;
+  end
+  else
+  begin
+    wa := 1 - s;
+    wb := s * Swap;
   end;
-  if CosTh >= 1.0 then Exit(an);
-  Th := UArcCos(CosTh);
-  SinTh := Sin(Th);
-  ra := Sin((1 - s) * Th) / SinTh;
-  rb := Sin(s * Th) / SinTh;
-  Result := TUQuat.Make(
-    an[0] * ra + bn[0] * rb,
-    an[1] * ra + bn[1] * rb,
-    an[2] * ra + bn[2] * rb,
-    an[3] * ra + bn[3] * rb
-  );
+  Result := an * wa + bn * wb;
 end;
 
 function USmoothStep(const v, MinV, MaxV: TUFloat): TUFloat;
@@ -8307,7 +8330,7 @@ begin
     Result := ArcTan(y / x);
   end;
   if x < 0 then Result += UPi;
-  if Result > pi then result -= UTwoPi;
+  if Result > UPi then result -= UTwoPi;
 end;
 
 function UPow(const b, e: TUFloat): TUFloat;
@@ -9045,6 +9068,16 @@ end;
 operator := (const m: TUMat): TUQuat;
 begin
   Result := UMatToQuat(m);
+end;
+
+operator := (const p: TUTransform): TUMat;
+begin
+  Result := p.Transform;
+end;
+
+operator := (const m: TUMat): TUTransform;
+begin
+  Result := TUTransform.Create(m);
 end;
 
 operator * (const a, b: TUQuat): TUQuat;
