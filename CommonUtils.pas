@@ -565,8 +565,11 @@ public
   property w: TUFloat read GetW write SetW;
   class function Identity: TUQuat; static; inline;
   class function Make(const Ax, Ay, Az, Aw: TUFloat): TUQuat; static; inline;
-  class function Norm(const v: TUQuat): TUQuat; static; overload; inline;
+  class function Make(const m: TUMat): TUQuat; static; inline;
+  class function Make(const Axis: TUVec3; const Angle: TUFloat): TUQuat; static; inline;
+  class function Norm(const q: TUQuat): TUQuat; static; overload; inline;
   function Norm: TUQuat; inline;
+  function ToMat: TUMat; inline;
   function ToString: String; inline;
 end;
 
@@ -1385,6 +1388,8 @@ procedure UFinalizeVarRecArr(var arr: array of TVarRec);
 function UIntToBool(const i: Integer): Boolean;
 function UBoolToInt(const b: Boolean): Integer;
 function UBoolToStr(const b: Boolean): String;
+function UMatToQuat(const m: TUMat): TUQuat;
+function UQuatToMat(const q: TUQuat): TUMat;
 generic function USignOf<T>(const v: T): T;
 function USignOf(const v: Int8): Int8;
 function USignOf(const v: Int16): Int16;
@@ -1518,6 +1523,7 @@ function UMulVec3Mat4x3(const v: TUVec3; const m: TUMat): TUVec3;
 function UMulVec3Mat4x4(const v: TUVec3; const m: TUMat): TUVec3;
 function UMulVec3Quat(const v: TUVec3; const q: TUQuat): TUVec3;
 function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4;
+function UMulQuat(const a, b: TUQuat): TUQuat;
 
 function UTriangleNormal(const v0, v1, v2: TUVec3): TUVec3;
 function UXct2DLineCircle(const v0, v1, c: TUVec2; const r: TUFloat; out x0, x1: TUVec2): Boolean;
@@ -1560,36 +1566,39 @@ generic function UArrPop<T>(var Arr: specialize TUArray<T>): T;
 generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
 generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
 
-operator + (const v0, v1: TUVec2): TUVec2;
-operator - (const v0, v1: TUVec2): TUVec2;
-operator * (const v0, v1: TUVec2): TUVec2;
-operator / (const v0, v1: TUVec2): TUVec2;
+operator + (const a, b: TUVec2): TUVec2;
+operator - (const a, b: TUVec2): TUVec2;
+operator * (const a, b: TUVec2): TUVec2;
+operator / (const a, b: TUVec2): TUVec2;
 operator / (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const f: TUFloat; const v: TUVec2): TUVec2;
 operator - (const v: TUVec2): TUVec2;
-operator + (const v0, v1: TUVec3): TUVec3;
-operator - (const v0, v1: TUVec3): TUVec3;
-operator * (const v0, v1: TUVec3): TUVec3;
-operator / (const v0, v1: TUVec3): TUVec3;
+operator + (const a, b: TUVec3): TUVec3;
+operator - (const a, b: TUVec3): TUVec3;
+operator * (const a, b: TUVec3): TUVec3;
+operator / (const a, b: TUVec3): TUVec3;
 operator / (const v: TUVec3; const f: TUFloat): TUVec3;
 operator * (const v: TUVec3; const f: TUFloat): TUVec3;
 operator * (const f: TUFloat; const v: TUVec3): TUVec3;
+operator * (const v: TUVec3; const m: TUMat): TUVec3;
+operator * (const v: TUVec3; const q: TUQuat): TUVec3;
 operator - (const v: TUVec3): TUVec3;
-operator + (const v0, v1: TUVec4): TUVec4;
-operator - (const v0, v1: TUVec4): TUVec4;
-operator * (const v0, v1: TUVec4): TUVec4;
-operator / (const v0, v1: TUVec4): TUVec4;
+operator + (const a, b: TUVec4): TUVec4;
+operator - (const a, b: TUVec4): TUVec4;
+operator * (const a, b: TUVec4): TUVec4;
+operator / (const a, b: TUVec4): TUVec4;
 operator / (const v: TUVec4; const f: TUFloat): TUVec4;
 operator * (const v: TUVec4; const f: TUFloat): TUVec4;
 operator * (const f: TUFloat; const v: TUVec4): TUVec4;
 operator - (const v: TUVec4): TUVec4;
-operator + (const m0, m1: TUMat): TUMat;
-operator - (const m0, m1: TUMat): TUMat;
-operator * (const m0, m1: TUMat): TUMat;
+operator + (const a, b: TUMat): TUMat;
+operator - (const a, b: TUMat): TUMat;
+operator * (const a, b: TUMat): TUMat;
 operator * (const m: TUMat; const f: TUFloat): TUMat;
 operator := (const q: TUQuat): TUMat;
 operator := (const m: TUMat): TUQuat;
+operator * (const a, b: TUQuat): TUQuat;
 operator mod (const a, b: TUDouble): TUDouble;
 operator mod (const a, b: TUFloat): TUFloat;
 operator < (const a, b: TUInt32Array): Boolean;
@@ -2030,12 +2039,12 @@ end;
 
 function TUMatImpl.GetOrientation: TUQuat;
 begin
-  Result := Self
+  Result := UMatToQuat(Self);
 end;
 
 procedure TUMatImpl.SetOrientation(const Value: TUQuat);
 begin
-  Self := Value;
+  Self := UQuatToMat(Value);
 end;
 
 class function TUMatImpl.Make(
@@ -2189,23 +2198,8 @@ begin
 end;
 
 class function TUMatImpl.Rotation(const q: TUQuat): TUMat;
-  var xx, yy, zz, xy, xz, yz, wx, wy, wz: TUFloat;
 begin
-  xx := 2 * q.x * q.x;
-  yy := 2 * q.y * q.y;
-  zz := 2 * q.z * q.z;
-  xy := 2 * q.x * q.y;
-  xz := 2 * q.x * q.z;
-  yz := 2 * q.y * q.z;
-  wx := 2 * q.w * q.x;
-  wy := 2 * q.w * q.y;
-  wz := 2 * q.w * q.z;
-  Result := Make(
-    1 - yy - zz, xy - wz, xz + wy, 0,
-    xy + wz, 1 - xx - zz, yz - wx, 0,
-    xz - wy, yz + wx, 1 - xx - yy, 0,
-    0, 0, 0, 1
-  );
+  Result := UQuatToMat(q);
 end;
 
 class function TUMatImpl.View(const Origin, Target, Up: TUVec3): TUMat;
@@ -3159,14 +3153,33 @@ begin
   Result[3] := Aw;
 end;
 
-class function TUQuatImpl.Norm(const v: TUQuat): TUQuat;
+class function TUQuatImpl.Make(const m: TUMat): TUQuat;
+begin
+  Result := UMatToQuat(m);
+end;
+
+class function TUQuatImpl.Make(const Axis: TUVec3; const Angle: TUFloat): TUQuat;
+  var AxisNorm: TUVec3;
+  var s, c: TUFloat;
+begin
+  AxisNorm := Axis.Norm;
+  USinCos(Angle * 0.5, s, c);
+  Result := TUQuat.Make(
+    s * AxisNorm.x,
+    s * AxisNorm.y,
+    s * AxisNorm.z,
+    c
+  );
+end;
+
+class function TUQuatImpl.Norm(const q: TUQuat): TUQuat;
   var d: TUFloat;
 begin
-  d := Sqrt(TUVec4.Dot(PUVec4(@v)^, PUVec4(@v)^));
+  d := Sqrt(TUVec4.Dot(PUVec4(@q)^, PUVec4(@q)^));
   if d > 0 then
   begin
     d := 1 / d;
-    Result := Make(v.x * d, v.y * d, v.z * d, v.w * d);
+    Result := Make(q.x * d, q.y * d, q.z * d, q.w * d);
   end
   else
   begin
@@ -3177,6 +3190,11 @@ end;
 function TUQuatImpl.Norm: TUQuat;
 begin
   Result := Norm(Self);
+end;
+
+function TUQuatImpl.ToMat: TUMat;
+begin
+  Result := UQuatToMat(Self);
 end;
 
 function TUQuatImpl.ToString: String;
@@ -7425,6 +7443,65 @@ begin
   if b then Exit('True') else Exit('False');
 end;
 
+function UMatToQuat(const m: TUMat): TUQuat;
+  var mn: TUMat;
+  var Trace, SqrtTrace, RcpSqrtTrace, MaxDiag, s: TUFloat;
+  var i, a, b, c: Int32;
+begin
+  mn := m.Norm;
+  Trace := mn[0, 0] + mn[1, 1] + mn[2, 2] + 1;
+  if Trace > UEps then
+  begin
+    SqrtTrace := Sqrt(Trace);
+    RcpSqrtTrace := 0.5 / SqrtTrace;
+    Exit(
+      TUQuat.Make(
+        (mn[1, 2] - mn[2, 1]) * RcpSqrtTrace,
+        (mn[2, 0] - mn[0, 2]) * RcpSqrtTrace,
+        (mn[0, 1] - mn[1, 0]) * RcpSqrtTrace,
+        SqrtTrace * 0.5
+      )
+    );
+  end;
+  a := 0;
+  MaxDiag := mn[0, 0];
+  for i := 1 to 2 do
+  begin
+    if mn[i, i] <= MaxDiag then Continue;
+    a := i;
+    MaxDiag := mn[i, i];
+  end;
+  b := (a + 1) mod 3;
+  c := (a + 2) mod 3;
+  s := 2 * Sqrt(1 + mn[a, a] - mn[b, b] - mn[c, c]);
+  Result[a] := 0.25 * s; s := 1 / s;
+  Result[b] := (mn[a, b] + mn[b, a]) * s;
+  Result[c] := (mn[a, c] + mn[c, a]) * s;
+  Result[3] := (mn[b, c] - mn[c, b]) * s;
+end;
+
+function UQuatToMat(const q: TUQuat): TUMat;
+  var xx, yy, zz, xy, xz, yz, xw, yw, zw: TUFloat;
+  var qn: TUQuat;
+begin
+  qn := q.Norm;
+  xx := 2 * qn[0] * qn[0];
+  yy := 2 * qn[1] * qn[1];
+  zz := 2 * qn[2] * qn[2];
+  xy := 2 * qn[0] * qn[1];
+  xz := 2 * qn[0] * qn[2];
+  yz := 2 * qn[1] * qn[2];
+  xw := 2 * qn[3] * qn[0];
+  yw := 2 * qn[3] * qn[1];
+  zw := 2 * qn[3] * qn[2];
+  Result := TUMat.Make(
+    1 - yy - zz, xy - zw, xz + yw, 0,
+    xy + zw, 1 - xx - zz, yz - xw, 0,
+    xz - yw, yz + xw, 1 - xx - yy, 0,
+    0, 0, 0, 1
+  );
+end;
+
 generic function USignOf<T>(const v: T): T;
 begin
   if v < 0 then Result := T(-1) else Result := T(1);
@@ -8393,6 +8470,16 @@ begin
   );
 end;
 
+function UMulQuat(const a, b: TUQuat): TUQuat;
+begin
+  Result := TUQuat.Make(
+    a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+    a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+    a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+    a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3]
+  );
+end;
+
 function UTriangleNormal(const v0, v1, v2: TUVec3): TUVec3;
 begin
   Result := (v1 - v0).Cross(v2 - v0).Norm;
@@ -8685,28 +8772,28 @@ begin
   end;
 end;
 
-operator + (const v0, v1: TUVec2): TUVec2;
+operator + (const a, b: TUVec2): TUVec2;
 begin
-  Result[0] := v0[0] + v1[0];
-  Result[1] := v0[1] + v1[1];
+  Result[0] := a[0] + b[0];
+  Result[1] := a[1] + b[1];
 end;
 
-operator - (const v0, v1: TUVec2): TUVec2;
+operator - (const a, b: TUVec2): TUVec2;
 begin
-  Result[0] := v0[0] - v1[0];
-  Result[1] := v0[1] - v1[1];
+  Result[0] := a[0] - b[0];
+  Result[1] := a[1] - b[1];
 end;
 
-operator * (const v0, v1: TUVec2): TUVec2;
+operator * (const a, b: TUVec2): TUVec2;
 begin
-  Result[0] := v0[0] * v1[0];
-  Result[1] := v0[1] * v1[1];
+  Result[0] := a[0] * b[0];
+  Result[1] := a[1] * b[1];
 end;
 
-operator / (const v0, v1: TUVec2): TUVec2;
+operator / (const a, b: TUVec2): TUVec2;
 begin
-  Result[0] := v0[0] / v1[0];
-  Result[1] := v0[1] / v1[1];
+  Result[0] := a[0] / b[0];
+  Result[1] := a[1] / b[1];
 end;
 
 operator / (const v: TUVec2; const f: TUFloat): TUVec2;
@@ -8735,32 +8822,32 @@ begin
   Result[1] := -v[1];
 end;
 
-operator + (const v0, v1: TUVec3): TUVec3;
+operator + (const a, b: TUVec3): TUVec3;
 begin
-  Result[0] := v0[0] + v1[0];
-  Result[1] := v0[1] + v1[1];
-  Result[2] := v0[2] + v1[2];
+  Result[0] := a[0] + b[0];
+  Result[1] := a[1] + b[1];
+  Result[2] := a[2] + b[2];
 end;
 
-operator - (const v0, v1: TUVec3): TUVec3;
+operator - (const a, b: TUVec3): TUVec3;
 begin
-  Result[0] := v0[0] - v1[0];
-  Result[1] := v0[1] - v1[1];
-  Result[2] := v0[2] - v1[2];
+  Result[0] := a[0] - b[0];
+  Result[1] := a[1] - b[1];
+  Result[2] := a[2] - b[2];
 end;
 
-operator * (const v0, v1: TUVec3): TUVec3;
+operator * (const a, b: TUVec3): TUVec3;
 begin
-  Result[0] := v0[0] * v1[0];
-  Result[1] := v0[1] * v1[1];
-  Result[2] := v0[2] * v1[2];
+  Result[0] := a[0] * b[0];
+  Result[1] := a[1] * b[1];
+  Result[2] := a[2] * b[2];
 end;
 
-operator / (const v0, v1: TUVec3): TUVec3;
+operator / (const a, b: TUVec3): TUVec3;
 begin
-  Result[0] := v0[0] / v1[0];
-  Result[1] := v0[1] / v1[1];
-  Result[2] := v0[2] / v1[2];
+  Result[0] := a[0] / b[0];
+  Result[1] := a[1] / b[1];
+  Result[2] := a[2] / b[2];
 end;
 
 operator / (const v: TUVec3; const f: TUFloat): TUVec3;
@@ -8786,6 +8873,16 @@ begin
   Result[2] := v[2] * f;
 end;
 
+operator * (const v: TUVec3; const m: TUMat): TUVec3;
+begin
+  Result := UMulVec3Mat4x3(v, m);
+end;
+
+operator * (const v: TUVec3; const q: TUQuat): TUVec3;
+begin
+  Result := UMulVec3Quat(v, q);
+end;
+
 operator - (const v: TUVec3): TUVec3;
 begin
   Result[0] := -v[0];
@@ -8793,36 +8890,36 @@ begin
   Result[2] := -v[2];
 end;
 
-operator + (const v0, v1: TUVec4): TUVec4;
+operator + (const a, b: TUVec4): TUVec4;
 begin
-  Result[0] := v0[0] + v1[0];
-  Result[1] := v0[1] + v1[1];
-  Result[2] := v0[2] + v1[2];
-  Result[3] := v0[3] + v1[3];
+  Result[0] := a[0] + b[0];
+  Result[1] := a[1] + b[1];
+  Result[2] := a[2] + b[2];
+  Result[3] := a[3] + b[3];
 end;
 
-operator - (const v0, v1: TUVec4): TUVec4;
+operator - (const a, b: TUVec4): TUVec4;
 begin
-  Result[0] := v0[0] - v1[0];
-  Result[1] := v0[1] - v1[1];
-  Result[2] := v0[2] - v1[2];
-  Result[3] := v0[3] - v1[3];
+  Result[0] := a[0] - b[0];
+  Result[1] := a[1] - b[1];
+  Result[2] := a[2] - b[2];
+  Result[3] := a[3] - b[3];
 end;
 
-operator * (const v0, v1: TUVec4): TUVec4;
+operator * (const a, b: TUVec4): TUVec4;
 begin
-  Result[0] := v0[0] * v1[0];
-  Result[1] := v0[1] * v1[1];
-  Result[2] := v0[2] * v1[2];
-  Result[3] := v0[3] * v1[3];
+  Result[0] := a[0] * b[0];
+  Result[1] := a[1] * b[1];
+  Result[2] := a[2] * b[2];
+  Result[3] := a[3] * b[3];
 end;
 
-operator / (const v0, v1: TUVec4): TUVec4;
+operator / (const a, b: TUVec4): TUVec4;
 begin
-  Result[0] := v0[0] / v1[0];
-  Result[1] := v0[1] / v1[1];
-  Result[2] := v0[2] / v1[2];
-  Result[3] := v0[3] / v1[3];
+  Result[0] := a[0] / b[0];
+  Result[1] := a[1] / b[1];
+  Result[2] := a[2] / b[2];
+  Result[3] := a[3] / b[3];
 end;
 
 operator / (const v: TUVec4; const f: TUFloat): TUVec4;
@@ -8859,19 +8956,19 @@ begin
   Result[3] := -v[3];
 end;
 
-operator + (const m0, m1: TUMat): TUMat;
+operator + (const a, b: TUMat): TUMat;
 begin
-  Result := UAddMat(m0, m1);
+  Result := UAddMat(a, b);
 end;
 
-operator - (const m0, m1: TUMat): TUMat;
+operator - (const a, b: TUMat): TUMat;
 begin
-  Result := USubMat(m0, m1);
+  Result := USubMat(a, b);
 end;
 
-operator * (const m0, m1: TUMat): TUMat;
+operator * (const a, b: TUMat): TUMat;
 begin
-  Result := UMulMat(m0, m1);
+  Result := UMulMat(a, b);
 end;
 
 operator * (const m: TUMat; const f: TUFloat): TUMat;
@@ -8880,60 +8977,18 @@ begin
 end;
 
 operator := (const q: TUQuat): TUMat;
-  var xx, yy, zz, xy, xz, yz, wx, wy, wz: TUFloat;
 begin
-  xx := 2 * q.x * q.x;
-  yy := 2 * q.y * q.y;
-  zz := 2 * q.z * q.z;
-  xy := 2 * q.x * q.y;
-  xz := 2 * q.x * q.z;
-  yz := 2 * q.y * q.z;
-  wx := 2 * q.w * q.x;
-  wy := 2 * q.w * q.y;
-  wz := 2 * q.w * q.z;
-  Result := TUMat.Make(
-    1 - yy - zz, xy - wz, xz + wy, 0,
-    xy + wz, 1 - xx - zz, yz - wx, 0,
-    xz - wy, yz + wx, 1 - xx - yy, 0,
-    0, 0, 0, 1
-  );
+  Result := UQuatToMat(q);
 end;
 
 operator := (const m: TUMat): TUQuat;
-  var mn: TUMat;
-  var Trace, SqrtTrace, RcpSqrtTrace, MaxDiag, s: TUFloat;
-  var i, a, b, c: Int32;
 begin
-  mn := m.Norm;
-  Trace := mn[0, 0] + mn[1, 1] + mn[2, 2] + 1;
-  if Trace > 0 then
-  begin
-    SqrtTrace := Sqrt(Trace);
-    RcpSqrtTrace := 0.5 / SqrtTrace;
-    Exit(
-      TUQuat.Make(
-        (mn[1, 2] - mn[2, 1]) * RcpSqrtTrace,
-        (mn[2, 0] - mn[0, 2]) * RcpSqrtTrace,
-        (mn[0, 1] - mn[1, 0]) * RcpSqrtTrace,
-        SqrtTrace * 0.5
-      )
-    );
-  end;
-  a := 0;
-  MaxDiag := mn[0, 0];
-  for i := 1 to 2 do
-  begin
-    if mn[i, i] <= MaxDiag then Continue;
-    a := i;
-    MaxDiag := mn[i, i];
-  end;
-  b := (a + 1) mod 3;
-  c := (a + 2) mod 3;
-  s := 2 * Sqrt(1 + mn[a, a] - mn[b, b] - mn[c, c]);
-  Result[a] := 0.25 * s; s := 1 / s;
-  Result[b] := (mn[a, b] + mn[b, a]) * s;
-  Result[c] := (mn[a, c] + mn[c, a]) * s;
-  Result[3] := (mn[b, c] - mn[c, b]) * s;
+  Result := UMatToQuat(m);
+end;
+
+operator * (const a, b: TUQuat): TUQuat;
+begin
+  Result := UMulQuat(a, b);
 end;
 
 operator mod (const a, b: TUDouble): TUDouble;
