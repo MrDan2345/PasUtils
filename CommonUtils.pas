@@ -563,12 +563,16 @@ public
   property y: TUFloat read GetY write SetY;
   property z: TUFloat read GetZ write SetZ;
   property w: TUFloat read GetW write SetW;
-  class function Identity: TUQuat; static; inline;
+  const Identity: TUQuat = (0, 0, 0, 1);
   class function Make(const Ax, Ay, Az, Aw: TUFloat): TUQuat; static; inline;
   class function Make(const m: TUMat): TUQuat; static; inline;
   class function Make(const Axis: TUVec3; const Angle: TUFloat): TUQuat; static; inline;
   class function Norm(const q: TUQuat): TUQuat; static; overload; inline;
+  class function Dot(const a, b: TUQuat): TUFloat; static; overload;
+  class function Slerp(const a, b: TUQuat; const t: TUFloat): TUQuat; static; overload;
   function Norm: TUQuat; inline;
+  function Dot(const q: TUQuat): TUFloat;
+  function Slerp(const q: TUQuat; const t: TUFloat): TUQuat;
   function ToMat: TUMat; inline;
   function ToString: String; inline;
 end;
@@ -725,12 +729,15 @@ strict private
   var _Scale: TUVec3;
   var _Position: TUVec3;
   procedure Initialize; inline;
+  function GetTransform: TUMat;
+  procedure SetTransform(const Value: TUMat);
 public
   property Rotation: TUQuat read _Rotation write _Rotation;
   property Scale: TUVec3 read _Scale write _Scale;
   property Position: TUVec3 read _Position write _Position;
+  property Transform: TUMat read GetTransform write SetTransform;
   class function Make(const ARotation: TUQuat; const AScale: TUVec3; const APosition: TUVec3): TUPlacement; static;
-  class function MAke(const ATransform: TUMat): TUPlacement; static;
+  class function Make(const ATransform: TUMat): TUPlacement; static;
   class operator Initialize(var v: TUPlacement);
   constructor Create(const ARotation: TUQuat; const AScale: TUVec3; const APosition: TUVec3);
   constructor Create(const ATransform: TUMat);
@@ -1445,6 +1452,7 @@ function ULerp(const a, b: TUVec2; const s: TUFloat): TUVec2; inline; overload;
 function ULerp(const a, b: TUVec3; const s: TUFloat): TUVec3; inline; overload;
 function ULerp(const a, b: TUVec4; const s: TUFloat): TUVec4; inline; overload;
 function ULerp(const a, b: TUMat; const s: TUFloat): TUMat; inline; overload;
+function UQuatSlerp(const a, b: TUQuat; const s: TUFloat): TUQuat;
 function USmoothStep(const v, MinV, MaxV: TUFloat): TUFloat; inline;
 generic function UBezier<T>(const f0, f1, f2, f3: T; const s: TUFloat): T; inline; overload;
 function UBezier(const v0, v1, v2, v3: TUFloat; const s: TUFloat): TUFloat; inline; overload;
@@ -3137,14 +3145,6 @@ begin
   Self[3] := Value;
 end;
 
-class function TUQuatImpl.Identity: TUQuat;
-begin
-  Result[0] := 0;
-  Result[1] := 0;
-  Result[2] := 0;
-  Result[3] := 1;
-end;
-
 class function TUQuatImpl.Make(const Ax, Ay, Az, Aw: TUFloat): TUQuat;
 begin
   Result[0] := Ax;
@@ -3187,9 +3187,29 @@ begin
   end;
 end;
 
+class function TUQuatImpl.Dot(const a, b: TUQuat): TUFloat;
+begin
+  Result := a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+end;
+
+class function TUQuatImpl.Slerp(const a, b: TUQuat; const t: TUFloat): TUQuat;
+begin
+  Result := UQuatSlerp(a, b, t);
+end;
+
 function TUQuatImpl.Norm: TUQuat;
 begin
   Result := Norm(Self);
+end;
+
+function TUQuatImpl.Dot(const q: TUQuat): TUFloat;
+begin
+  Result := Dot(Self, q);
+end;
+
+function TUQuatImpl.Slerp(const q: TUQuat; const t: TUFloat): TUQuat;
+begin
+  Result := Slerp(Self, q, t);
 end;
 
 function TUQuatImpl.ToMat: TUMat;
@@ -3767,6 +3787,22 @@ begin
   _Position := TUVec3.Zero;
 end;
 
+function TUPlacement.GetTransform: TUMat;
+begin
+  Result := UQuatToMat(_Rotation);
+  Result.AxisX := Result.AxisX * _Scale.x;
+  Result.AxisY := Result.AxisY * _Scale.y;
+  Result.AxisZ := Result.AxisZ * _Scale.z;
+  Result.Position := _Position;
+end;
+
+procedure TUPlacement.SetTransform(const Value: TUMat);
+begin
+  _Rotation := Value.Orientation;
+  _Scale := Value.Scale;
+  _Position := Value.Position;
+end;
+
 class function TUPlacement.Make(
   const ARotation: TUQuat;
   const AScale: TUVec3;
@@ -3776,7 +3812,7 @@ begin
   Result := TUPlacement.Create(ARotation, AScale, APosition);
 end;
 
-class function TUPlacement.MAke(const ATransform: TUMat): TUPlacement;
+class function TUPlacement.Make(const ATransform: TUMat): TUPlacement;
 begin
   Result := TUPlacement.Create(ATransform);
 end;
@@ -7786,6 +7822,31 @@ end;
 function ULerp(const a, b: TUMat; const s: TUFloat): TUMat;
 begin
   Result := a + (b - a) * s;
+end;
+
+function UQuatSlerp(const a, b: TUQuat; const s: TUFloat): TUQuat;
+  var SinTh, CosTh, Th, ra, rb: TUFloat;
+  var an, bn: TUQuat;
+begin
+  an := a.Norm;
+  bn := b.Norm;
+  CosTh := an.Dot(bn);
+  if CosTh < 0 then
+  begin
+    bn[0] := -bn[0]; bn[1] := -bn[1]; bn[2] := -bn[2];
+    CosTh := -CosTh;
+  end;
+  if CosTh >= 1.0 then Exit(an);
+  Th := UArcCos(CosTh);
+  SinTh := Sin(Th);
+  ra := Sin((1 - s) * Th) / SinTh;
+  rb := Sin(s * Th) / SinTh;
+  Result := TUQuat.Make(
+    an[0] * ra + bn[0] * rb,
+    an[1] * ra + bn[1] * rb,
+    an[2] * ra + bn[2] * rb,
+    an[3] * ra + bn[3] * rb
+  );
 end;
 
 function USmoothStep(const v, MinV, MaxV: TUFloat): TUFloat;
