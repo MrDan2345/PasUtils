@@ -1585,6 +1585,21 @@ operator / (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const f: TUFloat; const v: TUVec2): TUVec2;
 operator - (const v: TUVec2): TUVec2;
+operator + (const a, b: TUVec2i): TUVec2i;
+operator - (const a, b: TUVec2i): TUVec2i;
+operator * (const a, b: TUVec2i): TUVec2i;
+operator / (const a, b: TUVec2i): TUVec2i;
+operator + (const v: TUVec2i; const i: Int32): TUVec2i;
+operator - (const v: TUVec2i; const i: Int32): TUVec2i;
+operator * (const v: TUVec2i; const i: Int32): TUVec2i;
+operator / (const v: TUVec2i; const i: Int32): TUVec2i;
+operator + (const v: TUVec2i; const f: TUFloat): TUVec2;
+operator - (const v: TUVec2i; const f: TUFloat): TUVec2;
+operator * (const v: TUVec2i; const f: TUFloat): TUVec2;
+operator / (const v: TUVec2i; const f: TUFloat): TUVec2;
+operator mod (const v: TUVec2i; const i: Int32): TUVec2i;
+operator := (const v: TUVec2): TUVec2i;
+operator := (const v: TUVec2i): TUVec2;
 operator + (const a, b: TUVec3): TUVec3;
 operator - (const a, b: TUVec3): TUVec3;
 operator * (const a, b: TUVec3): TUVec3;
@@ -8904,6 +8919,96 @@ operator - (const v: TUVec2): TUVec2;
 begin
   Result[0] := -v[0];
   Result[1] := -v[1];
+end;
+
+operator + (const a, b: TUVec2i): TUVec2i;
+begin
+  Result[0] := a[0] + b[0];
+  Result[1] := a[1] + b[1];
+end;
+
+operator - (const a, b: TUVec2i): TUVec2i;
+begin
+  Result[0] := a[0] - b[0];
+  Result[1] := a[1] - b[1];
+end;
+
+operator * (const a, b: TUVec2i): TUVec2i;
+begin
+  Result[0] := a[0] * b[0];
+  Result[1] := a[1] * b[1];
+end;
+
+operator / (const a, b: TUVec2i): TUVec2i;
+begin
+  Result[0] := a[0] div b[0];
+  Result[1] := a[1] div b[1];
+end;
+
+operator + (const v: TUVec2i; const i: Int32): TUVec2i;
+begin
+  Result[0] := v[0] + i;
+  Result[1] := v[1] + i;
+end;
+
+operator - (const v: TUVec2i; const i: Int32): TUVec2i;
+begin
+  Result[0] := v[0] - i;
+  Result[1] := v[1] - i;
+end;
+
+operator * (const v: TUVec2i; const i: Int32): TUVec2i;
+begin
+  Result[0] := v[0] * i;
+  Result[1] := v[1] * i;
+end;
+
+operator / (const v: TUVec2i; const i: Int32): TUVec2i;
+begin
+  Result[0] := v[0] div i;
+  Result[1] := v[1] div i;
+end;
+
+operator + (const v: TUVec2i; const f: TUFloat): TUVec2;
+begin
+  Result[0] := v[0] + f;
+  Result[1] := v[1] + f;
+end;
+
+operator - (const v: TUVec2i; const f: TUFloat): TUVec2;
+begin
+  Result[0] := v[0] - f;
+  Result[1] := v[1] - f;
+end;
+
+operator * (const v: TUVec2i; const f: TUFloat): TUVec2;
+begin
+  Result[0] := v[0] * f;
+  Result[1] := v[1] * f;
+end;
+
+operator / (const v: TUVec2i; const f: TUFloat): TUVec2;
+begin
+  Result[0] := v[0] / f;
+  Result[1] := v[1] / f;
+end;
+
+operator mod (const v: TUVec2i; const i: Int32): TUVec2i;
+begin
+  Result[0] := v[0] mod i;
+  Result[1] := v[1] mod i;
+end;
+
+operator := (const v: TUVec2): TUVec2i;
+begin
+  Result[0] := Trunc(v[0]);
+  Result[1] := Trunc(v[1]);
+end;
+
+operator := (const v: TUVec2i): TUVec2;
+begin
+  Result[0] := v[0];
+  Result[1] := v[1];
 end;
 
 operator + (const a, b: TUVec3): TUVec3;

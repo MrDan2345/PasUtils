@@ -1999,7 +1999,9 @@ procedure TUImageDataPNG.Load(const StreamHelper: TUStreamHelper);
     sh.ReadBuffer(@Chunk.ChunkLength, 4); Chunk.ChunkLength := Swap32(Chunk.ChunkLength);
     sh.ReadBuffer(@Chunk.ChunkType, 4);
     if Length(ChunkData) < Integer(Chunk.ChunkLength) then
-    SetLength(ChunkData, Chunk.ChunkLength);
+    begin
+      SetLength(ChunkData, Chunk.ChunkLength);
+    end;
     Chunk.ChunkData := @ChunkData[0];
     sh.ReadBuffer(Chunk.ChunkData, Chunk.ChunkLength);
     sh.ReadBuffer(@Chunk.ChunkCRC, 4); Chunk.ChunkCRC := Swap32(Chunk.ChunkCRC);
@@ -2046,25 +2048,21 @@ procedure TUImageDataPNG.Load(const StreamHelper: TUStreamHelper);
   end;
   function GetC(const Pos: Int32): UInt8;
   begin
-    if ScanlinePrev <> nil then
+    if ScanlinePrev = nil then Exit(0);
+    if ChunkIHDR.BitDepth < 8 then
     begin
-      if ChunkIHDR.BitDepth < 8 then
-      begin
-        if Pos > 0 then
-        Result := ScanlinePrev^[Pos - 1]
-        else
-        Result := 0;
-      end
+      if Pos > 0 then
+      Result := ScanlinePrev^[Pos - 1]
       else
-      begin
-        if Pos >= PixelDataSize then
-        Result := ScanlinePrev^[Pos - PixelDataSize]
-        else
-        Result := 0;
-      end;
+      Result := 0;
     end
     else
-    Result := 0;
+    begin
+      if Pos >= PixelDataSize then
+      Result := ScanlinePrev^[Pos - PixelDataSize]
+      else
+      Result := 0;
+    end;
   end;
   function PaethPredictor(const a, b, c: UInt8): UInt8;
     var p, pa, pb, pc: Int32;
@@ -2110,353 +2108,349 @@ begin
   {$hints off}
   sh.ReadBuffer(@Header, 8);
   {$pop}
-  if Header = PNGHeader then
+  if Header <> PNGHeader then Exit;
+  ChunkIDAT := nil;
+  Transp := False;
+  KeepReading := True;
+  while KeepReading do
   begin
-    ChunkIDAT := nil;
-    Transp := False;
-    KeepReading := True;
-    while KeepReading do
+    ReadChunk;
+    if not CheckCRC(Chunk) then Continue;
+    if (Chunk.ChunkType = 'IHDR') then
     begin
-      ReadChunk;
-      if CheckCRC(Chunk) then
-      begin
-        if (Chunk.ChunkType = 'IHDR') then
+      ChunkIHDR.Width := Swap32(PUInt32(@PUInt8Arr(Chunk.ChunkData)^[0])^);
+      ChunkIHDR.Height := Swap32(PUInt32(@PUInt8Arr(Chunk.ChunkData)^[4])^);
+      ChunkIHDR.BitDepth := PUInt8Arr(Chunk.ChunkData)^[8];
+      ChunkIHDR.ColorType := TColorType(PByteArray(Chunk.ChunkData)^[9]);
+      ChunkIHDR.CompMethod := PUInt8Arr(Chunk.ChunkData)^[10];
+      ChunkIHDR.FilterMethod := PUInt8Arr(Chunk.ChunkData)^[11];
+      ChunkIHDR.InterlaceMethod := TInterlace(PUInt8Arr(Chunk.ChunkData)^[12]);
+      if ChunkIHDR.CompMethod <> 0 then Exit;
+      if ChunkIHDR.FilterMethod <> 0 then Exit;
+      if Byte(ChunkIHDR.InterlaceMethod) > 1 then Exit;
+      case ChunkIHDR.ColorType of
+        ctGrayscale:
         begin
-          ChunkIHDR.Width := Swap32(PUInt32(@PUInt8Arr(Chunk.ChunkData)^[0])^);
-          ChunkIHDR.Height := Swap32(PUInt32(@PUInt8Arr(Chunk.ChunkData)^[4])^);
-          ChunkIHDR.BitDepth := PUInt8Arr(Chunk.ChunkData)^[8];
-          ChunkIHDR.ColorType := TColorType(PByteArray(Chunk.ChunkData)^[9]);
-          ChunkIHDR.CompMethod := PUInt8Arr(Chunk.ChunkData)^[10];
-          ChunkIHDR.FilterMethod := PUInt8Arr(Chunk.ChunkData)^[11];
-          ChunkIHDR.InterlaceMethod := TInterlace(PUInt8Arr(Chunk.ChunkData)^[12]);
-          if ChunkIHDR.CompMethod <> 0 then Exit;
-          if ChunkIHDR.FilterMethod <> 0 then Exit;
-          if Byte(ChunkIHDR.InterlaceMethod) > 1 then Exit;
-          case ChunkIHDR.ColorType of
-            ctGrayscale:
+          if not (ChunkIHDR.BitDepth in [1, 2, 4, 8, 16]) then Exit;
+          if ChunkIHDR.BitDepth = 16 then
+          PixelDataSize := 2 else PixelDataSize := 1;
+          case ChunkIHDR.BitDepth of
+            1:
             begin
-              if not (ChunkIHDR.BitDepth in [1, 2, 4, 8, 16]) then Exit;
-              if ChunkIHDR.BitDepth = 16 then
-              PixelDataSize := 2 else PixelDataSize := 1;
-              case ChunkIHDR.BitDepth of
-                1:
-                begin
-                  BitPerPixel := 8;
-                  BitStep := 1;
-                  BitMask := 1;
-                  SetFormat(uif_g8);
-                end;
-                2:
-                begin
-                  BitPerPixel := 4;
-                  BitStep := 2;
-                  BitMask := 3;
-                  SetFormat(uif_g8);
-                end;
-                4:
-                begin
-                  BitPerPixel := 2;
-                  BitStep := 4;
-                  BitMask := 15;
-                  SetFormat(uif_g8);
-                end;
-                8: SetFormat(uif_g8);
-                16: SetFormat(uif_g16);
-              end;
+              BitPerPixel := 8;
+              BitStep := 1;
+              BitMask := 1;
+              SetFormat(uif_g8);
             end;
-            ctTrueColor:
+            2:
             begin
-              if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
-              PixelDataSize := 3 * ChunkIHDR.BitDepth div 8;
-              case ChunkIHDR.BitDepth of
-                8: SetFormat(uif_r8g8b8);
-                16: SetFormat(uif_r16g16b16);
-              end;
+              BitPerPixel := 4;
+              BitStep := 2;
+              BitMask := 3;
+              SetFormat(uif_g8);
             end;
-            ctIndexedColor:
+            4:
             begin
-              if not (ChunkIHDR.BitDepth in [1, 2, 4, 8]) then Exit;
-              PixelDataSize := 1;
-              SetFormat(uif_r8g8b8);
-              case ChunkIHDR.BitDepth of
-                1:
-                begin
-                  BitPerPixel := 8;
-                  BitStep := 1;
-                  BitMask := 1;
-                end;
-                2:
-                begin
-                  BitPerPixel := 4;
-                  BitStep := 2;
-                  BitMask := 3;
-                end;
-                4:
-                begin
-                  BitPerPixel := 2;
-                  BitStep := 4;
-                  BitMask := 15;
-                end;
-              end;
+              BitPerPixel := 2;
+              BitStep := 4;
+              BitMask := 15;
+              SetFormat(uif_g8);
             end;
-            ctGrayscaleAlpha:
-            begin
-              if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
-              PixelDataSize := 2 * ChunkIHDR.BitDepth div 8;
-              case ChunkIHDR.BitDepth of
-                8: SetFormat(uif_g8a8);
-                16: SetFormat(uif_g16a16);
-              end;
-            end;
-            ctTrueColorAlpha:
-            begin
-              if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
-              PixelDataSize := 4 * ChunkIHDR.BitDepth div 8;
-              case ChunkIHDR.BitDepth of
-                8: SetFormat(uif_r8g8b8a8);
-                16: SetFormat(uif_r16g16b16a16);
-              end;
-            end;
-            else
-            Exit;
-          end;
-        end
-        else if (Chunk.ChunkType = 'IEND') then
-        begin
-          KeepReading := False;
-        end
-        else if (Chunk.ChunkType = 'PLTE') then
-        begin
-          SetLength(ChunkPLTE.Entries, Chunk.ChunkLength div 3);
-          Move(Chunk.ChunkData^, ChunkPLTE.Entries[0], Chunk.ChunkLength);
-        end
-        else if (Chunk.ChunkType = 'IDAT') then
-        begin
-          SetLength(ChunkIDAT, Length(ChunkIDAT) + 1);
-          SetLength(ChunkIDAT[High(ChunkIDAT)], Chunk.ChunkLength);
-          Move(Chunk.ChunkData^, ChunkIDAT[High(ChunkIDAT)][0], Chunk.ChunkLength);
-        end
-        else if (Chunk.ChunkType = 'tRNS') then
-        begin
-          Transp := True;
-          case ChunkIHDR.ColorType of
-            ctGrayscale:
-            begin
-              TranspG := Swap16(PUInt16(Chunk.ChunkData)^);
-              if Format = uif_g8 then
-              SetFormat(uif_g8a8)
-              else
-              SetFormat(uif_g16a16);
-            end;
-            ctTrueColor:
-            begin
-              for i := 0 to 2 do
-              TranspRGB[i] := Swap16(PUInt16(Chunk.ChunkData)^);
-              if Format = uif_r8g8b8 then
-              SetFormat(uif_r8g8b8a8)
-              else
-              SetFormat(uif_r16g16b16a16);
-            end;
-            ctIndexedColor:
-            begin
-              SetLength(TranspPalette, Chunk.ChunkLength);
-              Move(Chunk.ChunkData^, TranspPalette[0], Chunk.ChunkLength);
-              SetFormat(uif_r8g8b8a8);
-            end;
-            ctGrayscaleAlpha, ctTrueColorAlpha: Exit;
-            else Exit;
+            8: SetFormat(uif_g8);
+            16: SetFormat(uif_g16);
           end;
         end;
+        ctTrueColor:
+        begin
+          if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
+          PixelDataSize := 3 * ChunkIHDR.BitDepth div 8;
+          case ChunkIHDR.BitDepth of
+            8: SetFormat(uif_r8g8b8);
+            16: SetFormat(uif_r16g16b16);
+          end;
+        end;
+        ctIndexedColor:
+        begin
+          if not (ChunkIHDR.BitDepth in [1, 2, 4, 8]) then Exit;
+          PixelDataSize := 1;
+          SetFormat(uif_r8g8b8);
+          case ChunkIHDR.BitDepth of
+            1:
+            begin
+              BitPerPixel := 8;
+              BitStep := 1;
+              BitMask := 1;
+            end;
+            2:
+            begin
+              BitPerPixel := 4;
+              BitStep := 2;
+              BitMask := 3;
+            end;
+            4:
+            begin
+              BitPerPixel := 2;
+              BitStep := 4;
+              BitMask := 15;
+            end;
+          end;
+        end;
+        ctGrayscaleAlpha:
+        begin
+          if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
+          PixelDataSize := 2 * ChunkIHDR.BitDepth div 8;
+          case ChunkIHDR.BitDepth of
+            8: SetFormat(uif_g8a8);
+            16: SetFormat(uif_g16a16);
+          end;
+        end;
+        ctTrueColorAlpha:
+        begin
+          if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
+          PixelDataSize := 4 * ChunkIHDR.BitDepth div 8;
+          case ChunkIHDR.BitDepth of
+            8: SetFormat(uif_r8g8b8a8);
+            16: SetFormat(uif_r16g16b16a16);
+          end;
+        end;
+        else
+        Exit;
+      end;
+    end
+    else if (Chunk.ChunkType = 'IEND') then
+    begin
+      KeepReading := False;
+    end
+    else if (Chunk.ChunkType = 'PLTE') then
+    begin
+      SetLength(ChunkPLTE.Entries, Chunk.ChunkLength div 3);
+      Move(Chunk.ChunkData^, ChunkPLTE.Entries[0], Chunk.ChunkLength);
+    end
+    else if (Chunk.ChunkType = 'IDAT') then
+    begin
+      SetLength(ChunkIDAT, Length(ChunkIDAT) + 1);
+      SetLength(ChunkIDAT[High(ChunkIDAT)], Chunk.ChunkLength);
+      Move(Chunk.ChunkData^, ChunkIDAT[High(ChunkIDAT)][0], Chunk.ChunkLength);
+    end
+    else if (Chunk.ChunkType = 'tRNS') then
+    begin
+      Transp := True;
+      case ChunkIHDR.ColorType of
+        ctGrayscale:
+        begin
+          TranspG := Swap16(PUInt16(Chunk.ChunkData)^);
+          if Format = uif_g8 then
+          SetFormat(uif_g8a8)
+          else
+          SetFormat(uif_g16a16);
+        end;
+        ctTrueColor:
+        begin
+          for i := 0 to 2 do
+          TranspRGB[i] := Swap16(PUInt16(Chunk.ChunkData)^);
+          if Format = uif_r8g8b8 then
+          SetFormat(uif_r8g8b8a8)
+          else
+          SetFormat(uif_r16g16b16a16);
+        end;
+        ctIndexedColor:
+        begin
+          SetLength(TranspPalette, Chunk.ChunkLength);
+          Move(Chunk.ChunkData^, TranspPalette[0], Chunk.ChunkLength);
+          SetFormat(uif_r8g8b8a8);
+        end;
+        ctGrayscaleAlpha, ctTrueColorAlpha: Exit;
+        else Exit;
       end;
     end;
-    CompressedData := TMemoryStream.Create;
-    DecompressedData := TMemoryStream.Create;
-    try
-      CompressedData.Position := 0;
-      DecompressedData.Position := 0;
-      for i := 0 to High(ChunkIDAT) do
+  end;
+  CompressedData := TMemoryStream.Create;
+  DecompressedData := TMemoryStream.Create;
+  try
+    CompressedData.Position := 0;
+    DecompressedData.Position := 0;
+    for i := 0 to High(ChunkIDAT) do
+    begin
+      CompressedData.Write(ChunkIDAT[i][0], Length(ChunkIDAT[i]));
+    end;
+    Decompress(CompressedData.Memory, CompressedData.Size, DecompressedData);
+    _Width := ChunkIHDR.Width;
+    _Height := ChunkIHDR.Height;
+    DataAlloc;
+    DecompressedData.Position := 0;
+    case ChunkIHDR.InterlaceMethod of
+      inAdam7: begin PassStart := 1; PassEnd := 7; end;
+      else begin PassStart := 0; PassEnd := 0; end;
+    end;
+    DataPtr := DecompressedData.Memory;
+    for Pass := PassStart to PassEnd do
+    begin
+      PassRows := _Height div RowOffset[Pass];
+      if (_Height mod RowOffset[Pass]) > RowStart[Pass] then Inc(PassRows);
+      PassCols := _Width div ColOffset[Pass];
+      if (_Width mod ColOffset[Pass]) > ColStart[Pass] then Inc(PassCols);
+      if (PassRows > 0) and (PassCols > 0) then
       begin
-        CompressedData.Write(ChunkIDAT[i][0], Length(ChunkIDAT[i]));
-      end;
-      Decompress(CompressedData.Memory, CompressedData.Size, DecompressedData);
-      _Width := ChunkIHDR.Width;
-      _Height := ChunkIHDR.Height;
-      DataAlloc;
-      DecompressedData.Position := 0;
-      case ChunkIHDR.InterlaceMethod of
-        inAdam7: begin PassStart := 1; PassEnd := 7; end;
-        else begin PassStart := 0; PassEnd := 0; end;
-      end;
-      DataPtr := DecompressedData.Memory;
-      for Pass := PassStart to PassEnd do
-      begin
-        PassRows := _Height div RowOffset[Pass];
-        if (_Height mod RowOffset[Pass]) > RowStart[Pass] then Inc(PassRows);
-        PassCols := _Width div ColOffset[Pass];
-        if (_Width mod ColOffset[Pass]) > ColStart[Pass] then Inc(PassCols);
-        if (PassRows > 0) and (PassCols > 0) then
+        ScanlineSize := PixelDataSize * PassCols;
+        ScanlinePrev := nil;
+        ScanlineCur := DataPtr;
+        if ChunkIHDR.BitDepth < 8 then
         begin
-          ScanlineSize := PixelDataSize * PassCols;
-          ScanlinePrev := nil;
-          ScanlineCur := DataPtr;
-          if ChunkIHDR.BitDepth < 8 then
-          begin
-            if ScanlineSize mod BitPerPixel > 0 then
-            ScanlineSize := (ScanlineSize div BitPerPixel + 1)
-            else
-            ScanlineSize := (ScanlineSize div BitPerPixel);
+          if ScanlineSize mod BitPerPixel > 0 then
+          ScanlineSize := (ScanlineSize div BitPerPixel + 1)
+          else
+          ScanlineSize := (ScanlineSize div BitPerPixel);
+        end;
+        Inc(DataPtr, (Integer(ScanlineSize) + 1) * PassRows);
+        y := RowStart[Pass];
+        for j := 0 to PassRows - 1 do
+        begin
+          CurFilter := TFilter(ScanlineCur^[0]);
+          {$push}
+          {$hints off}
+          ScanlineCur := PUInt8Arr(PtrUInt(ScanlineCur) + 1);
+          {$pop}
+          if ChunkIHDR.BitDepth > 8 then
+          for i := 0 to ScanlineSize div 2 - 1 do
+          PWord(@ScanlineCur^[i * 2])^ := Swap16(PUInt16(@ScanlineCur^[i * 2])^);
+          x := ColStart[Pass];
+          case CurFilter of
+            flSub:
+            for i := 0 to ScanlineSize - 1 do
+            ScanlineCur^[i] := FilterSub(ScanlineCur^[i], i);
+            flUp:
+            for i := 0 to ScanlineSize - 1 do
+            ScanlineCur^[i] := FilterUp(ScanlineCur^[i], i);
+            flAverage:
+            for i := 0 to ScanlineSize - 1 do
+            ScanlineCur^[i] := FilterAverage(ScanlineCur^[i], i);
+            flPaeth:
+            for i := 0 to ScanlineSize - 1 do
+            ScanlineCur^[i] := FilterPaeth(ScanlineCur^[i], i);
+            else begin end;
           end;
-          Inc(DataPtr, (Integer(ScanlineSize) + 1) * PassRows);
-          y := RowStart[Pass];
-          for j := 0 to PassRows - 1 do
+          if ChunkIHDR.ColorType = ctIndexedColor then
           begin
-            CurFilter := TFilter(ScanlineCur^[0]);
-            {$push}
-            {$hints off}
-            ScanlineCur := PUInt8Arr(PtrUInt(ScanlineCur) + 1);
-            {$pop}
-            if ChunkIHDR.BitDepth > 8 then
-            for i := 0 to ScanlineSize div 2 - 1 do
-            PWord(@ScanlineCur^[i * 2])^ := Swap16(PUInt16(@ScanlineCur^[i * 2])^);
-            x := ColStart[Pass];
-            case CurFilter of
-              flSub:
-              for i := 0 to ScanlineSize - 1 do
-              ScanlineCur^[i] := FilterSub(ScanlineCur^[i], i);
-              flUp:
-              for i := 0 to ScanlineSize - 1 do
-              ScanlineCur^[i] := FilterUp(ScanlineCur^[i], i);
-              flAverage:
-              for i := 0 to ScanlineSize - 1 do
-              ScanlineCur^[i] := FilterAverage(ScanlineCur^[i], i);
-              flPaeth:
-              for i := 0 to ScanlineSize - 1 do
-              ScanlineCur^[i] := FilterPaeth(ScanlineCur^[i], i);
-              else begin end;
-            end;
-            if ChunkIHDR.ColorType = ctIndexedColor then
+            if ChunkIHDR.BitDepth < 8 then
             begin
-              if ChunkIHDR.BitDepth < 8 then
+              for i := 0 to PassCols - 1 do
               begin
-                for i := 0 to PassCols - 1 do
+                BitCur := (ScanlineCur^[i div BitPerPixel] shr (8 - (i mod BitPerPixel + 1) * BitStep)) and BitMask;
+                PUInt8(_Data + (y * _Width + x) * _BPP + 0)^ := ChunkPLTE.Entries[BitCur].r;
+                PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := ChunkPLTE.Entries[BitCur].g;
+                PUInt8(_Data + (y * _Width + x) * _BPP + 2)^ := ChunkPLTE.Entries[BitCur].b;
+                if Transp then
                 begin
-                  BitCur := (ScanlineCur^[i div BitPerPixel] shr (8 - (i mod BitPerPixel + 1) * BitStep)) and BitMask;
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 0)^ := ChunkPLTE.Entries[BitCur].r;
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := ChunkPLTE.Entries[BitCur].g;
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 2)^ := ChunkPLTE.Entries[BitCur].b;
-                  if Transp then
-                  begin
-                    if BitCur > High(TranspPalette) then
-                    PByte(_Data + (y * _Width + x) * _BPP + 3)^ := $ff
-                    else
-                    PByte(_Data + (y * _Width + x) * _BPP + 3)^ := TranspPalette[BitCur];
-                  end;
-                  x := x + ColOffset[Pass];
+                  if BitCur > High(TranspPalette) then
+                  PByte(_Data + (y * _Width + x) * _BPP + 3)^ := $ff
+                  else
+                  PByte(_Data + (y * _Width + x) * _BPP + 3)^ := TranspPalette[BitCur];
                 end;
-              end
-              else //8 or 16 bit
-              begin
-                for i := 0 to PassCols - 1 do
-                begin
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 0)^ := ChunkPLTE.Entries[ScanlineCur^[i]].r;
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := ChunkPLTE.Entries[ScanlineCur^[i]].g;
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 2)^ := ChunkPLTE.Entries[ScanlineCur^[i]].b;
-                  if Transp then
-                  begin
-                    if ScanlineCur^[i] > High(TranspPalette) then
-                    PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := $ff
-                    else
-                    PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := TranspPalette[ScanlineCur^[i]];
-                  end;
-                  x := x + ColOffset[Pass];
-                end;
+                x := x + ColOffset[Pass];
               end;
             end
-            else //non indexed
+            else //8 or 16 bit
             begin
-              if ChunkIHDR.BitDepth < 8 then
+              for i := 0 to PassCols - 1 do
               begin
-                for i := 0 to PassCols - 1 do
+                PUInt8(_Data + (y * _Width + x) * _BPP + 0)^ := ChunkPLTE.Entries[ScanlineCur^[i]].r;
+                PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := ChunkPLTE.Entries[ScanlineCur^[i]].g;
+                PUInt8(_Data + (y * _Width + x) * _BPP + 2)^ := ChunkPLTE.Entries[ScanlineCur^[i]].b;
+                if Transp then
                 begin
-                  BitCur := (ScanlineCur^[i div BitPerPixel] shr (8 - (i mod BitPerPixel + 1) * BitStep)) and BitMask;
-                  if Transp then
-                  begin
-                    if ChunkIHDR.ColorType = ctGrayscale then
-                    begin
-                      if BitCur = TranspG and BitMask then
-                      PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := 0
-                      else
-                      PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := $ff;
-                    end;
-                  end;
-                  BitCur := UnpackBits(BitCur);
-                  PUInt8(_Data + (y * _Width + x) * _BPP)^ := BitCur;
-                  x := x + ColOffset[Pass];
+                  if ScanlineCur^[i] > High(TranspPalette) then
+                  PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := $ff
+                  else
+                  PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := TranspPalette[ScanlineCur^[i]];
                 end;
-              end
-              else //8 or 16 bit
+                x := x + ColOffset[Pass];
+              end;
+            end;
+          end
+          else //non indexed
+          begin
+            if ChunkIHDR.BitDepth < 8 then
+            begin
+              for i := 0 to PassCols - 1 do
               begin
-                for i := 0 to PassCols - 1 do
+                BitCur := (ScanlineCur^[i div BitPerPixel] shr (8 - (i mod BitPerPixel + 1) * BitStep)) and BitMask;
+                if Transp then
                 begin
-                  for b := 0 to PixelDataSize - 1 do
-                  PUInt8(_Data + (y * _Width + x) * _BPP + b)^ := ScanlineCur^[i * PixelDataSize + b];
-                  if Transp then
+                  if ChunkIHDR.ColorType = ctGrayscale then
                   begin
-                    if ChunkIHDR.ColorType = ctGrayscale then
+                    if BitCur = TranspG and BitMask then
+                    PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := 0
+                    else
+                    PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := $ff;
+                  end;
+                end;
+                BitCur := UnpackBits(BitCur);
+                PUInt8(_Data + (y * _Width + x) * _BPP)^ := BitCur;
+                x := x + ColOffset[Pass];
+              end;
+            end
+            else //8 or 16 bit
+            begin
+              for i := 0 to PassCols - 1 do
+              begin
+                for b := 0 to PixelDataSize - 1 do
+                PUInt8(_Data + (y * _Width + x) * _BPP + b)^ := ScanlineCur^[i * PixelDataSize + b];
+                if Transp then
+                begin
+                  if ChunkIHDR.ColorType = ctGrayscale then
+                  begin
+                    if ChunkIHDR.BitDepth = 8 then
                     begin
-                      if ChunkIHDR.BitDepth = 8 then
-                      begin
-                        if ScanlineCur^[i * PixelDataSize] = UInt8(TranspG and $ff) then
-                        PUInt8Arr(_Data)^[(y * _Width + x) * _BPP + PixelDataSize] := 0
-                        else
-                        PUInt8Arr(_Data)^[(y * _Width + x) * _BPP + PixelDataSize] := $ff;
-                      end
+                      if ScanlineCur^[i * PixelDataSize] = UInt8(TranspG and $ff) then
+                      PUInt8Arr(_Data)^[(y * _Width + x) * _BPP + PixelDataSize] := 0
                       else
-                      begin
-                        if PUInt16(@ScanlineCur^[i * PixelDataSize])^ = TranspG then
-                        PUInt16(@PByteArray(_Data)^[(y * _Width + x) * _BPP + PixelDataSize])^ := 0
-                        else
-                        PUInt16(@PByteArray(_Data)^[(y * _Width + x) * _BPP + PixelDataSize])^ := $ffff;
-                      end;
+                      PUInt8Arr(_Data)^[(y * _Width + x) * _BPP + PixelDataSize] := $ff;
                     end
                     else
                     begin
-                      if ChunkIHDR.BitDepth = 8 then
-                      begin
-                        if (ScanlineCur^[i * PixelDataSize + 0] = UInt8(TranspRGB[0] and $ff))
-                        and (ScanlineCur^[i * PixelDataSize + 1] = UInt8(TranspRGB[1] and $ff))
-                        and (ScanlineCur^[i * PixelDataSize + 2] = UInt8(TranspRGB[2] and $ff)) then
-                        PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := 0
-                        else
-                        PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := $ff;
-                      end
+                      if PUInt16(@ScanlineCur^[i * PixelDataSize])^ = TranspG then
+                      PUInt16(@PByteArray(_Data)^[(y * _Width + x) * _BPP + PixelDataSize])^ := 0
                       else
-                      begin
-                        if (PUInt16(@ScanlineCur^[i * PixelDataSize + 0])^ = TranspRGB[0])
-                        and (PUInt16(@ScanlineCur^[i * PixelDataSize + 2])^ = TranspRGB[1])
-                        and (PUInt16(@ScanlineCur^[i * PixelDataSize + 4])^ = TranspRGB[2]) then
-                        PUInt16(_Data + (y * _Width + x) * _BPP + 6)^ := 0
-                        else
-                        PUInt16(_Data + (y * _Width + x) * _BPP + 6)^ := $ffff;
-                      end;
+                      PUInt16(@PByteArray(_Data)^[(y * _Width + x) * _BPP + PixelDataSize])^ := $ffff;
+                    end;
+                  end
+                  else
+                  begin
+                    if ChunkIHDR.BitDepth = 8 then
+                    begin
+                      if (ScanlineCur^[i * PixelDataSize + 0] = UInt8(TranspRGB[0] and $ff))
+                      and (ScanlineCur^[i * PixelDataSize + 1] = UInt8(TranspRGB[1] and $ff))
+                      and (ScanlineCur^[i * PixelDataSize + 2] = UInt8(TranspRGB[2] and $ff)) then
+                      PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := 0
+                      else
+                      PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := $ff;
+                    end
+                    else
+                    begin
+                      if (PUInt16(@ScanlineCur^[i * PixelDataSize + 0])^ = TranspRGB[0])
+                      and (PUInt16(@ScanlineCur^[i * PixelDataSize + 2])^ = TranspRGB[1])
+                      and (PUInt16(@ScanlineCur^[i * PixelDataSize + 4])^ = TranspRGB[2]) then
+                      PUInt16(_Data + (y * _Width + x) * _BPP + 6)^ := 0
+                      else
+                      PUInt16(_Data + (y * _Width + x) * _BPP + 6)^ := $ffff;
                     end;
                   end;
-                  x := x + ColOffset[Pass];
                 end;
+                x := x + ColOffset[Pass];
               end;
             end;
-            ScanlinePrev := ScanlineCur;
-            {$Hints off}
-            ScanlineCur := PUInt8Arr(PtrUInt(ScanlineCur) + ScanlineSize);
-            {$Hints on}
-            y := y + RowOffset[Pass];
           end;
+          ScanlinePrev := ScanlineCur;
+          {$Hints off}
+          ScanlineCur := PUInt8Arr(PtrUInt(ScanlineCur) + ScanlineSize);
+          {$Hints on}
+          y := y + RowOffset[Pass];
         end;
       end;
-    finally
-      CompressedData.Free;
-      DecompressedData.Free;
     end;
+  finally
+    CompressedData.Free;
+    DecompressedData.Free;
   end;
 end;
 
