@@ -4508,9 +4508,19 @@ begin
     begin
       for NodeTech in Node do
       begin
-        specialize UArrAppend<TColladaEffectTechnique>(
-          _Techniques, TColladaEffectTechnique.Create(NodeTech, Self)
-        );
+        if (LowerCase(NodeTech.Name) = 'extra')
+        and (NodeTech.ChildCount > 0) then
+        begin
+          specialize UArrAppend<TColladaEffectTechnique>(
+            _Techniques, TColladaEffectTechnique.Create(NodeTech.Children[0], Self)
+          );
+        end
+        else
+        begin
+          specialize UArrAppend<TColladaEffectTechnique>(
+            _Techniques, TColladaEffectTechnique.Create(NodeTech, Self)
+          );
+        end;
       end;
     end;
   end;
@@ -5918,7 +5928,7 @@ constructor TUSceneDataDAE.TMaterialInterfaceCollada.Create(
 );
   var Technique: TColladaEffectTechnique;
   var Profile: TColladaEffectProfile;
-  var i: Int32;
+  var t, i: Int32;
   var Param: TColladaEffectProfileParam;
   var Sampler: TColladaEffectProfileParam.TDataSampler;
   var ParamName: String;
@@ -5930,50 +5940,53 @@ begin
   or not Assigned(ColladaMaterial.InstanceEffect.Effect)
   or not Assigned(ColladaMaterial.InstanceEffect.Effect.Profile) then Exit;
   Profile := ColladaMaterial.InstanceEffect.Effect.Profile;
-  if Length(Profile.Techniques) < 1 then Exit;
-  Technique := Profile.Techniques[0];
-  for i := 0 to High(Technique.Params) do
+  for t := 0 to High(Profile.Techniques) do
   begin
-    ParamName := Technique.Params[i].Name;
-    Param := Technique.Params[i].Param;
-    case Param.ParamType of
-      pt_sampler:
-      begin
-        Sampler := Param.AsSampler;
-        if Assigned(Sampler.Surface)
-        and Assigned(Sampler.Surface.Image) then
+    Technique := Profile.Techniques[t];
+    for i := 0 to High(Technique.Params) do
+    begin
+      ParamName := Technique.Params[i].Name;
+      Param := Technique.Params[i].Param;
+      if Assigned(FindParam(ParamName)) then Continue;
+      case Param.ParamType of
+        pt_sampler:
         begin
-          with NewParamImage(ParamName) do
+          Sampler := Param.AsSampler;
+          if Assigned(Sampler.Surface)
+          and Assigned(Sampler.Surface.Image) then
           begin
-            Image := TImageInterface(Sampler.Surface.Image.UserData);
-            Source := Sampler.Surface.Image.Source;
-            case Param.AsSampler.SamplerType of
-              st_1d: ImageType := it_1d;
-              st_2d: ImageType := it_2d;
-              st_3d: ImageType := it_3d;
-              st_cube: ImageType := it_cube;
-              else ImageType := it_2d;
+            with NewParamImage(ParamName) do
+            begin
+              Image := TImageInterface(Sampler.Surface.Image.UserData);
+              Source := Sampler.Surface.Image.Source;
+              case Param.AsSampler.SamplerType of
+                st_1d: ImageType := it_1d;
+                st_2d: ImageType := it_2d;
+                st_3d: ImageType := it_3d;
+                st_cube: ImageType := it_cube;
+                else ImageType := it_2d;
+              end;
             end;
           end;
         end;
+        pt_float:
+        begin
+          NewParamFloat(ParamName).Value := Param.AsFloat.Value;
+        end;
+        pt_float2:
+        begin
+          NewParamVec2(ParamName).Value := Param.AsFloat2.Value;
+        end;
+        pt_float3:
+        begin
+          NewParamVec3(ParamName).Value := Param.AsFloat3.Value;
+        end;
+        pt_float4:
+        begin
+          NewParamVec4(ParamName).Value := Param.AsFloat4.Value;
+        end;
+        else begin end;
       end;
-      pt_float:
-      begin
-        NewParamFloat(ParamName).Value := Param.AsFloat.Value;
-      end;
-      pt_float2:
-      begin
-        NewParamVec2(ParamName).Value := Param.AsFloat2.Value;
-      end;
-      pt_float3:
-      begin
-        NewParamVec3(ParamName).Value := Param.AsFloat3.Value;
-      end;
-      pt_float4:
-      begin
-        NewParamVec4(ParamName).Value := Param.AsFloat4.Value;
-      end;
-      else begin end;
     end;
   end;
 end;

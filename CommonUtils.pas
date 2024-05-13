@@ -7884,7 +7884,7 @@ begin
     wa := 1 - s;
     wb := s * Swap;
   end;
-  Result := an * wa + bn * wb;
+  Result := (an * wa + bn * wb).Norm;
 end;
 
 function USmoothStep(const v, MinV, MaxV: TUFloat): TUFloat;
