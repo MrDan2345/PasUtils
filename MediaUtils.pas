@@ -1358,6 +1358,7 @@ function ULoadImageData(const StreamHelper: TUStreamHelper): TUImageDataShared; 
 
 function UCmpVertexDescriptors(const vd0, vd1: TUVertexDescriptor): Boolean;
 function UComputeVertexSize(const vd: TUVertexDescriptor): UInt32;
+function UComputeVertexAttributeOffset(const vd: TUVertexDescriptor; const AttribIndex: Int32): UInt32;
 
 implementation
 
@@ -1444,6 +1445,19 @@ function UComputeVertexSize(const vd: TUVertexDescriptor): UInt32;
 begin
   Result := 0;
   for i := 0 to High(vd) do
+  begin
+    Result += vd[i].Size;
+  end;
+end;
+
+function UComputeVertexAttributeOffset(
+  const vd: TUVertexDescriptor;
+  const AttribIndex: Int32
+): UInt32;
+  var i: Int32;
+begin
+  Result := 0;
+  for i := 0 to AttribIndex - 1 do
   begin
     Result += vd[i].Size;
   end;
