@@ -105,14 +105,17 @@ type TUVec2i = array[0..1] of Int32; // TUVec2iImpl
 type PUVec2i = ^TUVec2i;
 type TUVec2iArr = array[UInt32] of TUVec2i;
 type PUVec2iArr = ^TUVec2iArr;
+type TUVec2iArray = array of TUVec2i;
 type TUVec3i = array[0..2] of Int32; // TUVec3iImpl
 type PUVec3i = ^TUVec2i;
 type TUVec3iArr = array[UInt32] of TUVec3i;
 type PUVec3iArr = ^TUVec3iArr;
+type TUVec3iArray = array of TUVec3i;
 type TUVec4i = array[0..3] of Int32; // TUVec4iImpl
 type PUVec4i = ^TUVec4i;
 type TUVec4iArr = array[UInt32] of TUVec4i;
 type PUVec4iArr = ^TUVec4iArr;
+type TUVec4iArray = array of TUVec4i;
 type TUQuat = array[0..3] of TUFloat; // TUQuatImpl
 type PUQuat = ^TUQuat;
 type TUQuatArr = array[UInt32] of TUQuat;
@@ -134,8 +137,17 @@ type TURot2Arr = array[UInt32] of TURot2;
 type PURot2Arr = ^TURot2;
 type TURay3 = array[0..1] of TUVec3; // TURay3Impl
 type TUBounds1f = array[0..1] of TUFloat; // TUBounds1fImpl
+type PUBounds1f = ^TUBounds1f;
 type TUBounds2f = array[0..1] of TUVec2; // TUBounds2fImpl
+type PUBounds2f = ^TUBounds2f;
 type TUBounds3f = array[0..1] of TUVec3; // TUBounds3fImpl
+type PUBounds3f = ^TUBounds3f;
+type TUBounds1i = array[0..1] of Int32; // TUBounds1iImpl
+type PUBounds1i = ^TUBounds1i;
+type TUBounds2i = array[0..1] of TUVec2i; // TUBounds2iImpl
+type PUBounds2i = ^TUBounds2i;
+type TUBounds3i = array[0..1] of TUVec3i; // TUBounds3iImpl
+type PUBounds3i = ^TUBounds3i;
 
 type TUSwizzle = record
 private
@@ -688,10 +700,14 @@ strict private
   procedure SetMin(const Value: TUVec2);
   function GetMax: TUVec2;
   procedure SetMax(const Value: TUVec2);
+  function GetSizeX: TUFloat;
+  function GetSizeY: TUFloat;
 public
   const Zero: TUBounds2f = ((0, 0), (0, 0));
   property Min: TUVec2 read GetMin write SetMin;
   property Max: TUVec2 read GetMax write SetMax;
+  property SizeX: TUFloat read GetSizeX;
+  property SizeY: TUFloat read GetSizeY;
   class function Make(const AMin, AMax: TUVec2): TUBounds2f; static; overload;
   class function Make(const ACenter: TUVec2): TUBounds2f; static; overload;
   class function Overlap(const a, b: TUBounds2f): Boolean; static; inline;
@@ -721,6 +737,66 @@ public
   class function Overlap(const a, b: TUBounds3f): Boolean; static; inline;
   function Overlap(const Other: TUBounds3f): Boolean;
   function GetPoints: TUVec3Array;
+end;
+
+type TUBounds1iImpl = type helper for TUBounds1i
+strict private
+  function GetMin: Int32;
+  procedure SetMin(const Value: Int32);
+  function GetMax: Int32;
+  procedure SetMax(const Value: Int32);
+public
+  const Zero: TUBounds1i = (0, 0);
+  class function Make(const AMin, AMax: Int32): TUBounds1i; static; overload;
+  class function Make(const ACenter: Int32): TUBounds1i; static; overload;
+  class function Overlap(const a, b: TUBounds1i): Boolean; static; inline;
+  property Min: Int32 read GetMin write SetMin;
+  property Max: Int32 read GetMax write SetMax;
+  function Overlap(const Other: TUBounds1i): Boolean;
+  procedure Add(const v: Int32);
+end;
+
+type TUBounds2iImpl = type helper for TUBounds2i
+strict private
+  function GetMin: TUVec2i;
+  procedure SetMin(const Value: TUVec2i);
+  function GetMax: TUVec2i;
+  procedure SetMax(const Value: TUVec2i);
+  function GetSizeX: Int32;
+  function GetSizeY: Int32;
+public
+  const Zero: TUBounds2i = ((0, 0), (0, 0));
+  property Min: TUVec2i read GetMin write SetMin;
+  property Max: TUVec2i read GetMax write SetMax;
+  property SizeX: Int32 read GetSizeX;
+  property SizeY: Int32 read GetSizeY;
+  class function Make(const AMin, AMax: TUVec2i): TUBounds2i; static; overload;
+  class function Make(const ACenter: TUVec2i): TUBounds2i; static; overload;
+  class function Overlap(const a, b: TUBounds2i): Boolean; static; inline;
+  function Overlap(const Other: TUBounds2i): Boolean;
+end;
+
+type TUBounds3iImpl = type helper for TUBounds3i
+strict private
+  function GetMin: TUVec3i;
+  procedure SetMin(const Value: TUVec3i);
+  function GetMax: TUVec3i;
+  procedure SetMax(const Value: TUVec3i);
+  function GetCenter: TUVec3i;
+  function GetExtent: TUVec3i;
+  function GetMajorExtent: TUVec3i;
+public
+  const Zero: TUBounds3i = ((0, 0, 0), (0, 0, 0));
+  property Min: TUVec3i read GetMin write SetMin;
+  property Max: TUVec3i read GetMax write SetMax;
+  property Center: TUVec3i read GetCenter;
+  property Extent: TUVec3i read GetExtent;
+  property MajorExtent: TUVec3i read GetMajorExtent;
+  class function Make(const AMin, AMax: TUVec3i): TUBounds3i; static; overload;
+  class function Make(const ACenter: TUVec3i): TUBounds3i; static; overload;
+  class function Make(const AVertices: TUVec3iArray): TUBounds3i; static; overload;
+  class function Overlap(const a, b: TUBounds3i): Boolean; static; inline;
+  function Overlap(const Other: TUBounds3i): Boolean;
 end;
 
 type TUTransform = record
@@ -1420,6 +1496,9 @@ function UMin(const a, b: TUDouble): TUDouble; inline; overload;
 function UMin(const a, b: TUVec2): TUVec2; inline; overload;
 function UMin(const a, b: TUVec3): TUVec3; inline; overload;
 function UMin(const a, b: TUVec4): TUVec4; inline; overload;
+function UMin(const a, b: TUVec2i): TUVec2i; inline; overload;
+function UMin(const a, b: TUVec3i): TUVec3i; inline; overload;
+function UMin(const a, b: TUVec4i): TUVec4i; inline; overload;
 generic function UMax<T>(const a, b: T): T; inline; overload;
 function UMax(const a, b: Int8): Int8; inline; overload;
 function UMax(const a, b: Int16): Int16; inline; overload;
@@ -1434,6 +1513,9 @@ function UMax(const a, b: TUDouble): TUDouble; inline; overload;
 function UMax(const a, b: TUVec2): TUVec2; inline; overload;
 function UMax(const a, b: TUVec3): TUVec3; inline; overload;
 function UMax(const a, b: TUVec4): TUVec4; inline; overload;
+function UMax(const a, b: TUVec2i): TUVec2i; inline; overload;
+function UMax(const a, b: TUVec3i): TUVec3i; inline; overload;
+function UMax(const a, b: TUVec4i): TUVec4i; inline; overload;
 generic function UClamp<T>(const v, MinV, MaxV: T): T; inline; overload;
 function UClamp(const v, MinV, MaxV: Int8): Int8; inline; overload;
 function UClamp(const v, MinV, MaxV: Int16): Int16; inline; overload;
@@ -1448,6 +1530,9 @@ function UClamp(const v, MinV, MaxV: TUDouble): TUDouble; inline; overload;
 function UClamp(const v, MinV, MaxV: TUVec2): TUVec2; inline; overload;
 function UClamp(const v, MinV, MaxV: TUVec3): TUVec3; inline; overload;
 function UClamp(const v, MinV, MaxV: TUVec4): TUVec4; inline; overload;
+function UClamp(const v, MinV, MaxV: TUVec2i): TUVec2i; inline; overload;
+function UClamp(const v, MinV, MaxV: TUVec3i): TUVec3i; inline; overload;
+function UClamp(const v, MinV, MaxV: TUVec4i): TUVec4i; inline; overload;
 generic function ULerp<T>(const a, b: T; const s: TUFloat): T; inline; overload;
 function ULerp(const a, b: TUFloat; const s: TUFloat): TUFloat; inline; overload;
 function ULerp(const a, b: TUVec2; const s: TUFloat): TUVec2; inline; overload;
@@ -1610,6 +1695,12 @@ operator * (const f: TUFloat; const v: TUVec3): TUVec3;
 operator * (const v: TUVec3; const m: TUMat): TUVec3;
 operator * (const v: TUVec3; const q: TUQuat): TUVec3;
 operator - (const v: TUVec3): TUVec3;
+operator + (const a, b: TUVec3i): TUVec3i;
+operator - (const a, b: TUVec3i): TUVec3i;
+operator * (const a, b: TUVec3i): TUVec3i;
+operator * (const v: TUVec3i; const i: Int32): TUVec3i;
+operator / (const a, b: TUVec3i): TUVec3i;
+operator / (const v: TUVec3i; const i: Int32): TUVec3i;
 operator + (const a, b: TUVec4): TUVec4;
 operator - (const a, b: TUVec4): TUVec4;
 operator * (const a, b: TUVec4): TUVec4;
@@ -1618,6 +1709,8 @@ operator / (const v: TUVec4; const f: TUFloat): TUVec4;
 operator * (const v: TUVec4; const f: TUFloat): TUVec4;
 operator * (const f: TUFloat; const v: TUVec4): TUVec4;
 operator - (const v: TUVec4): TUVec4;
+operator := (const v: TUVec4): TUBounds2f;
+operator := (const v: TUBounds2f): TUVec4;
 operator + (const a, b: TUMat): TUMat;
 operator - (const a, b: TUMat): TUMat;
 operator * (const a, b: TUMat): TUMat;
@@ -3655,6 +3748,16 @@ begin
   Self[1] := Value;
 end;
 
+function TUBounds2fImpl.GetSizeX: TUFloat;
+begin
+  Result := Abs(Self[1][0] - Self[0][0]);
+end;
+
+function TUBounds2fImpl.GetSizeY: TUFloat;
+begin
+  Result := Abs(Self[1][1] - Self[0][1]);
+end;
+
 class function TUBounds2fImpl.Make(const AMin, AMax: TUVec2): TUBounds2f;
 begin
   Result[0] := UMin(AMin, AMax);
@@ -3798,6 +3901,208 @@ begin
   Result[7] := Self[1];
 end;
 // TUBounds3f end
+
+// TUBounds1i begin
+function TUBounds1iImpl.GetMin: Int32;
+begin
+  Result := Self[0];
+end;
+
+procedure TUBounds1iImpl.SetMin(const Value: Int32);
+begin
+  Self[0] := Value;
+end;
+
+function TUBounds1iImpl.GetMax: Int32;
+begin
+  Result := Self[1];
+end;
+
+procedure TUBounds1iImpl.SetMax(const Value: Int32);
+begin
+  Self[1] := Value;
+end;
+
+class function TUBounds1iImpl.Make(const AMin, AMax: Int32): TUBounds1i;
+begin
+  Result[0] := UMin(AMin, AMax);
+  Result[1] := UMax(AMin, AMax);
+end;
+
+class function TUBounds1iImpl.Make(const ACenter: Int32): TUBounds1i;
+begin
+  Result[0] := ACenter;
+  Result[1] := ACenter;
+end;
+
+class function TUBounds1iImpl.Overlap(const a, b: TUBounds1i): Boolean;
+begin
+  Result := (a.Min <= b.Max) and (b.Min <= a.Max);
+end;
+
+function TUBounds1iImpl.Overlap(const Other: TUBounds1i): Boolean;
+begin
+  Result := Overlap(Self, Other);
+end;
+
+procedure TUBounds1iImpl.Add(const v: Int32);
+begin
+  if v < Self[0] then Self[0] := v
+  else if v > Self[1] then Self[1] := v;
+end;
+
+// TUBounds1i end
+
+// TUBounds2i begin
+function TUBounds2iImpl.GetMin: TUVec2i;
+begin
+  Result := Self[0];
+end;
+
+procedure TUBounds2iImpl.SetMin(const Value: TUVec2i);
+begin
+  Self[0] := Value;
+end;
+
+function TUBounds2iImpl.GetMax: TUVec2i;
+begin
+  Result := Self[1];
+end;
+
+procedure TUBounds2iImpl.SetMax(const Value: TUVec2i);
+begin
+  Self[1] := Value;
+end;
+
+function TUBounds2iImpl.GetSizeX: Int32;
+begin
+  Result := Abs(Self[1][0] - Self[0][0]);
+end;
+
+function TUBounds2iImpl.GetSizeY: Int32;
+begin
+  Result := Abs(Self[1][1] - Self[0][1]);
+end;
+
+class function TUBounds2iImpl.Make(const AMin, AMax: TUVec2i): TUBounds2i;
+begin
+  Result[0] := UMin(AMin, AMax);
+  Result[1] := UMax(AMin, AMax);
+end;
+
+class function TUBounds2iImpl.Make(const ACenter: TUVec2i): TUBounds2i;
+begin
+  Result[0] := ACenter;
+  Result[1] := ACenter;
+end;
+
+class function TUBounds2iImpl.Overlap(const a, b: TUBounds2i): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Max.x)
+    and (a.Min.y <= b.Max.y)
+    and (b.Min.x <= a.Max.x)
+    and (b.Min.y <= a.Max.y)
+  );
+end;
+
+function TUBounds2iImpl.Overlap(const Other: TUBounds2i): Boolean;
+begin
+  Result := Overlap(Self, Other);
+end;
+// TUBounds2i end
+
+// TUBounds3i begin
+function TUBounds3iImpl.GetMin: TUVec3i;
+begin
+  Result := Self[0];
+end;
+
+procedure TUBounds3iImpl.SetMin(const Value: TUVec3i);
+begin
+  Self[0] := Value;
+end;
+
+function TUBounds3iImpl.GetMax: TUVec3i;
+begin
+  Result := Self[1];
+end;
+
+procedure TUBounds3iImpl.SetMax(const Value: TUVec3i);
+begin
+  Self[1] := Value;
+end;
+
+function TUBounds3iImpl.GetCenter: TUVec3i;
+begin
+  Result := (Self[0] + Self[1]) / 2;
+end;
+
+function TUBounds3iImpl.GetExtent: TUVec3i;
+begin
+  Result := Self[1] - Self[0];
+end;
+
+function TUBounds3iImpl.GetMajorExtent: TUVec3i;
+  var e: TUVec3i;
+begin
+  e := Extent;
+  if e.x > e.y then
+  begin
+    if e.x > e.z then
+    begin
+      Exit(TUVec3i.AxisX);
+    end;
+    Exit(TUVec3i.AxisZ);
+  end;
+  if e.y > e.z then
+  begin
+    Exit(TUVec3i.AxisY);
+  end;
+  Exit(TUVec3i.AxisZ);
+end;
+
+class function TUBounds3iImpl.Make(const AMin, AMax: TUVec3i): TUBounds3i;
+begin
+  Result[0] := UMin(AMin, AMax);
+  Result[1] := UMax(AMin, AMax);
+end;
+
+class function TUBounds3iImpl.Make(const ACenter: TUVec3i): TUBounds3i;
+begin
+  Result[0] := ACenter;
+  Result[1] := ACenter;
+end;
+
+class function TUBounds3iImpl.Make(const AVertices: TUVec3iArray): TUBounds3i;
+  var i: Int32;
+begin
+  if Length(AVertices) = 0 then Exit(Make(TUVec3i.Zero));
+  Result := Make(AVertices[0]);
+  for i := 1 to High(AVertices) do
+  begin
+    Result[0] := UMin(Result[0], AVertices[i]);
+    Result[1] := UMax(Result[1], AVertices[i]);
+  end;
+end;
+
+class function TUBounds3iImpl.Overlap(const a, b: TUBounds3i): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Max.x)
+    and (a.Min.y <= b.Max.y)
+    and (a.Min.z <= b.Max.z)
+    and (b.Min.x <= a.Max.x)
+    and (b.Min.y <= a.Max.y)
+    and (b.Min.z <= a.Max.z)
+  );
+end;
+
+function TUBounds3iImpl.Overlap(const Other: TUBounds3i): Boolean;
+begin
+  Result := Overlap(Self, Other);
+end;
+// TUBounds3i end
 
 // TUTransform begin
 procedure TUTransform.Initialize;
@@ -7667,19 +7972,37 @@ end;
 function UMin(const a, b: TUVec2): TUVec2;
   var i: Int32;
 begin
-  for i := 0 to High(TUVec2) do Result[i] := UMin(a[i], b[i]);
+  for i := 0 to High(Result) do Result[i] := UMin(a[i], b[i]);
 end;
 
 function UMin(const a, b: TUVec3): TUVec3;
   var i: Int32;
 begin
-  for i := 0 to High(TUVec3) do Result[i] := UMin(a[i], b[i]);
+  for i := 0 to High(Result) do Result[i] := UMin(a[i], b[i]);
 end;
 
 function UMin(const a, b: TUVec4): TUVec4;
   var i: Int32;
 begin
-  for i := 0 to High(TUVec4) do Result[i] := UMin(a[i], b[i]);
+  for i := 0 to High(Result) do Result[i] := UMin(a[i], b[i]);
+end;
+
+function UMin(const a, b: TUVec2i): TUVec2i;
+  var i: Int32;
+begin
+  for i := 0 to High(Result) do Result[i] := UMin(a[i], b[i]);
+end;
+
+function UMin(const a, b: TUVec3i): TUVec3i;
+  var i: Int32;
+begin
+  for i := 0 to High(Result) do Result[i] := UMin(a[i], b[i]);
+end;
+
+function UMin(const a, b: TUVec4i): TUVec4i;
+  var i: Int32;
+begin
+  for i := 0 to High(Result) do Result[i] := UMin(a[i], b[i]);
 end;
 
 generic function UMax<T>(const a, b: T): T;
@@ -7740,19 +8063,37 @@ end;
 function UMax(const a, b: TUVec2): TUVec2;
   var i: Int32;
 begin
-  for i := 0 to High(TUVec2) do Result[i] := UMax(a[i], b[i]);
+  for i := 0 to High(Result) do Result[i] := UMax(a[i], b[i]);
 end;
 
 function UMax(const a, b: TUVec3): TUVec3;   
   var i: Int32;
 begin
-  for i := 0 to High(TUVec3) do Result[i] := UMax(a[i], b[i]);
+  for i := 0 to High(Result) do Result[i] := UMax(a[i], b[i]);
 end;
 
 function UMax(const a, b: TUVec4): TUVec4;   
   var i: Int32;
 begin
-  for i := 0 to High(TUVec4) do Result[i] := UMax(a[i], b[i]);
+  for i := 0 to High(Result) do Result[i] := UMax(a[i], b[i]);
+end;
+
+function UMax(const a, b: TUVec2i): TUVec2i;
+  var i: Int32;
+begin
+  for i := 0 to High(Result) do Result[i] := UMax(a[i], b[i]);
+end;
+
+function UMax(const a, b: TUVec3i): TUVec3i;
+  var i: Int32;
+begin
+  for i := 0 to High(Result) do Result[i] := UMax(a[i], b[i]);
+end;
+
+function UMax(const a, b: TUVec4i): TUVec4i;
+  var i: Int32;
+begin
+  for i := 0 to High(Result) do Result[i] := UMax(a[i], b[i]);
 end;
 
 generic function UClamp<T>(const v, MinV, MaxV: T): T;
@@ -7813,19 +8154,37 @@ end;
 function UClamp(const v, MinV, MaxV: TUVec2): TUVec2;
   var i: Int32;
 begin
-  for i := 0 to High(TUVec2) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
+  for i := 0 to High(Result) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
 end;
 
 function UClamp(const v, MinV, MaxV: TUVec3): TUVec3; 
   var i: Int32;
 begin
-  for i := 0 to High(TUVec3) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
+  for i := 0 to High(Result) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
 end;
 
 function UClamp(const v, MinV, MaxV: TUVec4): TUVec4;    
   var i: Int32;
 begin
-  for i := 0 to High(TUVec4) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
+  for i := 0 to High(Result) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
+end;
+
+function UClamp(const v, MinV, MaxV: TUVec2i): TUVec2i;
+  var i: Int32;
+begin
+  for i := 0 to High(Result) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
+end;
+
+function UClamp(const v, MinV, MaxV: TUVec3i): TUVec3i;
+  var i: Int32;
+begin
+  for i := 0 to High(Result) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
+end;
+
+function UClamp(const v, MinV, MaxV: TUVec4i): TUVec4i;
+  var i: Int32;
+begin
+  for i := 0 to High(Result) do Result[i] := UClamp(v[i], MinV[i], MaxV[i]);
 end;
 
 generic function ULerp<T>(const a, b: T; const s: TUFloat): T;
@@ -9079,6 +9438,48 @@ begin
   Result[2] := -v[2];
 end;
 
+operator + (const a, b: TUVec3i): TUVec3i;
+begin
+  Result[0] := a[0] + b[0];
+  Result[1] := a[1] + b[1];
+  Result[2] := a[2] + b[2];
+end;
+
+operator - (const a, b: TUVec3i): TUVec3i;
+begin
+  Result[0] := a[0] - b[0];
+  Result[1] := a[1] - b[1];
+  Result[2] := a[2] - b[2];
+end;
+
+operator * (const a, b: TUVec3i): TUVec3i;
+begin
+  Result[0] := a[0] * b[0];
+  Result[1] := a[1] * b[1];
+  Result[2] := a[2] * b[2];
+end;
+
+operator * (const v: TUVec3i; const i: Int32): TUVec3i;
+begin
+  Result[0] := v[0] * i;
+  Result[1] := v[1] * i;
+  Result[2] := v[2] * i;
+end;
+
+operator / (const a, b: TUVec3i): TUVec3i;
+begin
+  Result[0] := a[0] div b[0];
+  Result[1] := a[1] div b[1];
+  Result[2] := a[2] div b[2];
+end;
+
+operator / (const v: TUVec3i; const i: Int32): TUVec3i;
+begin
+  Result[0] := v[0] div i;
+  Result[1] := v[1] div i;
+  Result[2] := v[2] div i;
+end;
+
 operator + (const a, b: TUVec4): TUVec4;
 begin
   Result[0] := a[0] + b[0];
@@ -9143,6 +9544,16 @@ begin
   Result[1] := -v[1];
   Result[2] := -v[2];
   Result[3] := -v[3];
+end;
+
+operator := (const v: TUVec4): TUBounds2f;
+begin
+  Result := PUBounds2f(@v)^;
+end;
+
+operator := (const v: TUBounds2f): TUVec4;
+begin
+  Result := PUVec4(@v)^;
 end;
 
 operator + (const a, b: TUMat): TUMat;
