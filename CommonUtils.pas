@@ -683,6 +683,8 @@ strict private
   procedure SetMin(const Value: TUFloat);
   function GetMax: TUFloat;
   procedure SetMax(const Value: TUFloat);
+  function GetSize: TUFloat;
+  procedure SetSize(const Value: TUFloat);
 public
   const Zero: TUBounds1f = (0, 0);
   class function Make(const AMin, AMax: TUFLoat): TUBounds1f; static; overload;
@@ -690,6 +692,7 @@ public
   class function Overlap(const a, b: TUBounds1f): Boolean; static; inline;
   property Min: TUFloat read GetMin write SetMin;
   property Max: TUFloat read GetMax write SetMax;
+  property Size: TUFloat read GetSize write SetSize;
   function Overlap(const Other: TUBounds1f): Boolean;
   procedure Add(const v: TUFloat);
 end;
@@ -700,14 +703,13 @@ strict private
   procedure SetMin(const Value: TUVec2);
   function GetMax: TUVec2;
   procedure SetMax(const Value: TUVec2);
-  function GetSizeX: TUFloat;
-  function GetSizeY: TUFloat;
+  function GetSize: TUVec2;
+  procedure SetSize(const Value: TUVec2);
 public
   const Zero: TUBounds2f = ((0, 0), (0, 0));
   property Min: TUVec2 read GetMin write SetMin;
   property Max: TUVec2 read GetMax write SetMax;
-  property SizeX: TUFloat read GetSizeX;
-  property SizeY: TUFloat read GetSizeY;
+  property Size: TUVec2 read GetSize write SetSize;
   class function Make(const AMin, AMax: TUVec2): TUBounds2f; static; overload;
   class function Make(const ACenter: TUVec2): TUBounds2f; static; overload;
   class function Overlap(const a, b: TUBounds2f): Boolean; static; inline;
@@ -721,6 +723,8 @@ strict private
   procedure SetMin(const Value: TUVec3);
   function GetMax: TUVec3;
   procedure SetMax(const Value: TUVec3);
+  function GetSize: TUVec3;
+  procedure SetSize(const Value: TUVec3);
   function GetCenter: TUVec3;
   function GetExtent: TUVec3;
   function GetMajorExtent: TUVec3;
@@ -728,6 +732,7 @@ public
   const Zero: TUBounds3f = ((0, 0, 0), (0, 0, 0));
   property Min: TUVec3 read GetMin write SetMin;
   property Max: TUVec3 read GetMax write SetMax;
+  property Size: TUVec3 read GetSize write SetSize;
   property Center: TUVec3 read GetCenter;
   property Extent: TUVec3 read GetExtent;
   property MajorExtent: TUVec3 read GetMajorExtent;
@@ -745,13 +750,16 @@ strict private
   procedure SetMin(const Value: Int32);
   function GetMax: Int32;
   procedure SetMax(const Value: Int32);
+  function GetSize: Int32;
+  procedure SetSize(const Value: Int32);
 public
   const Zero: TUBounds1i = (0, 0);
+  property Min: Int32 read GetMin write SetMin;
+  property Max: Int32 read GetMax write SetMax;
+  property Size: Int32 read GetSize write SetSize;
   class function Make(const AMin, AMax: Int32): TUBounds1i; static; overload;
   class function Make(const ACenter: Int32): TUBounds1i; static; overload;
   class function Overlap(const a, b: TUBounds1i): Boolean; static; inline;
-  property Min: Int32 read GetMin write SetMin;
-  property Max: Int32 read GetMax write SetMax;
   function Overlap(const Other: TUBounds1i): Boolean;
   procedure Add(const v: Int32);
 end;
@@ -762,14 +770,13 @@ strict private
   procedure SetMin(const Value: TUVec2i);
   function GetMax: TUVec2i;
   procedure SetMax(const Value: TUVec2i);
-  function GetSizeX: Int32;
-  function GetSizeY: Int32;
+  function GetSize: TUVec2i;
+  procedure SetSize(const Value: TUVec2i);
 public
   const Zero: TUBounds2i = ((0, 0), (0, 0));
   property Min: TUVec2i read GetMin write SetMin;
   property Max: TUVec2i read GetMax write SetMax;
-  property SizeX: Int32 read GetSizeX;
-  property SizeY: Int32 read GetSizeY;
+  property Size: TUVec2i read GetSize write SetSize;
   class function Make(const AMin, AMax: TUVec2i): TUBounds2i; static; overload;
   class function Make(const ACenter: TUVec2i): TUBounds2i; static; overload;
   class function Overlap(const a, b: TUBounds2i): Boolean; static; inline;
@@ -782,6 +789,8 @@ strict private
   procedure SetMin(const Value: TUVec3i);
   function GetMax: TUVec3i;
   procedure SetMax(const Value: TUVec3i);
+  function GetSize: TUVec3i;
+  procedure SetSize(const Value: TUVec3i);
   function GetCenter: TUVec3i;
   function GetExtent: TUVec3i;
   function GetMajorExtent: TUVec3i;
@@ -789,6 +798,7 @@ public
   const Zero: TUBounds3i = ((0, 0, 0), (0, 0, 0));
   property Min: TUVec3i read GetMin write SetMin;
   property Max: TUVec3i read GetMax write SetMax;
+  property Size: TUVec3i read GetSize write SetSize;
   property Center: TUVec3i read GetCenter;
   property Extent: TUVec3i read GetExtent;
   property MajorExtent: TUVec3i read GetMajorExtent;
@@ -3697,6 +3707,16 @@ begin
   Self[1] := Value;
 end;
 
+function TUBounds1fImpl.GetSize: TUFloat;
+begin
+  Result := Self[1] - Self[0];
+end;
+
+procedure TUBounds1fImpl.SetSize(const Value: TUFloat);
+begin
+  Self[1] := Self[0] + Value;
+end;
+
 class function TUBounds1fImpl.Make(const AMin, AMax: TUFLoat): TUBounds1f;
 begin
   Result[0] := UMin(AMin, AMax);
@@ -3748,14 +3768,14 @@ begin
   Self[1] := Value;
 end;
 
-function TUBounds2fImpl.GetSizeX: TUFloat;
+function TUBounds2fImpl.GetSize: TUVec2;
 begin
-  Result := Abs(Self[1][0] - Self[0][0]);
+  Result := Self[1] - Self[0];
 end;
 
-function TUBounds2fImpl.GetSizeY: TUFloat;
+procedure TUBounds2fImpl.SetSize(const Value: TUVec2);
 begin
-  Result := Abs(Self[1][1] - Self[0][1]);
+  Self[1] := Self[0] + Value;
 end;
 
 class function TUBounds2fImpl.Make(const AMin, AMax: TUVec2): TUBounds2f;
@@ -3815,6 +3835,16 @@ end;
 procedure TUBounds3fImpl.SetMax(const Value: TUVec3);
 begin
   Self[1] := Value;
+end;
+
+function TUBounds3fImpl.GetSize: TUVec3;
+begin
+  Result := Self[1] - Self[0];
+end;
+
+procedure TUBounds3fImpl.SetSize(const Value: TUVec3);
+begin
+  Self[1] := Self[0] + Value;
 end;
 
 function TUBounds3fImpl.GetCenter: TUVec3;
@@ -3923,6 +3953,16 @@ begin
   Self[1] := Value;
 end;
 
+function TUBounds1iImpl.GetSize: Int32;
+begin
+  Result := Self[1] - Self[0];
+end;
+
+procedure TUBounds1iImpl.SetSize(const Value: Int32);
+begin
+  Self[1] := Self[0] + Value;
+end;
+
 class function TUBounds1iImpl.Make(const AMin, AMax: Int32): TUBounds1i;
 begin
   Result[0] := UMin(AMin, AMax);
@@ -3974,14 +4014,14 @@ begin
   Self[1] := Value;
 end;
 
-function TUBounds2iImpl.GetSizeX: Int32;
+function TUBounds2iImpl.GetSize: TUVec2i;
 begin
-  Result := Abs(Self[1][0] - Self[0][0]);
+  Result := Self[1] - Self[0];
 end;
 
-function TUBounds2iImpl.GetSizeY: Int32;
+procedure TUBounds2iImpl.SetSize(const Value: TUVec2i);
 begin
-  Result := Abs(Self[1][1] - Self[0][1]);
+  Self[1] := Self[0] + Value;
 end;
 
 class function TUBounds2iImpl.Make(const AMin, AMax: TUVec2i): TUBounds2i;
@@ -4031,6 +4071,16 @@ end;
 procedure TUBounds3iImpl.SetMax(const Value: TUVec3i);
 begin
   Self[1] := Value;
+end;
+
+function TUBounds3iImpl.GetSize: TUVec3i;
+begin
+  Result := Self[1] - Self[0];
+end;
+
+procedure TUBounds3iImpl.SetSize(const Value: TUVec3i);
+begin
+  Self[1] := Self[0] + Value;
 end;
 
 function TUBounds3iImpl.GetCenter: TUVec3i;
