@@ -7952,8 +7952,6 @@ begin
   Result := specialize USignOf<Int64>(v);
 end;
 
-generic
-
 function USignOf(const v: TUFloat): TUFloat;
 begin
   Result := specialize USignOf<TUFloat>(v);
