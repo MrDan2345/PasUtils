@@ -218,8 +218,9 @@ type TUVertexAttribute = record
 end;
 type TUVertexDescriptor = array of TUVertexAttribute;
 
-type TSceneDataOptions = (sdo_optimize, sdo_gen_normals, sdo_gen_tangents);
-type TSceneDataOptionsSet = set of TSceneDataOptions;
+type TUSceneDataOptions = (sdo_optimize, sdo_gen_normals, sdo_gen_tangents);
+type TUSceneDataOptionsSet = set of TUSceneDataOptions;
+type TUSceneDataUpVector = (sdu_any, sdu_x, sdu_y, sdu_z);
 
 type TUSceneData = class (TURefClass)
 public
@@ -231,11 +232,13 @@ public
     type TNodeList = array of TNodeInterface;
   protected
     var _Name: String;
+    var _Ids: TUStrArray;
     var _Transform: TUMat;
     var _Attachments: TAttachmentList;
     var _Parent: TNodeInterface;
     var _Children: TNodeList;
     procedure SetParent(const Value: TNodeInterface);
+    procedure AddId(const Id: String);
     procedure ApplyTransform(const Value: TUMat);
     procedure SetTransform(const Value: TUMat);
     function GetLocalTransform: TUMat; inline;
@@ -247,6 +250,8 @@ public
     property Attachments: TAttachmentList read _Attachments;
     property Children: TNodeList read _Children;
     property Parent: TNodeInterface read _Parent write SetParent;
+    property Ids: TUStrArray read _Ids;
+    function MatchId(const Id: String): Boolean;
     destructor Destroy; override;
   end;
   type TNodeInterfaceList = TNodeInterface.TNodeList;
@@ -444,12 +449,14 @@ public
     private
       var _Name: String;
       var _Keys: TKeyList;
+      var _TargetId: String;
       var _Target: TNodeInterface;
       var _MaxTime: TUFloat;
       function FindKey(const Time: TUFloat): Int32;
     public
       property Name: String read _Name;
       property Keys: TKeyList read _Keys;
+      property TargetId: String read _TargetId;
       property Target: TNodeInterface read _Target;
       property MaxTime: TUFloat read _MaxTime;
       function Sample(const Time: TUFloat; const Loop: Boolean = True): TUMat;
@@ -494,7 +501,8 @@ public
   var _AnimationList: TAnimationInterfaceList;
   var _RootNode: TNodeInterface;
 protected
-  var _Options: TSceneDataOptionsSet;
+  var _Options: TUSceneDataOptionsSet;
+  var _UpVector: TUSceneDataUpVector;
 public
   property ImageList: TImageInterfaceList read _ImageList;
   property MaterialList: TMaterialInterfaceList read _MaterialList;
@@ -502,7 +510,7 @@ public
   property SkinList: TSkinInterfaceList read _SkinList;
   property AnimationList: TAnimationInterfaceList read _AnimationList;
   property RootNode: TNodeInterface read _RootNode;
-  property Options: TSceneDataOptionsSet read _Options;
+  property Options: TUSceneDataOptionsSet read _Options;
   class function CanLoad(const Stream: TStream): Boolean; virtual; overload;
   class function CanLoad(const FileName: String): Boolean; virtual; overload;
   class function CanLoad(const Buffer: Pointer; const Size: UInt32): Boolean; virtual; overload;
@@ -512,7 +520,10 @@ public
   procedure Load(const FileName: String); virtual; overload;
   procedure Load(const Buffer: Pointer; const Size: UInt32); virtual; overload;
   procedure Load(const StreamHelper: TUStreamHelper); virtual; abstract; overload;
-  constructor Create(const AOptions: TSceneDataOptionsSet = []);
+  constructor Create(
+    const AOptions: TUSceneDataOptionsSet = [];
+    const UpVector: TUSceneDataUpVector = sdu_any
+  ); virtual;
 end;
 
 type TUSceneDataDAE = class (TUSceneData)
@@ -603,6 +614,7 @@ public
     var _Offset: Int32;
     var _Set: Int32;
     function GetSize: UInt32; inline;
+    function GetCount: UInt32; inline;
   protected
     procedure ResolveLinks; override;
   public
@@ -611,6 +623,7 @@ public
     property Offset: Int32 read _Offset;
     property InputSet: Int32 read _Set;
     property Size: UInt32 read GetSize;
+    property Count: UInt32 read GetCount;
     constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
     destructor Destroy; override;
   end;
@@ -1005,6 +1018,7 @@ public
   public
     property Sampler: TColladaAnimationSampler read _Sampler;
     property Target: TColladaObject read _Target;
+    property TargetRef: String read _TargetRef;
     property TargetProperty: String read _TargetProperty;
     property MaxTime: TUFloat read GetMaxTime;
     constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
@@ -1228,9 +1242,9 @@ public
   end;
   type TColladaAsset = class (TColladaObject)
   private
-    var _UpAxis: TUSwizzle;
+    var _UpAxis: TUSceneDataUpVector;
   public
-    property UpAxis: TUSwizzle read _UpAxis;
+    property UpAxis: TUSceneDataUpVector read _UpAxis;
     constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
     destructor Destroy; override;
   end;
@@ -1247,9 +1261,11 @@ public
     var _LibLights: TColladaLibraryLights;
     var _LibVisualScenes: TColladaLibraryVisualScenes;
     var _Scene: TColladaScene;
-    var _Options: TSceneDataOptionsSet;
+    var _Options: TUSceneDataOptionsSet;
     var _RootPath: String;
+    var _Swizzle: TUSwizzle;
   public
+    property Swizzle: TUSwizzle read _Swizzle;
     property Asset: TColladaAsset read _Asset;
     property LibMaterials: TColladaLibraryMaterials read _LibMaterials;
     property LibEffects: TColladaLibraryEffects read _LibEffects;
@@ -1261,10 +1277,15 @@ public
     property LibLights: TColladaLibraryLights read _LibLights;
     property LibVisualScenes: TColladaLibraryVisualScenes read _LibVisualScenes;
     property Scene: TColladaScene read _Scene;
-    property Options: TSceneDataOptionsSet read _Options;
+    property Options: TUSceneDataOptionsSet read _Options;
     property RootPath: String read _RootPath;
-    constructor Create(const XMLNode: TUXML; const AOptions: TSceneDataOptionsSet; const Path: String);
+    constructor Create(
+      const XMLNode: TUXML;
+      const Path: String;
+      const AOptions: TUSceneDataOptionsSet
+    );
     destructor Destroy; override;
+    procedure ApplySwizzle(const UpVector: TUSceneDataUpVector);
   end;
 private
   type TImageInterfaceCollada = class (TImageInterface)
@@ -1350,6 +1371,7 @@ function ULoadImageData(const StreamHelper: TUStreamHelper): TUImageDataShared; 
 
 function UCmpVertexDescriptors(const vd0, vd1: TUVertexDescriptor): Boolean;
 function UComputeVertexSize(const vd: TUVertexDescriptor): UInt32;
+function UComputeVertexAttributeOffset(const vd: TUVertexDescriptor; const AttribIndex: Int32): UInt32;
 
 implementation
 
@@ -1436,6 +1458,19 @@ function UComputeVertexSize(const vd: TUVertexDescriptor): UInt32;
 begin
   Result := 0;
   for i := 0 to High(vd) do
+  begin
+    Result += vd[i].Size;
+  end;
+end;
+
+function UComputeVertexAttributeOffset(
+  const vd: TUVertexDescriptor;
+  const AttribIndex: Int32
+): UInt32;
+  var i: Int32;
+begin
+  Result := 0;
+  for i := 0 to AttribIndex - 1 do
   begin
     Result += vd[i].Size;
   end;
@@ -1978,7 +2013,9 @@ procedure TUImageDataPNG.Load(const StreamHelper: TUStreamHelper);
     sh.ReadBuffer(@Chunk.ChunkLength, 4); Chunk.ChunkLength := Swap32(Chunk.ChunkLength);
     sh.ReadBuffer(@Chunk.ChunkType, 4);
     if Length(ChunkData) < Integer(Chunk.ChunkLength) then
-    SetLength(ChunkData, Chunk.ChunkLength);
+    begin
+      SetLength(ChunkData, Chunk.ChunkLength);
+    end;
     Chunk.ChunkData := @ChunkData[0];
     sh.ReadBuffer(Chunk.ChunkData, Chunk.ChunkLength);
     sh.ReadBuffer(@Chunk.ChunkCRC, 4); Chunk.ChunkCRC := Swap32(Chunk.ChunkCRC);
@@ -2025,25 +2062,21 @@ procedure TUImageDataPNG.Load(const StreamHelper: TUStreamHelper);
   end;
   function GetC(const Pos: Int32): UInt8;
   begin
-    if ScanlinePrev <> nil then
+    if ScanlinePrev = nil then Exit(0);
+    if ChunkIHDR.BitDepth < 8 then
     begin
-      if ChunkIHDR.BitDepth < 8 then
-      begin
-        if Pos > 0 then
-        Result := ScanlinePrev^[Pos - 1]
-        else
-        Result := 0;
-      end
+      if Pos > 0 then
+      Result := ScanlinePrev^[Pos - 1]
       else
-      begin
-        if Pos >= PixelDataSize then
-        Result := ScanlinePrev^[Pos - PixelDataSize]
-        else
-        Result := 0;
-      end;
+      Result := 0;
     end
     else
-    Result := 0;
+    begin
+      if Pos >= PixelDataSize then
+      Result := ScanlinePrev^[Pos - PixelDataSize]
+      else
+      Result := 0;
+    end;
   end;
   function PaethPredictor(const a, b, c: UInt8): UInt8;
     var p, pa, pb, pc: Int32;
@@ -2089,353 +2122,349 @@ begin
   {$hints off}
   sh.ReadBuffer(@Header, 8);
   {$pop}
-  if Header = PNGHeader then
+  if Header <> PNGHeader then Exit;
+  ChunkIDAT := nil;
+  Transp := False;
+  KeepReading := True;
+  while KeepReading do
   begin
-    ChunkIDAT := nil;
-    Transp := False;
-    KeepReading := True;
-    while KeepReading do
+    ReadChunk;
+    if not CheckCRC(Chunk) then Continue;
+    if (Chunk.ChunkType = 'IHDR') then
     begin
-      ReadChunk;
-      if CheckCRC(Chunk) then
-      begin
-        if (Chunk.ChunkType = 'IHDR') then
+      ChunkIHDR.Width := Swap32(PUInt32(@PUInt8Arr(Chunk.ChunkData)^[0])^);
+      ChunkIHDR.Height := Swap32(PUInt32(@PUInt8Arr(Chunk.ChunkData)^[4])^);
+      ChunkIHDR.BitDepth := PUInt8Arr(Chunk.ChunkData)^[8];
+      ChunkIHDR.ColorType := TColorType(PByteArray(Chunk.ChunkData)^[9]);
+      ChunkIHDR.CompMethod := PUInt8Arr(Chunk.ChunkData)^[10];
+      ChunkIHDR.FilterMethod := PUInt8Arr(Chunk.ChunkData)^[11];
+      ChunkIHDR.InterlaceMethod := TInterlace(PUInt8Arr(Chunk.ChunkData)^[12]);
+      if ChunkIHDR.CompMethod <> 0 then Exit;
+      if ChunkIHDR.FilterMethod <> 0 then Exit;
+      if Byte(ChunkIHDR.InterlaceMethod) > 1 then Exit;
+      case ChunkIHDR.ColorType of
+        ctGrayscale:
         begin
-          ChunkIHDR.Width := Swap32(PUInt32(@PUInt8Arr(Chunk.ChunkData)^[0])^);
-          ChunkIHDR.Height := Swap32(PUInt32(@PUInt8Arr(Chunk.ChunkData)^[4])^);
-          ChunkIHDR.BitDepth := PUInt8Arr(Chunk.ChunkData)^[8];
-          ChunkIHDR.ColorType := TColorType(PByteArray(Chunk.ChunkData)^[9]);
-          ChunkIHDR.CompMethod := PUInt8Arr(Chunk.ChunkData)^[10];
-          ChunkIHDR.FilterMethod := PUInt8Arr(Chunk.ChunkData)^[11];
-          ChunkIHDR.InterlaceMethod := TInterlace(PUInt8Arr(Chunk.ChunkData)^[12]);
-          if ChunkIHDR.CompMethod <> 0 then Exit;
-          if ChunkIHDR.FilterMethod <> 0 then Exit;
-          if Byte(ChunkIHDR.InterlaceMethod) > 1 then Exit;
-          case ChunkIHDR.ColorType of
-            ctGrayscale:
+          if not (ChunkIHDR.BitDepth in [1, 2, 4, 8, 16]) then Exit;
+          if ChunkIHDR.BitDepth = 16 then
+          PixelDataSize := 2 else PixelDataSize := 1;
+          case ChunkIHDR.BitDepth of
+            1:
             begin
-              if not (ChunkIHDR.BitDepth in [1, 2, 4, 8, 16]) then Exit;
-              if ChunkIHDR.BitDepth = 16 then
-              PixelDataSize := 2 else PixelDataSize := 1;
-              case ChunkIHDR.BitDepth of
-                1:
-                begin
-                  BitPerPixel := 8;
-                  BitStep := 1;
-                  BitMask := 1;
-                  SetFormat(uif_g8);
-                end;
-                2:
-                begin
-                  BitPerPixel := 4;
-                  BitStep := 2;
-                  BitMask := 3;
-                  SetFormat(uif_g8);
-                end;
-                4:
-                begin
-                  BitPerPixel := 2;
-                  BitStep := 4;
-                  BitMask := 15;
-                  SetFormat(uif_g8);
-                end;
-                8: SetFormat(uif_g8);
-                16: SetFormat(uif_g16);
-              end;
+              BitPerPixel := 8;
+              BitStep := 1;
+              BitMask := 1;
+              SetFormat(uif_g8);
             end;
-            ctTrueColor:
+            2:
             begin
-              if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
-              PixelDataSize := 3 * ChunkIHDR.BitDepth div 8;
-              case ChunkIHDR.BitDepth of
-                8: SetFormat(uif_r8g8b8);
-                16: SetFormat(uif_r16g16b16);
-              end;
+              BitPerPixel := 4;
+              BitStep := 2;
+              BitMask := 3;
+              SetFormat(uif_g8);
             end;
-            ctIndexedColor:
+            4:
             begin
-              if not (ChunkIHDR.BitDepth in [1, 2, 4, 8]) then Exit;
-              PixelDataSize := 1;
-              SetFormat(uif_r8g8b8);
-              case ChunkIHDR.BitDepth of
-                1:
-                begin
-                  BitPerPixel := 8;
-                  BitStep := 1;
-                  BitMask := 1;
-                end;
-                2:
-                begin
-                  BitPerPixel := 4;
-                  BitStep := 2;
-                  BitMask := 3;
-                end;
-                4:
-                begin
-                  BitPerPixel := 2;
-                  BitStep := 4;
-                  BitMask := 15;
-                end;
-              end;
+              BitPerPixel := 2;
+              BitStep := 4;
+              BitMask := 15;
+              SetFormat(uif_g8);
             end;
-            ctGrayscaleAlpha:
-            begin
-              if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
-              PixelDataSize := 2 * ChunkIHDR.BitDepth div 8;
-              case ChunkIHDR.BitDepth of
-                8: SetFormat(uif_g8a8);
-                16: SetFormat(uif_g16a16);
-              end;
-            end;
-            ctTrueColorAlpha:
-            begin
-              if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
-              PixelDataSize := 4 * ChunkIHDR.BitDepth div 8;
-              case ChunkIHDR.BitDepth of
-                8: SetFormat(uif_r8g8b8a8);
-                16: SetFormat(uif_r16g16b16a16);
-              end;
-            end;
-            else
-            Exit;
-          end;
-        end
-        else if (Chunk.ChunkType = 'IEND') then
-        begin
-          KeepReading := False;
-        end
-        else if (Chunk.ChunkType = 'PLTE') then
-        begin
-          SetLength(ChunkPLTE.Entries, Chunk.ChunkLength div 3);
-          Move(Chunk.ChunkData^, ChunkPLTE.Entries[0], Chunk.ChunkLength);
-        end
-        else if (Chunk.ChunkType = 'IDAT') then
-        begin
-          SetLength(ChunkIDAT, Length(ChunkIDAT) + 1);
-          SetLength(ChunkIDAT[High(ChunkIDAT)], Chunk.ChunkLength);
-          Move(Chunk.ChunkData^, ChunkIDAT[High(ChunkIDAT)][0], Chunk.ChunkLength);
-        end
-        else if (Chunk.ChunkType = 'tRNS') then
-        begin
-          Transp := True;
-          case ChunkIHDR.ColorType of
-            ctGrayscale:
-            begin
-              TranspG := Swap16(PUInt16(Chunk.ChunkData)^);
-              if Format = uif_g8 then
-              SetFormat(uif_g8a8)
-              else
-              SetFormat(uif_g16a16);
-            end;
-            ctTrueColor:
-            begin
-              for i := 0 to 2 do
-              TranspRGB[i] := Swap16(PUInt16(Chunk.ChunkData)^);
-              if Format = uif_r8g8b8 then
-              SetFormat(uif_r8g8b8a8)
-              else
-              SetFormat(uif_r16g16b16a16);
-            end;
-            ctIndexedColor:
-            begin
-              SetLength(TranspPalette, Chunk.ChunkLength);
-              Move(Chunk.ChunkData^, TranspPalette[0], Chunk.ChunkLength);
-              SetFormat(uif_r8g8b8a8);
-            end;
-            ctGrayscaleAlpha, ctTrueColorAlpha: Exit;
-            else Exit;
+            8: SetFormat(uif_g8);
+            16: SetFormat(uif_g16);
           end;
         end;
+        ctTrueColor:
+        begin
+          if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
+          PixelDataSize := 3 * ChunkIHDR.BitDepth div 8;
+          case ChunkIHDR.BitDepth of
+            8: SetFormat(uif_r8g8b8);
+            16: SetFormat(uif_r16g16b16);
+          end;
+        end;
+        ctIndexedColor:
+        begin
+          if not (ChunkIHDR.BitDepth in [1, 2, 4, 8]) then Exit;
+          PixelDataSize := 1;
+          SetFormat(uif_r8g8b8);
+          case ChunkIHDR.BitDepth of
+            1:
+            begin
+              BitPerPixel := 8;
+              BitStep := 1;
+              BitMask := 1;
+            end;
+            2:
+            begin
+              BitPerPixel := 4;
+              BitStep := 2;
+              BitMask := 3;
+            end;
+            4:
+            begin
+              BitPerPixel := 2;
+              BitStep := 4;
+              BitMask := 15;
+            end;
+          end;
+        end;
+        ctGrayscaleAlpha:
+        begin
+          if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
+          PixelDataSize := 2 * ChunkIHDR.BitDepth div 8;
+          case ChunkIHDR.BitDepth of
+            8: SetFormat(uif_g8a8);
+            16: SetFormat(uif_g16a16);
+          end;
+        end;
+        ctTrueColorAlpha:
+        begin
+          if not (ChunkIHDR.BitDepth in [8, 16]) then Exit;
+          PixelDataSize := 4 * ChunkIHDR.BitDepth div 8;
+          case ChunkIHDR.BitDepth of
+            8: SetFormat(uif_r8g8b8a8);
+            16: SetFormat(uif_r16g16b16a16);
+          end;
+        end;
+        else
+        Exit;
+      end;
+    end
+    else if (Chunk.ChunkType = 'IEND') then
+    begin
+      KeepReading := False;
+    end
+    else if (Chunk.ChunkType = 'PLTE') then
+    begin
+      SetLength(ChunkPLTE.Entries, Chunk.ChunkLength div 3);
+      Move(Chunk.ChunkData^, ChunkPLTE.Entries[0], Chunk.ChunkLength);
+    end
+    else if (Chunk.ChunkType = 'IDAT') then
+    begin
+      SetLength(ChunkIDAT, Length(ChunkIDAT) + 1);
+      SetLength(ChunkIDAT[High(ChunkIDAT)], Chunk.ChunkLength);
+      Move(Chunk.ChunkData^, ChunkIDAT[High(ChunkIDAT)][0], Chunk.ChunkLength);
+    end
+    else if (Chunk.ChunkType = 'tRNS') then
+    begin
+      Transp := True;
+      case ChunkIHDR.ColorType of
+        ctGrayscale:
+        begin
+          TranspG := Swap16(PUInt16(Chunk.ChunkData)^);
+          if Format = uif_g8 then
+          SetFormat(uif_g8a8)
+          else
+          SetFormat(uif_g16a16);
+        end;
+        ctTrueColor:
+        begin
+          for i := 0 to 2 do
+          TranspRGB[i] := Swap16(PUInt16(Chunk.ChunkData)^);
+          if Format = uif_r8g8b8 then
+          SetFormat(uif_r8g8b8a8)
+          else
+          SetFormat(uif_r16g16b16a16);
+        end;
+        ctIndexedColor:
+        begin
+          SetLength(TranspPalette, Chunk.ChunkLength);
+          Move(Chunk.ChunkData^, TranspPalette[0], Chunk.ChunkLength);
+          SetFormat(uif_r8g8b8a8);
+        end;
+        ctGrayscaleAlpha, ctTrueColorAlpha: Exit;
+        else Exit;
       end;
     end;
-    CompressedData := TMemoryStream.Create;
-    DecompressedData := TMemoryStream.Create;
-    try
-      CompressedData.Position := 0;
-      DecompressedData.Position := 0;
-      for i := 0 to High(ChunkIDAT) do
+  end;
+  CompressedData := TMemoryStream.Create;
+  DecompressedData := TMemoryStream.Create;
+  try
+    CompressedData.Position := 0;
+    DecompressedData.Position := 0;
+    for i := 0 to High(ChunkIDAT) do
+    begin
+      CompressedData.Write(ChunkIDAT[i][0], Length(ChunkIDAT[i]));
+    end;
+    Decompress(CompressedData.Memory, CompressedData.Size, DecompressedData);
+    _Width := ChunkIHDR.Width;
+    _Height := ChunkIHDR.Height;
+    DataAlloc;
+    DecompressedData.Position := 0;
+    case ChunkIHDR.InterlaceMethod of
+      inAdam7: begin PassStart := 1; PassEnd := 7; end;
+      else begin PassStart := 0; PassEnd := 0; end;
+    end;
+    DataPtr := DecompressedData.Memory;
+    for Pass := PassStart to PassEnd do
+    begin
+      PassRows := _Height div RowOffset[Pass];
+      if (_Height mod RowOffset[Pass]) > RowStart[Pass] then Inc(PassRows);
+      PassCols := _Width div ColOffset[Pass];
+      if (_Width mod ColOffset[Pass]) > ColStart[Pass] then Inc(PassCols);
+      if (PassRows > 0) and (PassCols > 0) then
       begin
-        CompressedData.Write(ChunkIDAT[i][0], Length(ChunkIDAT[i]));
-      end;
-      Decompress(CompressedData.Memory, CompressedData.Size, DecompressedData);
-      _Width := ChunkIHDR.Width;
-      _Height := ChunkIHDR.Height;
-      DataAlloc;
-      DecompressedData.Position := 0;
-      case ChunkIHDR.InterlaceMethod of
-        inAdam7: begin PassStart := 1; PassEnd := 7; end;
-        else begin PassStart := 0; PassEnd := 0; end;
-      end;
-      DataPtr := DecompressedData.Memory;
-      for Pass := PassStart to PassEnd do
-      begin
-        PassRows := _Height div RowOffset[Pass];
-        if (_Height mod RowOffset[Pass]) > RowStart[Pass] then Inc(PassRows);
-        PassCols := _Width div ColOffset[Pass];
-        if (_Width mod ColOffset[Pass]) > ColStart[Pass] then Inc(PassCols);
-        if (PassRows > 0) and (PassCols > 0) then
+        ScanlineSize := PixelDataSize * PassCols;
+        ScanlinePrev := nil;
+        ScanlineCur := DataPtr;
+        if ChunkIHDR.BitDepth < 8 then
         begin
-          ScanlineSize := PixelDataSize * PassCols;
-          ScanlinePrev := nil;
-          ScanlineCur := DataPtr;
-          if ChunkIHDR.BitDepth < 8 then
-          begin
-            if ScanlineSize mod BitPerPixel > 0 then
-            ScanlineSize := (ScanlineSize div BitPerPixel + 1)
-            else
-            ScanlineSize := (ScanlineSize div BitPerPixel);
+          if ScanlineSize mod BitPerPixel > 0 then
+          ScanlineSize := (ScanlineSize div BitPerPixel + 1)
+          else
+          ScanlineSize := (ScanlineSize div BitPerPixel);
+        end;
+        Inc(DataPtr, (Integer(ScanlineSize) + 1) * PassRows);
+        y := RowStart[Pass];
+        for j := 0 to PassRows - 1 do
+        begin
+          CurFilter := TFilter(ScanlineCur^[0]);
+          {$push}
+          {$hints off}
+          ScanlineCur := PUInt8Arr(PtrUInt(ScanlineCur) + 1);
+          {$pop}
+          if ChunkIHDR.BitDepth > 8 then
+          for i := 0 to ScanlineSize div 2 - 1 do
+          PWord(@ScanlineCur^[i * 2])^ := Swap16(PUInt16(@ScanlineCur^[i * 2])^);
+          x := ColStart[Pass];
+          case CurFilter of
+            flSub:
+            for i := 0 to ScanlineSize - 1 do
+            ScanlineCur^[i] := FilterSub(ScanlineCur^[i], i);
+            flUp:
+            for i := 0 to ScanlineSize - 1 do
+            ScanlineCur^[i] := FilterUp(ScanlineCur^[i], i);
+            flAverage:
+            for i := 0 to ScanlineSize - 1 do
+            ScanlineCur^[i] := FilterAverage(ScanlineCur^[i], i);
+            flPaeth:
+            for i := 0 to ScanlineSize - 1 do
+            ScanlineCur^[i] := FilterPaeth(ScanlineCur^[i], i);
+            else begin end;
           end;
-          Inc(DataPtr, (Integer(ScanlineSize) + 1) * PassRows);
-          y := RowStart[Pass];
-          for j := 0 to PassRows - 1 do
+          if ChunkIHDR.ColorType = ctIndexedColor then
           begin
-            CurFilter := TFilter(ScanlineCur^[0]);
-            {$push}
-            {$hints off}
-            ScanlineCur := PUInt8Arr(PtrUInt(ScanlineCur) + 1);
-            {$pop}
-            if ChunkIHDR.BitDepth > 8 then
-            for i := 0 to ScanlineSize div 2 - 1 do
-            PWord(@ScanlineCur^[i * 2])^ := Swap16(PUInt16(@ScanlineCur^[i * 2])^);
-            x := ColStart[Pass];
-            case CurFilter of
-              flSub:
-              for i := 0 to ScanlineSize - 1 do
-              ScanlineCur^[i] := FilterSub(ScanlineCur^[i], i);
-              flUp:
-              for i := 0 to ScanlineSize - 1 do
-              ScanlineCur^[i] := FilterUp(ScanlineCur^[i], i);
-              flAverage:
-              for i := 0 to ScanlineSize - 1 do
-              ScanlineCur^[i] := FilterAverage(ScanlineCur^[i], i);
-              flPaeth:
-              for i := 0 to ScanlineSize - 1 do
-              ScanlineCur^[i] := FilterPaeth(ScanlineCur^[i], i);
-              else begin end;
-            end;
-            if ChunkIHDR.ColorType = ctIndexedColor then
+            if ChunkIHDR.BitDepth < 8 then
             begin
-              if ChunkIHDR.BitDepth < 8 then
+              for i := 0 to PassCols - 1 do
               begin
-                for i := 0 to PassCols - 1 do
+                BitCur := (ScanlineCur^[i div BitPerPixel] shr (8 - (i mod BitPerPixel + 1) * BitStep)) and BitMask;
+                PUInt8(_Data + (y * _Width + x) * _BPP + 0)^ := ChunkPLTE.Entries[BitCur].r;
+                PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := ChunkPLTE.Entries[BitCur].g;
+                PUInt8(_Data + (y * _Width + x) * _BPP + 2)^ := ChunkPLTE.Entries[BitCur].b;
+                if Transp then
                 begin
-                  BitCur := (ScanlineCur^[i div BitPerPixel] shr (8 - (i mod BitPerPixel + 1) * BitStep)) and BitMask;
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 0)^ := ChunkPLTE.Entries[BitCur].r;
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := ChunkPLTE.Entries[BitCur].g;
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 2)^ := ChunkPLTE.Entries[BitCur].b;
-                  if Transp then
-                  begin
-                    if BitCur > High(TranspPalette) then
-                    PByte(_Data + (y * _Width + x) * _BPP + 3)^ := $ff
-                    else
-                    PByte(_Data + (y * _Width + x) * _BPP + 3)^ := TranspPalette[BitCur];
-                  end;
-                  x := x + ColOffset[Pass];
+                  if BitCur > High(TranspPalette) then
+                  PByte(_Data + (y * _Width + x) * _BPP + 3)^ := $ff
+                  else
+                  PByte(_Data + (y * _Width + x) * _BPP + 3)^ := TranspPalette[BitCur];
                 end;
-              end
-              else //8 or 16 bit
-              begin
-                for i := 0 to PassCols - 1 do
-                begin
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 0)^ := ChunkPLTE.Entries[ScanlineCur^[i]].r;
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := ChunkPLTE.Entries[ScanlineCur^[i]].g;
-                  PUInt8(_Data + (y * _Width + x) * _BPP + 2)^ := ChunkPLTE.Entries[ScanlineCur^[i]].b;
-                  if Transp then
-                  begin
-                    if ScanlineCur^[i] > High(TranspPalette) then
-                    PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := $ff
-                    else
-                    PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := TranspPalette[ScanlineCur^[i]];
-                  end;
-                  x := x + ColOffset[Pass];
-                end;
+                x := x + ColOffset[Pass];
               end;
             end
-            else //non indexed
+            else //8 or 16 bit
             begin
-              if ChunkIHDR.BitDepth < 8 then
+              for i := 0 to PassCols - 1 do
               begin
-                for i := 0 to PassCols - 1 do
+                PUInt8(_Data + (y * _Width + x) * _BPP + 0)^ := ChunkPLTE.Entries[ScanlineCur^[i]].r;
+                PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := ChunkPLTE.Entries[ScanlineCur^[i]].g;
+                PUInt8(_Data + (y * _Width + x) * _BPP + 2)^ := ChunkPLTE.Entries[ScanlineCur^[i]].b;
+                if Transp then
                 begin
-                  BitCur := (ScanlineCur^[i div BitPerPixel] shr (8 - (i mod BitPerPixel + 1) * BitStep)) and BitMask;
-                  if Transp then
-                  begin
-                    if ChunkIHDR.ColorType = ctGrayscale then
-                    begin
-                      if BitCur = TranspG and BitMask then
-                      PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := 0
-                      else
-                      PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := $ff;
-                    end;
-                  end;
-                  BitCur := UnpackBits(BitCur);
-                  PUInt8(_Data + (y * _Width + x) * _BPP)^ := BitCur;
-                  x := x + ColOffset[Pass];
+                  if ScanlineCur^[i] > High(TranspPalette) then
+                  PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := $ff
+                  else
+                  PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := TranspPalette[ScanlineCur^[i]];
                 end;
-              end
-              else //8 or 16 bit
+                x := x + ColOffset[Pass];
+              end;
+            end;
+          end
+          else //non indexed
+          begin
+            if ChunkIHDR.BitDepth < 8 then
+            begin
+              for i := 0 to PassCols - 1 do
               begin
-                for i := 0 to PassCols - 1 do
+                BitCur := (ScanlineCur^[i div BitPerPixel] shr (8 - (i mod BitPerPixel + 1) * BitStep)) and BitMask;
+                if Transp then
                 begin
-                  for b := 0 to PixelDataSize - 1 do
-                  PUInt8(_Data + (y * _Width + x) * _BPP + b)^ := ScanlineCur^[i * PixelDataSize + b];
-                  if Transp then
+                  if ChunkIHDR.ColorType = ctGrayscale then
                   begin
-                    if ChunkIHDR.ColorType = ctGrayscale then
+                    if BitCur = TranspG and BitMask then
+                    PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := 0
+                    else
+                    PUInt8(_Data + (y * _Width + x) * _BPP + 1)^ := $ff;
+                  end;
+                end;
+                BitCur := UnpackBits(BitCur);
+                PUInt8(_Data + (y * _Width + x) * _BPP)^ := BitCur;
+                x := x + ColOffset[Pass];
+              end;
+            end
+            else //8 or 16 bit
+            begin
+              for i := 0 to PassCols - 1 do
+              begin
+                for b := 0 to PixelDataSize - 1 do
+                PUInt8(_Data + (y * _Width + x) * _BPP + b)^ := ScanlineCur^[i * PixelDataSize + b];
+                if Transp then
+                begin
+                  if ChunkIHDR.ColorType = ctGrayscale then
+                  begin
+                    if ChunkIHDR.BitDepth = 8 then
                     begin
-                      if ChunkIHDR.BitDepth = 8 then
-                      begin
-                        if ScanlineCur^[i * PixelDataSize] = UInt8(TranspG and $ff) then
-                        PUInt8Arr(_Data)^[(y * _Width + x) * _BPP + PixelDataSize] := 0
-                        else
-                        PUInt8Arr(_Data)^[(y * _Width + x) * _BPP + PixelDataSize] := $ff;
-                      end
+                      if ScanlineCur^[i * PixelDataSize] = UInt8(TranspG and $ff) then
+                      PUInt8Arr(_Data)^[(y * _Width + x) * _BPP + PixelDataSize] := 0
                       else
-                      begin
-                        if PUInt16(@ScanlineCur^[i * PixelDataSize])^ = TranspG then
-                        PUInt16(@PByteArray(_Data)^[(y * _Width + x) * _BPP + PixelDataSize])^ := 0
-                        else
-                        PUInt16(@PByteArray(_Data)^[(y * _Width + x) * _BPP + PixelDataSize])^ := $ffff;
-                      end;
+                      PUInt8Arr(_Data)^[(y * _Width + x) * _BPP + PixelDataSize] := $ff;
                     end
                     else
                     begin
-                      if ChunkIHDR.BitDepth = 8 then
-                      begin
-                        if (ScanlineCur^[i * PixelDataSize + 0] = UInt8(TranspRGB[0] and $ff))
-                        and (ScanlineCur^[i * PixelDataSize + 1] = UInt8(TranspRGB[1] and $ff))
-                        and (ScanlineCur^[i * PixelDataSize + 2] = UInt8(TranspRGB[2] and $ff)) then
-                        PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := 0
-                        else
-                        PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := $ff;
-                      end
+                      if PUInt16(@ScanlineCur^[i * PixelDataSize])^ = TranspG then
+                      PUInt16(@PByteArray(_Data)^[(y * _Width + x) * _BPP + PixelDataSize])^ := 0
                       else
-                      begin
-                        if (PUInt16(@ScanlineCur^[i * PixelDataSize + 0])^ = TranspRGB[0])
-                        and (PUInt16(@ScanlineCur^[i * PixelDataSize + 2])^ = TranspRGB[1])
-                        and (PUInt16(@ScanlineCur^[i * PixelDataSize + 4])^ = TranspRGB[2]) then
-                        PUInt16(_Data + (y * _Width + x) * _BPP + 6)^ := 0
-                        else
-                        PUInt16(_Data + (y * _Width + x) * _BPP + 6)^ := $ffff;
-                      end;
+                      PUInt16(@PByteArray(_Data)^[(y * _Width + x) * _BPP + PixelDataSize])^ := $ffff;
+                    end;
+                  end
+                  else
+                  begin
+                    if ChunkIHDR.BitDepth = 8 then
+                    begin
+                      if (ScanlineCur^[i * PixelDataSize + 0] = UInt8(TranspRGB[0] and $ff))
+                      and (ScanlineCur^[i * PixelDataSize + 1] = UInt8(TranspRGB[1] and $ff))
+                      and (ScanlineCur^[i * PixelDataSize + 2] = UInt8(TranspRGB[2] and $ff)) then
+                      PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := 0
+                      else
+                      PUInt8(_Data + (y * _Width + x) * _BPP + 3)^ := $ff;
+                    end
+                    else
+                    begin
+                      if (PUInt16(@ScanlineCur^[i * PixelDataSize + 0])^ = TranspRGB[0])
+                      and (PUInt16(@ScanlineCur^[i * PixelDataSize + 2])^ = TranspRGB[1])
+                      and (PUInt16(@ScanlineCur^[i * PixelDataSize + 4])^ = TranspRGB[2]) then
+                      PUInt16(_Data + (y * _Width + x) * _BPP + 6)^ := 0
+                      else
+                      PUInt16(_Data + (y * _Width + x) * _BPP + 6)^ := $ffff;
                     end;
                   end;
-                  x := x + ColOffset[Pass];
                 end;
+                x := x + ColOffset[Pass];
               end;
             end;
-            ScanlinePrev := ScanlineCur;
-            {$Hints off}
-            ScanlineCur := PUInt8Arr(PtrUInt(ScanlineCur) + ScanlineSize);
-            {$Hints on}
-            y := y + RowOffset[Pass];
           end;
+          ScanlinePrev := ScanlineCur;
+          {$Hints off}
+          ScanlineCur := PUInt8Arr(PtrUInt(ScanlineCur) + ScanlineSize);
+          {$Hints on}
+          y := y + RowOffset[Pass];
         end;
       end;
-    finally
-      CompressedData.Free;
-      DecompressedData.Free;
     end;
+  finally
+    CompressedData.Free;
+    DecompressedData.Free;
   end;
 end;
 
@@ -2578,6 +2607,11 @@ begin
   end;
 end;
 
+procedure TUSceneData.TNodeInterface.AddId(const Id: String);
+begin
+  specialize UArrAppend<String>(_Ids, LowerCase(Id));
+end;
+
 procedure TUSceneData.TNodeInterface.ApplyTransform(const Value: TUMat);
   var i: Int32;
 begin
@@ -2617,6 +2651,18 @@ begin
   begin
     SetTransform(Value);
   end;
+end;
+
+function TUSceneData.TNodeInterface.MatchId(const Id: String): Boolean;
+  var i: Int32;
+  var IdLc: String;
+begin
+  IdLc := LowerCase(Id);
+  for i := 0 to High(_Ids) do
+  begin
+    if IdLc = _Ids[i] then Exit(True);
+  end;
+  Result := False;
 end;
 
 destructor TUSceneData.TNodeInterface.Destroy;
@@ -2991,10 +3037,14 @@ begin
   end;
 end;
 
-constructor TUSceneData.Create(const AOptions: TSceneDataOptionsSet);
+constructor TUSceneData.Create(
+  const AOptions: TUSceneDataOptionsSet;
+  const UpVector: TUSceneDataUpVector
+);
 begin
   inherited Create;
   _Options := AOptions;
+  _UpVector := UpVector;
 end;
 // TUSceneData end
 
@@ -3374,6 +3424,24 @@ begin
     Exit(0);
   end;
   Result := Src.DataArray.ItemSize * Src.Accessor.Stride;
+end;
+
+function TUSceneDataDAE.TColladaInput.GetCount: UInt32;
+  var Src: TColladaSource;
+begin
+  if _Source is TColladaSource then
+  begin
+    Src := TColladaSource(Source);
+  end
+  else if _Source is TColladaVertices then
+  begin
+    Src := TColladaSource(TColladaVertices(_Source).Inputs[0].Source);
+  end
+  else
+  begin
+    Exit(0);
+  end;
+  Result := Src.Accessor.Count;
 end;
 
 procedure TUSceneDataDAE.TColladaInput.ResolveLinks;
@@ -4454,9 +4522,19 @@ begin
     begin
       for NodeTech in Node do
       begin
-        specialize UArrAppend<TColladaEffectTechnique>(
-          _Techniques, TColladaEffectTechnique.Create(NodeTech, Self)
-        );
+        if (LowerCase(NodeTech.Name) = 'extra')
+        and (NodeTech.ChildCount > 0) then
+        begin
+          specialize UArrAppend<TColladaEffectTechnique>(
+            _Techniques, TColladaEffectTechnique.Create(NodeTech.Children[0], Self)
+          );
+        end
+        else
+        begin
+          specialize UArrAppend<TColladaEffectTechnique>(
+            _Techniques, TColladaEffectTechnique.Create(NodeTech, Self)
+          );
+        end;
       end;
     end;
   end;
@@ -4870,53 +4948,46 @@ begin
   InputInterpolation := FindInput('INTERPOLATION');
   InputTangentIn := FindInput('IN_TANGENT');
   InputTangentOut := FindInput('OUT_TANGENT');
-  if (Assigned(InputTime))
-  or (Assigned(InputValue)) then
+  if not (Assigned(InputTime) and Assigned(InputValue)) then Exit;
+  src := TColladaSource(InputValue.Source);
+  GetMemory(_Data, src.Accessor.Count * src.Accessor.Stride * src.DataArray.ItemSize);
+  _DataType := src.DataArray.ArrayType;
+  _DataStride := src.Accessor.Stride;
+  _DataSize := src.DataArray.ItemSize;
+  SetLength(_Keys, TColladaSource(InputTime.Source).Accessor.Count);
+  for i := 0 to High(_Keys) do
   begin
+    src := TColladaSource(InputTime.Source);
+    _Keys[i].Time := src.DataArray.AsFloat[src.Accessor.Stride * i]^;
     src := TColladaSource(InputValue.Source);
-    GetMemory(_Data, src.Accessor.Count * src.Accessor.Stride * src.DataArray.ItemSize);
-    _DataType := src.DataArray.ArrayType;
-    _DataStride := src.Accessor.Stride;
-    _DataSize := src.DataArray.ItemSize;
-    SetLength(_Keys, TColladaSource(InputTime.Source).Accessor.Count);
-    for i := 0 to High(_Keys) do
+    n := i * src.Accessor.Stride * src.DataArray.ItemSize;
+    _Keys[i].Value := _Data + n;
+    Move(src.DataArray.RawData[n]^, _Keys[i].Value^, src.Accessor.Stride * src.DataArray.ItemSize);
+    if Assigned(InputInterpolation) then
     begin
-      src := TColladaSource(InputTime.Source);
-      _Keys[i].Time := src.DataArray.AsFloat[src.Accessor.Stride * i]^;
-      src := TColladaSource(InputValue.Source);
-      n := i * src.Accessor.Stride * src.DataArray.ItemSize;
-      _Keys[i].Value := _Data + n;
-      Move(src.DataArray.RawData[n]^, _Keys[i].Value^, src.Accessor.Stride * src.DataArray.ItemSize);
-      if Assigned(InputInterpolation) then
+      src := TColladaSource(InputInterpolation.Source);
+      if src.DataArray.AsString[i] = 'STEP' then
       begin
-        src := TColladaSource(InputInterpolation.Source);
-        if src.DataArray.AsString[i] = 'STEP' then
+        _Keys[i].Interpolation := ai_step;
+      end
+      else if src.DataArray.AsString[i] = 'BEZIER' then
+      begin
+        if Assigned(InputTangentIn)
+        and Assigned(InputTangentOut) then
         begin
-          _Keys[i].Interpolation := ai_step;
-        end
-        else if src.DataArray.AsString[i] = 'BEZIER' then
-        begin
-          if Assigned(InputTangentIn)
-          and Assigned(InputTangentOut) then
+          src := TColladaSource(InputTangentIn.Source);
+          SetLength(_Keys[i].TangentIn, src.Accessor.Stride);
+          for j := 0 to src.Accessor.Stride - 1 do
           begin
-            src := TColladaSource(InputTangentIn.Source);
-            SetLength(_Keys[i].TangentIn, src.Accessor.Stride);
-            for j := 0 to src.Accessor.Stride - 1 do
-            begin
-              _Keys[i].TangentIn[j] := src.DataArray.AsFloat[i * src.Accessor.Stride + j]^;
-            end;
-            src := TColladaSource(InputTangentOut.Source);
-            SetLength(_Keys[i].TangentOut, src.Accessor.Stride);
-            for j := 0 to src.Accessor.Stride - 1 do
-            begin
-              _Keys[i].TangentOut[j] := src.DataArray.AsFloat[i * src.Accessor.Stride + j]^;
-            end;
-            _Keys[i].Interpolation := ai_bezier;
-          end
-          else
-          begin
-            _Keys[i].Interpolation := ai_linear;
+            _Keys[i].TangentIn[j] := src.DataArray.AsFloat[i * src.Accessor.Stride + j]^;
           end;
+          src := TColladaSource(InputTangentOut.Source);
+          SetLength(_Keys[i].TangentOut, src.Accessor.Stride);
+          for j := 0 to src.Accessor.Stride - 1 do
+          begin
+            _Keys[i].TangentOut[j] := src.DataArray.AsFloat[i * src.Accessor.Stride + j]^;
+          end;
+          _Keys[i].Interpolation := ai_bezier;
         end
         else
         begin
@@ -4927,6 +4998,10 @@ begin
       begin
         _Keys[i].Interpolation := ai_linear;
       end;
+    end
+    else
+    begin
+      _Keys[i].Interpolation := ai_linear;
     end;
   end;
 end;
@@ -5741,18 +5816,22 @@ constructor TUSceneDataDAE.TColladaAsset.Create(
   var Str: String;
 begin
   inherited Create(XMLNode, AParent);
-  _UpAxis.SetIdentity;
+  _UpAxis := sdu_any;
   Node := XMLNode.FindChild('up_axis');
   if Assigned(Node) then
   begin
     Str := LowerCase(Node.Content);
     if Str = 'x_up' then
     begin
-      _UpAxis.SetValue(1, 0);
+      _UpAxis := sdu_x;
+    end
+    else if Str = 'y_up' then
+    begin
+      _UpAxis := sdu_y;
     end
     else if Str = 'z_up' then
     begin
-      _UpAxis.SetValue(0, 2, 1);
+      _UpAxis := sdu_z;
     end;
   end;
 end;
@@ -5764,14 +5843,15 @@ end;
 
 constructor TUSceneDataDAE.TColladaRoot.Create(
   const XMLNode: TUXML;
-  const AOptions: TSceneDataOptionsSet;
-  const Path: String
+  const Path: String;
+  const AOptions: TUSceneDataOptionsSet
 );
   var Node: TUXML;
   var NodeName: String;
 begin
   inherited Create(XMLNode, nil);
   _RootPath := Path;
+  _Options := AOptions;
   Node := XMLNode.FindChild('asset');
   if Assigned(Node) then
   begin
@@ -5828,6 +5908,24 @@ begin
   inherited Destroy;
 end;
 
+procedure TUSceneDataDAE.TColladaRoot.ApplySwizzle(
+  const UpVector: TUSceneDataUpVector
+);
+  const Remap: array [0..2] of array [0..2] of array [0..2] of UInt8 = (
+    ((0, 1, 2), (1, 0, 2), (2, 1, 0)),
+    ((1, 0, 2), (0, 1, 2), (0, 2, 1)),
+    ((2, 1, 0), (0, 2, 1), (0, 1, 2))
+  );
+  var i, j: Int32;
+begin
+  if UpVector = sdu_any then Exit;
+  if not Assigned(_Asset) then Exit;
+  if _Asset.UpAxis = sdu_any then Exit;
+  i := Int32(UpVector) - 1;
+  j := Int32(_Asset.UpAxis) - 1;
+  _Swizzle := TUSwizzle.Make(Remap[i, j][0], Remap[i, j][1], Remap[i, j][2]);
+end;
+
 constructor TUSceneDataDAE.TImageInterfaceCollada.Create(
   const ColladaImage: TColladaImage
 );
@@ -5844,7 +5942,7 @@ constructor TUSceneDataDAE.TMaterialInterfaceCollada.Create(
 );
   var Technique: TColladaEffectTechnique;
   var Profile: TColladaEffectProfile;
-  var i: Int32;
+  var t, i: Int32;
   var Param: TColladaEffectProfileParam;
   var Sampler: TColladaEffectProfileParam.TDataSampler;
   var ParamName: String;
@@ -5856,50 +5954,53 @@ begin
   or not Assigned(ColladaMaterial.InstanceEffect.Effect)
   or not Assigned(ColladaMaterial.InstanceEffect.Effect.Profile) then Exit;
   Profile := ColladaMaterial.InstanceEffect.Effect.Profile;
-  if Length(Profile.Techniques) < 1 then Exit;
-  Technique := Profile.Techniques[0];
-  for i := 0 to High(Technique.Params) do
+  for t := 0 to High(Profile.Techniques) do
   begin
-    ParamName := Technique.Params[i].Name;
-    Param := Technique.Params[i].Param;
-    case Param.ParamType of
-      pt_sampler:
-      begin
-        Sampler := Param.AsSampler;
-        if Assigned(Sampler.Surface)
-        and Assigned(Sampler.Surface.Image) then
+    Technique := Profile.Techniques[t];
+    for i := 0 to High(Technique.Params) do
+    begin
+      ParamName := Technique.Params[i].Name;
+      Param := Technique.Params[i].Param;
+      if Assigned(FindParam(ParamName)) then Continue;
+      case Param.ParamType of
+        pt_sampler:
         begin
-          with NewParamImage(ParamName) do
+          Sampler := Param.AsSampler;
+          if Assigned(Sampler.Surface)
+          and Assigned(Sampler.Surface.Image) then
           begin
-            Image := TImageInterface(Sampler.Surface.Image.UserData);
-            Source := Sampler.Surface.Image.Source;
-            case Param.AsSampler.SamplerType of
-              st_1d: ImageType := it_1d;
-              st_2d: ImageType := it_2d;
-              st_3d: ImageType := it_3d;
-              st_cube: ImageType := it_cube;
-              else ImageType := it_2d;
+            with NewParamImage(ParamName) do
+            begin
+              Image := TImageInterface(Sampler.Surface.Image.UserData);
+              Source := Sampler.Surface.Image.Source;
+              case Param.AsSampler.SamplerType of
+                st_1d: ImageType := it_1d;
+                st_2d: ImageType := it_2d;
+                st_3d: ImageType := it_3d;
+                st_cube: ImageType := it_cube;
+                else ImageType := it_2d;
+              end;
             end;
           end;
         end;
+        pt_float:
+        begin
+          NewParamFloat(ParamName).Value := Param.AsFloat.Value;
+        end;
+        pt_float2:
+        begin
+          NewParamVec2(ParamName).Value := Param.AsFloat2.Value;
+        end;
+        pt_float3:
+        begin
+          NewParamVec3(ParamName).Value := Param.AsFloat3.Value;
+        end;
+        pt_float4:
+        begin
+          NewParamVec4(ParamName).Value := Param.AsFloat4.Value;
+        end;
+        else begin end;
       end;
-      pt_float:
-      begin
-        NewParamFloat(ParamName).Value := Param.AsFloat.Value;
-      end;
-      pt_float2:
-      begin
-        NewParamVec2(ParamName).Value := Param.AsFloat2.Value;
-      end;
-      pt_float3:
-      begin
-        NewParamVec3(ParamName).Value := Param.AsFloat3.Value;
-      end;
-      pt_float4:
-      begin
-        NewParamVec4(ParamName).Value := Param.AsFloat4.Value;
-      end;
-      else begin end;
     end;
   end;
 end;
@@ -5919,6 +6020,7 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
   var FaceNormals: array of TUVec3;
   var Normals: array of TUVec3;
   var RemapNormals: array of Int32;
+  var AttribStride: Int32;
   procedure GenerateNormals;
     var i, j, Ind, VCount: Int32;
     var Pos: array[0..2] of TUVec4;
@@ -6062,17 +6164,17 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
     end;
     SetLength(Tangents, TangentCount);
   end;
-  var VertexBuffer: array of array of Int32;
-  //var VertexRemap: array of Int32;
-  function AddVertex(const AttribIndices: array of Int32): Int32;
+  var VertexBuffer: array of Int32;
+  var VertexBufferCount: Int32;
+  function AddVertex(const AttribIndices: TUInt32Array): Int32;
     var i, j: Int32;
     var Match: Boolean;
   begin
-    for i := 0 to High(VertexBuffer) do
+    for i := 0 to Length(VertexBuffer) div AttribStride - 1 do
     begin
       Match := True;
       for j := 0 to High(_VertexDescriptor) do
-      if VertexBuffer[i][j] <> AttribIndices[j] then
+      if VertexBuffer[i * AttribStride + j] <> AttribIndices[j] then
       begin
         Match := False;
         Break;
@@ -6082,14 +6184,49 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
         Exit(i);
       end;
     end;
-    i := Length(VertexBuffer);
-    SetLength(VertexBuffer, i + 1);
-    SetLength(VertexBuffer[i], Length(_VertexDescriptor));
+    i := VertexBufferCount;
+    Inc(VertexBufferCount);
     for j := 0 to High(_VertexDescriptor) do
     begin
-      VertexBuffer[i][j] := AttribIndices[j];
+      VertexBuffer[i * AttribStride + j] := AttribIndices[j];
     end;
     Result := i;
+  end;
+  var Root: TColladaRoot;
+  var AttribOffsets: array of Int32;
+  procedure ApplySwizzle;
+    var i, j: Int32;
+    var Data: Pointer;
+    var DataVec2: PUVec2 absolute Data;
+    var DataVec3: PUVec3 absolute Data;
+    var v2: TUVec2;
+    var v3: TUVec3;
+  begin
+    if not Assigned(Root) then Exit;
+    if Root.Swizzle.IsIdentity then Exit;
+    for i := 0 to Length(VertexBuffer) div AttribStride do
+    for j := 0 to High(_VertexDescriptor) do
+    begin
+      if _VertexDescriptor[j].DataType <> dt_float then Continue;
+      Data := _VertexData + i * VertexSize + AttribOffsets[j];
+      if _VertexDescriptor[j].Semantic in [
+         as_position, as_normal, as_tangent, as_binormal
+      ] then
+      begin
+        case _VertexDescriptor[j].DataCount of
+          2:
+          begin
+            v2 := DataVec2^;
+            DataVec2^ := v2.Swizzle(Root.Swizzle);
+          end;
+          3:
+          begin
+            v3 := DataVec3^;
+            DataVec3^ := v3.Swizzle(Root.Swizzle);
+          end;
+        end;
+      end;
+    end;
   end;
   var NormalInd: Int32;
   var TangentInd: Int32;
@@ -6097,11 +6234,10 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
   var GenAttribs: Int32;
   var GenNormals: Boolean;
   var GenTangents: Boolean;
-  var AttribOffsets: array of Int32;
-  var AttribIndices: array of Int32;
-  var VertexIndices: array of Int32;
+  var AttribIndices: TUInt32Array;
+  var VertexIndices: TUInt32Array;
   var i, j, ai, Ind: Int32;
-  var Root: TColladaRoot;
+  var VertexPtr, AttribPtr: Pointer;
 begin
   ColladaTriangles.UserData := Self;
   _VertexDescriptor := ColladaTriangles.VertexDescriptor;
@@ -6161,6 +6297,7 @@ begin
     end;
     GenerateTangents;
   end;
+  AttribStride := Length(_VertexDescriptor);
   AttribOffsets := nil;
   SetLength(AttribOffsets, Length(_VertexDescriptor));
   _VertexSize := 0;
@@ -6183,51 +6320,81 @@ begin
   SetLength(AttribIndices, Length(_VertexDescriptor));
   _VertexRemap := nil;
   SetLength(_VertexRemap, Length(VertexIndices));
-  for i := 0 to ColladaTriangles.Count * 3 - 1 do
+  VertexBuffer := nil;
+  VertexBufferCount := 0;
+  if (GenAttribs = 0) then
   begin
-    for j := 0 to High(ColladaTriangles.VertexLayout) do
+    VertexBufferCount := ColladaTriangles.Inputs[PositionInd].Count;
+    SetLength(VertexBuffer, VertexBufferCount * AttribStride);
+    for i := 0 to ColladaTriangles.Count * 3 - 1 do
     begin
-      Ind := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[j].Offset];
-      AttribIndices[j] := Ind;
-    end;
-    for j := 0 to GenAttribs - 1 do
-    begin
-      ai := Length(ColladaTriangles.VertexLayout) + j;
-      case _VertexDescriptor[ai].Semantic of
-        as_normal: Ind := RemapNormals[i];
-        as_tangent, as_binormal: Ind := RemapTangents[i];
-        else begin end;
+      VertexInd := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[PositionInd].Offset];
+      for j := 0 to High(ColladaTriangles.VertexLayout) do
+      begin
+        Ind := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[j].Offset];
+        VertexBuffer[VertexInd * AttribStride + j] := Ind;
       end;
-      AttribIndices[ai] := Ind;
+      VertexIndices[i] := VertexInd;
+      _VertexRemap[VertexIndices[i]] := VertexInd;
     end;
-    VertexInd := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[PositionInd].Offset];
-    VertexIndices[i] := AddVertex(AttribIndices);
-    _VertexRemap[VertexIndices[i]] := VertexInd;
   end;
-  _VertexCount := Length(VertexBuffer);
+  if Length(VertexBuffer) = 0 then
+  begin
+    SetLength(VertexBuffer, ColladaTriangles.Count * 3 * AttribStride);
+    for i := 0 to ColladaTriangles.Count * 3 - 1 do
+    begin
+      VertexInd := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[PositionInd].Offset];
+      for j := 0 to High(ColladaTriangles.VertexLayout) do
+      begin
+        Ind := ColladaTriangles.Indices^[IndexInputStride * i + ColladaTriangles.Inputs[j].Offset];
+        AttribIndices[j] := Ind;
+      end;
+      for j := 0 to GenAttribs - 1 do
+      begin
+        ai := Length(ColladaTriangles.VertexLayout) + j;
+        case _VertexDescriptor[ai].Semantic of
+          as_normal: Ind := RemapNormals[i];
+          as_tangent, as_binormal: Ind := RemapTangents[i];
+          else begin end;
+        end;
+        AttribIndices[ai] := Ind;
+      end;
+      VertexIndices[i] := AddVertex(AttribIndices);
+      _VertexRemap[VertexIndices[i]] := VertexInd;
+    end;
+  end;
+  _VertexCount := VertexBufferCount;
   _VertexData := GetMem(VertexSize * _VertexCount);
   _IndexCount := ColladaTriangles.Count * 3;
   _IndexData := GetMem(IndexSize * _IndexCount);
-  for i := 0 to High(VertexBuffer) do
+  for i := 0 to _VertexCount - 1 do
   begin
+    VertexPtr := _VertexData + i * VertexSize;
     for j := 0 to High(ColladaTriangles.VertexLayout) do
     begin
+      AttribPtr := VertexPtr + AttribOffsets[j];
       ColladaTriangles.CopyInputData(
-        _VertexData + i * VertexSize + AttribOffsets[j],
-        ColladaTriangles.VertexLayout[j], VertexBuffer[i][j]
+        AttribPtr, ColladaTriangles.VertexLayout[j], VertexBuffer[i * AttribStride + j]
       );
+      if (_VertexDescriptor[j].Semantic = as_texcoord)
+      and (_VertexDescriptor[j].DataType = dt_float)
+      and (_VertexDescriptor[j].DataCount > 1) then
+      begin
+        PUVec2(AttribPtr)^[1] := 1 - PUVec2(AttribPtr)^[1];
+      end;
     end;
     for j := 0 to GenAttribs - 1 do
     begin
       ai := Length(ColladaTriangles.VertexLayout) + j;
       case _VertexDescriptor[ai].Semantic of
-        as_normal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Normals[VertexBuffer[i][ai]];
-        as_tangent: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][ai]].Tangent;
-        as_binormal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i][ai]].Binormal;
+        as_normal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Normals[VertexBuffer[i * AttribStride + ai]];
+        as_tangent: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i * AttribStride + ai]].Tangent;
+        as_binormal: PUVec3(_VertexData + i * VertexSize + AttribOffsets[ai])^ := Tangents[VertexBuffer[i * AttribStride + ai]].Binormal;
         else begin end;
       end;
     end;
   end;
+  ApplySwizzle;
   if _IndexSize = 2 then
   begin
     for i := 0 to High(VertexIndices) do
@@ -6271,6 +6438,7 @@ constructor TUSceneDataDAE.TSkinInterfaceCollada.Create(
   type PDataIndices = ^TDataIndices;
   type TDataWeights = array[0..3] of TUFloat;
   type PDataWeights = ^TDataWeights;
+  var Root: TColladaRoot;
   var i, j, w, n: Int32;
   var tw: TUFloat;
   var pi: PDataIndices;
@@ -6279,14 +6447,24 @@ constructor TUSceneDataDAE.TSkinInterfaceCollada.Create(
   var Weights: array of array of TWeight;
   var MaxWeightCount, VertexStride, WeightsOffset: Int32;
 begin
+  Root := ColladaSkin.GetRoot as TColladaRoot;
   ColladaSkin.UserData := Self;
   _ShapeBind := ColladaSkin.BindShapeMatrix;
+  if not Root.Swizzle.IsIdentity then
+  begin
+    _ShapeBind := _ShapeBind.Swizzle(Root.Swizzle);
+  end;
   _Mesh := TMeshInterface(ColladaSkin.Geometry.UserData);
   SetLength(_Joints, Length(ColladaSkin.Joints.Joints));
   for i := 0 to High(_Joints) do
   begin
     _Joints[i].Name := ColladaSkin.Joints.Joints[i].JointName;
     _Joints[i].Bind := ColladaSkin.Joints.Joints[i].BindPose;
+  end;
+  if not Root.Swizzle.IsIdentity then
+  for i := 0 to High(_Joints) do
+  begin
+    _Joints[i].Bind := _Joints[i].Bind.Swizzle(Root.Swizzle);
   end;
   Weights := nil;
   SetLength(Weights, ColladaSkin.VertexWeights.VCount);
@@ -6350,11 +6528,16 @@ constructor TUSceneDataDAE.TAnimationInterfaceCollada.TTrackCollada.Create(
   const ColladaChannel: TColladaAnimationChannel
 );
   var i: Int32;
+  var Xf: TUMat;
+  var Root: TColladaRoot;
 begin
   inherited Create;
+  Root := ColladaChannel.GetRoot as TColladaRoot;
   _Name := ColladaChannel.Target.AnyName;
   _Target := TNodeInterface(ColladaChannel.Target.UserData);
-  if ColladaChannel.TargetProperty <> 'transform' then Exit;
+  _TargetId := ColladaChannel.TargetRef;
+  if (ColladaChannel.TargetProperty <> 'transform')
+  and (ColladaChannel.TargetProperty <> 'matrix') then Exit;
   if ColladaChannel.Sampler.DataType <> at_float then Exit;
   if ColladaChannel.Sampler.SampleSize <> 16 * SizeOf(TUFloat) then Exit;
   _MaxTime := ColladaChannel.Sampler.MaxTime;
@@ -6362,8 +6545,13 @@ begin
   for i := 0 to High(_Keys) do
   begin
     _Keys[i].Time := ColladaChannel.Sampler.Keys[i]^.Time;
-    _Keys[i].Value := PUMat(ColladaChannel.Sampler.Keys[i]^.Value)^;
-    _Keys[i].Value := _Keys[i].Value.Transpose;
+    Xf := PUMat(ColladaChannel.Sampler.Keys[i]^.Value)^;
+    Xf := Xf.Transpose;
+    if not Root.Swizzle.IsIdentity then
+    begin
+      Xf := Xf.Swizzle(Root.Swizzle);
+    end;
+    _Keys[i].Value := Xf;
     case (ColladaChannel.Sampler.Keys[i]^.Interpolation) of
       ai_step: _Keys[i].Interpolation := ki_step;
       ai_linear, ai_bezier: _Keys[i].Interpolation := ki_linear;
@@ -6430,7 +6618,6 @@ begin
   begin
     JointObject := FindNode(ControllerInstance.Skeleton, _Skin.Joints[i].Name);
     _JointBindings[i] := TNodeInterface(JointObject.UserData);
-    WriteLn(_JointBindings[i].Name);
   end;
   _MaterialBindings := GenerateMaterialBindings(
     ControllerInstance.Controller.AsSkin.Geometry, ControllerInstance.MaterialBindings
@@ -6441,7 +6628,9 @@ constructor TUSceneDataDAE.TNodeInterfaceCollada.Create(
   const AColladaNode: TColladaNode;
   const AParent: TNodeInterfaceCollada
 );
+  var Root: TColladaRoot;
   var Child: TColladaObject;
+  var Xf: TUMat;
 begin
   inherited Create;
   _Transform := TUMat.Identity;
@@ -6449,8 +6638,17 @@ begin
   Parent := AParent;
   if Assigned(_ColladaNode) then
   begin
+    AddId(_ColladaNode.Name);
+    if Length(_ColladaNode.id) > 0 then AddId(_ColladaNode.id);
+    if Length(_ColladaNode.sid) > 0 then AddId(_ColladaNode.sid);
+    Root := AColladaNode.GetRoot as TColladaRoot;
     _ColladaNode.UserData := Self;
-    LocalTransform := _ColladaNode.Matrix;
+    Xf := _ColladaNode.Matrix;
+    if Assigned(Root) and (not Root.Swizzle.IsIdentity) then
+    begin
+      Xf := Xf.Swizzle(Root.Swizzle);
+    end;
+    LocalTransform := Xf;
     if Length(_ColladaNode.Name) > 0 then
     begin
       _Name := _ColladaNode.Name;
@@ -6459,7 +6657,6 @@ begin
     begin
       _Name := _ColladaNode.id;
     end;
-    WriteLn(_ColladaNode.AnyName, ' ', PtrUInt(_ColladaNode.UserData));
     for Child in _ColladaNode.Children do
     begin
       if Child is TColladaNode then
@@ -6636,7 +6833,8 @@ procedure TUSceneDataDAE.Read(const XML: TUXML);
 begin
   if LowerCase(XML.Name) <> 'collada' then Exit;
   if Assigned(_Root) then FreeAndNil(_Root);
-  _Root := TColladaRoot.Create(XML, _Options, _Path);
+  _Root := TColladaRoot.Create(XML, _Path, Options);
+  _Root.ApplySwizzle(_UpVector);
   _Root.Resolve;
   _Root.Initialize;
   //_Root.Dump;
