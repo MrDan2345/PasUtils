@@ -7942,7 +7942,7 @@ begin
   begin
     SetLength(CopyFileBuffer, BufferMinSize);
   end;
-  FileSrc := TFileStream.Create(SrcFile, fmOpenRead);
+  FileSrc := TFileStream.Create(SrcFile, fmOpenRead or fmShareDenyWrite);
   try
     if FileExists(DstFile) then DeleteFile(DstFile);
     FileDst := TFileStream.Create(DstFile, fmCreate);
