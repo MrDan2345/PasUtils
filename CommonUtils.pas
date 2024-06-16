@@ -1433,8 +1433,9 @@ private
   var _Content: TContent;
   var _Elements: TElements;
   function ReadJson(const p: TUParser): Boolean;
-  procedure SetNodeType(const Value: TNodeType);
+  procedure SetNodeType(const AValue: TNodeType);
   function GetValue: String;
+  procedure SetValue(const AValue: String);
   function GetContent(const Key: String): TUJson;
   function GetName(const Index: Int32): String;
   function GetElement(const Index: Int32): TUJson;
@@ -1447,7 +1448,7 @@ private
   function GetIsNull: Boolean;
 public
   property NodeType: TNodeType read _NodeType write SetNodeType;
-  property Value: String read GetValue;
+  property Value: String read GetValue write SetValue;
   property Content[const Key: String]: TUJson read GetContent; default;
   property Name[const Index: Int32]: String read GetName;
   property Element[const Index: Int32]: TUJson read GetElement;
@@ -1460,6 +1461,11 @@ public
   property IsNull: Boolean read GetIsNull;
   function GetEnumerator: TEnumerator;
   function FormatJson(const Offset: String = ''): String;
+  function AddValue(const NewValue: String; const ValueName: String = ''): TUJson;
+  function AddValue(const NewValue: Int32; const ValueName: String = ''): TUJson;
+  function AddValueFloat(const NewValue: TUFloat; const ValueName: String = ''): TUJson;
+  function AddObject(const ObjectName: String = ''): TUJson;
+  function AddArray(const ArrayName: String = ''): TUJson;
   class constructor CreateClass;
   class destructor DestroyClass;
   constructor Create;
@@ -1467,6 +1473,7 @@ public
   class function Load(const Json: String): TUJson;
   class function Load(const Stream: TStream): TUJson;
   class function LoadFromFile(const FileName: String): TUJson;
+  class function Make: TUJson;
   function Save: String;
   procedure Save(const Stream: TStream);
   procedure SaveToFile(const FileName: String);
@@ -1655,6 +1662,7 @@ function UStrExplode(const Str: String; const Separator: String): TUStrArray;
 function UStrIsNumber(const Str: String): Boolean;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UFileToStr(const FileName: String): String;
+function UFileSearch(const Path: String): TUStrArray;
 procedure UCopyFilePrepare(const BufferSize: UInt32 = 1024 * 1024 * 1024);
 procedure UCopyFileCleanup;
 procedure UCopyFile(const SrcFile, DstFile: String);
@@ -7437,10 +7445,10 @@ begin
   Result := True;
 end;
 
-procedure TUJson.SetNodeType(const Value: TNodeType);
+procedure TUJson.SetNodeType(const AValue: TNodeType);
   var i: Int32;
 begin
-  if _NodeType = Value then Exit;
+  if _NodeType = AValue then Exit;
   if (_NodeType = nt_object) then
   begin
     for i := 0 to High(_Content) do
@@ -7453,7 +7461,7 @@ begin
   begin
     specialize UArrClear<TUJson>(_Elements);
   end;
-  _NodeType := Value;
+  _NodeType := AValue;
   if (_NodeType = nt_object) then _Value := '';
 end;
 
@@ -7500,6 +7508,12 @@ begin
     end;
     else Result := _Value;
   end;
+end;
+
+procedure TUJson.SetValue(const AValue: String);
+begin
+  if _NodeType <> nt_value then Exit;
+  _Value := AValue;
 end;
 
 function TUJson.GetContent(const Key: String): TUJson;
@@ -7637,6 +7651,91 @@ begin
   end;
 end;
 
+function TUJson.AddValue(const NewValue: String; const ValueName: String): TUJson;
+  var NamedNode: TNamedNode;
+begin
+  Result := _NullNode;
+  if not IsValid then Exit;
+  case _NodeType of
+    nt_object:
+    begin
+      if Length(ValueName) = 0 then Exit;
+      Result := TUJson.Create;
+      Result.NodeType := nt_value;
+      Result.Value := NewValue;
+      NamedNode.Name := ValueName;
+      NamedNode.Node := Result;
+      specialize UArrAppend<TNamedNode>(_Content, NamedNode);
+    end;
+    nt_array:
+    begin
+      Result := TUJson.Create;
+      Result.NodeType := nt_value;
+      Result.Value := NewValue;
+      specialize UArrAppend<TUJson>(_Elements, Result);
+    end;
+  end;
+end;
+
+function TUJson.AddValue(const NewValue: Int32; const ValueName: String): TUJson;
+begin
+  Result := AddValue(IntToStr(NewValue), ValueName);
+end;
+
+function TUJson.AddValueFloat(const NewValue: TUFloat; const ValueName: String): TUJson;
+begin
+  Result := AddValue(FloatToStr(NewValue), ValueName);
+end;
+
+function TUJson.AddObject(const ObjectName: String): TUJson;
+  var NamedNode: TNamedNode;
+begin
+  Result := _NullNode;
+  if not IsValid then Exit;
+  case _NodeType of
+    nt_object:
+    begin
+      if Length(ObjectName) = 0 then Exit;
+      Result := TUJson.Create;
+      Result.NodeType := nt_object;
+      NamedNode.Name := ObjectName;
+      NamedNode.Node := Result;
+      specialize UArrAppend<TNamedNode>(_Content, NamedNode);
+    end;
+    nt_array:
+    begin
+      Result := TUJson.Create;
+      Result.NodeType := nt_object;
+      specialize UArrAppend<TUJson>(_Elements, Result);
+    end;
+  end;
+end;
+
+function TUJson.AddArray(const ArrayName: String): TUJson;
+  var NamedNode: TNamedNode;
+begin
+  Result := _NullNode;
+  if not IsValid then Exit;
+  case _NodeType of
+    nt_object:
+    begin
+      if Length(ArrayName) = 0 then Exit;
+      Result := TUJson.Create;
+      Result.NodeType := nt_array;
+      NamedNode.Name := ArrayName;
+      NamedNode.Node := Result;
+      specialize UArrAppend<TNamedNode>(_Content, NamedNode);
+    end;
+    nt_array:
+    begin
+      Result := TUJson.Create;
+      Result.NodeType := nt_array;
+      Result.Value := Value;
+      specialize UArrAppend<TUJson>(_Elements, Result);
+    end;
+  end;
+end;
+
 class constructor TUJson.CreateClass;
 begin
   with _Syntax do
@@ -7700,6 +7799,12 @@ begin
   finally
     fs.Free;
   end;
+end;
+
+class function TUJson.Make: TUJson;
+begin
+  Result := TUJson.Create;
+  Result.NodeType := nt_object;
 end;
 
 function TUJson.Save: String;
@@ -9757,6 +9862,16 @@ begin
 end;
 
 threadvar CopyFileBuffer: array of UInt8;
+
+function UFileSearch(const Path: String): TUStrArray;
+  var sr: TSearchRec;
+begin
+  if FindFirst(Path, 0, sr) <> 0 then Exit(nil);
+  repeat
+    specialize UArrAppend<String>(Result, sr.Name);
+  until FindNext(sr) <> 0;
+  FindClose(sr);
+end;
 
 procedure UCopyFilePrepare(const BufferSize: UInt32);
 begin
