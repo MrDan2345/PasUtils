@@ -9866,6 +9866,7 @@ threadvar CopyFileBuffer: array of UInt8;
 function UFileSearch(const Path: String): TUStrArray;
   var sr: TSearchRec;
 begin
+  Result := nil;
   if FindFirst(Path, 0, sr) <> 0 then Exit(nil);
   repeat
     specialize UArrAppend<String>(Result, sr.Name);
