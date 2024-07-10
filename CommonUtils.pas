@@ -1460,12 +1460,15 @@ public
   property IsNumber: Boolean read GetIsNumber;
   property IsNull: Boolean read GetIsNull;
   function GetEnumerator: TEnumerator;
+  function ToString: String;
   function FormatJson(const Offset: String = ''): String;
   function AddValue(const NewValue: String; const ValueName: String = ''): TUJson;
   function AddValue(const NewValue: Int32; const ValueName: String = ''): TUJson;
   function AddValueFloat(const NewValue: TUFloat; const ValueName: String = ''): TUJson;
   function AddObject(const ObjectName: String = ''): TUJson;
   function AddArray(const ArrayName: String = ''): TUJson;
+  function ValueAsInt: Int32;
+  function ValueAsFloat: TUFloat;
   class constructor CreateClass;
   class destructor DestroyClass;
   constructor Create;
@@ -7606,6 +7609,11 @@ begin
   Result := TEnumerator.Create(Self);
 end;
 
+function TUJson.ToString: String;
+begin
+  Result := Value;
+end;
+
 function TUJson.FormatJson(const Offset: String): String;
   var i: Int32;
 begin
@@ -7734,6 +7742,18 @@ begin
       specialize UArrAppend<TUJson>(_Elements, Result);
     end;
   end;
+end;
+
+function TUJson.ValueAsInt: Int32;
+begin
+  if _NodeType <> nt_value then Exit(0);
+  Result := StrToIntDef(_Value, 0);
+end;
+
+function TUJson.ValueAsFloat: TUFloat;
+begin
+  if _NodeType <> nt_value then Exit(0);
+  Result := StrToFloatDef(_Value, 0);
 end;
 
 class constructor TUJson.CreateClass;
