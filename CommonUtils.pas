@@ -1663,6 +1663,7 @@ function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
 
 function UStrExplode(const Str: String; const Separator: String): TUStrArray;
 function UStrIsNumber(const Str: String): Boolean;
+function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UFileToStr(const FileName: String): String;
 function UFileSearch(const Path: String): TUStrArray;
@@ -9852,6 +9853,13 @@ begin
   for i := n to Length(Str) do
   if not (Str[i] in ['0'..'9']) then Exit(False);
   Result := True;
+end;
+
+function UStrClone(const Str: String): String;
+begin
+  Result := '';
+  SetLength(Result, Length(Str));
+  Move(Str[1], Result[1], Length(Str));
 end;
 
 procedure UStrToFile(const FileName: String; const Str: String);
