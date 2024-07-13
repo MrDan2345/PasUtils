@@ -1613,6 +1613,7 @@ function UMinValue(out v: TInt32): TInt32; inline; overload;
 function UMinValue(out v: TInt64): TInt64; inline; overload;
 function UMinValue(out v: TUFloat): TUFloat; inline; overload;
 function UMinValue(out v: TUDouble): TUDouble; inline; overload;
+generic function UEnumToStr<T>(const Enum: T): String;
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
 generic function USelect<T>(const Cond: Boolean; constref IfTrue: T; constref IfFalse: T): T; inline;
 function UCRC32(const CRC: UInt32; const Value: Pointer; const Count: UInt32): UInt32;
@@ -8695,6 +8696,13 @@ end;
 function UMinValue(out v: TUDouble): TUDouble;
 begin
   Result := 5.0E-324;
+end;
+
+generic function UEnumToStr<T>(const Enum: T): String;
+  var ti: PTypeInfo;
+begin
+  ti := PTypeInfo(TypeInfo(Enum));
+  Result := GetEnumName(ti, PUInt64(@Enum)^);
 end;
 
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
