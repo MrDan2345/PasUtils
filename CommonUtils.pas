@@ -1354,7 +1354,6 @@ generic TUArrayUtils<T> = class
   class procedure Remove(var Arr: TArr; const Item: TItem);
   class function Pop(var Arr: TArr): TItem;
   class function Find(const Arr: TArr; const Item: TItem): Int32;
-  class procedure Sort(var Arr: array of T);
 end;
 
 generic TUArrayObjUtils<T> = class (specialize TUArrayUtils<T>)
@@ -7130,34 +7129,6 @@ begin
     if Arr[i] = Item then Exit(i);
   end;
   Result := -1;
-end;
-
-class procedure TUArrayUtils.Sort(var Arr: array of T);
-  procedure SortRange(const RangeStart, RangeEnd: Integer); overload;
-    var i, j: Integer;
-    var tmp, pivot: T;
-  begin
-    if RangeEnd <= RangeStart then Exit;
-    i := RangeStart;
-    j := RangeEnd;
-    pivot := Arr[(RangeStart + RangeEnd) shr 1];
-    repeat
-      while (pivot > Arr[i]) do i := i + 1;
-      while (Arr[j] > pivot) do j := j - 1;
-      if i <= j then
-      begin
-        tmp := Arr[i];
-        Arr[i] := Arr[j];
-        Arr[j] := tmp;
-        j := j - 1;
-        i := i + 1;
-      end;
-    until i > j;
-    if RangeStart < j then SortRange(RangeStart, j);
-    if i < RangeEnd then SortRange(i, RangeEnd);
-  end;
-begin
-  SortRange(Low(Arr), High(Arr));
 end;
 //TUArrayUtils end
 
