@@ -1344,6 +1344,22 @@ public
 end;
 
 generic TUArray<T> = array of T;
+generic TUArrayUtils<T> = class
+  type TItem = T;
+  type TArr = specialize TUArray<TItem>;
+  class function Add(var Arr: TArr; const Item: TItem): Int32;
+  class function Append(var Arr: TArr; const Other: TArr): Int32;
+  class procedure Insert(var Arr: TArr; const Item: TItem; const Position: Int32);
+  class procedure Delete(var Arr: TArr; const DelStart: Int32; const DelCount: Int32 = 1);
+  class procedure Remove(var Arr: TArr; const Item: TItem);
+  class function Pop(var Arr: TArr): TItem;
+  class function Find(const Arr: TArr; const Item: TItem): Int32;
+  class procedure Sort(var Arr: array of T);
+end;
+
+generic TUArrayObjUtils<T> = class (specialize TUArrayUtils<T>)
+  class procedure Clear(var Arr: TArr);
+end;
 
 type TUXML = class (TURefClass)
 public
@@ -1460,7 +1476,7 @@ public
   property IsNumber: Boolean read GetIsNumber;
   property IsNull: Boolean read GetIsNull;
   function GetEnumerator: TEnumerator;
-  function ToString: String;
+  function AsString: String;
   function FormatJson(const Offset: String = ''): String;
   function AddValue(const NewValue: String; const ValueName: String = ''): TUJson;
   function AddValue(const NewValue: Int32; const ValueName: String = ''): TUJson;
@@ -7034,6 +7050,126 @@ begin
 end;
 // TUMap end
 
+//TUArrayUtils begin
+class function TUArrayUtils.Add(var Arr: TArr; const Item: TItem): Int32;
+begin
+  Result := Length(Arr);
+  SetLength(Arr, Result + 1);
+  Arr[Result] := Item;
+end;
+
+class function TUArrayUtils.Append(var Arr: TArr; const Other: TArr): Int32;
+  var i: Int32;
+begin
+  Result := Length(Arr);
+  if Length(Other) = 0 then Exit;
+  SetLength(Arr, Result + Length(Other));
+  for i := 0 to High(Other) do Arr[Result + i] := Other[i];
+  Result += Length(Other);
+end;
+
+class procedure TUArrayUtils.Insert(
+  var Arr: TArr; const Item: TItem; const Position: Int32
+);
+  var i, j: Int32;
+begin
+  SetLength(Arr, Length(Arr) + 1);
+  if Position < 0 then i := 0
+  else if Position > High(Arr) then i := High(Arr)
+  else i := Position;
+  for j := i to High(Arr) - 1 do
+  begin
+    Arr[j + 1] := Arr[j];
+  end;
+  Arr[i] := Item;
+end;
+
+class procedure TUArrayUtils.Delete(
+  var Arr: TArr; const DelStart: Int32; const DelCount: Int32
+);
+  var i, dc: Int32;
+begin
+  dc := DelCount;
+  if DelStart + dc > Length(Arr) then dc := Length(Arr) - DelStart;
+  if (dc < 1) or (DelStart < 0) then Exit;
+  for i := DelStart to High(Arr) - dc do
+  begin
+    Arr[i] := Arr[i + 1];
+  end;
+  SetLength(Arr, Length(Arr) - dc);
+end;
+
+class procedure TUArrayUtils.Remove(var Arr: TArr; const Item: TItem);
+  var i, j, n: Int32;
+begin
+  n := 0;
+  for i := High(Arr) downto 0 do
+  if Arr[i] = Item then
+  begin
+    for j := i to High(Arr) - 1 - n do
+    begin
+      Arr[j] := Arr[j + 1];
+    end;
+    Inc(n);
+  end;
+  SetLength(Arr, Length(Arr) - n);
+end;
+
+class function TUArrayUtils.Pop(var Arr: TArr): TItem;
+begin
+  if Length(Arr) = 0 then Exit(Default(T));
+  Result := Arr[High(Arr)];
+  SetLength(Arr, Length(Arr) - 1);
+end;
+
+class function TUArrayUtils.Find(const Arr: TArr; const Item: TItem): Int32;
+  var i: Int32;
+begin
+  for i := 0 to High(Arr) do
+  begin
+    if Arr[i] = Item then Exit(i);
+  end;
+  Result := -1;
+end;
+
+class procedure TUArrayUtils.Sort(var Arr: array of T);
+  procedure SortRange(const RangeStart, RangeEnd: Integer); overload;
+    var i, j: Integer;
+    var tmp, pivot: T;
+  begin
+    if RangeEnd <= RangeStart then Exit;
+    i := RangeStart;
+    j := RangeEnd;
+    pivot := Arr[(RangeStart + RangeEnd) shr 1];
+    repeat
+      while (pivot > Arr[i]) do i := i + 1;
+      while (Arr[j] > pivot) do j := j - 1;
+      if i <= j then
+      begin
+        tmp := Arr[i];
+        Arr[i] := Arr[j];
+        Arr[j] := tmp;
+        j := j - 1;
+        i := i + 1;
+      end;
+    until i > j;
+    if RangeStart < j then SortRange(RangeStart, j);
+    if i < RangeEnd then SortRange(i, RangeEnd);
+  end;
+begin
+  SortRange(Low(Arr), High(Arr));
+end;
+//TUArrayUtils end
+
+//TUArrayObjUtils begin
+class procedure TUArrayObjUtils.Clear(var Arr: TArr);
+  var i: Int32;
+begin
+  for i := High(Arr) downto 0 do FreeAndNil(Arr[i]);
+  Arr := nil;
+end;
+//TUArrayObjUtils end
+
 // TUXML begin
 function TUXML.TEnumerator.GetCurrent: TUXML;
 begin
@@ -7611,7 +7747,7 @@ begin
   Result := TEnumerator.Create(Self);
 end;
 
-function TUJson.ToString: String;
+function TUJson.AsString: String;
 begin
   Result := Value;
 end;
