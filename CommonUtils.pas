@@ -1484,6 +1484,7 @@ public
   function AddArray(const ArrayName: String = ''): TUJson;
   function ValueAsInt: Int32;
   function ValueAsFloat: TUFloat;
+  function ValueAsBool: Boolean;
   class constructor CreateClass;
   class destructor DestroyClass;
   constructor Create;
@@ -7863,6 +7864,16 @@ function TUJson.ValueAsFloat: TUFloat;
 begin
   if _NodeType <> nt_value then Exit(0);
   Result := StrToFloatDef(_Value, 0);
+end;
+
+function TUJson.ValueAsBool: Boolean;
+  var lc: String;
+begin
+  if _NodeType <> nt_value then Exit(False);
+  lc := LowerCase(_Value);
+  if Value = 'true' then Exit(True);
+  if Value = 'false' then Exit(False);
+  Result := StrToIntDef(lc, 0) <> 0;
 end;
 
 class constructor TUJson.CreateClass;
