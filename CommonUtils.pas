@@ -1451,7 +1451,8 @@ private
   procedure SetNodeType(const AValue: TNodeType);
   function GetValue: String;
   procedure SetValue(const AValue: String);
-  function GetContent(const Key: String): TUJson;
+  function GetContent(const Key: String): TUJson; overload;
+  function GetContent(const Index: Int32): TUJson; overload;
   function GetName(const Index: Int32): String;
   function GetElement(const Index: Int32): TUJson;
   function GetCount: Int32;
@@ -1477,9 +1478,14 @@ public
   function GetEnumerator: TEnumerator;
   function AsString: String;
   function FormatJson(const Offset: String = ''): String;
-  function AddValue(const NewValue: String; const ValueName: String = ''): TUJson;
-  function AddValue(const NewValue: Int32; const ValueName: String = ''): TUJson;
-  function AddValueFloat(const NewValue: TUFloat; const ValueName: String = ''): TUJson;
+  function AddValue(const ValueName: String; const NewValue: String): TUJson; overload;
+  function AddValue(const NewValue: String): TUJson; overload;
+  function AddValue(const ValueName: String; const NewValue: Int32): TUJson; overload;
+  function AddValue(const NewValue: Int32): TUJson; overload;
+  function AddValue(const ValueName: String; const NewValue: Boolean): TUJson; overload;
+  function AddValue(const NewValue: Boolean): TUJson; overload;
+  function AddValueFloat(const ValueName: String; const NewValue: TUFloat): TUJson;
+  function AddValueFloat(const NewValue: TUFloat): TUJson;
   function AddObject(const ObjectName: String = ''): TUJson;
   function AddArray(const ArrayName: String = ''): TUJson;
   function ValueAsInt: Int32;
@@ -7641,6 +7647,11 @@ begin
   Result := _NullNode;
 end;
 
+function TUJson.GetContent(const Index: Int32): TUJson;
+begin
+  Result := GetElement(Index);
+end;
+
 function TUJson.GetName(const Index: Int32): String;
 begin
   case _NodeType of
@@ -7769,40 +7780,60 @@ begin
   end;
 end;
 
-function TUJson.AddValue(const NewValue: String; const ValueName: String): TUJson;
+function TUJson.AddValue(const ValueName: String; const NewValue: String): TUJson;
   var NamedNode: TNamedNode;
 begin
   Result := _NullNode;
   if not IsValid then Exit;
-  case _NodeType of
-    nt_object:
-    begin
-      if Length(ValueName) = 0 then Exit;
-      Result := TUJson.Create;
-      Result.NodeType := nt_value;
-      Result.Value := NewValue;
-      NamedNode.Name := ValueName;
-      NamedNode.Node := Result;
-      specialize UArrAppend<TNamedNode>(_Content, NamedNode);
-    end;
-    nt_array:
-    begin
-      Result := TUJson.Create;
-      Result.NodeType := nt_value;
-      Result.Value := NewValue;
-      specialize UArrAppend<TUJson>(_Elements, Result);
-    end;
-  end;
+  if _NodeType <> nt_object then Exit;
+  if Length(ValueName) = 0 then Exit;
+  Result := TUJson.Create;
+  Result.NodeType := nt_value;
+  Result.Value := NewValue;
+  NamedNode.Name := ValueName;
+  NamedNode.Node := Result;
+  specialize UArrAppend<TNamedNode>(_Content, NamedNode);
 end;
 
-function TUJson.AddValue(const NewValue: Int32; const ValueName: String): TUJson;
+function TUJson.AddValue(const NewValue: String): TUJson;
 begin
-  Result := AddValue(IntToStr(NewValue), ValueName);
+  Result := _NullNode;
+  if not IsValid then Exit;
+  if _NodeType <> nt_array then Exit;
+  Result := TUJson.Create;
+  Result.NodeType := nt_value;
+  Result.Value := NewValue;
+  specialize UArrAppend<TUJson>(_Elements, Result);
 end;
 
-function TUJson.AddValueFloat(const NewValue: TUFloat; const ValueName: String): TUJson;
+function TUJson.AddValue(const ValueName: String; const NewValue: Int32): TUJson;
 begin
-  Result := AddValue(FloatToStr(NewValue), ValueName);
+  Result := AddValue(ValueName, IntToStr(NewValue));
+end;
+
+function TUJson.AddValue(const NewValue: Int32): TUJson;
+begin
+  Result := AddValue(IntToStr(NewValue));
+end;
+
+function TUJson.AddValue(const ValueName: String; const NewValue: Boolean): TUJson;
+begin
+  Result := AddValue(ValueName, UBoolToStr(NewValue));
+end;
+
+function TUJson.AddValue(const NewValue: Boolean): TUJson;
+begin
+  Result := AddValue(UBoolToStr(NewValue));
+end;
+
+function TUJson.AddValueFloat(const ValueName: String; const NewValue: TUFloat): TUJson;
+begin
+  Result := AddValue(ValueName, FloatToStr(NewValue));
+end;
+
+function TUJson.AddValueFloat(const NewValue: TUFloat): TUJson;
+begin
+  Result := AddValue(FloatToStr(NewValue));
 end;
 
 function TUJson.AddObject(const ObjectName: String): TUJson;
