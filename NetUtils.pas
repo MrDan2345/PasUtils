@@ -504,20 +504,23 @@ begin
 {$else}
   r := UNetGetIfAddrs(@IfAddrs);
   if r <> 0 then Exit;
-  a := IfAddrs;
-  while Assigned(a) do
   try
-    if not Assigned(a^.ifa_addr) then Continue;
-    Addr := a^.ifa_addr^.sin_addr;
-    if (Result.Addr32 = 0)
-    or (Addr.Addr8[0] = 192) then
-    begin
-      Result := Addr;
+    a := IfAddrs;
+    while Assigned(a) do
+    try
+      if not Assigned(a^.ifa_addr) then Continue;
+      Addr := a^.ifa_addr^.sin_addr;
+      if (Result.Addr32 = 0)
+      or (Addr.Addr8[0] = 192) then
+      begin
+        Result := Addr;
+      end;
+    finally
+      a := a^.ifa_next;
     end;
   finally
-    a := a^.ifa_next;
+    FreeIfAddrs(IfAddrs);
   end;
-  FreeIfAddrs(IfAddrs);
 {$endif}
 end;
 
