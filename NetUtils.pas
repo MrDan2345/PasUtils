@@ -132,7 +132,7 @@ TUIfAddrs = record
   ifa_data: Pointer;
 end;
 
-type TUSocket = type Int32;
+type TUSocket = Int32;
 type PUSocket = ^TUSocket;
 
 type TUInAddrImpl = type helper for TUInAddr
@@ -145,8 +145,20 @@ type TUInAddr6Impl = type helper for TUInAddr6
   const Zero: TUInAddr6 = (Addr32: (0, 0, 0, 0));
 end;
 
+type TUSockAddrImpl = type helper for TUSockAddr
+  const Default: TUSockAddr = (
+    sa_len: 0; sin_family: AF_INET;
+    sin_port: 0; sin_addr: (Addr32: 0);
+    sin_zero: (0, 0, 0, 0, 0, 0, 0, 0);
+  );
+end;
+
+type TUSockAddr6Impl = type helper for TUSockAddr6
+
+end;
+
 type TUSocketImpl = type helper for TUSocket
-  const InvalidSocket = -1;
+  const Invalid = -1;
   function Make(
     const SockDomain: Int32 = AF_INET;
     const SockType: Int32 = SOCK_STREAM;
@@ -275,9 +287,15 @@ function UNetSetSockOpt(
 function UNetSocketPair(
     Domain: Int32; SockType: Int32; Protocol: Int32; OutSock: PInt32
 ): Int32; call_decl; external SockLib name 'socketpair';
+{$if defined(windows)}
+function UNetClose(
+    Sock: Int32
+): Int32; call_decl; external SockLib name 'closesocket';
+{$else}
 function UNetClose(
     Sock: Int32
 ): Int32; call_decl; external SockLib name 'close';
+{$endif}
 
 function UNetHostName: String;
 function UNetLocalAddr: TUInAddr;
@@ -287,12 +305,12 @@ function NToHl(const Net: UInt32): UInt32; inline;
 function HToNs(const Host: UInt16): UInt16; inline;
 function NToHs(const Net: UInt16): UInt16; inline;
 
-function UNetHostToNet(const Host: UInt32): UInt32; overload;
-function UNetHostToNet(const Host: UInt16): UInt16; overload;
+function UNetHostToNetLong(const Host: UInt32): UInt32; overload;
+function UNetHostToNetShort(const Host: UInt16): UInt16; overload;
 function UNetHostToNet(const Host: TUInAddr): TUInAddr; overload;
 function UNetHostToNet(const Host: TUSockAddr): TUSockAddr; overload;
-function UNetNetToHost(const Net: UInt32): UInt32; overload;
-function UNetNetToHost(const Net: UInt16): UInt16; overload;
+function UNetNetToHostLong(const Net: UInt32): UInt32; overload;
+function UNetNetToHostShort(const Net: UInt16): UInt16; overload;
 function UNetNetToHost(const Net: TUInAddr): TUInAddr; overload;
 function UNetNetToHost(const Net: TUSockAddr): TUSockAddr; overload;
 
@@ -460,12 +478,12 @@ begin
 {$endif}
 end;
 
-function UNetHostToNet(const Host: UInt32): UInt32;
+function UNetHostToNetLong(const Host: UInt32): UInt32;
 begin
   Result := HToNl(Host);
 end;
 
-function UNetHostToNet(const Host: UInt16): UInt16;
+function UNetHostToNetShort(const Host: UInt16): UInt16;
 begin
   Result := HToNs(Host);
 end;
@@ -479,17 +497,17 @@ function UNetHostToNet(const Host: TUSockAddr): TUSockAddr;
 begin
   Result.sa_len := Host.sa_len;
   Result.sin_family := Host.sin_family;
-  Result.sin_port := UNetHostToNet(Host.sin_port);
+  Result.sin_port := UNetHostToNetShort(Host.sin_port);
   Result.sin_addr := UNetHostToNet(Host.sin_addr);
   Result.sin_zero := Host.sin_zero;
 end;
 
-function UNetNetToHost(const Net: UInt32): UInt32;
+function UNetNetToHostLong(const Net: UInt32): UInt32;
 begin
   Result := NToHl(Net);
 end;
 
-function UNetNetToHost(const Net: UInt16): UInt16;
+function UNetNetToHostShort(const Net: UInt16): UInt16;
 begin
   Result := NToHs(Net);
 end;
@@ -503,7 +521,7 @@ function UNetNetToHost(const Net: TUSockAddr): TUSockAddr;
 begin
   Result.sa_len := Net.sa_len;
   Result.sin_family := Net.sin_family;
-  Result.sin_port := UNetHostToNet(Net.sin_port);
+  Result.sin_port := UNetHostToNetShort(Net.sin_port);
   Result.sin_addr := UNetHostToNet(Net.sin_addr);
   Result.sin_zero := Net.sin_zero;
 end;
