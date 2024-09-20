@@ -640,12 +640,12 @@ function UNetTryStrToNetAddr(const AddrStr: AnsiString; out OutAddr: TUInAddr): 
     d := 100;
     n := 0;
     try
-      for i := Pos to Length(AddrStr) do
+      while Pos <= Length(AddrStr) do
       begin
-        Pos := i + 1;
+        i := Pos; Inc(Pos);
         if AddrStr[i] = '.' then Exit(True);
         if not Ord(AddrStr[i]) in [Ord('0')..Ord('9')] then Exit(False);
-        n += Ord(AddrStr[i]) - Ord('0') * d;
+        n += (Ord(AddrStr[i]) - Ord('0')) * d;
         d := d div 10;
       end;
       Result := True;
@@ -657,7 +657,7 @@ function UNetTryStrToNetAddr(const AddrStr: AnsiString; out OutAddr: TUInAddr): 
   var Addr: TUInAddr;
 begin
   if Length(AddrStr) < 7 then Exit(False);
-  i := 0;
+  i := 1;
   for n := 0 to 3 do
   begin
     if not ReadNum(i, Addr.Addr8[n]) then Exit(False);
