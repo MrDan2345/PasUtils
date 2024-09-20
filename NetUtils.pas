@@ -9,6 +9,9 @@ unit NetUtils;
 
 interface
 
+uses
+  SysUtils;
+
 {$if defined(windows)}
 const SockLib = 'ws2_32.dll';
 {$define call_decl := stdcall}
@@ -172,6 +175,31 @@ type TUSocketImpl = type helper for TUSocket
 end;
 
 {$if defined(windows)}
+const UNET_WSADESCRIPTION_LEN = 256;
+const UNET_WSASYS_STATUS_LEN = 128;
+type PUNetWSAData = ^TUNetWSAData;
+TUNetWSAData = record
+   wVersion: UInt16;
+   wHighVersion: UInt16;
+{$ifdef win64}
+   iMaxSockets: UInt16;
+   iMaxUdpDg: UInt16;
+   lpVendorInfo: PAnsiChar;
+   szDescription: array[0..UNET_WSADESCRIPTION_LEN] of AnsiChar;
+   szSystemStatus: array[0..UNET_WSASYS_STATUS_LEN] of AnsiChar;
+{$else}
+   szDescription: array[0..UNET_WSADESCRIPTION_LEN] of AnsiChar;
+   szSystemStatus: array[0..UNET_WSASYS_STATUS_LEN] of AnsiChar;
+   iMaxSockets: UInt16;
+   iMaxUdpDg: UInt16;
+   lpVendorInfo: PAnsiChar;
+{$endif}
+end;
+function UNetWSAStartup(
+  VersionRequired: word;
+  var WSData: TUNetWSAData
+): Longint; call_decl; external SockLib name 'WSAStartup';
+function UNetWSACleanup: Longint; call_decl; external SockLib name 'WSACleanup';
 {$else}
 function UNetGetIfAddrs(
   const IfAddrs: PPUIfAddrs
@@ -261,20 +289,24 @@ function NToHs(const Net: UInt16): UInt16; inline;
 
 function UNetHostToNet(const Host: UInt32): UInt32; overload;
 function UNetHostToNet(const Host: UInt16): UInt16; overload;
+function UNetHostToNet(const Host: TUInAddr): TUInAddr; overload;
+function UNetHostToNet(const Host: TUSockAddr): TUSockAddr; overload;
 function UNetNetToHost(const Net: UInt32): UInt32; overload;
 function UNetNetToHost(const Net: UInt16): UInt16; overload;
+function UNetNetToHost(const Net: TUInAddr): TUInAddr; overload;
+function UNetNetToHost(const Net: TUSockAddr): TUSockAddr; overload;
 
 function UNetNetAddrToStr(const Addr: TUInAddr): AnsiString;
 function UNetHostAddrToStr(const Addr: TUInAddr): AnsiString;
 function UNetStrToHostAddr(const AddrStr: AnsiString): TUInAddr;
 function UNetStrToNetAddr(const AddrStr: AnsiString): TUInAddr;
-function UNetTryStrToHostAddr(const AddrStr: AnsiString; out OutAddr: TUInAddr): Boolean;
+function UNetTryStrToNetAddr(const AddrStr: AnsiString; out OutAddr: TUInAddr): Boolean;
 
 function UNetHostAddrToStr6(const Addr: TUInAddr6): AnsiString;
 function UNetStrToHostAddr6(const AddrStr: AnsiString): TUInAddr6;
 function UNetNetAddrToStr6(const Addr: TUInAddr6): AnsiString;
 function UNetStrToNetAddr6(const AddrStr: AnsiString): TUInAddr6;
-function UNetTryStrToHostAddr6(const AddrStr: AnsiString; out OutAddr: TUInAddr6): Boolean;
+function UNetTryStrToNetAddr6(const AddrStr: AnsiString; out OutAddr: TUInAddr6): Boolean;
 
 implementation
 
@@ -430,12 +462,26 @@ end;
 
 function UNetHostToNet(const Host: UInt32): UInt32;
 begin
-  Result := NToHl(Host);
+  Result := HToNl(Host);
 end;
 
 function UNetHostToNet(const Host: UInt16): UInt16;
 begin
-  Result := NToHs(Host);
+  Result := HToNs(Host);
+end;
+
+function UNetHostToNet(const Host: TUInAddr): TUInAddr;
+begin
+  Result.Addr32 := HToNl(Host.Addr32);
+end;
+
+function UNetHostToNet(const Host: TUSockAddr): TUSockAddr;
+begin
+  Result.sa_len := Host.sa_len;
+  Result.sin_family := Host.sin_family;
+  Result.sin_port := UNetHostToNet(Host.sin_port);
+  Result.sin_addr := UNetHostToNet(Host.sin_addr);
+  Result.sin_zero := Host.sin_zero;
 end;
 
 function UNetNetToHost(const Net: UInt32): UInt32;
@@ -448,27 +494,50 @@ begin
   Result := NToHs(Net);
 end;
 
-function UNetNetAddrToStr(const Addr: TUInAddr): AnsiString;
+function UNetNetToHost(const Net: TUInAddr): TUInAddr;
 begin
+  Result.Addr32 := NToHl(Net.Addr32);
+end;
 
+function UNetNetToHost(const Net: TUSockAddr): TUSockAddr;
+begin
+  Result.sa_len := Net.sa_len;
+  Result.sin_family := Net.sin_family;
+  Result.sin_port := UNetHostToNet(Net.sin_port);
+  Result.sin_addr := UNetHostToNet(Net.sin_addr);
+  Result.sin_zero := Net.sin_zero;
+end;
+
+function UNetNetAddrToStr(const Addr: TUInAddr): AnsiString;
+  var i: Int32;
+begin
+  Result := IntToStr(Addr.Addr8[0]);
+  for i := 1 to 3 do
+  begin
+    Result += '.' + IntToStr(Addr.Addr8[i]);
+  end;
 end;
 
 function UNetHostAddrToStr(const Addr: TUInAddr): AnsiString;
 begin
-
+  Result := UNetNetAddrToStr(UNetHostToNet(Addr));
 end;
 
 function UNetStrToHostAddr(const AddrStr: AnsiString): TUInAddr;
+  var Addr: TUInAddr;
 begin
-
+  if not UNetTryStrToNetAddr(AddrStr, Addr) then Exit(TUInAddr.Zero);
+  Result := UNetNetToHost(Addr);
 end;
 
 function UNetStrToNetAddr(const AddrStr: AnsiString): TUInAddr;
+  var Addr: TUInAddr;
 begin
-  if not UNetTryStrToHostAddr(AddrStr, Result) then Result := TUInAddr.Zero;
+  if not UNetTryStrToNetAddr(AddrStr, Addr) then Exit(TUInAddr.Zero);
+  Result := Addr;
 end;
 
-function UNetTryStrToHostAddr(const AddrStr: AnsiString; out OutAddr: TUInAddr): Boolean;
+function UNetTryStrToNetAddr(const AddrStr: AnsiString; out OutAddr: TUInAddr): Boolean;
   function ReadNum(var Pos: Int32; out Num: UInt8): Boolean;
     var i, d: Int32;
     var n: UInt32;
@@ -494,7 +563,7 @@ function UNetTryStrToHostAddr(const AddrStr: AnsiString; out OutAddr: TUInAddr):
 begin
   if Length(AddrStr) < 7 then Exit(False);
   i := 0;
-  for n := 3 downto 0 do
+  for n := 0 to 3 do
   begin
     if not ReadNum(i, Addr.Addr8[n]) then Exit(False);
   end;
@@ -522,9 +591,40 @@ begin
 
 end;
 
-function UNetTryStrToHostAddr6(const AddrStr: AnsiString; out OutAddr: TUInAddr6): Boolean;
+function UNetTryStrToNetAddr6(const AddrStr: AnsiString; out OutAddr: TUInAddr6): Boolean;
 begin
 
+end;
+
+procedure UNetInitialize;
+{$if defined(windows)}
+  var WSAData: TUNetWSAData;
+begin
+  UNetWSAStartup(2 or (2 shl 8), WSAData);
+end;
+{$else}
+begin
+end;
+{$endif}
+
+procedure UNetFinalize;
+{$if defined(windows)}
+begin
+  UNetWSACleanup;
+end;
+{$else}
+begin
+end;
+{$endif}
+
+initialization
+begin
+  UNetInitialize;
+end;
+
+finalization
+begin
+  UNetFinalize;
 end;
 
 end.
