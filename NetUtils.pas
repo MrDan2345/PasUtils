@@ -509,8 +509,8 @@ begin
   try
     if not Assigned(a^.ifa_addr) then Continue;
     Addr := a^.ifa_addr^.sin_addr;
-    if (Result.s_addr = 0)
-    or (Addr.s_bytes[1] = 192) then
+    if (Result.Addr32 = 0)
+    or (Addr.Addr8[0] = 192) then
     begin
       Result := Addr;
     end;
