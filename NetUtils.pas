@@ -400,8 +400,15 @@ begin
 end;
 
 function TUSocketImpl.Send(const Msg: AnsiString): SizeInt;
+  var ShortMsg: array[0..2048] of AnsiChar;
 begin
-  Result := UNetSend(Self, @Msg[1], Length(Msg) + 1, 0);
+  if Length(Msg) < 2048 then
+  begin
+    Exit(UNetSend(Self, @Msg[1], Length(Msg) + 1, 0));
+  end;
+  Move(Msg[1], ShortMsg[0], 2047);
+  ShortMsg[2047] := #0;
+  Result := UNetSend(Self, @ShortMsg, SizeOf(ShortMsg), 0);
 end;
 
 function TUSocketImpl.Recv(
