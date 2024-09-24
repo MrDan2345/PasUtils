@@ -601,8 +601,8 @@ end;
 function UNetNetToHost(const Net: TUSockAddr): TUSockAddr;
 begin
   Result.sin_family := Net.sin_family;
-  Result.sin_port := UNetHostToNetShort(Net.sin_port);
-  Result.sin_addr := UNetHostToNet(Net.sin_addr);
+  Result.sin_port := UNetNetToHostShort(Net.sin_port);
+  Result.sin_addr := UNetNetToHost(Net.sin_addr);
   Result.sin_zero := Net.sin_zero;
 end;
 
