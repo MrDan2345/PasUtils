@@ -551,6 +551,7 @@ begin
     FreeAndNil(_Broadcaster);
   end;
   _Enabled := Value;
+  _Peers := nil;
   if _Enabled then
   begin
     _Listener := TListener.Create(True);
@@ -685,7 +686,7 @@ begin
     if n <= 0 then Break;
     if OtherAddr.sin_addr.Addr32 = Beacon.LocalAddr.Addr32 then Continue;
     Beacon.AddPeer(OtherAddr.sin_addr);
-    Sock.SendTo(
+    n := Sock.SendTo(
       @Beacon.Message[1], Length(Beacon.Message) + 1, 0,
       @OtherAddr, SizeOf(OtherAddr)
     );
