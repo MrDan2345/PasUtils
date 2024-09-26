@@ -237,8 +237,7 @@ public
     end;
     var _Enabled: Boolean;
     var _Active: Boolean;
-    var _ListenPort: UInt16;
-    var _BroadcastPort: UInt16;
+    var _Port: UInt16;
     var _BroadcastInterval: UInt32;
     var _LocalAddr: TUInAddr;
     var _HostName: String;
@@ -252,16 +251,14 @@ public
     property Message: String read _Message;
     procedure SetEnabled(const Value: Boolean);
     procedure SetActive(const Value: Boolean);
-    procedure SetListenPort(const Value: UInt16);
-    procedure SetBroadcastPort(const Value: UInt16);
+    procedure SetPort(const Value: UInt16);
     procedure AddPeer(const Addr: TUInAddr);
     function GetPeers: TUInAddrArray;
     procedure ClearOldPeers;
   public
     property Enabled: Boolean read _Enabled write SetEnabled;
     property Active: Boolean read _Active write SetActive;
-    property ListenPort: UInt16 read _ListenPort write SetListenPort;
-    property BroadcastPort: UInt16 read _BroadcastPort write SetBroadcastPort;
+    property Port: UInt16 read _Port write SetPort;
     property BroadcastInterval: Uint32 read _BroadcastInterval write _BroadcastInterval;
     property Peers: TUInAddrArray read GetPeers;
     procedure Reset;
@@ -573,17 +570,10 @@ begin
   Reset;
 end;
 
-procedure TUNet.TBeacon.SetListenPort(const Value: UInt16);
+procedure TUNet.TBeacon.SetPort(const Value: UInt16);
 begin
-  if _ListenPort = Value then Exit;
-  _ListenPort := Value;
-  Reset;
-end;
-
-procedure TUNet.TBeacon.SetBroadcastPort(const Value: UInt16);
-begin
-  if _BroadcastPort = Value then Exit;
-  _BroadcastPort := Value;
+  if _Port = Value then Exit;
+  _Port := Value;
   Reset;
 end;
 
@@ -650,8 +640,7 @@ constructor TUNet.TBeacon.Create;
 begin
   _Enabled := False;
   _Active := False;
-  _BroadcastPort := 57210;
-  _ListenPort := 57210;
+  _Port := 57210;
   _LocalAddr := UNetLocalAddr;
   _HostName := UNetHostName;
   _BroadcastInterval := 5000;
@@ -676,7 +665,7 @@ begin
   Sock := TUSocket.Invalid;
   Sock.MakeUDP();
   SockAddr := TUSockAddr.Default;
-  SockAddr.sin_port := UNetHostToNetShort(Beacon.ListenPort);
+  SockAddr.sin_port := UNetHostToNetShort(Beacon.Port);
   Sock.Bind(@SockAddr, SizeOf(SockAddr));
   OtherAddr := TUSockAddr.Default;
   OtherAddrLen := SizeOf(OtherAddr);
@@ -686,6 +675,7 @@ begin
     if n <= 0 then Break;
     if OtherAddr.sin_addr.Addr32 = Beacon.LocalAddr.Addr32 then Continue;
     Beacon.AddPeer(OtherAddr.sin_addr);
+    OtherAddr.sin_port := UNetHostToNetShort(Beacon.Port);
     n := Sock.SendTo(
       @Beacon.Message[1], Length(Beacon.Message) + 1, 0,
       @OtherAddr, SizeOf(OtherAddr)
@@ -715,7 +705,7 @@ begin
   Sock.MakeUDP();
   SockAddr := TUSockAddr.Default;
   SockAddr.sin_addr := LocalAddr;
-  SockAddr.sin_port := UNetHostToNetShort(Beacon.BroadcastPort);
+  SockAddr.sin_port := UNetHostToNetShort(Beacon.Port);
   Event.Unsignal;
   while not Terminated do
   begin
