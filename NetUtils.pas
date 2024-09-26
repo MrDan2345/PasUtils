@@ -211,6 +211,7 @@ public
     type TPeer = record
       Addr: TUInAddr;
       TimeStamp: UInt64;
+      Message: String;
     end;
     type TPeerArray = array of TPeer;
   private
@@ -248,19 +249,20 @@ public
     var _PeersLock: TUCriticalSection;
     property LocalAddr: TUInAddr read _LocalAddr;
     property HostName: String read _HostName;
-    property Message: String read _Message;
     procedure SetEnabled(const Value: Boolean);
     procedure SetActive(const Value: Boolean);
     procedure SetPort(const Value: UInt16);
-    procedure AddPeer(const Addr: TUInAddr);
-    function GetPeers: TUInAddrArray;
+    procedure SetMessage(const Value: String);
+    procedure AddPeer(const Addr: TUInAddr; const Message: String);
+    function GetPeers: TPeerArray;
     procedure ClearOldPeers;
   public
     property Enabled: Boolean read _Enabled write SetEnabled;
     property Active: Boolean read _Active write SetActive;
     property Port: UInt16 read _Port write SetPort;
     property BroadcastInterval: Uint32 read _BroadcastInterval write _BroadcastInterval;
-    property Peers: TUInAddrArray read GetPeers;
+    property Peers: TPeerArray read GetPeers;
+    property Message: String read _Message write SetMessage;
     procedure Reset;
     constructor Create;
     destructor Destroy; override;
@@ -577,7 +579,20 @@ begin
   Reset;
 end;
 
-procedure TUNet.TBeacon.AddPeer(const Addr: TUInAddr);
+procedure TUNet.TBeacon.SetMessage(const Value: String);
+begin
+  if _Message = Value then Exit;
+  if not Enabled then
+  begin
+    _Message := Value;
+    Exit;
+  end;
+  Enabled := False;
+  _Message := Value;
+  Enabled := True;
+end;
+
+procedure TUNet.TBeacon.AddPeer(const Addr: TUInAddr; const Message: String);
   var i: Int32;
   var Peer: TPeer;
 begin
@@ -587,18 +602,20 @@ begin
     if _Peers[i].Addr.Addr32 = Addr.Addr32 then
     begin
       _Peers[i].TimeStamp := GetTickCount64;
+      _Peers[i].Message := Message;
       Exit;
     end;
     ClearOldPeers;
     Peer.Addr := Addr;
     Peer.TimeStamp := GetTickCount64;
+    Peer.Message := Message;
     specialize UArrAppend<TPeer>(_Peers, Peer);
   finally
     _PeersLock.Leave;
   end;
 end;
 
-function TUNet.TBeacon.GetPeers: TUInAddrArray;
+function TUNet.TBeacon.GetPeers: TPeerArray;
   var i: Int32;
 begin
   Result := nil;
@@ -609,7 +626,7 @@ begin
     SetLength(Result, Length(_Peers));
     for i := 0 to High(_Peers) do
     begin
-      Result[i] := _Peers[i].Addr;
+      Result[i] := _Peers[i];
     end;
   finally
     _PeersLock.Leave;
@@ -659,8 +676,9 @@ end;
 procedure TUNet.TBeacon.TListener.Execute;
   var SockAddr, OtherAddr: TUSockAddr;
   var OtherAddrLen: TUSockLen;
-  var Buffer: array[0..2047] of UInt8;
+  var Buffer: array[0..2047] of AnsiChar;
   var n: SizeInt;
+  var Msg: String;
 begin
   Sock := TUSocket.Invalid;
   Sock.MakeUDP();
@@ -674,7 +692,8 @@ begin
     n := Sock.RecvFrom(@Buffer, SizeOf(Buffer), 0, @OtherAddr, @OtherAddrLen);
     if n <= 0 then Break;
     if OtherAddr.sin_addr.Addr32 = Beacon.LocalAddr.Addr32 then Continue;
-    Beacon.AddPeer(OtherAddr.sin_addr);
+    Msg := Buffer;
+    Beacon.AddPeer(OtherAddr.sin_addr, Msg);
     OtherAddr.sin_port := UNetHostToNetShort(Beacon.Port);
     n := Sock.SendTo(
       @Beacon.Message[1], Length(Beacon.Message) + 1, 0,
