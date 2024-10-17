@@ -1640,6 +1640,8 @@ generic function UEnumSetToStr<T>(const EnumSet: T): String;
 generic function USelect<T>(const Cond: Boolean; constref IfTrue: T; constref IfFalse: T): T; inline;
 function UCRC32(const CRC: UInt32; const Value: Pointer; const Count: UInt32): UInt32;
 function UCRC64(const CRC: UInt64; const Value: Pointer; const Count: UInt32): UInt64;
+function UFileCRC32(const FileName: String; const CRC: UInt32 = 0): UInt32;
+function UFileCRC64(const FileName: String; const CRC: UInt64 = 0): UInt64;
 procedure USinCos(const a: TUFloat; out s: TUFloat; out c: TUFloat);
 function UCoTan(const x: TUFloat): TUFloat;
 function UArcCos(const x: TUFloat): TUFloat;
@@ -9002,6 +9004,44 @@ begin
     Result := ((Result shr 8) and UINt64($00ffffffffffffff)) xor CRC64Table[(Result xor pb^[i]) and $ff];
   end;
   Result := Result xor UInt64($ffffffffffffffff);
+end;
+
+function UFileCRC32(const FileName: String; const CRC: UInt32): UInt32;
+  var fs: TFileStream;
+  var Buffer: array[0..2048] of UInt8;
+  var RemSize, Size: Int64;
+begin
+  Result := 0;
+  fs := TFileStream.Create(FileName, fmOpenRead);
+  try
+    RemSize := fs.Size;
+    repeat
+      Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
+      Result := UCRC32(Result, @Buffer, Size);
+      Dec(RemSize, Size);
+    until RemSize = 0;
+  finally
+    fs.Free;
+  end;
+end;
+
+function UFileCRC64(const FileName: String; const CRC: UInt64): UInt64;
+  var fs: TFileStream;
+  var Buffer: array[0..2048] of UInt8;
+  var RemSize, Size: Int64;
+begin
+  Result := 0;
+  fs := TFileStream.Create(FileName, fmOpenRead);
+  try
+    RemSize := fs.Size;
+    repeat
+      Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
+      Result := UCRC64(Result, @Buffer, Size);
+      Dec(RemSize, Size);
+    until RemSize = 0;
+  finally
+    fs.Free;
+  end;
 end;
 
 procedure USinCos(const a: TUFloat; out s: TUFloat; out c: TUFloat);
