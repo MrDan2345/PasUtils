@@ -199,6 +199,13 @@ type TUSocketImpl = type helper for TUSocket
   function Shutdown(const How: Int32 = SHUT_RDWR): Int32;
   function Close: Int32;
   function IsValid: Boolean;
+  class function Create(
+    const SockDomain: Int32 = AF_INET;
+    const SockType: Int32 = SOCK_STREAM;
+    const SockProtocol: Int32 = 0
+  ): TUSocket; static;
+  class function CreateTCP(const SockDomain: Int32 = AF_INET): TUSocket; static;
+  class function CreateUDP(const SockDomain: Int32 = AF_INET): TUSocket; static;
 end;
 
 type TUNetInAddrProc = procedure (const Addr: TUInAddr) of Object;
@@ -532,6 +539,28 @@ end;
 function TUSocketImpl.IsValid: Boolean;
 begin
   Result := Self > -1;
+end;
+
+class function TUSocketImpl.Create(
+  const SockDomain: Int32;
+  const SockType: Int32;
+  const SockProtocol: Int32
+): TUSocket;
+begin
+  Result := TUSocket.Invalid;
+  Result.Make(SockDomain, SockType, SockProtocol);
+end;
+
+class function TUSocketImpl.CreateTCP(const SockDomain: Int32): TUSocket;
+begin
+  Result := TUSocket.Invalid;
+  Result.MakeTCP(SockDomain);
+end;
+
+class function TUSocketImpl.CreateUDP(const SockDomain: Int32): TUSocket;
+begin
+  Result := TUSocket.Invalid;
+  Result.MakeUDP(SockDomain);
 end;
 
 procedure TUNet.TBeacon.SetEnabled(const Value: Boolean);
