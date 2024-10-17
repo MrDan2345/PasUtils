@@ -174,13 +174,13 @@ type TUSocketImpl = type helper for TUSocket
     const Buffer: Pointer;
     const BufferLen: UInt32;
     const Flags: Int32
-  ): SizeInt;
-  function Send(const Msg: AnsiString): SizeInt;
+  ): Int32;
+  function Send(const Msg: AnsiString): Int32;
   function Recv(
     const Buffer: Pointer;
     const BufferLen: UInt32;
     const Flags: Int32
-  ): SizeInt;
+  ): Int32;
   function Recv: String;
   function SendTo(
     const Buffer: Pointer;
@@ -188,14 +188,14 @@ type TUSocketImpl = type helper for TUSocket
     const Flags: Int32;
     const ToAddr: PUSockAddr;
     const ToLen: TUSockLen
-  ): SizeInt;
+  ): Int32;
   function RecvFrom(
     const Buffer: Pointer;
     const BufferLen: UInt32;
     const Flags: Int32;
     const AddrFrom: PUSockAddr;
     const AddrLen: PUSockLen
-  ): SizeInt;
+  ): Int32;
   function Shutdown(const How: Int32 = SHUT_RDWR): Int32;
   function Close: Int32;
   function IsValid: Boolean;
@@ -334,18 +334,18 @@ function UNetSocket(
 ): Int32; call_decl; external SockLib name 'socket';
 function UNetRecv(
   Sock: Int32; Buf: Pointer; Len: UInt32; Flags: Int32
-): SizeInt; call_decl; external SockLib name 'recv';
+): Int32; call_decl; external SockLib name 'recv';
 function UNetRecvFrom(
   Sock: Int32; Buf: Pointer; Len: UInt32; Flags: Int32;
   FromAddr: PUSockAddr; FromLen: PUSockLen
-): SizeInt; call_decl; external SockLib name 'recvfrom';
+): Int32; call_decl; external SockLib name 'recvfrom';
 function UNetSend(
   Sock: Int32; Msg: Pointer; Len: UInt32; Flags: Int32
-): SizeInt; call_decl; external SockLib name 'send';
+): Int32; call_decl; external SockLib name 'send';
 function UNetSendTo(
   Sock: Int32; Msg: Pointer; Len: UInt32; Flags: Int32;
   ToAddr: PUSockAddr; ToLen: TUSockLen
-): SizeInt; call_decl; external SockLib name 'sendto';
+): Int32; call_decl; external SockLib name 'sendto';
 function UNetBind(
   Sock: Int32; Addr: PUSockAddr; AddrLen: TUSockLen
 ): Int32; call_decl; external SockLib name 'bind';
@@ -471,12 +471,12 @@ function TUSocketImpl.Send(
   const Buffer: Pointer;
   const BufferLen: UInt32;
   const Flags: Int32
-): SizeInt;
+): Int32;
 begin
   Result := UNetSend(Self, Buffer, BufferLen, Flags);
 end;
 
-function TUSocketImpl.Send(const Msg: AnsiString): SizeInt;
+function TUSocketImpl.Send(const Msg: AnsiString): Int32;
   var ShortMsg: array[0..2048] of AnsiChar;
 begin
   if Length(Msg) < 2048 then
@@ -492,7 +492,7 @@ function TUSocketImpl.Recv(
   const Buffer: Pointer;
   const BufferLen: UInt32;
   const Flags: Int32
-): SizeInt;
+): Int32;
 begin
   Result := UNetRecv(Self, Buffer, BufferLen, Flags);
 end;
@@ -510,7 +510,7 @@ function TUSocketImpl.SendTo(
   const Flags: Int32;
   const ToAddr: PUSockAddr;
   const ToLen: TUSockLen
-): SizeInt;
+): Int32;
 begin
   Result := UNetSendTo(Self, Buffer, BufferLen, Flags, ToAddr, ToLen);
 end;
@@ -521,7 +521,7 @@ function TUSocketImpl.RecvFrom(
   const Flags: Int32;
   const AddrFrom: PUSockAddr;
   const AddrLen: PUSockLen
-): SizeInt;
+): Int32;
 begin
   Result := UNetRecvFrom(Self, Buffer, BufferLen, Flags, AddrFrom, AddrLen);
 end;
@@ -706,7 +706,7 @@ procedure TUNet.TBeacon.TListener.Execute;
   var SockAddr, OtherAddr: TUSockAddr;
   var OtherAddrLen: TUSockLen;
   var Buffer: array[0..2047] of AnsiChar;
-  var n: SizeInt;
+  var n: Int32;
   var Msg: String;
 begin
   Sock := TUSocket.Invalid;
