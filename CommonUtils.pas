@@ -1640,6 +1640,8 @@ generic function UEnumSetToStr<T>(const EnumSet: T): String;
 generic function USelect<T>(const Cond: Boolean; constref IfTrue: T; constref IfFalse: T): T; inline;
 function UCRC32(const CRC: UInt32; const Value: Pointer; const Count: UInt32): UInt32;
 function UCRC64(const CRC: UInt64; const Value: Pointer; const Count: UInt32): UInt64;
+function UFileCRC32(const FileName: String; const CRC: UInt32 = 0): UInt32;
+function UFileCRC64(const FileName: String; const CRC: UInt64 = 0): UInt64;
 procedure USinCos(const a: TUFloat; out s: TUFloat; out c: TUFloat);
 function UCoTan(const x: TUFloat): TUFloat;
 function UArcCos(const x: TUFloat): TUFloat;
@@ -1685,7 +1687,7 @@ function UDist3DPointToPlane(const v: TUVec3; const p: TUPlane): TUFloat;
 function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
 
 function UStrExplode(const Str: String; const Separator: String): TUStrArray;
-function UStrIsNumber(const Str: String): Boolean;
+function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boolean;
 function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UFileToStr(const FileName: String): String;
@@ -7620,7 +7622,14 @@ begin
       Result := '[';
       for i := 0 to High(_Elements) do
       begin
-        Result += _Elements[i].Value;
+        if _Elements[i].IsNumber then
+        begin
+          Result += _Elements[i].Value;
+        end
+        else
+        begin
+          Result += '"' + _Elements[i].Value + '"';
+        end;
         if i < High(_Elements) then Result += ',';
       end;
       Result += ']';
@@ -7717,7 +7726,7 @@ end;
 
 function TUJson.GetIsNumber: Boolean;
 begin
-  Result := (_NodeType = nt_value) and UStrIsNumber(_Value);
+  Result := (_NodeType = nt_value) and UStrIsNumber(_Value, True);
 end;
 
 function TUJson.GetIsNull: Boolean;
@@ -9004,6 +9013,44 @@ begin
   Result := Result xor UInt64($ffffffffffffffff);
 end;
 
+function UFileCRC32(const FileName: String; const CRC: UInt32): UInt32;
+  var fs: TFileStream;
+  var Buffer: array[0..2048] of UInt8;
+  var RemSize, Size: Int64;
+begin
+  Result := 0;
+  fs := TFileStream.Create(FileName, fmOpenRead);
+  try
+    RemSize := fs.Size;
+    repeat
+      Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
+      Result := UCRC32(Result, @Buffer, Size);
+      Dec(RemSize, Size);
+    until RemSize = 0;
+  finally
+    fs.Free;
+  end;
+end;
+
+function UFileCRC64(const FileName: String; const CRC: UInt64): UInt64;
+  var fs: TFileStream;
+  var Buffer: array[0..2048] of UInt8;
+  var RemSize, Size: Int64;
+begin
+  Result := 0;
+  fs := TFileStream.Create(FileName, fmOpenRead);
+  try
+    RemSize := fs.Size;
+    repeat
+      Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
+      Result := UCRC64(Result, @Buffer, Size);
+      Dec(RemSize, Size);
+    until RemSize = 0;
+  finally
+    fs.Free;
+  end;
+end;
+
 procedure USinCos(const a: TUFloat; out s: TUFloat; out c: TUFloat);
 begin
   s := Sin(a);
@@ -10002,13 +10049,23 @@ begin
   SetLength(Result, CurElement);
 end;
 
-function UStrIsNumber(const Str: String): Boolean;
+function UStrIsNumber(const Str: String; const AllowFloat: Boolean): Boolean;
   var i, n: Integer;
+  var af: Boolean;
 begin
   if Length(Str) < 1 then Exit(False);
   if Str[1] in ['-', '+'] then n := 2 else n := 1;
+  af := AllowFloat;
   for i := n to Length(Str) do
-  if not (Str[i] in ['0'..'9']) then Exit(False);
+  begin
+    if (Str[i] = '.') then
+    begin
+      if not af then Exit(False);
+      af := False;
+      Continue;
+    end;
+    if not (Str[i] in ['0'..'9']) then Exit(False);
+  end;
   Result := True;
 end;
 
