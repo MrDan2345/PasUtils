@@ -952,6 +952,7 @@ function UNetTryStrToNetAddr(const AddrStr: AnsiString; out OutAddr: TUInAddr): 
     var i, d: Int32;
     var n: UInt32;
   begin
+    Result := False;
     d := 1;
     n := 0;
     try
