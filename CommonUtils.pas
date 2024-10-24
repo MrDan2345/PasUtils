@@ -1687,7 +1687,7 @@ function UDist3DPointToPlane(const v: TUVec3; const p: TUPlane): TUFloat;
 function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
 
 function UStrExplode(const Str: String; const Separator: String): TUStrArray;
-function UStrIsNumber(const Str: String): Boolean;
+function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boolean;
 function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UFileToStr(const FileName: String): String;
@@ -7622,7 +7622,14 @@ begin
       Result := '[';
       for i := 0 to High(_Elements) do
       begin
-        Result += _Elements[i].Value;
+        if _Elements[i].IsNumber then
+        begin
+          Result += _Elements[i].Value;
+        end
+        else
+        begin
+          Result += '"' + _Elements[i].Value + '"';
+        end;
         if i < High(_Elements) then Result += ',';
       end;
       Result += ']';
@@ -7719,7 +7726,7 @@ end;
 
 function TUJson.GetIsNumber: Boolean;
 begin
-  Result := (_NodeType = nt_value) and UStrIsNumber(_Value);
+  Result := (_NodeType = nt_value) and UStrIsNumber(_Value, True);
 end;
 
 function TUJson.GetIsNull: Boolean;
@@ -10042,13 +10049,23 @@ begin
   SetLength(Result, CurElement);
 end;
 
-function UStrIsNumber(const Str: String): Boolean;
+function UStrIsNumber(const Str: String; const AllowFloat: Boolean): Boolean;
   var i, n: Integer;
+  var af: Boolean;
 begin
   if Length(Str) < 1 then Exit(False);
   if Str[1] in ['-', '+'] then n := 2 else n := 1;
+  af := AllowFloat;
   for i := n to Length(Str) do
-  if not (Str[i] in ['0'..'9']) then Exit(False);
+  begin
+    if (Str[i] = '.') then
+    begin
+      if not af then Exit(False);
+      af := False;
+      Continue;
+    end;
+    if not (Str[i] in ['0'..'9']) then Exit(False);
+  end;
   Result := True;
 end;
 
