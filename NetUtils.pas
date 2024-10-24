@@ -275,6 +275,19 @@ public
     destructor Destroy; override;
   end;
   type TBeaconRef = specialize TUSharedRef<TBeacon>;
+  type TBroker = class (TURefClass)
+  public
+  private
+    type TBrokerThread = class (TThread)
+    private
+      var _Broker: TBroker;
+    public
+      property Broker: TBroker read _Broker write _Broker;
+    end;
+  public
+    constructor Create;
+    destructor Destroy; override;
+  end;
 end;
 
 {$if defined(windows)}
@@ -774,6 +787,16 @@ procedure TUNet.TBeacon.TBroadcaster.TerminatedSet;
 begin
   Event.Signal;
   inherited TerminatedSet;
+end;
+
+constructor TUNet.TBroker.Create;
+begin
+
+end;
+
+destructor TUNet.TBroker.Destroy;
+begin
+  inherited Destroy;
 end;
 
 function UNetHostName: String;
