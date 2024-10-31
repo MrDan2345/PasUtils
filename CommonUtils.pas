@@ -1688,7 +1688,7 @@ function UDist3DPointToPlane(const v: TUVec3; const p: TUPlane): TUFloat;
 function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
 
 function UStrExplode(const Str: String; const Separator: String): TUStrArray;
-function UStrIsNumber(const Str: String): Boolean;
+function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boolean;
 function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UFileToStr(const FileName: String): String;
@@ -7588,10 +7588,24 @@ begin
 end;
 
 function TUJson.GetValue: String;
+  function GetWrappedValue(const Node: TUJson): String;
+  begin
+    if Node.IsSingleValue and not Node.IsNumber then
+    begin
+      Result := '"' + Node.Value + '"';
+    end
+    else
+    begin
+      Result := Node.Value;
+    end;
+  end;
   var i: Int32;
 begin
   case _NodeType of
-    nt_value: Result := _Value;
+    nt_value:
+    begin
+      Result := _Value;
+    end;
     nt_object:
     begin
       if Length(_Value) > 0 then
@@ -7604,15 +7618,7 @@ begin
         for i := 0 to High(_Content) do
         begin
           Result += '"' + _Content[i].Name + '":';
-          if _Content[i].Node.IsSingleValue
-          and not _Content[i].Node.IsNumber then
-          begin
-            Result += '"' + _Content[i].Node.Value + '"';
-          end
-          else
-          begin
-            Result += _Content[i].Node.Value;
-          end;
+          Result += GetWrappedValue(_Content[i].Node);
           if i < High(_Content) then Result += ',';
         end;
         Result += '}';
@@ -7623,7 +7629,7 @@ begin
       Result := '[';
       for i := 0 to High(_Elements) do
       begin
-        Result += _Elements[i].Value;
+        Result += GetWrappedValue(_Elements[i]);
         if i < High(_Elements) then Result += ',';
       end;
       Result += ']';
@@ -7720,7 +7726,7 @@ end;
 
 function TUJson.GetIsNumber: Boolean;
 begin
-  Result := (_NodeType = nt_value) and UStrIsNumber(_Value);
+  Result := (_NodeType = nt_value) and UStrIsNumber(_Value, True);
 end;
 
 function TUJson.GetIsNull: Boolean;
@@ -7910,8 +7916,8 @@ function TUJson.ValueAsBool: Boolean;
 begin
   if _NodeType <> nt_value then Exit(False);
   lc := LowerCase(_Value);
-  if Value = 'true' then Exit(True);
-  if Value = 'false' then Exit(False);
+  if lc = 'true' then Exit(True);
+  if lc = 'false' then Exit(False);
   Result := StrToIntDef(lc, 0) <> 0;
 end;
 
@@ -10048,13 +10054,23 @@ begin
   SetLength(Result, CurElement);
 end;
 
-function UStrIsNumber(const Str: String): Boolean;
+function UStrIsNumber(const Str: String; const AllowFloat: Boolean): Boolean;
   var i, n: Integer;
+  var af: Boolean;
 begin
   if Length(Str) < 1 then Exit(False);
   if Str[1] in ['-', '+'] then n := 2 else n := 1;
+  af := AllowFloat;
   for i := n to Length(Str) do
-  if not (Str[i] in ['0'..'9']) then Exit(False);
+  begin
+    if (Str[i] = '.') then
+    begin
+      if not af then Exit(False);
+      af := False;
+      Continue;
+    end;
+    if not (Str[i] in ['0'..'9']) then Exit(False);
+  end;
   Result := True;
 end;
 

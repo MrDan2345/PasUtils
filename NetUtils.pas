@@ -10,7 +10,7 @@ unit NetUtils;
 interface
 
 uses
-  SysUtils, Classes, CommonUtils;
+  SysUtils, Classes, CommonUtils, DateUtils;
 
 {$if defined(windows)}
 const SockLib = 'ws2_32.dll';
@@ -174,13 +174,13 @@ type TUSocketImpl = type helper for TUSocket
     const Buffer: Pointer;
     const BufferLen: UInt32;
     const Flags: Int32
-  ): SizeInt;
-  function Send(const Msg: AnsiString): SizeInt;
+  ): Int32;
+  function Send(const Msg: AnsiString): Int32;
   function Recv(
     const Buffer: Pointer;
     const BufferLen: UInt32;
     const Flags: Int32
-  ): SizeInt;
+  ): Int32;
   function Recv: String;
   function SendTo(
     const Buffer: Pointer;
@@ -188,14 +188,14 @@ type TUSocketImpl = type helper for TUSocket
     const Flags: Int32;
     const ToAddr: PUSockAddr;
     const ToLen: TUSockLen
-  ): SizeInt;
+  ): Int32;
   function RecvFrom(
     const Buffer: Pointer;
     const BufferLen: UInt32;
     const Flags: Int32;
     const AddrFrom: PUSockAddr;
     const AddrLen: PUSockLen
-  ): SizeInt;
+  ): Int32;
   function Shutdown(const How: Int32 = SHUT_RDWR): Int32;
   function Close: Int32;
   function IsValid: Boolean;
@@ -230,15 +230,15 @@ public
     end;
     type TListener = class (TBeaconThread)
     private
-      var Sock: TUSocket;
+      var _Sock: TUSocket;
     public
       procedure Execute; override;
       procedure TerminatedSet; override;
     end;
     type TBroadcaster = class (TBeaconThread)
     private
-      var Sock: TUSocket;
-      var Event: TUEvent;
+      var _Sock: TUSocket;
+      var _Event: TUEvent;
     public
       procedure Execute; override;
       procedure TerminatedSet; override;
@@ -275,6 +275,88 @@ public
     destructor Destroy; override;
   end;
   type TBeaconRef = specialize TUSharedRef<TBeacon>;
+  type TSessionMarker = array[0..3] of AnsiChar;
+  const DefaultMarker: TSessionMarker = 'UDSM';
+  type TSessionMessage = packed record
+    Marker: TSessionMarker;
+    Id: TGuid;
+    Domain: TGuid;
+    Mask: UInt32;
+    LocalAddr: TUInAddr;
+    Visible: Boolean;
+    SeekId: TGuid;
+  end;
+  type TPeerMessage = packed record
+    PeerId: TGuid;
+    Addr: TUInAddr;
+    Port: UInt16;
+  end;
+  type TBroker = class (TURefClass)
+  public
+  private
+    type TBrokerThread = class (TThread)
+    private
+      var _Broker: TBroker;
+    public
+      property Broker: TBroker read _Broker write _Broker;
+    end;
+    type TListener = class (TBrokerThread)
+    public
+      procedure Execute; override;
+      procedure TerminatedSet; override;
+    end;
+    type TUpdater = class (TBrokerThread)
+    private
+      var _Event: TUEvent;
+    public
+      procedure Resume;
+      procedure Execute; override;
+      procedure TerminatedSet; override;
+    end;
+    type TClient = class
+    public
+      var Id: TGuid;
+      var AddrLocal: TUInAddr;
+      var Addr: TUInAddr;
+      var Port: UInt16;
+      var TimeStamp: TDateTime;
+      var Visible: Boolean;
+      var SeekId: TGuid;
+      function MakePeerMessage: TPeerMessage;
+      function MakeSockAddr: TUSockAddr;
+    end;
+    type TClientArray = array of TClient;
+    type TDomain = class
+    public
+      var Id: TGuid;
+      var Clients: array of TClient;
+      function FindClient(const ClientId: TGuid): TClient;
+      destructor Destroy; override;
+    end;
+    type TDomainArray = array of TDomain;
+    var Sock: TUSocket;
+    var _Enabled: Boolean;
+    var _Listener: TListener;
+    var _Updater: TUpdater;
+    var _Domains: TDomainArray;
+    var _Marker: TSessionMarker;
+    var _Port: UInt16;
+    var _CS: TUCriticalSection;
+    function QueryClient(const DomainId: TGuid; const ClientId: TGuid): TClient;
+    procedure Connection(
+      const ClientAddr: TUInAddr;
+      const ClientPort: UInt16;
+      const Message: TSessionMessage
+    );
+    procedure Update;
+    procedure PurgeStaleConnections(const ThresholdSec: Int32 = 60);
+    procedure SetEnabled(const Value: Boolean);
+  public
+    property Port: UInt16 read _Port write _Port;
+    property Enabled: Boolean read _Enabled write SetEnabled;
+    constructor Create;
+    destructor Destroy; override;
+  end;
 end;
 
 {$if defined(windows)}
@@ -334,18 +416,18 @@ function UNetSocket(
 ): Int32; call_decl; external SockLib name 'socket';
 function UNetRecv(
   Sock: Int32; Buf: Pointer; Len: UInt32; Flags: Int32
-): SizeInt; call_decl; external SockLib name 'recv';
+): Int32; call_decl; external SockLib name 'recv';
 function UNetRecvFrom(
   Sock: Int32; Buf: Pointer; Len: UInt32; Flags: Int32;
   FromAddr: PUSockAddr; FromLen: PUSockLen
-): SizeInt; call_decl; external SockLib name 'recvfrom';
+): Int32; call_decl; external SockLib name 'recvfrom';
 function UNetSend(
   Sock: Int32; Msg: Pointer; Len: UInt32; Flags: Int32
-): SizeInt; call_decl; external SockLib name 'send';
+): Int32; call_decl; external SockLib name 'send';
 function UNetSendTo(
   Sock: Int32; Msg: Pointer; Len: UInt32; Flags: Int32;
   ToAddr: PUSockAddr; ToLen: TUSockLen
-): SizeInt; call_decl; external SockLib name 'sendto';
+): Int32; call_decl; external SockLib name 'sendto';
 function UNetBind(
   Sock: Int32; Addr: PUSockAddr; AddrLen: TUSockLen
 ): Int32; call_decl; external SockLib name 'bind';
@@ -471,12 +553,12 @@ function TUSocketImpl.Send(
   const Buffer: Pointer;
   const BufferLen: UInt32;
   const Flags: Int32
-): SizeInt;
+): Int32;
 begin
   Result := UNetSend(Self, Buffer, BufferLen, Flags);
 end;
 
-function TUSocketImpl.Send(const Msg: AnsiString): SizeInt;
+function TUSocketImpl.Send(const Msg: AnsiString): Int32;
   var ShortMsg: array[0..2048] of AnsiChar;
 begin
   if Length(Msg) < 2048 then
@@ -492,7 +574,7 @@ function TUSocketImpl.Recv(
   const Buffer: Pointer;
   const BufferLen: UInt32;
   const Flags: Int32
-): SizeInt;
+): Int32;
 begin
   Result := UNetRecv(Self, Buffer, BufferLen, Flags);
 end;
@@ -510,7 +592,7 @@ function TUSocketImpl.SendTo(
   const Flags: Int32;
   const ToAddr: PUSockAddr;
   const ToLen: TUSockLen
-): SizeInt;
+): Int32;
 begin
   Result := UNetSendTo(Self, Buffer, BufferLen, Flags, ToAddr, ToLen);
 end;
@@ -521,7 +603,7 @@ function TUSocketImpl.RecvFrom(
   const Flags: Int32;
   const AddrFrom: PUSockAddr;
   const AddrLen: PUSockLen
-): SizeInt;
+): Int32;
 begin
   Result := UNetRecvFrom(Self, Buffer, BufferLen, Flags, AddrFrom, AddrLen);
 end;
@@ -706,40 +788,40 @@ procedure TUNet.TBeacon.TListener.Execute;
   var SockAddr, OtherAddr: TUSockAddr;
   var OtherAddrLen: TUSockLen;
   var Buffer: array[0..2047] of AnsiChar;
-  var n: SizeInt;
+  var n: Int32;
   var Msg: String;
 begin
-  Sock := TUSocket.Invalid;
-  Sock.MakeUDP();
+  _Sock := TUSocket.Invalid;
+  _Sock.MakeUDP();
   SockAddr := TUSockAddr.Default;
   SockAddr.sin_port := UNetHostToNetShort(Beacon.Port);
-  Sock.Bind(@SockAddr, SizeOf(SockAddr));
+  _Sock.Bind(@SockAddr, SizeOf(SockAddr));
   OtherAddr := TUSockAddr.Default;
   OtherAddrLen := SizeOf(OtherAddr);
   while not Terminated do
   begin
-    n := Sock.RecvFrom(@Buffer, SizeOf(Buffer), 0, @OtherAddr, @OtherAddrLen);
+    n := _Sock.RecvFrom(@Buffer, SizeOf(Buffer), 0, @OtherAddr, @OtherAddrLen);
     if n <= 0 then Break;
     if OtherAddr.sin_addr.Addr32 = Beacon.LocalAddr.Addr32 then Continue;
     Msg := Buffer;
     Beacon.AddPeer(OtherAddr.sin_addr, Msg);
     OtherAddr.sin_port := UNetHostToNetShort(Beacon.Port);
-    n := Sock.SendTo(
+    n := _Sock.SendTo(
       @Beacon.Message[1], Length(Beacon.Message) + 1, 0,
       @OtherAddr, SizeOf(OtherAddr)
     );
   end;
-  if Sock.IsValid then
+  if _Sock.IsValid then
   begin
-    Sock.Shutdown();
-    Sock.Close;
+    _Sock.Shutdown();
+    _Sock.Close;
   end;
 end;
 
 procedure TUNet.TBeacon.TListener.TerminatedSet;
 begin
-  Sock.Shutdown();
-  Sock.Close;
+  _Sock.Shutdown();
+  _Sock.Close;
   inherited TerminatedSet;
 end;
 
@@ -749,31 +831,256 @@ procedure TUNet.TBeacon.TBroadcaster.Execute;
   var i: Int32;
 begin
   LocalAddr := Beacon.LocalAddr;
-  Sock := TUSocket.Invalid;
-  Sock.MakeUDP();
+  _Sock := TUSocket.Invalid;
+  _Sock.MakeUDP();
   SockAddr := TUSockAddr.Default;
   SockAddr.sin_addr := LocalAddr;
   SockAddr.sin_port := UNetHostToNetShort(Beacon.Port);
-  Event.Unsignal;
+  _Event.Unsignal;
   while not Terminated do
   begin
     for i := 1 to 255 do
     begin
       SockAddr.sin_addr.Addr8[3] := UInt8(i);
       if SockAddr.sin_addr.Addr32 = LocalAddr.Addr32 then Continue;
-      Sock.SendTo(
+      _Sock.SendTo(
         @Beacon.Message[1], Length(Beacon.Message) + 1, 0,
         @SockAddr, SizeOf(SockAddr)
       );
     end;
-    Event.WaitFor(Beacon.BroadcastInterval);
+    _Event.WaitFor(Beacon.BroadcastInterval);
   end;
 end;
 
 procedure TUNet.TBeacon.TBroadcaster.TerminatedSet;
 begin
-  Event.Signal;
+  _Event.Signal;
   inherited TerminatedSet;
+end;
+
+function TUNet.TBroker.QueryClient(const DomainId: TGuid; const ClientId: TGuid): TClient;
+  var i: Int32;
+  var Domain: TDomain;
+  var Client: TClient;
+begin
+  Result := nil;
+  Domain := nil;
+  for i := 0 to High(_Domains) do
+  if IsEqualGUID(_Domains[i].Id, DomainId) then
+  begin
+    Domain := _Domains[i];
+    Break;
+  end;
+  if not Assigned(Domain) then
+  begin
+    Domain := TDomain.Create;
+    specialize UArrAppend<TDomain>(_Domains, Domain);
+  end;
+  for Client in Domain.Clients do
+  if IsEqualGuid(Client.Id, ClientId) then
+  begin
+    Result := Client;
+    Break;
+  end;
+  if not Assigned(Result) then
+  begin
+    Result := TClient.Create;
+    Result.Id := ClientId;
+    specialize UArrAppend<TClient>(Domain.Clients, Result);
+  end;
+end;
+
+procedure TUNet.TBroker.Connection(
+  const ClientAddr: TUInAddr;
+  const ClientPort: UInt16;
+  const Message: TSessionMessage
+);
+  var Client: TClient;
+begin
+  if Message.Marker <> _Marker then Exit;
+  _CS.Enter;
+  try
+    Client := QueryClient(Message.Domain, Message.Id);
+    Client.AddrLocal := Message.LocalAddr;
+    Client.Addr := ClientAddr;
+    Client.Port := ClientPort;
+    Client.TimeStamp := Now;
+    Client.Visible := Message.Visible;
+    Client.SeekId := Message.SeekId;
+    _Updater.Resume;
+  finally
+    _CS.Leave;
+  end;
+end;
+
+procedure TUNet.TBroker.Update;
+  var Domain: TDomain;
+  var Client, Seek: TClient;
+  var PeerMessage: TPeerMessage;
+  var SockAddr: TUSockAddr;
+begin
+  _CS.Enter;
+  try
+    PurgeStaleConnections;
+    for Domain in _Domains do
+    begin
+      for Client in Domain.Clients do
+      begin
+        if IsEqualGUID(Client.SeekId, GUID_NULL) then Continue;
+        Seek := Domain.FindClient(Client.SeekId);
+        if not Assigned(Seek) then Continue;
+        if not Seek.Visible then Continue;
+        PeerMessage := Client.MakePeerMessage;
+        SockAddr := Seek.MakeSockAddr;
+        Sock.SendTo(@PeerMessage, SizeOf(PeerMessage), 0, @SockAddr, SizeOf(SockAddr));
+        PeerMessage := Seek.MakePeerMessage;
+        SockAddr := Client.MakeSockAddr;
+        Sock.SendTo(@PeerMessage, SizeOf(PeerMessage), 0, @SockAddr, SizeOf(SockAddr));
+        Client.SeekId := GUID_NULL;
+      end;
+    end;
+  finally
+    _CS.Leave;
+  end;
+end;
+
+procedure TUNet.TBroker.PurgeStaleConnections(const ThresholdSec: Int32);
+  var i, j: Int32;
+  var CurTime: TDateTime;
+begin
+  CurTime := Now;
+  for i := High(_Domains) downto 0 do
+  begin
+    for j := High(_Domains[i].Clients) downto 0 do
+    begin
+      if SecondsBetween(_Domains[i].Clients[j].TimeStamp, CurTime) < ThresholdSec then Continue;
+      FreeAndNil(_Domains[i].Clients[j]);
+      specialize UArrDelete<TClient>(_Domains[i].Clients, j);
+    end;
+    if Length(_Domains[i].Clients) > 0 then Continue;
+    FreeAndNil(_Domains[i]);
+    specialize UArrDelete<TDomain>(_Domains, i);
+  end;
+end;
+
+procedure TUNet.TBroker.SetEnabled(const Value: Boolean);
+  var SockAddr: TUSockAddr;
+  var n: TUSockLen;
+begin
+  if _Enabled = Value then Exit;
+  _Enabled := Value;
+  if _Enabled then
+  begin
+    Sock := TUSocket.CreateUDP();
+    SockAddr := TUSockAddr.Default;
+    SockAddr.sin_port := UNetHostToNetShort(_Port);
+    n := SizeOf(SockAddr);
+    if Sock.Bind(@SockAddr, n) <> 0 then
+    begin
+      WriteLn('Bind socket failed');
+      _Enabled := False;
+      Sock.Close;
+      Exit;
+    end;
+    _Listener := TListener.Create(True);
+    _Listener.Broker := Self;
+    _Listener.Start;
+    _Updater := TUpdater.Create(True);
+    _Updater.Broker := Self;
+    _Updater.Start;
+  end
+  else
+  begin
+    Sock.Shutdown();
+    Sock.Close;
+    _Updater.Terminate;
+    _Updater.WaitFor;
+    _Listener.Terminate;
+    _Listener.WaitFor;
+  end;
+end;
+
+constructor TUNet.TBroker.Create;
+begin
+  _Enabled := False;
+  _Marker := DefaultMarker;
+  _Port := 61380;
+end;
+
+destructor TUNet.TBroker.Destroy;
+begin
+  Enabled := False;
+  specialize UArrClear<TDomain>(_Domains);
+  inherited Destroy;
+end;
+
+procedure TUNet.TBroker.TListener.Execute;
+  var OtherAddr: TUSockAddr;
+  var n, r: Int32;
+  var Message: TSessionMessage;
+begin
+  if not Broker.Sock.IsValid then Exit;
+  while not Terminated do
+  begin
+    n := SizeOf(OtherAddr);
+    r := Broker.Sock.RecvFrom(@Message, SizeOf(Message), 0, @OtherAddr, @n);
+    if r <> SizeOf(Message) then Continue;
+    WriteLn('Connection: ', UNetNetAddrToStr(OtherAddr.sin_addr), ':', IntToStr(ntohs(OtherAddr.sin_port)));
+    Broker.Connection(OtherAddr.sin_addr, OtherAddr.sin_port, Message);
+  end;
+end;
+
+procedure TUNet.TBroker.TListener.TerminatedSet;
+begin
+  inherited TerminatedSet;
+end;
+
+procedure TUNet.TBroker.TUpdater.Resume;
+begin
+  _Event.Signal;
+end;
+
+procedure TUNet.TBroker.TUpdater.Execute;
+begin
+  while not Terminated do
+  begin
+    _Event.Unsignal;
+    _Event.WaitFor(5000);
+    Broker.Update;
+  end;
+end;
+
+procedure TUNet.TBroker.TUpdater.TerminatedSet;
+begin
+  inherited TerminatedSet;
+end;
+
+function TUNet.TBroker.TClient.MakePeerMessage: TPeerMessage;
+begin
+  Result.PeerId := Id;
+  Result.Addr := Addr;
+  Result.Port := Port;
+end;
+
+function TUNet.TBroker.TClient.MakeSockAddr: TUSockAddr;
+begin
+  Result := TUSockAddr.Default;
+  Result.sin_addr := Addr;
+  Result.sin_port := Port;
+end;
+
+function TUNet.TBroker.TDomain.FindClient(const ClientId: TGuid): TClient;
+  var Client: TClient;
+begin
+  for Client in Clients do
+  if IsEqualGUID(Client.Id, ClientId) then Exit(Client);
+  Result := nil;
+end;
+
+destructor TUNet.TBroker.TDomain.Destroy;
+begin
+  specialize UArrClear<TClient>(Clients);
+  inherited Destroy;
 end;
 
 function UNetHostName: String;
@@ -952,16 +1259,17 @@ function UNetTryStrToNetAddr(const AddrStr: AnsiString; out OutAddr: TUInAddr): 
     var i, d: Int32;
     var n: UInt32;
   begin
-    d := 100;
+    Result := False;
+    d := 1;
     n := 0;
     try
-      while Pos <= Length(AddrStr) do
+      while Pos >= 1 do
       begin
-        i := Pos; Inc(Pos);
+        i := Pos; Dec(Pos);
         if AddrStr[i] = '.' then Exit(True);
         if not Ord(AddrStr[i]) in [Ord('0')..Ord('9')] then Exit(False);
         n += (Ord(AddrStr[i]) - Ord('0')) * d;
-        d := d div 10;
+        d := d * 10;
       end;
       Result := True;
     finally
@@ -972,8 +1280,8 @@ function UNetTryStrToNetAddr(const AddrStr: AnsiString; out OutAddr: TUInAddr): 
   var Addr: TUInAddr;
 begin
   if Length(AddrStr) < 7 then Exit(False);
-  i := 1;
-  for n := 0 to 3 do
+  i := Length(AddrStr);
+  for n := 3 downto 0 do
   begin
     if not ReadNum(i, Addr.Addr8[n]) then Exit(False);
   end;
