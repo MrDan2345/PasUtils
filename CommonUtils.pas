@@ -1441,7 +1441,7 @@ public
   end;
 protected
   class var _Syntax: TUParserSyntax;
-  class var _NullNode: TUJson;
+  class var _NullNodeRef: IInterface;
 private
   var _NodeType: TNodeType;
   var _Value: String;
@@ -1475,6 +1475,7 @@ public
   property IsArray: Boolean read GetIsArray;
   property IsNumber: Boolean read GetIsNumber;
   property IsNull: Boolean read GetIsNull;
+  class function NullNode: TUJson;
   function GetEnumerator: TEnumerator;
   function AsString: String;
   function FormatJson(const Offset: String = ''): String;
@@ -7468,7 +7469,7 @@ end;
 // TUJson begin
 function TUJson.TEnumerator.GetCurrent: TUJson;
 begin
-  if (i = -1) or (i >= n.Count) then Exit(_NullNode);
+  if (i = -1) or (i >= n.Count) then Exit(NullNode);
   Result := n.Element[i];
 end;
 
@@ -7640,13 +7641,13 @@ end;
 function TUJson.GetContent(const Key: String): TUJson;
   var i: Int32;
 begin
-  if _NodeType <> nt_object then Exit(_NullNode);
+  if _NodeType <> nt_object then Exit(NullNode);
   for i := 0 to High(_Content) do
   if _Content[i].Name = Key then
   begin
     Exit(_Content[i].Node);
   end;
-  Result := _NullNode;
+  Result := NullNode;
 end;
 
 function TUJson.GetContent(const Index: Int32): TUJson;
@@ -7676,15 +7677,15 @@ begin
   case _NodeType of
     nt_array:
     begin
-      if (Index < 0) or (Index > High(_Elements)) then Exit(_NullNode);
+      if (Index < 0) or (Index > High(_Elements)) then Exit(NullNode);
       Result := _Elements[Index];
     end;
     nt_object:
     begin
-      if (Index < 0) or (Index > High(_Content)) then Exit(_NullNode);
+      if (Index < 0) or (Index > High(_Content)) then Exit(NullNode);
       Result := _Content[Index].Node;
     end;
-    else Result := _NullNode;
+    else Result := NullNode;
   end;
 end;
 
@@ -7699,7 +7700,7 @@ end;
 
 function TUJson.GetIsValid: Boolean;
 begin
-  Result := (Self <> _NullNode) and (_NodeType <> nt_invalid);
+  Result := (Self <> NullNode) and (_NodeType <> nt_invalid);
 end;
 
 function TUJson.GetIsSingleValue: Boolean;
@@ -7725,6 +7726,11 @@ end;
 function TUJson.GetIsNull: Boolean;
 begin
   Result := (_NodeType = nt_object) and (Length(_Value) > 0);
+end;
+
+class function TUJson.NullNode: TUJson;
+begin
+  Result := _NullNodeRef as TUJson;
 end;
 
 function TUJson.GetEnumerator: TEnumerator;
@@ -7785,7 +7791,7 @@ end;
 function TUJson.AddValue(const ValueName: String; const NewValue: String): TUJson;
   var NamedNode: TNamedNode;
 begin
-  Result := _NullNode;
+  Result := NullNode;
   if not IsValid then Exit;
   if _NodeType <> nt_object then Exit;
   if Length(ValueName) = 0 then Exit;
@@ -7799,7 +7805,7 @@ end;
 
 function TUJson.AddValue(const NewValue: String): TUJson;
 begin
-  Result := _NullNode;
+  Result := NullNode;
   if not IsValid then Exit;
   if _NodeType <> nt_array then Exit;
   Result := TUJson.Create;
@@ -7841,7 +7847,7 @@ end;
 function TUJson.AddObject(const ObjectName: String): TUJson;
   var NamedNode: TNamedNode;
 begin
-  Result := _NullNode;
+  Result := NullNode;
   if not IsValid then Exit;
   case _NodeType of
     nt_object:
@@ -7865,7 +7871,7 @@ end;
 function TUJson.AddArray(const ArrayName: String): TUJson;
   var NamedNode: TNamedNode;
 begin
-  Result := _NullNode;
+  Result := NullNode;
   if not IsValid then Exit;
   case _NodeType of
     nt_object:
@@ -7917,12 +7923,12 @@ begin
     AddString('"');
     AddKeywords(['null', 'undefined']);
   end;
-  _NullNode := TUJson.Create;
+  _NullNodeRef := TUJson.Create;
 end;
 
 class destructor TUJson.DestroyClass;
 begin
-  _NullNode.Free;
+  _NullNodeRef := nil;
 end;
 
 constructor TUJson.Create;
@@ -7946,7 +7952,7 @@ begin
     if not Result.ReadJson(p) then
     begin
       FreeAndNil(Result);
-      Result := _NullNode;
+      Result := NullNode;
     end;
     if not Result.IsValid then WriteLn('Error, line: ', p.Line);
   finally
