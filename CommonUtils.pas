@@ -7587,13 +7587,23 @@ begin
 end;
 
 function TUJson.GetValue: String;
+  function GetWrappedValue(const Node: TUJson): String;
+  begin
+    if Node.IsSingleValue and not Node.IsNumber then
+    begin
+      Result := '"' + Node.Value + '"';
+    end
+    else
+    begin
+      Result := Node.Value;
+    end;
+  end;
   var i: Int32;
 begin
   case _NodeType of
     nt_value:
     begin
-      if IsNumber then Result := _Value
-      else Result := '"' + _Value + '"';
+      Result := _Value;
     end;
     nt_object:
     begin
@@ -7607,7 +7617,7 @@ begin
         for i := 0 to High(_Content) do
         begin
           Result += '"' + _Content[i].Name + '":';
-          Result += _Content[i].Node.Value;
+          Result += GetWrappedValue(_Content[i].Node);
           if i < High(_Content) then Result += ',';
         end;
         Result += '}';
@@ -7618,7 +7628,7 @@ begin
       Result := '[';
       for i := 0 to High(_Elements) do
       begin
-        Result += _Elements[i].Value;
+        Result += GetWrappedValue(_Elements[i]);
         if i < High(_Elements) then Result += ',';
       end;
       Result += ']';
