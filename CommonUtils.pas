@@ -7590,7 +7590,11 @@ function TUJson.GetValue: String;
   var i: Int32;
 begin
   case _NodeType of
-    nt_value: Result := _Value;
+    nt_value:
+    begin
+      if IsNumber then Result := _Value
+      else Result := '"' + _Value + '"';
+    end;
     nt_object:
     begin
       if Length(_Value) > 0 then
@@ -7603,15 +7607,7 @@ begin
         for i := 0 to High(_Content) do
         begin
           Result += '"' + _Content[i].Name + '":';
-          if _Content[i].Node.IsSingleValue
-          and not _Content[i].Node.IsNumber then
-          begin
-            Result += '"' + _Content[i].Node.Value + '"';
-          end
-          else
-          begin
-            Result += _Content[i].Node.Value;
-          end;
+          Result += _Content[i].Node.Value;
           if i < High(_Content) then Result += ',';
         end;
         Result += '}';
@@ -7622,14 +7618,7 @@ begin
       Result := '[';
       for i := 0 to High(_Elements) do
       begin
-        if _Elements[i].IsNumber then
-        begin
-          Result += _Elements[i].Value;
-        end
-        else
-        begin
-          Result += '"' + _Elements[i].Value + '"';
-        end;
+        Result += _Elements[i].Value;
         if i < High(_Elements) then Result += ',';
       end;
       Result += ']';
@@ -7911,8 +7900,8 @@ function TUJson.ValueAsBool: Boolean;
 begin
   if _NodeType <> nt_value then Exit(False);
   lc := LowerCase(_Value);
-  if Value = 'true' then Exit(True);
-  if Value = 'false' then Exit(False);
+  if lc = 'true' then Exit(True);
+  if lc = 'false' then Exit(False);
   Result := StrToIntDef(lc, 0) <> 0;
 end;
 
