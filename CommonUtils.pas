@@ -1360,6 +1360,9 @@ generic TUArrayObjUtils<T> = class (specialize TUArrayUtils<T>)
   class procedure Clear(var Arr: TArr);
 end;
 
+generic TUPredicate<T> = function (const a, b: T): Boolean;
+generic TUPredicateObj<T> = function (const a, b: T): Boolean of object;
+
 type TUXML = class (TURefClass)
 public
   type TAttribute = class
@@ -1700,7 +1703,9 @@ procedure UCopyDir(const SrcDir, DstDir: String; const LogProc: TUProcedureStrin
 procedure ULog(const Text: String; const Offset: Int32 = 0);
 procedure ULogOffset(const Offset: Int32);
 
-generic procedure UArrSort<T>(var Arr: array of T);
+generic procedure UArrSort<T>(var Arr: array of T); overload;
+generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>); overload;
+generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>); overload;
 generic function UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T): Int32; overload;
 generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Other: specialize TUArray<T>); overload;
 generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
@@ -10238,8 +10243,64 @@ generic procedure UArrSort<T>(var Arr: array of T);
     j := RangeEnd;
     pivot := Arr[(RangeStart + RangeEnd) shr 1];
     repeat
-      while (pivot > Arr[i]) do i := i + 1;
-      while (Arr[j] > pivot) do j := j - 1;
+      while (pivot > Arr[i]) do Inc(i);
+      while (Arr[j] > pivot) do Dec(j);
+      if i <= j then
+      begin
+        tmp := Arr[i];
+        Arr[i] := Arr[j];
+        Arr[j] := tmp;
+        j := j - 1;
+        i := i + 1;
+      end;
+    until i > j;
+    if RangeStart < j then SortRange(RangeStart, j);
+    if i < RangeEnd then SortRange(i, RangeEnd);
+  end;
+begin
+  SortRange(Low(Arr), High(Arr));
+end;
+
+generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>);
+  procedure SortRange(const RangeStart, RangeEnd: Integer); overload;
+    var i, j: Integer;
+    var tmp, pivot: T;
+  begin
+    if RangeEnd <= RangeStart then exit;
+    i := RangeStart;
+    j := RangeEnd;
+    pivot := Arr[(RangeStart + RangeEnd) shr 1];
+    repeat
+      while Pred(pivot, Arr[i]) do Inc(i);
+      while Pred(Arr[j], pivot) do Dec(j);
+      if i <= j then
+      begin
+        tmp := Arr[i];
+        Arr[i] := Arr[j];
+        Arr[j] := tmp;
+        j := j - 1;
+        i := i + 1;
+      end;
+    until i > j;
+    if RangeStart < j then SortRange(RangeStart, j);
+    if i < RangeEnd then SortRange(i, RangeEnd);
+  end;
+begin
+  SortRange(Low(Arr), High(Arr));
+end;
+
+generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>);
+  procedure SortRange(const RangeStart, RangeEnd: Integer); overload;
+    var i, j: Integer;
+    var tmp, pivot: T;
+  begin
+    if RangeEnd <= RangeStart then exit;
+    i := RangeStart;
+    j := RangeEnd;
+    pivot := Arr[(RangeStart + RangeEnd) shr 1];
+    repeat
+      while Pred(pivot, Arr[i]) do Inc(i);
+      while Pred(Arr[j], pivot) do Dec(j);
       if i <= j then
       begin
         tmp := Arr[i];
