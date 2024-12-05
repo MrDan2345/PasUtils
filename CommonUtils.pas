@@ -1509,6 +1509,19 @@ public
 end;
 type TUJsonRef = specialize TUSharedRef<TUJson>;
 
+type TUExprMatch = record
+  Match: Boolean;
+  MatchStr: String;
+  MatchStart: Int32;
+  MatchLength: Int32;
+end;
+type TUExprMatchHelper = type helper for TUExprMatch
+  const NoMatch: TUExprMatch = (
+    Match: False; MatchStr: '';
+    MatchStart: 0; MatchLength: 0
+  );
+end;
+
 procedure UClear(out x; const Size: UInt32);
 procedure UMove(out Dest; const Src; const Size: UInt32);
 function UIntToPtr(const i: PtrUInt): Pointer;
@@ -1690,7 +1703,9 @@ function UProj3DPointToBounds(const b: TUBounds3f; const v: TUVec3): TUVec3;
 function UDist3DPointToPlane(const v: TUVec3; const p: TUPlane): TUFloat;
 function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
 
-function UStrExplode(const Str: String; const Separator: String): TUStrArray;
+function UStrExprMatch(const Str, Expr: String): TUExprMatch;
+function UStrExplode(const Str: String; const Separator: String; const AllowEmpty: Boolean = True): TUStrArray;
+function UStrSubStr(const Str: String; const SubStrStart: Int32; const SubStrLength: Int32 = 0): String;
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boolean;
 function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
@@ -10010,7 +10025,59 @@ begin
   Result := True;
 end;
 
-function UStrExplode(const Str: String; const Separator: String): TUStrArray;
+function UStrExprMatch(const Str, Expr: String): TUExprMatch;
+  function CompareSeq(const StrPos: Int32; const Seq: String): Boolean;
+    var i: Int32;
+  begin
+    if (Length(Str) - StrPos + 1) < Length(Seq) then Exit(False);
+    for i := 0 to Length(Seq) - 1 do
+    if Str[StrPos + i] <> Seq[i + 1] then Exit(False);
+    Result := True;
+  end;
+  var Sequence: TUStrArray;
+  var i, j, s, sl: Int32;
+  function AdvanceSequence: Boolean;
+  begin
+    repeat
+      Inc(s);
+      Result := s > High(Sequence)
+    until Result or (Length(Sequence[s]) > 0);
+  end;
+begin
+  if Length(Expr) = 0 then Exit(TUExprMatch.NoMatch);
+  Sequence := UStrExplode(Expr, '*', False);
+  for i := 1 to Length(Str) do
+  begin
+    s := -1;
+    if AdvanceSequence then
+    begin
+      Result.Match := True;
+      Result.MatchStart := i;
+      Result.MatchLength := Length(Str) - i + 1;
+      Result.MatchStr := UStrSubStr(Str, Result.MatchStart, Result.MatchLength);
+      Exit;
+    end;
+    j := 1;
+    while j <= Length(Str) do
+    begin
+      if not CompareSeq(j, Sequence[s]) then
+      begin
+        Inc(j);
+        Continue;
+      end;
+      Inc(j, Length(Sequence[s]));
+      if not AdvanceSequence then Continue;
+      Result.Match := True;
+      Result.MatchStart := i;
+      Result.MatchLength := j - i;
+      Result.MatchStr := UStrSubStr(Str, Result.MatchStart, Result.MatchLength);
+      Exit;
+    end;
+  end;
+  Result := TUExprMatch.NoMatch;
+end;
+
+function UStrExplode(const Str: String; const Separator: String; const AllowEmpty: Boolean): TUStrArray;
   var i, j: Int32;
   var CurElement: Int32;
   var PrevParamIndex: Int32;
@@ -10051,12 +10118,28 @@ begin
     Move(Str[PrevParamIndex], Result[CurElement][1], Length(Str) - PrevParamIndex + 1);
     Inc(CurElement);
   end
-  else
+  else if AllowEmpty then
   begin
     Result[CurElement] := '';
     Inc(CurElement);
   end;
   SetLength(Result, CurElement);
+end;
+
+function UStrSubStr(
+  const Str: String;
+  const SubStrStart: Int32;
+  const SubStrLength: Int32
+): String;
+  var First, Len: Int32;
+begin
+  if SubStrStart < 1 then First := 1 else First := SubStrStart;
+  if First > Length(Str) then Exit('');
+  if SubStrLength = 0 then Len := Length(Str) - First + 1
+  else Len := UMin(SubStrLength, Length(Str) - First + 1);
+  if Len < 1 then Exit('');
+  SetLength(Result, Len);
+  Move(Str[First], Result[1], Len);
 end;
 
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean): Boolean;
