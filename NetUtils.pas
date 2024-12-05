@@ -10,7 +10,13 @@ unit NetUtils;
 interface
 
 uses
-  SysUtils, Classes, CommonUtils, DateUtils;
+{$if defined(windows)}
+  Windows,
+{$endif}
+  SysUtils,
+  Classes,
+  CommonUtils,
+  DateUtils;
 
 {$if defined(windows)}
 const SockLib = 'ws2_32.dll';
@@ -442,6 +448,47 @@ TUNetWSAData = record
    lpVendorInfo: PAnsiChar;
 {$endif}
 end;
+const MAX_ADAPTER_NAME_LENGTH = 256;
+const MAX_ADAPTER_DESCRIPTION_LENGTH = 128;
+const MAX_ADAPTER_ADDRESS_LENGTH = 8;
+type PIP_ADDRESS_STRING = ^TIP_ADDRESS_STRING;
+TIP_ADDRESS_STRING = record
+  Str: array[0..15] of AnsiChar;
+end;
+type PIP_MASK_STRING = ^TIP_MASK_STRING;
+TIP_MASK_STRING = TIP_ADDRESS_STRING;
+type PIP_ADDR_STRING = ^TIP_ADDR_STRING;
+TIP_ADDR_STRING = record
+  Next: PIP_ADDR_STRING;
+  IpAddress: TIP_ADDRESS_STRING;
+  IpMask: TIP_MASK_STRING;
+  Context: DWORD;
+end;
+type PIP_ADAPTER_INFO = ^TIP_ADAPTER_INFO;
+TIP_ADAPTER_INFO = record
+  Next: PIP_ADAPTER_INFO;
+  ComboIndex: DWORD;
+  AdapterName: array[0..MAX_ADAPTER_NAME_LENGTH + 3] of AnsiChar;
+  Description: array[0..MAX_ADAPTER_DESCRIPTION_LENGTH + 3] of AnsiChar;
+  AddressLength: UINT;
+  Address: array[0..MAX_ADAPTER_ADDRESS_LENGTH - 1] of BYTE;
+  Index: DWORD;
+  _Type: UINT;
+  DhcpEnabled: UINT;
+  CurrentIpAddress: PIP_ADDR_STRING;
+  IpAddressList: TIP_ADDR_STRING;
+  GatewayList: TIP_ADDR_STRING;
+  DhcpServer: TIP_ADDR_STRING;
+  HaveWins: BOOL;
+  PrimaryWinsServer: TIP_ADDR_STRING;
+  SecondaryWinsServer: TIP_ADDR_STRING;
+  LeaseObtained: Int32;
+  LeaseExpires: Int32;
+end;
+function GetAdaptersInfo(
+  AdapterInfo: PIP_ADAPTER_INFO;
+  SizePointer: PULONG
+): ULONG; call_decl; external 'iphlpapi' name 'GetAdaptersInfo';
 function UNetWSAStartup(
   VersionRequired: word;
   var WSData: TUNetWSAData
@@ -1296,6 +1343,32 @@ begin
 end;
 
 function UNetLocalMacAddr: TUMacAddr;
+{$if defined(windows)}
+  function ViaAdapters: TUMacAddrArray;
+    var Adapters, Adapter: PIP_ADAPTER_INFO;
+    var Buffer: array[0..1024 * 16 - 1] of UInt8;
+    var BufSize: UInt32;
+    var i: Int32;
+    var Addr: TUMacAddr;
+  begin
+    Result := nil;
+    BufSize := SizeOf(Buffer);
+    Adapters := PIP_ADAPTER_INFO(@Buffer);
+    if GetAdaptersInfo(Adapters, @BufSize) <> 0 then Exit;
+    Adapter := Adapters;
+    while Assigned(Adapter) do
+    try
+      //WriteLn(Adapter^.AdapterName);
+      //WriteLn(Adapter^.Description);
+      if Adapter^.AddressLength <> 6 then Continue;
+      Move(Adapter^.Address, Addr, SizeOf(TUMacAddr));
+      specialize UArrAppend<TUMacAddr>(Result, Addr);
+      //WriteLn(UNetMacAddrToStr(Addr));
+    finally
+      Adapter := Adapter^.Next;
+    end;
+  end;
+{$else}
   function ViaSysCall: TUMacAddrArray;
     var Sock: TUSocket;
     var Conf: TUIfConf;
@@ -1363,12 +1436,18 @@ function UNetLocalMacAddr: TUMacAddr;
       FreeIfAddrs(IfAddrs);
     end;
   end;
+{$endif}
   var Addr: TUMacAddrArray;
 begin
+{$if defined(windows)}
+  Addr := ViaAdapters;
+  if Length(Addr) > 0 then Exit(Addr[0]);
+{$else}
   Addr := ViaSysCall;
   if Length(Addr) > 0 then Exit(Addr[0]);
   Addr := ViaIfAddrs;
   if Length(Addr) > 0 then Exit(Addr[High(Addr)]);
+{$endif}
   Result := TUMacAddr.Zero;
 end;
 
