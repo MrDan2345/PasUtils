@@ -24,6 +24,7 @@ const SockLib = 'c';
 const AF_UNSPEC = 0;
 const AF_UNIX = 1;
 const AF_INET = 2;
+const AF_PACKET = 17;
 {$if defined(windows)}
 const AF_IPX = 6;
 const AF_INET6 = 23;
@@ -60,8 +61,14 @@ const SHUT_RD = 0;
 const SHUT_WR = 1;
 const SHUT_RDWR = 2;
 
+const UNET_IPPROTO_IP = 0;
+
 type TUSockLen = UInt32;
 type PUSockLen = ^TUSockLen;
+
+type TUMacAddr = array[0..5] of UInt8;
+type PUMacAddr = ^TUMacAddr;
+type TUMacAddrArray = array of TUMacAddr;
 
 type PUInAddr = ^TUInAddr;
 TUInAddr = packed record
@@ -132,8 +139,51 @@ TUIfAddrs = record
   ifa_data: Pointer;
 end;
 
+type TUIfMap = record
+  mem_start: UInt64;
+  mem_end: UInt64;
+  base_addr: UInt16;
+  irq: UInt8;
+  dma: UInt8;
+  port: UInt8;
+end;
+
+const UNET_IF_NAMESIZE = 16;
+type TUIfReq = record
+  const IFHWADDRLEN = 6;
+  const IFNAMSIZ = UNET_IF_NAMESIZE;
+  var ifrn_name: array[0..IFNAMSIZ - 1] of AnsiChar;
+  case Int32 of
+  0: (ifru_addr: TUSockAddr);
+  1: (ifru_dstaddr: TUSockAddr);
+  2: (ifru_broadaddr: TUSockAddr);
+  3: (ifru_netmask: TUSockAddr);
+  4: (ifru_hwaddr: TUSockAddr);
+  5: (ifru_flags: Int16);
+  6: (ifru_ivalue: Int32);
+  7: (ifru_mtu: Int32);
+  8: (ifru_map: TUIfMap);
+  9: (ifru_slave: array[0..IFNAMSIZ - 1] of AnsiChar);
+  10: (ifru_newname: array[0..IFNAMSIZ - 1] of AnsiChar);
+  11: (ifru_data: Pointer);
+end;
+type PUIfReq = ^TUIfReq;
+
+type TUIfConf = record
+  ifc_len: Int32;
+  case UInt8 of
+  0: (ifcu_buf: Pointer);
+  1: (ifcu_req: PUIfReq);
+end;
+type PUIfConf = ^TUIfConf;
+
 type TUSocket = Int32;
 type PUSocket = ^TUSocket;
+
+type TUMacAddrImpl = type helper for TUMacAddr
+  const Zero: TUMacAddr = (0, 0, 0, 0, 0, 0);
+  function IsValid: Boolean;
+end;
 
 type TUInAddrImpl = type helper for TUInAddr
   const Zero: TUInAddr = (Addr32: 0);
@@ -164,8 +214,14 @@ type TUSocketImpl = type helper for TUSocket
     const SockType: Int32 = SOCK_STREAM;
     const SockProtocol: Int32 = 0
   ): TUSocket;
-  function MakeTCP(const SockDomain: Int32 = AF_INET): TUSocket;
-  function MakeUDP(const SockDomain: Int32 = AF_INET): TUSocket;
+  function MakeTCP(
+    const SockDomain: Int32 = AF_INET;
+    const SockProtocol: Int32 = 0
+  ): TUSocket;
+  function MakeUDP(
+    const SockDomain: Int32 = AF_INET;
+    const SockProtocol: Int32 = 0
+  ): TUSocket;
   function Bind(const Addr: PUSockAddr; const AddrLen: TUSockLen): Int32;
   function Listen(const Backlog: Int32): Int32;
   function Accept(const Addr: PUSockAddr; const AddrLen: PUSockLen): Int32;
@@ -204,8 +260,14 @@ type TUSocketImpl = type helper for TUSocket
     const SockType: Int32 = SOCK_STREAM;
     const SockProtocol: Int32 = 0
   ): TUSocket; static;
-  class function CreateTCP(const SockDomain: Int32 = AF_INET): TUSocket; static;
-  class function CreateUDP(const SockDomain: Int32 = AF_INET): TUSocket; static;
+  class function CreateTCP(
+    const SockDomain: Int32 = AF_INET;
+    const SockProtocol: Int32 = 0
+  ): TUSocket; static;
+  class function CreateUDP(
+    const SockDomain: Int32 = AF_INET;
+    const SockProtocol: Int32 = 0
+  ): TUSocket; static;
 end;
 
 type TUNetInAddrProc = procedure (const Addr: TUInAddr) of Object;
@@ -386,12 +448,79 @@ function UNetWSAStartup(
 ): Longint; call_decl; external SockLib name 'WSAStartup';
 function UNetWSACleanup: Longint; call_decl; external SockLib name 'WSACleanup';
 {$else}
+const UNET_SIOCGIFNAME = $8910;
+const UNET_SIOCSIFLINK = $8911;
+const UNET_SIOCGIFCONF = $8912;
+const UNET_SIOCGIFFLAGS = $8913;
+const UNET_SIOCSIFFLAGS = $8914;
+const UNET_SIOCGIFADDR = $8915;
+const UNET_SIOCSIFADDR = $8916;
+const UNET_SIOCGIFDSTADDR = $8917;
+const UNET_SIOCSIFDSTADDR = $8918;
+const UNET_SIOCGIFBRDADDR = $8919;
+const UNET_SIOCSIFBRDADDR = $891a;
+const UNET_SIOCGIFNETMASK = $891b;
+const UNET_SIOCSIFNETMASK = $891c;
+const UNET_SIOCGIFMETRIC = $891d;
+const UNET_SIOCSIFMETRIC = $891e;
+const UNET_SIOCGIFMEM = $891f;
+const UNET_SIOCSIFMEM = $8920;
+const UNET_SIOCGIFMTU = $8921;
+const UNET_SIOCSIFMTU = $8922;
+const UNET_SIOCSIFNAME = $8923;
+const UNET_SIOCSIFHWADDR = $8924;
+const UNET_SIOCGIFENCAP = $8925;
+const UNET_SIOCSIFENCAP = $8926;
+const UNET_SIOCGIFHWADDR = $8927;
+const UNET_SIOCGIFSLAVE = $8929;
+const UNET_SIOCSIFSLAVE = $8930;
+const UNET_SIOCADDMULTI = $8931;
+const UNET_SIOCDELMULTI = $8932;
+const UNET_SIOCGIFINDEX = $8933;
+const UNET_SIOGIFINDEX = UNET_SIOCGIFINDEX;
+const UNET_SIOCSIFPFLAGS = $8934;
+const UNET_SIOCGIFPFLAGS = $8935;
+const UNET_SIOCDIFADDR = $8936;
+const UNET_SIOCSIFHWBROADCAST = $8937;
+const UNET_SIOCGIFCOUNT = $8938;
+const UNET_SIOCGIFBR = $8940;
+const UNET_SIOCSIFBR = $8941;
+const UNET_SIOCGIFTXQLEN = $8942;
+const UNET_SIOCSIFTXQLEN = $8943;
+const UNET_SIOCETHTOOL = $8946;
+const UNET_SIOCGMIIPHY = $8947;
+const UNET_SIOCGMIIREG = $8948;
+const UNET_SIOCSMIIREG = $8949;
+const UNET_SIOCWANDEV = $894A;
+
+const UNET_IFF_UP = $1;
+const UNET_IFF_BROADCAST = $2;
+const UNET_IFF_DEBUG = $4;
+const UNET_IFF_LOOPBACK = $8;
+const UNET_IFF_POINTOPOINT = $10;
+const UNET_IFF_NOTRAILERS = $20;
+const UNET_IFF_RUNNING = $40;
+const UNET_IFF_NOARP = $80;
+const UNET_IFF_PROMISC = $100;
+const UNET_IFF_ALLMULTI = $200;
+const UNET_IFF_MASTER = $400;
+const UNET_IFF_SLAVE = $800;
+const UNET_IFF_MULTICAST = $1000;
+const UNET_IFF_PORTSEL = $2000;
+const UNET_IFF_AUTOMEDIA = $4000;
+const UNET_IFF_DYNAMIC = $8000;
+
 function UNetGetIfAddrs(
   const IfAddrs: PPUIfAddrs
 ): Int32; call_decl; external SockLib name 'getifaddrs';
 procedure FreeIfAddrs(
   const IfAddrs: PUIfAddrs
 ); call_decl; external SockLib name 'freeifaddrs';
+function UNetIOCtl(
+  Handle: Int32;
+  Ndx: UInt32;
+  Data: Pointer
+): Int32; call_decl; external name 'ioctl';
 {$endif}
 
 function UNetGetAddrInfo(
@@ -472,6 +601,7 @@ function UNetClose(
 
 function UNetHostName: String;
 function UNetLocalAddr: TUInAddr;
+function UNetLocalMacAddr: TUMacAddr;
 
 function HToNl(const Host: UInt32): UInt32; inline;
 function NToHl(const Net: UInt32): UInt32; inline;
@@ -487,6 +617,7 @@ function UNetNetToHostShort(const Net: UInt16): UInt16; overload;
 function UNetNetToHost(const Net: TUInAddr): TUInAddr; overload;
 function UNetNetToHost(const Net: TUSockAddr): TUSockAddr; overload;
 
+function UNetMacAddrToStr(const Addr: TUMacAddr): AnsiString;
 function UNetNetAddrToStr(const Addr: TUInAddr): AnsiString;
 function UNetHostAddrToStr(const Addr: TUInAddr): AnsiString;
 function UNetStrToHostAddr(const AddrStr: AnsiString): TUInAddr;
@@ -501,6 +632,14 @@ function UNetTryStrToNetAddr6(const AddrStr: AnsiString; out OutAddr: TUInAddr6)
 
 implementation
 
+function TUMacAddrImpl.IsValid: Boolean;
+  var i: Int32;
+begin
+  for i := 0 to High(Self) do
+  if Self[i] <> 0 then Exit(True);
+  Result := False;
+end;
+
 function TUSocketImpl.Make(
   const SockDomain: Int32;
   const SockType: Int32;
@@ -511,14 +650,20 @@ begin
   Result := Self;
 end;
 
-function TUSocketImpl.MakeTCP(const SockDomain: Int32): TUSocket;
+function TUSocketImpl.MakeTCP(
+  const SockDomain: Int32;
+  const SockProtocol: Int32
+): TUSocket;
 begin
-  Result := Make(SockDomain, SOCK_STREAM);
+  Result := Make(SockDomain, SOCK_STREAM, SockProtocol);
 end;
 
-function TUSocketImpl.MakeUDP(const SockDomain: Int32): TUSocket;
+function TUSocketImpl.MakeUDP(
+  const SockDomain: Int32;
+  const SockProtocol: Int32
+): TUSocket;
 begin
-  Result := Make(SockDomain, SOCK_DGRAM);
+  Result := Make(SockDomain, SOCK_DGRAM, SockProtocol);
 end;
 
 function TUSocketImpl.Bind(
@@ -633,16 +778,22 @@ begin
   Result.Make(SockDomain, SockType, SockProtocol);
 end;
 
-class function TUSocketImpl.CreateTCP(const SockDomain: Int32): TUSocket;
+class function TUSocketImpl.CreateTCP(
+  const SockDomain: Int32;
+  const SockProtocol: Int32
+): TUSocket;
 begin
   Result := TUSocket.Invalid;
-  Result.MakeTCP(SockDomain);
+  Result.MakeTCP(SockDomain, SockProtocol);
 end;
 
-class function TUSocketImpl.CreateUDP(const SockDomain: Int32): TUSocket;
+class function TUSocketImpl.CreateUDP(
+  const SockDomain: Int32;
+  const SockProtocol: Int32
+): TUSocket;
 begin
   Result := TUSocket.Invalid;
-  Result.MakeUDP(SockDomain);
+  Result.MakeUDP(SockDomain, SockProtocol);
 end;
 
 procedure TUNet.TBeacon.SetEnabled(const Value: Boolean);
@@ -1128,6 +1279,7 @@ begin
     while Assigned(a) do
     try
       if not Assigned(a^.ifa_addr) then Continue;
+      if a^.ifa_addr^.sin_family <> AF_INET then Continue;
       Addr := a^.ifa_addr^.sin_addr;
       if (Result.Addr32 = 0)
       or (Addr.Addr8[0] = 192) then
@@ -1141,6 +1293,83 @@ begin
     FreeIfAddrs(IfAddrs);
   end;
 {$endif}
+end;
+
+function UNetLocalMacAddr: TUMacAddr;
+  function ViaSysCall: TUMacAddrArray;
+    var Sock: TUSocket;
+    var Conf: TUIfConf;
+    var ReqList: PUIfReq;
+    var Req: TUIfReq;
+    var Buffer: array[0..1023] of UInt8;
+    var r, n, i: Int32;
+    var Addr: TUMacAddr;
+  begin
+    Result := nil;
+    Sock := TUSocket.CreateUDP(AF_INET);
+    if (not Sock.IsValid) then Exit;
+    try
+      UClear(Conf, SizeOf(Conf));
+      Conf.ifc_len := SizeOf(Buffer);
+      Conf.ifcu_buf := @Buffer;
+      r := UNetIOCtl(Sock, UNET_SIOCGIFCONF, @Conf);
+      if r <> 0 then Exit;
+      i := SizeOf(TUIfReq);
+      n := Conf.ifc_len div i;
+      ReqList := Conf.ifcu_req;
+      for i := 0 to n - 1 do
+      begin
+        //WriteLn(ReqList^.ifrn_name);
+        try
+          UClear(Req, SizeOf(Req));
+          Req.ifrn_name := ReqList^.ifrn_name;
+          if not (UNetIOCtl(Sock, UNET_SIOCGIFFLAGS, @Req) = 0) then Continue;
+          if (Req.ifru_flags and UNET_IFF_LOOPBACK) > 0 then Continue;
+          if UNetIOCtl(Sock, UNET_SIOCGIFHWADDR, @Req) <> 0 then Continue;
+          Addr := PUMacAddr(@Req.ifru_hwaddr.sin_port)^;
+          specialize UArrAppend<TUMacAddr>(Result, Addr);
+        finally
+          Inc(ReqList);
+        end;
+      end;
+    finally
+      Sock.Close;
+    end;
+  end;
+  function ViaIfAddrs: TUMacAddrArray;
+    var IfAddrs, a: PUIfAddrs;
+    var r: Int32;
+    var Addr: TUMacAddr;
+  begin
+    Result := nil;
+    r := UNetGetIfAddrs(@IfAddrs);
+    if r <> 0 then Exit;
+    try
+      a := IfAddrs;
+      while Assigned(a) do
+      try
+        if not Assigned(a^.ifa_addr) then Continue;
+        if (a^.ifa_flags and UNET_IFF_LOOPBACK) > 0 then Continue;
+        if a^.ifa_addr^.sin_family <> AF_PACKET then Continue;
+        if a^.ifa_addr^.sin_zero[3] <> 6 then Continue;
+        //Write('Name = ', a^.ifa_name, ' Family = ', a^.ifa_addr^.sin_family, ' Flags = ', a^.ifa_flags, ' Addr = ');
+        Addr := PUMacAddr(@a^.ifa_addr^.sin_zero[4])^;
+        specialize UArrAppend<TUMacAddr>(Result, Addr);
+        //WriteLn(UNetMacAddrToStr(Addr));
+      finally
+        a := a^.ifa_next;
+      end;
+    finally
+      FreeIfAddrs(IfAddrs);
+    end;
+  end;
+  var Addr: TUMacAddrArray;
+begin
+  Addr := ViaSysCall;
+  if Length(Addr) > 0 then Exit(Addr[0]);
+  Addr := ViaIfAddrs;
+  if Length(Addr) > 0 then Exit(Addr[High(Addr)]);
+  Result := TUMacAddr.Zero;
 end;
 
 function HToNl(const Host: UInt32): UInt32;
@@ -1223,6 +1452,14 @@ begin
   Result.sin_port := UNetNetToHostShort(Net.sin_port);
   Result.sin_addr := UNetNetToHost(Net.sin_addr);
   Result.sin_zero := Net.sin_zero;
+end;
+
+function UNetMAcAddrToStr(const Addr: TUMacAddr): AnsiString;
+begin
+  Result := LowerCase(Format(
+    '%0:.2X:%1:.2X:%2:.2X:%3:.2X:%4:.2X:%5:.2X',
+    [Addr[0], Addr[1], Addr[2], Addr[3], Addr[4], Addr[5]]
+  ));
 end;
 
 function UNetNetAddrToStr(const Addr: TUInAddr): AnsiString;
