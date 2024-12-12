@@ -665,6 +665,7 @@ function UNetNetToHost(const Net: TUInAddr): TUInAddr; overload;
 function UNetNetToHost(const Net: TUSockAddr): TUSockAddr; overload;
 
 function UNetMacAddrToStr(const Addr: TUMacAddr): AnsiString;
+function UNetStrToMacAddr(const AddrStr: AnsiString): TUMacAddr;
 function UNetNetAddrToStr(const Addr: TUInAddr): AnsiString;
 function UNetHostAddrToStr(const Addr: TUInAddr): AnsiString;
 function UNetStrToHostAddr(const AddrStr: AnsiString): TUInAddr;
@@ -1533,12 +1534,30 @@ begin
   Result.sin_zero := Net.sin_zero;
 end;
 
-function UNetMAcAddrToStr(const Addr: TUMacAddr): AnsiString;
+function UNetMacAddrToStr(const Addr: TUMacAddr): AnsiString;
 begin
   Result := LowerCase(Format(
     '%0:.2X:%1:.2X:%2:.2X:%3:.2X:%4:.2X:%5:.2X',
     [Addr[0], Addr[1], Addr[2], Addr[3], Addr[4], Addr[5]]
   ));
+end;
+
+function UNetStrToMacAddr(const AddrStr: AnsiString): TUMacAddr;
+  var i, j, r: Int32;
+begin
+  Result := TUMacAddr.Zero;
+  r := 0;
+  j := 1;
+  for i := 1 to Length(AddrStr) do
+  if AddrStr[i] = ':' then
+  begin
+    if i = j then Exit(TUMacAddr.Zero);
+    Result[r] := StrToIntDef('$' + UStrSubStr(AddrStr, j, i - j), 0);
+    if r = 5 then Exit;
+    j := i + 1;
+    Inc(r);
+  end;
+  Result := TUMacAddr.Zero;
 end;
 
 function UNetNetAddrToStr(const Addr: TUInAddr): AnsiString;
