@@ -69,6 +69,79 @@ const SHUT_RDWR = 2;
 
 const UNET_IPPROTO_IP = 0;
 
+{$if defined(windows)}
+const SOL_SOCKET = $ffff;
+const SO_DEBUG = $0001;
+const SO_ACCEPTCONN = $0002;
+const SO_REUSEADDR = $0004;
+const SO_KEEPALIVE = $0008;
+const SO_DONTROUTE = $0010;
+const SO_BROADCAST = $0020;
+const SO_USELOOPBACK = $0040;
+const SO_LINGER = $0080;
+const SO_OOBINLINE = $0100;
+const SO_DONTLINGER = Int32(not SO_LINGER);
+const SO_EXCLUSIVEADDRUSE = Int32(not SO_REUSEADDR);
+const SO_SNDBUF = $1001;
+const SO_RCVBUF = $1002;
+const SO_SNDLOWAT = $1003;
+const SO_RCVLOWAT = $1004;
+const SO_SNDTIMEO = $1005;
+const SO_RCVTIMEO = $1006;
+const SO_ERROR = $1007;
+const SO_TYPE = $1008;
+const SO_CONNDATA = $7000;
+const SO_CONNOPT = $7001;
+const SO_DISCDATA = $7002;
+const SO_DISCOPT = $7003;
+const SO_CONNDATALEN = $7004;
+const SO_CONNOPTLEN = $7005;
+const SO_DISCDATALEN = $7006;
+const SO_DISCOPTLEN = $7007;
+const SO_OPENTYPE = $7008;
+const SO_SYNCHRONOUS_ALERT = $10;
+const SO_SYNCHRONOUS_NONALERT = $20;
+const SO_MAXDG = $7009;
+const SO_MAXPATHDG = $700A;
+const SO_UPDATE_ACCEPT_CONTEXT = $700B;
+const SO_CONNECT_TIME = $700C;
+const TCP_NODELAY = $0001;
+const TCP_BSDURGENT = $7000;
+{$else}
+SOL_SOCKET = 1;
+const SO_DEBUG = 1;
+const SO_REUSEADDR = 2;
+const SO_TYPE = 3;
+const SO_ERROR = 4;
+const SO_DONTROUTE = 5;
+const SO_BROADCAST = 6;
+const SO_SNDBUF = 7;
+const SO_RCVBUF = 8;
+const SO_KEEPALIVE = 9;
+const SO_OOBINLINE = 10;
+const SO_NO_CHECK = 11;
+const SO_PRIORITY = 12;
+const SO_LINGER = 13;
+const SO_BSDCOMPAT = 14;
+const SO_REUSEPORT = 15;
+const SO_PASSCRED = 16;
+const SO_PEERCRED = 17;
+const SO_RCVLOWAT = 18;
+const SO_SNDLOWAT = 19;
+const SO_RCVTIMEO = 20;
+const SO_SNDTIMEO = 21;
+const SO_SECURITY_AUTHENTICATION = 22;
+const SO_SECURITY_ENCRYPTION_TRANSPORT = 23;
+const SO_SECURITY_ENCRYPTION_NETWORK = 24;
+const SO_BINDTODEVICE = 25;
+const SO_ATTACH_FILTER = 26;
+const SO_DETACH_FILTER = 27;
+const SO_PEERNAME = 28;
+const SO_TIMESTAMP = 29;
+const SCM_TIMESTAMP = SO_TIMESTAMP;
+const SO_ACCEPTCONN = 30;
+{$endif}
+
 type TUSockLen = UInt32;
 type PUSockLen = ^TUSockLen;
 
@@ -188,6 +261,7 @@ type PUSocket = ^TUSocket;
 
 type TUMacAddrImpl = type helper for TUMacAddr
   const Zero: TUMacAddr = (0, 0, 0, 0, 0, 0);
+  const Broadcast: TUMacAddr = ($ff, $ff, $ff, $ff, $ff, $ff);
   function IsValid: Boolean;
 end;
 
@@ -195,6 +269,7 @@ type TUInAddrImpl = type helper for TUInAddr
   const Zero: TUInAddr = (Addr32: 0);
   const LocalhostH: TUInAddr = (Addr8: (1, 0, 0, 127));
   const LocalhostN: TUInAddr = (Addr8: (127, 0, 0, 1));
+  const Broadcast: TUInAddr = (Addr32: $ffffffff);
 end;
 
 type TUInAddr6Impl = type helper for TUInAddr6
@@ -257,6 +332,18 @@ type TUSocketImpl = type helper for TUSocket
     const Flags: Int32;
     const AddrFrom: PUSockAddr;
     const AddrLen: PUSockLen
+  ): Int32;
+  function GetSockOpt(
+    const Level: Int32; const OptName: Int32;
+    const OptVal: Pointer; const OptLen: PUSockLen
+  ): Int32;
+  function SetSockOpt(
+    const Level: Int32; const OptName: Int32;
+    const OptVal: Pointer; const OptLen: TUSockLen
+  ): Int32;
+  function SetSockOpt(
+    const OptName: Int32;
+    const OptVal: Int32
   ): Int32;
   function Shutdown(const How: Int32 = SHUT_RDWR): Int32;
   function Close: Int32;
@@ -799,6 +886,33 @@ function TUSocketImpl.RecvFrom(
 ): Int32;
 begin
   Result := UNetRecvFrom(Self, Buffer, BufferLen, Flags, AddrFrom, AddrLen);
+end;
+
+function TUSocketImpl.GetSockOpt(
+  const Level: Int32;
+  const OptName: Int32;
+  const OptVal: Pointer;
+  const OptLen: PUSockLen
+): Int32;
+begin
+  Result := UNetGetSockOpt(Self, Level, OptName, OptVal, OptLen);
+end;
+
+function TUSocketImpl.SetSockOpt(
+  const Level: Int32;
+  const OptName: Int32;
+  const OptVal: Pointer;
+  const OptLen: TUSockLen
+): Int32;
+begin
+  Result := UNetSetSockOpt(Self, Level, OptName, OptVal, OptLen);
+end;
+
+function TUSocketImpl.SetSockOpt(
+  const OptName: Int32;
+  const OptVal: Int32): Int32;
+begin
+  Result := SetSockOpt(SOL_SOCKET, OptName, @OptVal, SizeOf(OptVal));
 end;
 
 function TUSocketImpl.Shutdown(const How: Int32): Int32;
@@ -1549,7 +1663,7 @@ begin
   r := 0;
   j := 1;
   for i := 1 to Length(AddrStr) do
-  if AddrStr[i] = ':' then
+  if (AddrStr[i] = ':') or (i = Length(AddrStr)) then
   begin
     if i = j then Exit(TUMacAddr.Zero);
     Result[r] := StrToIntDef('$' + UStrSubStr(AddrStr, j, i - j), 0);
