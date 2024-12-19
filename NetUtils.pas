@@ -1662,18 +1662,21 @@ begin
 end;
 
 function UNetStrToMacAddr(const AddrStr: AnsiString): TUMacAddr;
-  var i, j, r: Int32;
+  var i, j, n, r: Int32;
+  var Hex: String;
 begin
   Result := TUMacAddr.Zero;
   r := 0;
   j := 1;
   for i := 1 to Length(AddrStr) do
-  if (AddrStr[i] = ':') or (i = Length(AddrStr)) then
+  if (AddrStr[i] in [':', '-']) or (i = Length(AddrStr)) then
   begin
     if i = j then Exit(TUMacAddr.Zero);
-    Result[r] := StrToIntDef('$' + UStrSubStr(AddrStr, j, i - j), 0);
+    if i = Length(AddrStr) then n := i + 1 else n := i;
+    Hex := '$' + UStrSubStr(AddrStr, j, n - j);
+    Result[r] := StrToIntDef(Hex, 0);
     if r = 5 then Exit;
-    j := i + 1;
+    j := n + 1;
     Inc(r);
   end;
   Result := TUMacAddr.Zero;
