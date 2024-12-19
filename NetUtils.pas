@@ -736,6 +736,7 @@ function UNetClose(
 function UNetHostName: String;
 function UNetLocalAddr: TUInAddr;
 function UNetLocalMacAddr: TUMacAddr;
+function UNetWakeOnLan(const MacAddr: TUMacAddr): Boolean;
 
 function HToNl(const Host: UInt32): UInt32; inline;
 function NToHl(const Net: UInt32): UInt32; inline;
@@ -1569,6 +1570,35 @@ begin
   if Length(Addr) > 0 then Exit(Addr[High(Addr)]);
 {$endif}
   Result := TUMacAddr.Zero;
+end;
+
+function UNetWakeOnLan(const MacAddr: TUMacAddr): Boolean;
+  var Sock: TUSocket;
+  var Msg: packed record
+    Sync: array[0..5] of UInt8;
+    MacAddr: array[0..15] of TUMacAddr;
+  end;
+  var Addr: TUSockAddr;
+  var i, BytesSent: Int32;
+begin
+  for i := 0 to High(Msg.Sync) do Msg.Sync[i] := $ff;
+  for i := 0 to High(Msg.MacAddr) do Msg.MacAddr[i] := MacAddr;
+  Sock := TUSocket.CreateUDP();
+  if not Sock.IsValid then Exit(False);
+  if Sock.SetSockOpt(SO_BROADCAST, 1) < 0 then Exit(False);
+  try
+    Addr := TUSockAddr.Default;
+    Addr.sin_addr := TUInAddr.Broadcast;
+    Addr.sin_port := UNetHostToNetShort(7);
+    for i := 0 to 4 do
+    begin
+      BytesSent := Sock.SendTo(@Msg, SizeOf(Msg), 0, @Addr, SizeOf(Addr));
+      if BytesSent <= 0 then Exit(False);
+    end;
+  finally
+    Sock.Close;
+  end;
+  Result := True;
 end;
 
 function HToNl(const Host: UInt32): UInt32;
