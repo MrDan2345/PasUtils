@@ -1104,8 +1104,7 @@ procedure TUNet.TBeacon.TListener.Execute;
   var n: Int32;
   var Msg: String;
 begin
-  _Sock := TUSocket.Invalid;
-  _Sock.MakeUDP();
+  _Sock := TUSocket.CreateUDP();
   SockAddr := TUSockAddr.Default;
   SockAddr.sin_port := UNetHostToNetShort(Beacon.Port);
   _Sock.Bind(@SockAddr, SizeOf(SockAddr));
@@ -1144,23 +1143,23 @@ procedure TUNet.TBeacon.TBroadcaster.Execute;
   var i: Int32;
 begin
   LocalAddr := Beacon.LocalAddr;
-  _Sock := TUSocket.Invalid;
-  _Sock.MakeUDP();
+  _Sock := TUSocket.CreateUDP();
+  _Sock.SetSockOpt(SO_BROADCAST, 1);
   SockAddr := TUSockAddr.Default;
   SockAddr.sin_addr := LocalAddr;
   SockAddr.sin_port := UNetHostToNetShort(Beacon.Port);
   _Event.Unsignal;
   while not Terminated do
   begin
-    for i := 1 to 255 do
-    begin
-      SockAddr.sin_addr.Addr8[3] := UInt8(i);
+    //for i := 1 to 254 do
+    //begin
+      SockAddr.sin_addr.Addr8[3] := 255;//UInt8(i);
       if SockAddr.sin_addr.Addr32 = LocalAddr.Addr32 then Continue;
       _Sock.SendTo(
         @Beacon.Message[1], Length(Beacon.Message) + 1, 0,
         @SockAddr, SizeOf(SockAddr)
       );
-    end;
+    //end;
     _Event.WaitFor(Beacon.BroadcastInterval);
   end;
 end;
