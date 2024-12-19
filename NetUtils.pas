@@ -378,10 +378,9 @@ public
     type TPeerArray = array of TPeer;
   private
     type TBeaconThread = class (TThread)
-    private
-      var _Beacon: TBeacon;
     public
-      property Beacon: TBeacon read _Beacon write _Beacon;
+      var Beacon: TBeacon;
+      var Message: String;
     end;
     type TListener = class (TBeaconThread)
     private
@@ -404,7 +403,10 @@ public
     var _BroadcastInterval: UInt32;
     var _LocalAddr: TUInAddr;
     var _HostName: String;
+    var _MessageJson: TUJsonRef;
     var _Message: String;
+    var _MessageSonar: String;
+    var _MessageBounce: String;
     var _Listener: TListener;
     var _Broadcaster: TBroadcaster;
     var _Peers: TPeerArray;
@@ -977,13 +979,19 @@ begin
   _Peers := nil;
   if _Enabled then
   begin
+    _MessageJson.Ptr.Content['type'].Value := 'sonar';
+    _MessageSonar := _MessageJson.Ptr.AsString;
+    _MessageJson.Ptr.Content['type'].Value := 'bounce';
+    _MessageBounce := _MessageJson.Ptr.AsString;
     _Listener := TListener.Create(True);
     _Listener.Beacon := Self;
+    _Listener.Message := _MessageBounce;
     _Listener.Start;
     if _Active then
     begin
       _Broadcaster := TBroadcaster.Create(True);
       _Broadcaster.Beacon := Self;
+      _Broadcaster.Message := _MessageSonar;
       _Broadcaster.Start;
     end;
   end;
@@ -1077,7 +1085,6 @@ begin
 end;
 
 constructor TUNet.TBeacon.Create;
-  var Json: TUJsonRef;
 begin
   _Enabled := False;
   _Active := False;
@@ -1085,10 +1092,12 @@ begin
   _LocalAddr := UNetLocalAddr;
   _HostName := UNetHostName;
   _BroadcastInterval := 5000;
-  Json := TUJson.Make;
-  Json.Ptr.AddValue('id', _HostName);
-  Json.Ptr.AddValue('addr', UNetNetAddrToStr(_LocalAddr));
-  _Message := Json.Ptr.AsString;
+  _Message := '';
+  _MessageJson := TUJson.Make;
+  _MessageJson.Ptr.AddValue('id', _HostName);
+  _MessageJson.Ptr.AddValue('type', '');
+  _MessageJson.Ptr.AddValue('addr', UNetNetAddrToStr(_LocalAddr));
+  _MessageJson.Ptr.AddValue('message', _Message);
 end;
 
 destructor TUNet.TBeacon.Destroy;
@@ -1103,6 +1112,7 @@ procedure TUNet.TBeacon.TListener.Execute;
   var Buffer: array[0..2047] of AnsiChar;
   var n: Int32;
   var Msg: String;
+  var Json: TUJsonRef;
 begin
   _Sock := TUSocket.CreateUDP();
   SockAddr := TUSockAddr.Default;
@@ -1116,10 +1126,13 @@ begin
     if n <= 0 then Break;
     if OtherAddr.sin_addr.Addr32 = Beacon.LocalAddr.Addr32 then Continue;
     Msg := Buffer;
-    Beacon.AddPeer(OtherAddr.sin_addr, Msg);
+    Json := TUJson.Load(Msg);
+    if not Json.IsValid then Continue;
+    if not (Json.Ptr.Content['type'].Value = 'sonar') then Continue;
+    Beacon.AddPeer(OtherAddr.sin_addr, Json.Ptr.Content['message'].Value);
     OtherAddr.sin_port := UNetHostToNetShort(Beacon.Port);
     n := _Sock.SendTo(
-      @Beacon.Message[1], Length(Beacon.Message) + 1, 0,
+      @Message[1], Length(Message) + 1, 0,
       @OtherAddr, SizeOf(OtherAddr)
     );
   end;
@@ -1140,7 +1153,6 @@ end;
 procedure TUNet.TBeacon.TBroadcaster.Execute;
   var LocalAddr: TUInAddr;
   var SockAddr: TUSockAddr;
-  var i: Int32;
 begin
   LocalAddr := Beacon.LocalAddr;
   _Sock := TUSocket.CreateUDP();
@@ -1151,15 +1163,12 @@ begin
   _Event.Unsignal;
   while not Terminated do
   begin
-    //for i := 1 to 254 do
-    //begin
-      SockAddr.sin_addr.Addr8[3] := 255;//UInt8(i);
-      if SockAddr.sin_addr.Addr32 = LocalAddr.Addr32 then Continue;
-      _Sock.SendTo(
-        @Beacon.Message[1], Length(Beacon.Message) + 1, 0,
-        @SockAddr, SizeOf(SockAddr)
-      );
-    //end;
+    SockAddr.sin_addr.Addr8[3] := 255;
+    if SockAddr.sin_addr.Addr32 = LocalAddr.Addr32 then Continue;
+    _Sock.SendTo(
+      @Message[1], Length(Message) + 1, 0,
+      @SockAddr, SizeOf(SockAddr)
+    );
     _Event.WaitFor(Beacon.BroadcastInterval);
   end;
 end;
