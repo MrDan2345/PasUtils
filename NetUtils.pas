@@ -1128,8 +1128,8 @@ begin
     Msg := Buffer;
     Json := TUJson.Load(Msg);
     if not Json.IsValid then Continue;
-    if not (Json.Ptr.Content['type'].Value = 'sonar') then Continue;
     Beacon.AddPeer(OtherAddr.sin_addr, Json.Ptr.Content['message'].Value);
+    if not (Json.Ptr.Content['type'].Value = 'sonar') then Continue;
     OtherAddr.sin_port := UNetHostToNetShort(Beacon.Port);
     n := _Sock.SendTo(
       @Message[1], Length(Message) + 1, 0,
