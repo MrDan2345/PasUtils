@@ -405,8 +405,6 @@ public
     var _HostName: String;
     var _MessageJson: TUJsonRef;
     var _Message: String;
-    var _MessageSonar: String;
-    var _MessageBounce: String;
     var _Listener: TListener;
     var _Broadcaster: TBroadcaster;
     var _Peers: TPeerArray;
@@ -979,19 +977,18 @@ begin
   _Peers := nil;
   if _Enabled then
   begin
-    _MessageJson.Ptr.Content['type'].Value := 'sonar';
-    _MessageSonar := _MessageJson.Ptr.AsString;
-    _MessageJson.Ptr.Content['type'].Value := 'bounce';
-    _MessageBounce := _MessageJson.Ptr.AsString;
+    _MessageJson.Ptr['message'].Value := _Message;
     _Listener := TListener.Create(True);
     _Listener.Beacon := Self;
-    _Listener.Message := _MessageBounce;
+    _MessageJson.Ptr['type'].Value := 'sonar';
+    _Listener.Message := _MessageJson.Ptr.AsString;
     _Listener.Start;
     if _Active then
     begin
       _Broadcaster := TBroadcaster.Create(True);
       _Broadcaster.Beacon := Self;
-      _Broadcaster.Message := _MessageSonar;
+      _MessageJson.Ptr.Content['type'].Value := 'bounce';
+      _Broadcaster.Message := _MessageJson.Ptr.AsString;
       _Broadcaster.Start;
     end;
   end;
