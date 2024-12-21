@@ -981,14 +981,14 @@ begin
     _MessageJson.Ptr['message'].Value := _Message;
     _Listener := TListener.Create(True);
     _Listener.Beacon := Self;
-    _MessageJson.Ptr['type'].Value := 'sonar';
+    _MessageJson.Ptr['type'].Value := 'bounce';
     _Listener.Message := _MessageJson.Ptr.AsString;
     _Listener.Start;
     if _Active then
     begin
       _Broadcaster := TBroadcaster.Create(True);
       _Broadcaster.Beacon := Self;
-      _MessageJson.Ptr.Content['type'].Value := 'bounce';
+      _MessageJson.Ptr['type'].Value := 'sonar';
       _Broadcaster.Message := _MessageJson.Ptr.AsString;
       _Broadcaster.Start;
     end;
