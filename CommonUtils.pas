@@ -1707,7 +1707,9 @@ function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
 function UStrExprMatch(const Str, Expr: String): TUExprMatch;
 function UStrExplode(const Str: String; const Separator: String; const AllowEmpty: Boolean = True): TUStrArray;
 function UStrSubStr(const Str: String; const SubStrStart: Int32; const SubStrLength: Int32 = 0): String;
+function UStrSubPos(const Str, SubStr: String): Int32;
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boolean;
+function UStrExtractNumber(const Str: String; const Offset: Int32 = 1): Int32;
 function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UFileToStr(const FileName: String): String;
@@ -10148,6 +10150,23 @@ begin
   Move(Str[First], Result[1], Len);
 end;
 
+function UStrSubPos(const Str, SubStr: String): Int32;
+  var i, j: Int32;
+begin
+  for i := 0 to Length(Str) - Length(SubStr) do
+  begin
+    Result := i + 1;
+    for j := 1 to Length(SubStr) do
+    if Str[i + j] <> SubStr[j] then
+    begin
+      Result := 0;
+      Break;
+    end;
+    if Result > 0 then Exit;
+  end;
+  Result := 0;
+end;
+
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean): Boolean;
   var i, n: Integer;
   var af: Boolean;
@@ -10166,6 +10185,23 @@ begin
     if not (Str[i] in ['0'..'9']) then Exit(False);
   end;
   Result := True;
+end;
+
+function UStrExtractNumber(const Str: String; const Offset: Int32): Int32;
+  var i, j: Int32;
+  var s: String;
+begin
+  for i := Offset to Length(Str) do
+  begin
+    if not (Str[i] in ['0'..'9']) then Continue;
+    for j := i + 1 to Length(Str) do
+    if not (Str[j] in ['0'..'9']) then
+    begin
+      s := UStrSubStr(Str, i, j - i);
+      Exit(StrToInt(s));
+    end;
+  end;
+  Result := 0;
 end;
 
 function UStrClone(const Str: String): String;
