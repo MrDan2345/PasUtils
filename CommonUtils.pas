@@ -1532,6 +1532,7 @@ procedure UFinalizeVarRecArr(var arr: array of TVarRec);
 function UIntToBool(const i: Integer): Boolean;
 function UBoolToInt(const b: Boolean): Integer;
 function UBoolToStr(const b: Boolean): String;
+function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
 function UMatToQuat(const m: TUMat): TUQuat;
 function UQuatToMat(const q: TUQuat): TUMat;
 generic function USignOf<T>(const v: T): T;
@@ -8176,6 +8177,11 @@ end;
 function UBoolToStr(const b: Boolean): String;
 begin
   if b then Exit('True') else Exit('False');
+end;
+
+function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
+begin
+  if b then Exit(IfTrue) else Exit(IfFalse);
 end;
 
 function UMatToQuat(const m: TUMat): TUQuat;
