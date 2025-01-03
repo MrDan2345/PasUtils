@@ -1618,7 +1618,7 @@ generic function UEndianSwap<T>(const v: T): T; inline; overload;
 function UEndianSwap(const v: UInt16): UInt16; inline; overload;
 function UEndianSwap(const v: UInt32): UInt32; inline; overload;
 function UEndianSwap(const v: UInt64): UInt64; inline; overload;
-generic procedure UByteSwap(var v: T); inline; overload;
+generic procedure UByteSwap<T>(var v: T); inline; overload;
 procedure UByteSwap(var v: UInt16); inline; overload;
 procedure UByteSwap(var v: UInt32); inline; overload;
 procedure UByteSwap(var v: UInt64); inline; overload;
@@ -8714,7 +8714,7 @@ begin
   Result := specialize UEndianSwap<UInt64>(v);
 end;
 
-generic procedure UByteSwap(var v: T);
+generic procedure UByteSwap<T>(var v: T);
   type TByteArr = array[0..SizeOf(T) - 1] of UInt8;
   var Arr: TByteArr absolute v;
   var Tmp: UInt8;
