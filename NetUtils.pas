@@ -10,7 +10,13 @@ unit NetUtils;
 interface
 
 uses
-  SysUtils, Classes, CommonUtils, DateUtils;
+{$if defined(windows)}
+  Windows,
+{$endif}
+  SysUtils,
+  Classes,
+  CommonUtils,
+  DateUtils;
 
 {$if defined(windows)}
 const SockLib = 'ws2_32.dll';
@@ -24,6 +30,7 @@ const SockLib = 'c';
 const AF_UNSPEC = 0;
 const AF_UNIX = 1;
 const AF_INET = 2;
+const AF_PACKET = 17;
 {$if defined(windows)}
 const AF_IPX = 6;
 const AF_INET6 = 23;
@@ -54,14 +61,97 @@ const SOCK_SEQPACKET = 5;               { sequential packet socket     }
 
 const INADDR_ANY = UInt32(0);
 const INADDR_NONE = UInt32(-1);
+const SOCKET_ERROR = -1;
 
 //shutdown options
 const SHUT_RD = 0;
 const SHUT_WR = 1;
 const SHUT_RDWR = 2;
 
+const UNET_IPPROTO_IP = 0;
+const UNET_IPPROTO_ICMP = 1;
+
+const ICMP_ECHO = 8;
+
+{$if defined(windows)}
+const SOL_SOCKET = $ffff;
+const SO_DEBUG = $0001;
+const SO_ACCEPTCONN = $0002;
+const SO_REUSEADDR = $0004;
+const SO_KEEPALIVE = $0008;
+const SO_DONTROUTE = $0010;
+const SO_BROADCAST = $0020;
+const SO_USELOOPBACK = $0040;
+const SO_LINGER = $0080;
+const SO_OOBINLINE = $0100;
+const SO_DONTLINGER = Int32(not SO_LINGER);
+const SO_EXCLUSIVEADDRUSE = Int32(not SO_REUSEADDR);
+const SO_SNDBUF = $1001;
+const SO_RCVBUF = $1002;
+const SO_SNDLOWAT = $1003;
+const SO_RCVLOWAT = $1004;
+const SO_SNDTIMEO = $1005;
+const SO_RCVTIMEO = $1006;
+const SO_ERROR = $1007;
+const SO_TYPE = $1008;
+const SO_CONNDATA = $7000;
+const SO_CONNOPT = $7001;
+const SO_DISCDATA = $7002;
+const SO_DISCOPT = $7003;
+const SO_CONNDATALEN = $7004;
+const SO_CONNOPTLEN = $7005;
+const SO_DISCDATALEN = $7006;
+const SO_DISCOPTLEN = $7007;
+const SO_OPENTYPE = $7008;
+const SO_SYNCHRONOUS_ALERT = $10;
+const SO_SYNCHRONOUS_NONALERT = $20;
+const SO_MAXDG = $7009;
+const SO_MAXPATHDG = $700A;
+const SO_UPDATE_ACCEPT_CONTEXT = $700B;
+const SO_CONNECT_TIME = $700C;
+const TCP_NODELAY = $0001;
+const TCP_BSDURGENT = $7000;
+{$else}
+const SOL_SOCKET = 1;
+const SO_DEBUG = 1;
+const SO_REUSEADDR = 2;
+const SO_TYPE = 3;
+const SO_ERROR = 4;
+const SO_DONTROUTE = 5;
+const SO_BROADCAST = 6;
+const SO_SNDBUF = 7;
+const SO_RCVBUF = 8;
+const SO_KEEPALIVE = 9;
+const SO_OOBINLINE = 10;
+const SO_NO_CHECK = 11;
+const SO_PRIORITY = 12;
+const SO_LINGER = 13;
+const SO_BSDCOMPAT = 14;
+const SO_REUSEPORT = 15;
+const SO_PASSCRED = 16;
+const SO_PEERCRED = 17;
+const SO_RCVLOWAT = 18;
+const SO_SNDLOWAT = 19;
+const SO_RCVTIMEO = 20;
+const SO_SNDTIMEO = 21;
+const SO_SECURITY_AUTHENTICATION = 22;
+const SO_SECURITY_ENCRYPTION_TRANSPORT = 23;
+const SO_SECURITY_ENCRYPTION_NETWORK = 24;
+const SO_BINDTODEVICE = 25;
+const SO_ATTACH_FILTER = 26;
+const SO_DETACH_FILTER = 27;
+const SO_PEERNAME = 28;
+const SO_TIMESTAMP = 29;
+const SCM_TIMESTAMP = SO_TIMESTAMP;
+const SO_ACCEPTCONN = 30;
+{$endif}
+
 type TUSockLen = UInt32;
 type PUSockLen = ^TUSockLen;
+
+type TUMacAddr = array[0..5] of UInt8;
+type PUMacAddr = ^TUMacAddr;
+type TUMacAddrArray = array of TUMacAddr;
 
 type PUInAddr = ^TUInAddr;
 TUInAddr = packed record
@@ -132,13 +222,59 @@ TUIfAddrs = record
   ifa_data: Pointer;
 end;
 
+type TUIfMap = record
+  mem_start: UInt64;
+  mem_end: UInt64;
+  base_addr: UInt16;
+  irq: UInt8;
+  dma: UInt8;
+  port: UInt8;
+end;
+
+const UNET_IF_NAMESIZE = 16;
+type TUIfReq = record
+  const IFHWADDRLEN = 6;
+  const IFNAMSIZ = UNET_IF_NAMESIZE;
+  var ifrn_name: array[0..IFNAMSIZ - 1] of AnsiChar;
+  case Int32 of
+  0: (ifru_addr: TUSockAddr);
+  1: (ifru_dstaddr: TUSockAddr);
+  2: (ifru_broadaddr: TUSockAddr);
+  3: (ifru_netmask: TUSockAddr);
+  4: (ifru_hwaddr: TUSockAddr);
+  5: (ifru_flags: Int16);
+  6: (ifru_ivalue: Int32);
+  7: (ifru_mtu: Int32);
+  8: (ifru_map: TUIfMap);
+  9: (ifru_slave: array[0..IFNAMSIZ - 1] of AnsiChar);
+  10: (ifru_newname: array[0..IFNAMSIZ - 1] of AnsiChar);
+  11: (ifru_data: Pointer);
+end;
+type PUIfReq = ^TUIfReq;
+
+type TUIfConf = record
+  ifc_len: Int32;
+  case UInt8 of
+  0: (ifcu_buf: Pointer);
+  1: (ifcu_req: PUIfReq);
+end;
+type PUIfConf = ^TUIfConf;
+
 type TUSocket = Int32;
 type PUSocket = ^TUSocket;
+const INVALID_SOCKET = TUSocket(not(0));
+
+type TUMacAddrImpl = type helper for TUMacAddr
+  const Zero: TUMacAddr = (0, 0, 0, 0, 0, 0);
+  const Broadcast: TUMacAddr = ($ff, $ff, $ff, $ff, $ff, $ff);
+  function IsValid: Boolean;
+end;
 
 type TUInAddrImpl = type helper for TUInAddr
   const Zero: TUInAddr = (Addr32: 0);
   const LocalhostH: TUInAddr = (Addr8: (1, 0, 0, 127));
   const LocalhostN: TUInAddr = (Addr8: (127, 0, 0, 1));
+  const Broadcast: TUInAddr = (Addr32: $ffffffff);
 end;
 
 type TUInAddr6Impl = type helper for TUInAddr6
@@ -164,8 +300,14 @@ type TUSocketImpl = type helper for TUSocket
     const SockType: Int32 = SOCK_STREAM;
     const SockProtocol: Int32 = 0
   ): TUSocket;
-  function MakeTCP(const SockDomain: Int32 = AF_INET): TUSocket;
-  function MakeUDP(const SockDomain: Int32 = AF_INET): TUSocket;
+  function MakeTCP(
+    const SockDomain: Int32 = AF_INET;
+    const SockProtocol: Int32 = 0
+  ): TUSocket;
+  function MakeUDP(
+    const SockDomain: Int32 = AF_INET;
+    const SockProtocol: Int32 = 0
+  ): TUSocket;
   function Bind(const Addr: PUSockAddr; const AddrLen: TUSockLen): Int32;
   function Listen(const Backlog: Int32): Int32;
   function Accept(const Addr: PUSockAddr; const AddrLen: PUSockLen): Int32;
@@ -196,6 +338,18 @@ type TUSocketImpl = type helper for TUSocket
     const AddrFrom: PUSockAddr;
     const AddrLen: PUSockLen
   ): Int32;
+  function GetSockOpt(
+    const Level: Int32; const OptName: Int32;
+    const OptVal: Pointer; const OptLen: PUSockLen
+  ): Int32;
+  function SetSockOpt(
+    const Level: Int32; const OptName: Int32;
+    const OptVal: Pointer; const OptLen: TUSockLen
+  ): Int32;
+  function SetSockOpt(
+    const OptName: Int32;
+    const OptVal: Int32
+  ): Int32;
   function Shutdown(const How: Int32 = SHUT_RDWR): Int32;
   function Close: Int32;
   function IsValid: Boolean;
@@ -204,8 +358,14 @@ type TUSocketImpl = type helper for TUSocket
     const SockType: Int32 = SOCK_STREAM;
     const SockProtocol: Int32 = 0
   ): TUSocket; static;
-  class function CreateTCP(const SockDomain: Int32 = AF_INET): TUSocket; static;
-  class function CreateUDP(const SockDomain: Int32 = AF_INET): TUSocket; static;
+  class function CreateTCP(
+    const SockDomain: Int32 = AF_INET;
+    const SockProtocol: Int32 = 0
+  ): TUSocket; static;
+  class function CreateUDP(
+    const SockDomain: Int32 = AF_INET;
+    const SockProtocol: Int32 = 0
+  ): TUSocket; static;
 end;
 
 type TUNetInAddrProc = procedure (const Addr: TUInAddr) of Object;
@@ -223,10 +383,9 @@ public
     type TPeerArray = array of TPeer;
   private
     type TBeaconThread = class (TThread)
-    private
-      var _Beacon: TBeacon;
     public
-      property Beacon: TBeacon read _Beacon write _Beacon;
+      var Beacon: TBeacon;
+      var Message: String;
     end;
     type TListener = class (TBeaconThread)
     private
@@ -249,6 +408,7 @@ public
     var _BroadcastInterval: UInt32;
     var _LocalAddr: TUInAddr;
     var _HostName: String;
+    var _MessageJson: TUJsonRef;
     var _Message: String;
     var _Listener: TListener;
     var _Broadcaster: TBroadcaster;
@@ -380,18 +540,126 @@ TUNetWSAData = record
    lpVendorInfo: PAnsiChar;
 {$endif}
 end;
+const MAX_ADAPTER_NAME_LENGTH = 256;
+const MAX_ADAPTER_DESCRIPTION_LENGTH = 128;
+const MAX_ADAPTER_ADDRESS_LENGTH = 8;
+type PIP_ADDRESS_STRING = ^TIP_ADDRESS_STRING;
+TIP_ADDRESS_STRING = record
+  Str: array[0..15] of AnsiChar;
+end;
+type PIP_MASK_STRING = ^TIP_MASK_STRING;
+TIP_MASK_STRING = TIP_ADDRESS_STRING;
+type PIP_ADDR_STRING = ^TIP_ADDR_STRING;
+TIP_ADDR_STRING = record
+  Next: PIP_ADDR_STRING;
+  IpAddress: TIP_ADDRESS_STRING;
+  IpMask: TIP_MASK_STRING;
+  Context: DWORD;
+end;
+type PIP_ADAPTER_INFO = ^TIP_ADAPTER_INFO;
+TIP_ADAPTER_INFO = record
+  Next: PIP_ADAPTER_INFO;
+  ComboIndex: DWORD;
+  AdapterName: array[0..MAX_ADAPTER_NAME_LENGTH + 3] of AnsiChar;
+  Description: array[0..MAX_ADAPTER_DESCRIPTION_LENGTH + 3] of AnsiChar;
+  AddressLength: UINT;
+  Address: array[0..MAX_ADAPTER_ADDRESS_LENGTH - 1] of BYTE;
+  Index: DWORD;
+  _Type: UINT;
+  DhcpEnabled: UINT;
+  CurrentIpAddress: PIP_ADDR_STRING;
+  IpAddressList: TIP_ADDR_STRING;
+  GatewayList: TIP_ADDR_STRING;
+  DhcpServer: TIP_ADDR_STRING;
+  HaveWins: BOOL;
+  PrimaryWinsServer: TIP_ADDR_STRING;
+  SecondaryWinsServer: TIP_ADDR_STRING;
+  LeaseObtained: Int32;
+  LeaseExpires: Int32;
+end;
+function GetAdaptersInfo(
+  AdapterInfo: PIP_ADAPTER_INFO;
+  SizePointer: PULONG
+): ULONG; call_decl; external 'iphlpapi' name 'GetAdaptersInfo';
 function UNetWSAStartup(
   VersionRequired: word;
   var WSData: TUNetWSAData
 ): Longint; call_decl; external SockLib name 'WSAStartup';
 function UNetWSACleanup: Longint; call_decl; external SockLib name 'WSACleanup';
 {$else}
+const UNET_SIOCGIFNAME = $8910;
+const UNET_SIOCSIFLINK = $8911;
+const UNET_SIOCGIFCONF = $8912;
+const UNET_SIOCGIFFLAGS = $8913;
+const UNET_SIOCSIFFLAGS = $8914;
+const UNET_SIOCGIFADDR = $8915;
+const UNET_SIOCSIFADDR = $8916;
+const UNET_SIOCGIFDSTADDR = $8917;
+const UNET_SIOCSIFDSTADDR = $8918;
+const UNET_SIOCGIFBRDADDR = $8919;
+const UNET_SIOCSIFBRDADDR = $891a;
+const UNET_SIOCGIFNETMASK = $891b;
+const UNET_SIOCSIFNETMASK = $891c;
+const UNET_SIOCGIFMETRIC = $891d;
+const UNET_SIOCSIFMETRIC = $891e;
+const UNET_SIOCGIFMEM = $891f;
+const UNET_SIOCSIFMEM = $8920;
+const UNET_SIOCGIFMTU = $8921;
+const UNET_SIOCSIFMTU = $8922;
+const UNET_SIOCSIFNAME = $8923;
+const UNET_SIOCSIFHWADDR = $8924;
+const UNET_SIOCGIFENCAP = $8925;
+const UNET_SIOCSIFENCAP = $8926;
+const UNET_SIOCGIFHWADDR = $8927;
+const UNET_SIOCGIFSLAVE = $8929;
+const UNET_SIOCSIFSLAVE = $8930;
+const UNET_SIOCADDMULTI = $8931;
+const UNET_SIOCDELMULTI = $8932;
+const UNET_SIOCGIFINDEX = $8933;
+const UNET_SIOGIFINDEX = UNET_SIOCGIFINDEX;
+const UNET_SIOCSIFPFLAGS = $8934;
+const UNET_SIOCGIFPFLAGS = $8935;
+const UNET_SIOCDIFADDR = $8936;
+const UNET_SIOCSIFHWBROADCAST = $8937;
+const UNET_SIOCGIFCOUNT = $8938;
+const UNET_SIOCGIFBR = $8940;
+const UNET_SIOCSIFBR = $8941;
+const UNET_SIOCGIFTXQLEN = $8942;
+const UNET_SIOCSIFTXQLEN = $8943;
+const UNET_SIOCETHTOOL = $8946;
+const UNET_SIOCGMIIPHY = $8947;
+const UNET_SIOCGMIIREG = $8948;
+const UNET_SIOCSMIIREG = $8949;
+const UNET_SIOCWANDEV = $894A;
+
+const UNET_IFF_UP = $1;
+const UNET_IFF_BROADCAST = $2;
+const UNET_IFF_DEBUG = $4;
+const UNET_IFF_LOOPBACK = $8;
+const UNET_IFF_POINTOPOINT = $10;
+const UNET_IFF_NOTRAILERS = $20;
+const UNET_IFF_RUNNING = $40;
+const UNET_IFF_NOARP = $80;
+const UNET_IFF_PROMISC = $100;
+const UNET_IFF_ALLMULTI = $200;
+const UNET_IFF_MASTER = $400;
+const UNET_IFF_SLAVE = $800;
+const UNET_IFF_MULTICAST = $1000;
+const UNET_IFF_PORTSEL = $2000;
+const UNET_IFF_AUTOMEDIA = $4000;
+const UNET_IFF_DYNAMIC = $8000;
+
 function UNetGetIfAddrs(
   const IfAddrs: PPUIfAddrs
 ): Int32; call_decl; external SockLib name 'getifaddrs';
 procedure FreeIfAddrs(
   const IfAddrs: PUIfAddrs
 ); call_decl; external SockLib name 'freeifaddrs';
+function UNetIOCtl(
+  Handle: Int32;
+  Ndx: UInt32;
+  Data: Pointer
+): Int32; call_decl; external name 'ioctl';
 {$endif}
 
 function UNetGetAddrInfo(
@@ -472,6 +740,9 @@ function UNetClose(
 
 function UNetHostName: String;
 function UNetLocalAddr: TUInAddr;
+function UNetLocalMacAddr: TUMacAddr;
+function UNetWakeOnLan(const MacAddr: TUMacAddr): Boolean;
+function UNetPing(const InAddrN: TUInAddr): Boolean;
 
 function HToNl(const Host: UInt32): UInt32; inline;
 function NToHl(const Net: UInt32): UInt32; inline;
@@ -487,6 +758,8 @@ function UNetNetToHostShort(const Net: UInt16): UInt16; overload;
 function UNetNetToHost(const Net: TUInAddr): TUInAddr; overload;
 function UNetNetToHost(const Net: TUSockAddr): TUSockAddr; overload;
 
+function UNetMacAddrToStr(const Addr: TUMacAddr): AnsiString;
+function UNetStrToMacAddr(const AddrStr: AnsiString): TUMacAddr;
 function UNetNetAddrToStr(const Addr: TUInAddr): AnsiString;
 function UNetHostAddrToStr(const Addr: TUInAddr): AnsiString;
 function UNetStrToHostAddr(const AddrStr: AnsiString): TUInAddr;
@@ -501,6 +774,14 @@ function UNetTryStrToNetAddr6(const AddrStr: AnsiString; out OutAddr: TUInAddr6)
 
 implementation
 
+function TUMacAddrImpl.IsValid: Boolean;
+  var i: Int32;
+begin
+  for i := 0 to High(Self) do
+  if Self[i] <> 0 then Exit(True);
+  Result := False;
+end;
+
 function TUSocketImpl.Make(
   const SockDomain: Int32;
   const SockType: Int32;
@@ -511,14 +792,20 @@ begin
   Result := Self;
 end;
 
-function TUSocketImpl.MakeTCP(const SockDomain: Int32): TUSocket;
+function TUSocketImpl.MakeTCP(
+  const SockDomain: Int32;
+  const SockProtocol: Int32
+): TUSocket;
 begin
-  Result := Make(SockDomain, SOCK_STREAM);
+  Result := Make(SockDomain, SOCK_STREAM, SockProtocol);
 end;
 
-function TUSocketImpl.MakeUDP(const SockDomain: Int32): TUSocket;
+function TUSocketImpl.MakeUDP(
+  const SockDomain: Int32;
+  const SockProtocol: Int32
+): TUSocket;
 begin
-  Result := Make(SockDomain, SOCK_DGRAM);
+  Result := Make(SockDomain, SOCK_DGRAM, SockProtocol);
 end;
 
 function TUSocketImpl.Bind(
@@ -608,6 +895,33 @@ begin
   Result := UNetRecvFrom(Self, Buffer, BufferLen, Flags, AddrFrom, AddrLen);
 end;
 
+function TUSocketImpl.GetSockOpt(
+  const Level: Int32;
+  const OptName: Int32;
+  const OptVal: Pointer;
+  const OptLen: PUSockLen
+): Int32;
+begin
+  Result := UNetGetSockOpt(Self, Level, OptName, OptVal, OptLen);
+end;
+
+function TUSocketImpl.SetSockOpt(
+  const Level: Int32;
+  const OptName: Int32;
+  const OptVal: Pointer;
+  const OptLen: TUSockLen
+): Int32;
+begin
+  Result := UNetSetSockOpt(Self, Level, OptName, OptVal, OptLen);
+end;
+
+function TUSocketImpl.SetSockOpt(
+  const OptName: Int32;
+  const OptVal: Int32): Int32;
+begin
+  Result := SetSockOpt(SOL_SOCKET, OptName, @OptVal, SizeOf(OptVal));
+end;
+
 function TUSocketImpl.Shutdown(const How: Int32): Int32;
 begin
   Result := UNetShutDown(Self, How);
@@ -633,16 +947,22 @@ begin
   Result.Make(SockDomain, SockType, SockProtocol);
 end;
 
-class function TUSocketImpl.CreateTCP(const SockDomain: Int32): TUSocket;
+class function TUSocketImpl.CreateTCP(
+  const SockDomain: Int32;
+  const SockProtocol: Int32
+): TUSocket;
 begin
   Result := TUSocket.Invalid;
-  Result.MakeTCP(SockDomain);
+  Result.MakeTCP(SockDomain, SockProtocol);
 end;
 
-class function TUSocketImpl.CreateUDP(const SockDomain: Int32): TUSocket;
+class function TUSocketImpl.CreateUDP(
+  const SockDomain: Int32;
+  const SockProtocol: Int32
+): TUSocket;
 begin
   Result := TUSocket.Invalid;
-  Result.MakeUDP(SockDomain);
+  Result.MakeUDP(SockDomain, SockProtocol);
 end;
 
 procedure TUNet.TBeacon.SetEnabled(const Value: Boolean);
@@ -664,13 +984,18 @@ begin
   _Peers := nil;
   if _Enabled then
   begin
+    _MessageJson.Ptr['message'].Value := _Message;
     _Listener := TListener.Create(True);
     _Listener.Beacon := Self;
+    _MessageJson.Ptr['type'].Value := 'bounce';
+    _Listener.Message := _MessageJson.Ptr.AsString;
     _Listener.Start;
     if _Active then
     begin
       _Broadcaster := TBroadcaster.Create(True);
       _Broadcaster.Beacon := Self;
+      _MessageJson.Ptr['type'].Value := 'sonar';
+      _Broadcaster.Message := _MessageJson.Ptr.AsString;
       _Broadcaster.Start;
     end;
   end;
@@ -764,7 +1089,6 @@ begin
 end;
 
 constructor TUNet.TBeacon.Create;
-  var Json: TUJsonRef;
 begin
   _Enabled := False;
   _Active := False;
@@ -772,10 +1096,12 @@ begin
   _LocalAddr := UNetLocalAddr;
   _HostName := UNetHostName;
   _BroadcastInterval := 5000;
-  Json := TUJson.Make;
-  Json.Ptr.AddValue('id', _HostName);
-  Json.Ptr.AddValue('addr', UNetNetAddrToStr(_LocalAddr));
-  _Message := Json.Ptr.AsString;
+  _Message := '';
+  _MessageJson := TUJson.Make;
+  _MessageJson.Ptr.AddValue('id', _HostName);
+  _MessageJson.Ptr.AddValue('type', '');
+  _MessageJson.Ptr.AddValue('addr', UNetNetAddrToStr(_LocalAddr));
+  _MessageJson.Ptr.AddValue('message', _Message);
 end;
 
 destructor TUNet.TBeacon.Destroy;
@@ -790,9 +1116,9 @@ procedure TUNet.TBeacon.TListener.Execute;
   var Buffer: array[0..2047] of AnsiChar;
   var n: Int32;
   var Msg: String;
+  var Json: TUJsonRef;
 begin
-  _Sock := TUSocket.Invalid;
-  _Sock.MakeUDP();
+  _Sock := TUSocket.CreateUDP();
   SockAddr := TUSockAddr.Default;
   SockAddr.sin_port := UNetHostToNetShort(Beacon.Port);
   _Sock.Bind(@SockAddr, SizeOf(SockAddr));
@@ -804,10 +1130,13 @@ begin
     if n <= 0 then Break;
     if OtherAddr.sin_addr.Addr32 = Beacon.LocalAddr.Addr32 then Continue;
     Msg := Buffer;
-    Beacon.AddPeer(OtherAddr.sin_addr, Msg);
+    Json := TUJson.Load(Msg);
+    if not Json.IsValid then Continue;
+    Beacon.AddPeer(OtherAddr.sin_addr, Json.Ptr['message'].Value);
+    if not (Json.Ptr.Content['type'].Value = 'sonar') then Continue;
     OtherAddr.sin_port := UNetHostToNetShort(Beacon.Port);
     n := _Sock.SendTo(
-      @Beacon.Message[1], Length(Beacon.Message) + 1, 0,
+      @Message[1], Length(Message) + 1, 0,
       @OtherAddr, SizeOf(OtherAddr)
     );
   end;
@@ -828,26 +1157,22 @@ end;
 procedure TUNet.TBeacon.TBroadcaster.Execute;
   var LocalAddr: TUInAddr;
   var SockAddr: TUSockAddr;
-  var i: Int32;
 begin
   LocalAddr := Beacon.LocalAddr;
-  _Sock := TUSocket.Invalid;
-  _Sock.MakeUDP();
+  _Sock := TUSocket.CreateUDP();
+  _Sock.SetSockOpt(SO_BROADCAST, 1);
   SockAddr := TUSockAddr.Default;
   SockAddr.sin_addr := LocalAddr;
   SockAddr.sin_port := UNetHostToNetShort(Beacon.Port);
   _Event.Unsignal;
   while not Terminated do
   begin
-    for i := 1 to 255 do
-    begin
-      SockAddr.sin_addr.Addr8[3] := UInt8(i);
-      if SockAddr.sin_addr.Addr32 = LocalAddr.Addr32 then Continue;
-      _Sock.SendTo(
-        @Beacon.Message[1], Length(Beacon.Message) + 1, 0,
-        @SockAddr, SizeOf(SockAddr)
-      );
-    end;
+    SockAddr.sin_addr.Addr8[3] := 255;
+    if SockAddr.sin_addr.Addr32 = LocalAddr.Addr32 then Continue;
+    _Sock.SendTo(
+      @Message[1], Length(Message) + 1, 0,
+      @SockAddr, SizeOf(SockAddr)
+    );
     _Event.WaitFor(Beacon.BroadcastInterval);
   end;
 end;
@@ -1128,6 +1453,7 @@ begin
     while Assigned(a) do
     try
       if not Assigned(a^.ifa_addr) then Continue;
+      if a^.ifa_addr^.sin_family <> AF_INET then Continue;
       Addr := a^.ifa_addr^.sin_addr;
       if (Result.Addr32 = 0)
       or (Addr.Addr8[0] = 192) then
@@ -1141,6 +1467,208 @@ begin
     FreeIfAddrs(IfAddrs);
   end;
 {$endif}
+end;
+
+function UNetLocalMacAddr: TUMacAddr;
+{$if defined(windows)}
+  function ViaAdapters: TUMacAddrArray;
+    var Adapters, Adapter: PIP_ADAPTER_INFO;
+    var Buffer: array[0..1024 * 16 - 1] of UInt8;
+    var BufSize: UInt32;
+    var i: Int32;
+    var Addr: TUMacAddr;
+  begin
+    Result := nil;
+    BufSize := SizeOf(Buffer);
+    Adapters := PIP_ADAPTER_INFO(@Buffer);
+    if GetAdaptersInfo(Adapters, @BufSize) <> 0 then Exit;
+    Adapter := Adapters;
+    while Assigned(Adapter) do
+    try
+      //WriteLn(Adapter^.AdapterName);
+      //WriteLn(Adapter^.Description);
+      if Adapter^.AddressLength <> 6 then Continue;
+      Move(Adapter^.Address, Addr, SizeOf(TUMacAddr));
+      specialize UArrAppend<TUMacAddr>(Result, Addr);
+      //WriteLn(UNetMacAddrToStr(Addr));
+    finally
+      Adapter := Adapter^.Next;
+    end;
+  end;
+{$else}
+  function ViaSysCall: TUMacAddrArray;
+    var Sock: TUSocket;
+    var Conf: TUIfConf;
+    var ReqList: PUIfReq;
+    var Req: TUIfReq;
+    var Buffer: array[0..1023] of UInt8;
+    var r, n, i: Int32;
+    var Addr: TUMacAddr;
+  begin
+    Result := nil;
+    Sock := TUSocket.CreateUDP(AF_INET);
+    if (not Sock.IsValid) then Exit;
+    try
+      UClear(Conf, SizeOf(Conf));
+      Conf.ifc_len := SizeOf(Buffer);
+      Conf.ifcu_buf := @Buffer;
+      r := UNetIOCtl(Sock, UNET_SIOCGIFCONF, @Conf);
+      if r <> 0 then Exit;
+      i := SizeOf(TUIfReq);
+      n := Conf.ifc_len div i;
+      ReqList := Conf.ifcu_req;
+      for i := 0 to n - 1 do
+      begin
+        //WriteLn(ReqList^.ifrn_name);
+        try
+          UClear(Req, SizeOf(Req));
+          Req.ifrn_name := ReqList^.ifrn_name;
+          if not (UNetIOCtl(Sock, UNET_SIOCGIFFLAGS, @Req) = 0) then Continue;
+          if (Req.ifru_flags and UNET_IFF_LOOPBACK) > 0 then Continue;
+          if UNetIOCtl(Sock, UNET_SIOCGIFHWADDR, @Req) <> 0 then Continue;
+          Addr := PUMacAddr(@Req.ifru_hwaddr.sin_port)^;
+          specialize UArrAppend<TUMacAddr>(Result, Addr);
+        finally
+          Inc(ReqList);
+        end;
+      end;
+    finally
+      Sock.Close;
+    end;
+  end;
+  function ViaIfAddrs: TUMacAddrArray;
+    var IfAddrs, a: PUIfAddrs;
+    var r: Int32;
+    var Addr: TUMacAddr;
+  begin
+    Result := nil;
+    r := UNetGetIfAddrs(@IfAddrs);
+    if r <> 0 then Exit;
+    try
+      a := IfAddrs;
+      while Assigned(a) do
+      try
+        if not Assigned(a^.ifa_addr) then Continue;
+        if (a^.ifa_flags and UNET_IFF_LOOPBACK) > 0 then Continue;
+        if a^.ifa_addr^.sin_family <> AF_PACKET then Continue;
+        if a^.ifa_addr^.sin_zero[3] <> 6 then Continue;
+        //Write('Name = ', a^.ifa_name, ' Family = ', a^.ifa_addr^.sin_family, ' Flags = ', a^.ifa_flags, ' Addr = ');
+        Addr := PUMacAddr(@a^.ifa_addr^.sin_zero[4])^;
+        specialize UArrAppend<TUMacAddr>(Result, Addr);
+        //WriteLn(UNetMacAddrToStr(Addr));
+      finally
+        a := a^.ifa_next;
+      end;
+    finally
+      FreeIfAddrs(IfAddrs);
+    end;
+  end;
+{$endif}
+  var Addr: TUMacAddrArray;
+begin
+{$if defined(windows)}
+  Addr := ViaAdapters;
+  if Length(Addr) > 0 then Exit(Addr[0]);
+{$else}
+  Addr := ViaSysCall;
+  if Length(Addr) > 0 then Exit(Addr[0]);
+  Addr := ViaIfAddrs;
+  if Length(Addr) > 0 then Exit(Addr[High(Addr)]);
+{$endif}
+  Result := TUMacAddr.Zero;
+end;
+
+function UNetWakeOnLan(const MacAddr: TUMacAddr): Boolean;
+  var Sock: TUSocket;
+  var Msg: packed record
+    Sync: array[0..5] of UInt8;
+    MacAddr: array[0..15] of TUMacAddr;
+  end;
+  var Addr: TUSockAddr;
+  var i, BytesSent: Int32;
+begin
+  for i := 0 to High(Msg.Sync) do Msg.Sync[i] := $ff;
+  for i := 0 to High(Msg.MacAddr) do Msg.MacAddr[i] := MacAddr;
+  Sock := TUSocket.CreateUDP();
+  if not Sock.IsValid then Exit(False);
+  if Sock.SetSockOpt(SO_BROADCAST, 1) < 0 then Exit(False);
+  try
+    Addr := TUSockAddr.Default;
+    Addr.sin_addr := TUInAddr.Broadcast;
+    Addr.sin_port := UNetHostToNetShort(7);
+    for i := 0 to 4 do
+    begin
+      BytesSent := Sock.SendTo(@Msg, SizeOf(Msg), 0, @Addr, SizeOf(Addr));
+      if BytesSent <= 0 then Exit(False);
+    end;
+  finally
+    Sock.Close;
+  end;
+  Result := True;
+end;
+
+function UNetPing(const InAddrN: TUInAddr): Boolean;
+  type TICMPHeader = packed record
+    RequestType: UInt8;
+    Code: UInt8;
+    Checksum: UInt16;
+    Identifier: UInt16;
+    SequenceNumber: UInt16;
+  end;
+  type PICMPHeader = ^TICMPHeader;
+  type TTimeVal = record
+    tv_sec: Int32;
+    tv_usec: Int32;
+  end;
+  function Checksum(const Buffer: Pointer; const BufferSize: UInt16): UInt16;
+    var i: Int32;
+  begin
+    if BufferSize mod 2 = 1 then Exit(0);
+    Result := 0;
+    for i := 0 to (BufferSize shr 1) - 1 do
+    begin
+      Result += PUInt16Arr(Buffer)^[i];
+    end;
+    Result := (Result shr 16) + (Result and $ffff);
+    Result += Result shr 16;
+    Result := not Result;
+  end;
+  var Sock: TUSocket;
+  var Addr: TUSockAddr;
+  var Request: TICMPHeader;
+  var Response: PICMPHeader;
+  var r: Int32;
+  var TimeOut: TTimeVal;
+  var ResponseBuffer: array[0..255] of UInt8;
+  var SockLen: TUSockLen;
+  var ICMPOffset: Int32;
+begin
+  Sock := TUSocket.Create(AF_INET, SOCK_RAW, UNET_IPPROTO_ICMP);
+  if Sock = INVALID_SOCKET then Exit(False);
+  try
+    Addr := TUSockAddr.Default;
+    Addr.sin_addr := InAddrN;
+    UClear(Request, SizeOf(Request));
+    Request.RequestType := ICMP_ECHO;
+    Request.Identifier := GetCurrentProcessId mod 32768;
+    Request.SequenceNumber := 1;
+    Request.Checksum := Checksum(@Request, SizeOf(Request));
+    r := Sock.SendTo(@Request, SizeOf(Request), 0, @Addr, SizeOf(Addr));
+    if r = SOCKET_ERROR then Exit(False);
+    TimeOut.tv_sec := 1;
+    TimeOut.tv_usec := 0;
+    Sock.SetSockOpt(SOL_SOCKET, SO_RCVTIMEO, @TimeOut, SizeOf(TimeOut));
+    SockLen := SizeOf(Addr);
+    r := Sock.RecvFrom(@ResponseBuffer, SizeOf(ResponseBuffer), 0, @Addr, @SockLen);
+    if r = SOCKET_ERROR then Exit(False);
+    ICMPOffset := (ResponseBuffer[0] and $f) * 4;
+    Response := PICMPHeader(@ResponseBuffer[ICMPOffset]);
+    if Response^.RequestType <> 0 then Exit(False);
+    if Response^.Identifier <> Request.Identifier then Exit(False);
+    Result := True;
+  finally
+    Sock.Close;
+  end;
 end;
 
 function HToNl(const Host: UInt32): UInt32;
@@ -1223,6 +1751,35 @@ begin
   Result.sin_port := UNetNetToHostShort(Net.sin_port);
   Result.sin_addr := UNetNetToHost(Net.sin_addr);
   Result.sin_zero := Net.sin_zero;
+end;
+
+function UNetMacAddrToStr(const Addr: TUMacAddr): AnsiString;
+begin
+  Result := LowerCase(Format(
+    '%0:.2X:%1:.2X:%2:.2X:%3:.2X:%4:.2X:%5:.2X',
+    [Addr[0], Addr[1], Addr[2], Addr[3], Addr[4], Addr[5]]
+  ));
+end;
+
+function UNetStrToMacAddr(const AddrStr: AnsiString): TUMacAddr;
+  var i, j, n, r: Int32;
+  var Hex: String;
+begin
+  Result := TUMacAddr.Zero;
+  r := 0;
+  j := 1;
+  for i := 1 to Length(AddrStr) do
+  if (AddrStr[i] in [':', '-']) or (i = Length(AddrStr)) then
+  begin
+    if i = j then Exit(TUMacAddr.Zero);
+    if i = Length(AddrStr) then n := i + 1 else n := i;
+    Hex := '$' + UStrSubStr(AddrStr, j, n - j);
+    Result[r] := StrToIntDef(Hex, 0);
+    if r = 5 then Exit;
+    j := n + 1;
+    Inc(r);
+  end;
+  Result := TUMacAddr.Zero;
 end;
 
 function UNetNetAddrToStr(const Addr: TUInAddr): AnsiString;
