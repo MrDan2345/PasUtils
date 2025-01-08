@@ -1602,6 +1602,12 @@ function ULerp(const a, b: TUQuat; const s: TUFloat): TUQuat; inline; overload;
 function ULerp(const a, b: TUMat; const s: TUFloat): TUMat; inline; overload;
 function UQuatSlerp(const a, b: TUQuat; const s: TUFloat): TUQuat;
 function USmoothStep(const v, MinV, MaxV: TUFloat): TUFloat; inline;
+generic function UBezier<T>(const f0, f1, f2: T; const s: TUFloat): T; inline; overload;
+function UBezier(const v0, v1, v2: TUFloat; const s: TUFloat): TUFloat; inline; overload;
+function UBezier(const v0, v1, v2: TUDouble; const s: TUFloat): TUDouble; inline; overload;
+function UBezier(const v0, v1, v2: TUVec2; const s: TUFloat): TUVec2; inline; overload;
+function UBezier(const v0, v1, v2: TUVec3; const s: TUFloat): TUVec3; inline; overload;
+function UBezier(const v0, v1, v2: TUVec4; const s: TUFloat): TUVec4; inline; overload;
 generic function UBezier<T>(const f0, f1, f2, f3: T; const s: TUFloat): T; inline; overload;
 function UBezier(const v0, v1, v2, v3: TUFloat; const s: TUFloat): TUFloat; inline; overload;
 function UBezier(const v0, v1, v2, v3: TUDouble; const s: TUFloat): TUDouble; inline; overload;
@@ -1629,6 +1635,7 @@ procedure UByteSwap(var v: Int16); inline; overload;
 procedure UByteSwap(var v: Int32); inline; overload;
 procedure UByteSwap(var v: Int64); inline; overload;
 generic procedure UByteSwapRecord<T>(var Rec: T); inline;
+generic procedure UByteSwapArray<T>(var Arr: array of T); inline;
 generic procedure USwap<T>(var a: T; var b: T); inline; overload;
 procedure USwap(var a: Int8; var b: Int8); inline; overload;
 procedure USwap(var a: Int16; var b: Int16); inline; overload;
@@ -1755,11 +1762,13 @@ operator - (const v: TUVec2): TUVec2;
 operator + (const a, b: TUVec2i): TUVec2i;
 operator - (const a, b: TUVec2i): TUVec2i;
 operator * (const a, b: TUVec2i): TUVec2i;
-operator / (const a, b: TUVec2i): TUVec2i;
+operator / (const a, b: TUVec2i): TUVec2;
+operator div (const a, b: TUVec2i): TUVec2i;
 operator + (const v: TUVec2i; const i: Int32): TUVec2i;
 operator - (const v: TUVec2i; const i: Int32): TUVec2i;
 operator * (const v: TUVec2i; const i: Int32): TUVec2i;
-operator / (const v: TUVec2i; const i: Int32): TUVec2i;
+operator / (const v: TUVec2i; const i: Int32): TUVec2;
+operator div (const v: TUVec2i; const i: Int32): TUVec2i;
 operator + (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator - (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2i; const f: TUFloat): TUVec2;
@@ -1781,8 +1790,10 @@ operator + (const a, b: TUVec3i): TUVec3i;
 operator - (const a, b: TUVec3i): TUVec3i;
 operator * (const a, b: TUVec3i): TUVec3i;
 operator * (const v: TUVec3i; const i: Int32): TUVec3i;
-operator / (const a, b: TUVec3i): TUVec3i;
-operator / (const v: TUVec3i; const i: Int32): TUVec3i;
+operator / (const a, b: TUVec3i): TUVec3;
+operator div (const a, b: TUVec3i): TUVec3i;
+operator / (const v: TUVec3i; const i: Int32): TUVec3;
+operator div (const v: TUVec3i; const i: Int32): TUVec3i;
 operator + (const a, b: TUVec4): TUVec4;
 operator - (const a, b: TUVec4): TUVec4;
 operator * (const a, b: TUVec4): TUVec4;
@@ -4157,7 +4168,7 @@ end;
 
 function TUBounds3iImpl.GetCenter: TUVec3i;
 begin
-  Result := (Self[0] + Self[1]) / 2;
+  Result := (Self[0] + Self[1]) div 2;
 end;
 
 function TUBounds3iImpl.GetExtent: TUVec3i;
@@ -8630,6 +8641,38 @@ begin
   Result := x * x * (3 - 2 * x);
 end;
 
+generic function UBezier<T>(const f0, f1, f2: T; const s: TUFloat): T;
+  var si: TUFloat;
+begin
+  si := 1 - s;
+  Result := si * si * f0 + 2 * si * s * f1 + s * s * f2;
+end;
+
+function UBezier(const v0, v1, v2: TUFloat; const s: TUFloat): TUFloat;
+begin
+  Result := specialize UBezier<TUFloat>(v0, v1, v2, s);
+end;
+
+function UBezier(const v0, v1, v2: TUDouble; const s: TUFloat): TUDouble;
+begin
+  Result := specialize UBezier<TUDouble>(v0, v1, v2, s);
+end;
+
+function UBezier(const v0, v1, v2: TUVec2; const s: TUFloat): TUVec2;
+begin
+  Result := specialize UBezier<TUVec2>(v0, v1, v2, s);
+end;
+
+function UBezier(const v0, v1, v2: TUVec3; const s: TUFloat): TUVec3;
+begin
+  Result := specialize UBezier<TUVec3>(v0, v1, v2, s);
+end;
+
+function UBezier(const v0, v1, v2: TUVec4; const s: TUFloat): TUVec4;
+begin
+  Result := specialize UBezier<TUVec4>(v0, v1, v2, s);
+end;
+
 generic function UBezier<T>(const f0, f1, f2, f3: T; const s: TUFloat): T;
   var s2, s3: TUFloat;
 begin
@@ -8818,6 +8861,12 @@ begin
   finally
     Inc(mf);
   end;
+end;
+
+generic procedure UByteSwapArray<T>(var Arr: array of T);
+  var i: Int32;
+begin
+  for i := 0 to High(Arr) do specialize UByteSwap<T>(Arr[i]);
 end;
 
 generic procedure USwap<T>(var a: T; var b: T);
@@ -9819,7 +9868,13 @@ begin
   Result[1] := a[1] * b[1];
 end;
 
-operator / (const a, b: TUVec2i): TUVec2i;
+operator / (const a, b: TUVec2i): TUVec2;
+begin
+  Result[0] := a[0] / b[0];
+  Result[1] := a[1] / b[1];
+end;
+
+operator div (const a, b: TUVec2i): TUVec2i;
 begin
   Result[0] := a[0] div b[0];
   Result[1] := a[1] div b[1];
@@ -9843,7 +9898,15 @@ begin
   Result[1] := v[1] * i;
 end;
 
-operator / (const v: TUVec2i; const i: Int32): TUVec2i;
+operator / (const v: TUVec2i; const i: Int32): TUVec2;
+  var rcp: TUFloat;
+begin
+  rcp := 1 / i;
+  Result[0] := v[0] * rcp;
+  Result[1] := v[1] * rcp;
+end;
+
+operator div (const v: TUVec2i; const i: Int32): TUVec2i;
 begin
   Result[0] := v[0] div i;
   Result[1] := v[1] div i;
@@ -9987,14 +10050,30 @@ begin
   Result[2] := v[2] * i;
 end;
 
-operator / (const a, b: TUVec3i): TUVec3i;
+operator / (const a, b: TUVec3i): TUVec3;
+begin
+  Result[0] := a[0] / b[0];
+  Result[1] := a[1] / b[1];
+  Result[2] := a[2] / b[2];
+end;
+
+operator div (const a, b: TUVec3i): TUVec3i;
 begin
   Result[0] := a[0] div b[0];
   Result[1] := a[1] div b[1];
   Result[2] := a[2] div b[2];
 end;
 
-operator / (const v: TUVec3i; const i: Int32): TUVec3i;
+operator / (const v: TUVec3i; const i: Int32): TUVec3;
+  var rcp: TUFloat;
+begin
+  rcp := 1 / i;
+  Result[0] := v[0] * rcp;
+  Result[1] := v[1] * rcp;
+  Result[2] := v[2] * rcp;
+end;
+
+operator div (const v: TUVec3i; const i: Int32): TUVec3i;
 begin
   Result[0] := v[0] div i;
   Result[1] := v[1] div i;
