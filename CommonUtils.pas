@@ -1762,6 +1762,7 @@ operator - (const v: TUVec2): TUVec2;
 operator + (const a, b: TUVec2i): TUVec2i;
 operator - (const a, b: TUVec2i): TUVec2i;
 operator * (const a, b: TUVec2i): TUVec2i;
+operator * (const a: TUVec2i; const b: TUVec2): TUVec2;
 operator / (const a, b: TUVec2i): TUVec2;
 operator div (const a, b: TUVec2i): TUVec2i;
 operator + (const v: TUVec2i; const i: Int32): TUVec2i;
@@ -9863,6 +9864,12 @@ begin
 end;
 
 operator * (const a, b: TUVec2i): TUVec2i;
+begin
+  Result[0] := a[0] * b[0];
+  Result[1] := a[1] * b[1];
+end;
+
+operator * (const a: TUVec2i; const b: TUVec2): TUVec2;
 begin
   Result[0] := a[0] * b[0];
   Result[1] := a[1] * b[1];
