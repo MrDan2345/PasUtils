@@ -1628,6 +1628,7 @@ procedure UByteSwap(var v: UInt64); inline; overload;
 procedure UByteSwap(var v: Int16); inline; overload;
 procedure UByteSwap(var v: Int32); inline; overload;
 procedure UByteSwap(var v: Int64); inline; overload;
+generic procedure UByteSwapRecord<T>(var Rec: T); inline;
 generic procedure USwap<T>(var a: T; var b: T); inline; overload;
 procedure USwap(var a: Int8; var b: Int8); inline; overload;
 procedure USwap(var a: Int16; var b: Int16); inline; overload;
@@ -8778,6 +8779,45 @@ end;
 procedure UByteSwap(var v: Int64);
 begin
   specialize UByteSwap<Int64>(v);
+end;
+
+generic procedure UByteSwapRecord<T>(var Rec: T);
+  procedure Swap(const Data: PUInt8Arr; const Count: Int32);
+    var i, j, n: Int32;
+    var Tmp: UInt8;
+  begin
+    n := (Count shr 1);
+    for i := 0 to n - 1 do
+    begin
+      j := Count - 1 - i;
+      Tmp := Data^[i];
+      Data^[i] := Data^[j];
+      Data^[j] := Tmp;
+    end;
+  end;
+  var ti: PTypeInfo;
+  var td: PTypeData;
+  var mf: PManagedField;
+  var i: Int32;
+begin
+  ti := TypeInfo(T);
+  if ti^.Kind <> tkRecord then Exit;
+  td := GetTypeData(ti);
+  mf := PManagedField(Pointer(@td^.TotalFieldCount) + SizeOf(td^.TotalFieldCount));
+  for i := 0 to td^.TotalFieldCount - 1 do
+  try
+    ti := mf^.TypeRef;
+    if not (ti^.Kind in [tkInteger, tkInt64, tkQWord, tkEnumeration]) then Continue;
+    td := GetTypeData(ti);
+    case td^.OrdType of
+      otSWord, otUWord: Swap(Pointer(@Rec) + mf^.FldOffset, 2);
+      otSLong, otULong: Swap(Pointer(@Rec) + mf^.FldOffset, 4);
+      otSQWord, otUQWord: Swap(Pointer(@Rec) + mf^.FldOffset, 8);
+      else Continue;
+    end;
+  finally
+    Inc(mf);
+  end;
 end;
 
 generic procedure USwap<T>(var a: T; var b: T);
