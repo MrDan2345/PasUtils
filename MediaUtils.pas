@@ -188,6 +188,30 @@ public
   procedure Save(const StreamHelper: TUStreamHelper); override;
 end;
 
+type TUTrueTypeFont = class (TURefClass)
+public
+  type TContourPoint = record
+    OnCurve: Boolean;
+    Pos: TUVec2i;
+  end;
+  type TContour = array of TContourPoint;
+  type TGlyph = record
+    IsCompound: Boolean;
+    Bounds: TUBounds2i;
+    Contours: array of TContour;
+  end;
+  type TGlyphArray = array of TGlyph;
+private
+  var _Glyphs: TGlyphArray;
+public
+  property Glyphs: TGlyphArray read _Glyphs;
+  constructor Create(const Reader: TUStreamHelper);
+  constructor Create(const Stream: TStream);
+  constructor Create(const FileName: String);
+  destructor Destroy; override;
+end;
+type TUTrueTypeFontShared = specialize TUSharedRef<TUTrueTypeFont>;
+
 type TUVertexAttributeSemantic = (
   as_invalid,
   as_position,
@@ -2563,6 +2587,289 @@ begin
   ChunkEnd;
 end;
 // TUImageDataPNG end
+
+// TUTrueTypeFont begin
+constructor TUTrueTypeFont.Create(const Reader: TUStreamHelper);
+  type THeader = record
+    Version: UInt32;
+    NumTables: UInt16;
+    SearchRange: UInt16;
+    EntrySelector: UInt16;
+    RangeShift: UInt16;
+  end;
+  type TTableTag = array[0..3] of AnsiChar;
+  type TTableHeader = record
+    Tag: TTableTag;
+    CheckSum: UInt32;
+    Offset: UInt32;
+    Length: UInt32;
+  end;
+  type TTblMaxp = record
+    Version: UInt32;
+    NumGlyphs: UInt16;
+  end;
+  type TTblHead = record
+    TableVersionNumber: UInt32;
+    FontRevision: UInt32;
+    ChecksumAdjustment: UInt32;
+    MagicNumber: UInt32;
+    Flags: UInt16;
+    UnitsPerEm: Int16;
+    Created: array[0..1] of UInt32;
+    Modified: array[0..1] of UInt32;
+    xMin: Int16;
+    yMin: Int16;
+    xMax: Int16;
+    yMax: Int16;
+    MacStyle: UInt16;
+    LowestRecPPEM: UInt16;
+    FontDirectionHint: Int16;
+    IndexToLocFormat: Int16;
+    GlyphDataFormat: Int16;
+  end;
+  function CheckBit(const Flags: UInt8; const BitIndex: Int32): Boolean;
+  begin
+    Result := ((Flags shr BitIndex) and 1) = 1;
+  end;
+  function ReadGlyph: TGlyph;
+    type TGlyfHeader = record
+      NumberOfContours: Int16;
+      XMin, YMin, XMax, YMax: Int16;
+    end;
+    var GlyfHeader: TGlyfHeader;
+    var ContourEndPoints: array of UInt16;
+    var TotalPoints: UInt32;
+    var Flags: array of UInt8;
+    procedure ReadFlags;
+      var i: Int32;
+      var Flag, Repeats: UInt8;
+    begin
+      Flag := 0;
+      Repeats := 0;
+      for i := 0 to TotalPoints - 1 do
+      begin
+        if Repeats > 0 then
+        begin
+          Dec(Repeats);
+        end
+        else
+        begin
+          Flag := Reader.ReadUInt8;
+          if CheckBit(Flag, 3) then
+          begin
+            Repeats := Reader.ReadUInt8;
+          end;
+        end;
+        Flags[i] := Flag;
+      end;
+    end;
+    var Points: array of TContourPoint;
+    procedure ReadPoints(const ValueOffset: UInt8);
+      var i: Int32;
+      var CurValue, NewValue: Int16;
+      var BitSize, BitSignSkip: UInt8;
+    begin
+      BitSize := 1 + ValueOffset;
+      BitSignSkip := 4 + ValueOffset;
+      CurValue := 0;
+      for i := 0 to TotalPoints - 1 do
+      begin
+        Points[i].OnCurve := CheckBit(Flags[i], 0);
+        if CheckBit(Flags[i], BitSize) then
+        begin
+          NewValue := Reader.ReadUInt8;
+          if not CheckBit(Flags[i], BitSignSkip) then
+          begin
+            NewValue := -NewValue;
+          end;
+        end
+        else if not CheckBit(Flags[i], BitSignSkip) then
+        begin
+          NewValue := UEndianSwap(Reader.ReadInt16);
+        end
+        else
+        begin
+          NewValue := 0;
+        end;
+        CurValue := CurValue + NewValue;
+        Points[i].Pos[ValueOffset] := CurValue;
+      end;
+    end;
+    function ReconstructContour(const StartIndex, EndIndex: Int32): TContour;
+      var CurPoint: TContourPoint;
+      var i, j, n: Int32;
+    begin
+      n := EndIndex - StartIndex + 1;
+      j := EndIndex;
+      for i := StartIndex to EndIndex do
+      begin
+        if (not Points[i].OnCurve)
+        and (not Points[j].OnCurve) then
+        begin
+          Inc(n);
+        end;
+        j := i;
+      end;
+      Result := nil;
+      SetLength(Result, n);
+      CurPoint := Points[EndIndex];
+      j := 0;
+      for i := StartIndex to EndIndex do
+      begin
+        if (not Points[i].OnCurve)
+        and (not CurPoint.OnCurve) then
+        begin
+          Result[j].OnCurve := True;
+          Result[j].Pos := (CurPoint.Pos + Points[i].Pos) div 2;
+          Inc(j);
+        end;
+        CurPoint := Points[i];
+        Result[j] := CurPoint;
+        Inc(j);
+      end;
+    end;
+    var InstructionLength: UInt16;
+    var i, PointIndex: Int32;
+  begin
+    Reader.ReadBuffer(@GlyfHeader, SizeOf(GlyfHeader));
+    specialize UByteSwapRecord<TGlyfHeader>(GlyfHeader);
+    Result.IsCompound := GlyfHeader.NumberOfContours < 0;
+    Result.Bounds := [
+      [GlyfHeader.XMin, GlyfHeader.YMin],
+      [GlyfHeader.XMax, GlyfHeader.YMax]
+    ];
+    // TODO: handle compound glyphs
+    if Result.IsCompound then
+    begin
+      WriteLn('Compound Glyph');
+      Exit;
+    end
+    else if GlyfHeader.NumberOfContours = 0 then
+    begin
+      Result.Contours := nil;
+      WriteLn('Empty Glyph (Space?)');
+      Exit;
+    end;
+    ContourEndPoints := nil;
+    SetLength(ContourEndPoints, GlyfHeader.NumberOfContours);
+    Reader.ReadBuffer(@ContourEndPoints[0], Length(ContourEndPoints) * SizeOf(UInt16));
+    specialize UByteSwapArray<UInt16>(ContourEndPoints);
+    TotalPoints := ContourEndPoints[High(ContourEndPoints)] + 1;
+    InstructionLength := UEndianSwap(Reader.ReadUInt16);
+    Reader.Skip(InstructionLength);
+    Flags := nil;
+    SetLength(Flags, TotalPoints);
+    ReadFlags;
+    Points := nil;
+    SetLength(Points, TotalPoints);
+    ReadPoints(0);
+    ReadPoints(1);
+    SetLength(Result.Contours, GlyfHeader.NumberOfContours);
+    PointIndex := 0;
+    for i := 0 to High(Result.Contours) do
+    begin
+      Result.Contours[i] := ReconstructContour(PointIndex, ContourEndPoints[i]);
+      PointIndex := ContourEndPoints[i] + 1;
+    end;
+    WriteLn('New Glyph ', TotalPoints);
+  end;
+  var Header: THeader;
+  var Tables: array of TTableHeader;
+  var Maxp: TTblMaxp;
+  var Head: TTblHead;
+  var GlyphOffsets: array of UInt32;
+  var GlyphTable: UInt32;
+  function SeekTable(const Tag: TTableTag): Boolean;
+    var i: Int32;
+  begin
+    for i := 0 to High(Tables) do
+    if Tables[i].Tag = Tag then
+    begin
+      Reader.Position := Tables[i].Offset;
+      Exit(True);
+    end;
+    Result := False;
+  end;
+  var i: Int32;
+begin
+  Reader.ReadBuffer(@Header, SizeOf(Header));
+  specialize UByteSwapRecord<THeader>(Header);
+  if Header.Version <> $00010000 then Exit;
+  Tables := nil;
+  SetLength(Tables, Header.NumTables);
+  for i := 0 to High(Tables) do
+  begin
+    Reader.ReadBuffer(@Tables[i], SizeOf(Tables[i]));
+    specialize UByteSwapRecord<TTableHeader>(Tables[i]);
+    WriteLn('Table: ', Tables[i].Tag, '; Offset: ', Tables[i].Offset, '; Length: ', Tables[i].Length);
+  end;
+  if not SeekTable('maxp') then Exit;
+  Reader.ReadBuffer(@Maxp, SizeOf(Maxp));
+  specialize UByteSwapRecord<TTblMaxp>(Maxp);
+  SetLength(_Glyphs, Maxp.NumGlyphs);
+  GlyphOffsets := nil;
+  SetLength(GlyphOffsets, Maxp.NumGlyphs);
+  if not SeekTable('head') then Exit;
+  Reader.ReadBuffer(@Head, SizeOf(Head));
+  specialize UByteSwapRecord<TTblHead>(Head);
+  WriteLn('Magic Number: ', IntToHex(Head.MagicNumber));
+  if Head.MagicNumber <> $5F0F3CF5 then Exit;
+  if not SeekTable('loca') then Exit;
+  if Head.IndexToLocFormat = 0 then
+  begin
+    for i := 0 to High(GlyphOffsets) do
+    begin
+      GlyphOffsets[i] := UEndianSwap(Reader.ReadUInt16);
+    end;
+  end
+  else
+  begin
+    for i := 0 to High(GlyphOffsets) do
+    begin
+      GlyphOffsets[i] := UEndianSwap(Reader.ReadUInt32);
+    end;
+  end;
+  if not SeekTable('glyf') then Exit;
+  GlyphTable := Reader.Position;
+  for i := 0 to High(_Glyphs) do
+  begin
+    if (i > 0) and (GlyphOffsets[i] = GlyphOffsets[i - 1]) then
+    begin
+      _Glyphs[i] := _Glyphs[i - 1];
+      Continue;
+    end;
+    Reader.Position := GlyphTable + GlyphOffsets[i];
+    _Glyphs[i] := ReadGlyph;
+  end;
+end;
+
+constructor TUTrueTypeFont.Create(const Stream: TStream);
+  var sh: TUStreamHelper;
+begin
+  sh := TUStreamHelper.Create(Stream);
+  try
+    Create(sh);
+  finally
+    sh.Free;
+  end;
+end;
+
+constructor TUTrueTypeFont.Create(const FileName: String);
+  var fs: TFileStream;
+begin
+  fs := TFileStream.Create(FileName, fmOpenRead);
+  try
+    Create(fs);
+  finally
+    fs.Free;
+  end;
+end;
+
+destructor TUTrueTypeFont.Destroy;
+begin
+  inherited Destroy;
+end;
+// TUTrueTypeFont end
 
 // TUVertexAttribute begin
 class function TUVertexAttribute.Make(
