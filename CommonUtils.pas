@@ -87,6 +87,11 @@ type PUMat = ^TUMat;
 type TUMatArr = array[UInt32] of TUMat;
 type PUMatArr = ^TUMatArr;
 type TUMatArray = array of TUMat;
+type TUMat2 = array[0..1, 0..1] of TUFloat; // TUMat2Impl
+type PUMat2 = ^TUMat2;
+type TUMat2Arr = array[UInt32] of TUMat2;
+type PUMat2Arr = ^TUMat2Arr;
+type TUMat2Array = array of TUMat2;
 type TUVec2 = array[0..1] of TUFloat; // TUVec2Impl
 type PUVec2 = ^TUVec2;
 type TUVec2Arr = array[UInt32] of TUVec2;
@@ -362,6 +367,31 @@ public
   function ToString: String;
 end;
 
+type TUMat2Impl = type helper for TUMat2
+private
+  function GetElement(const Index: UInt32): TUFloat;
+  procedure SetElement(const Index: UInt32; const Value: TUFloat);
+  function GetAxisX: TUVec2;
+  procedure SetAxisX(const Value: TUVec2);
+  function GetAxisY: TUVec2;
+  procedure SetAxisY(const Value: TUVec2);
+public
+  const Zero: TUMat2 = ((0, 0), (0, 0));
+  const Identity: TUMat2 = ((1, 0), (0, 1));
+  property Element[const Index: UInt32]: TUFloat read GetElement write SetElement; default;
+  property AxisX: TUVec2 read GetAxisX write SetAxisX;
+  property AxisY: TUVec2 read GetAxisY write SetAxisY;
+  class function Make(
+    const e00, e10: TUFloat;
+    const e01, e11: TUFloat
+  ): TUMat2; static;
+  procedure SetValue(
+    const e00, e10: TUFloat;
+    const e01, e11: TUFloat
+  ); inline;
+  function ToString: String;
+end;
+
 type TUVec2Impl = type helper for TUVec2
 private
   function GetX: TUFloat;
@@ -385,6 +415,7 @@ public
   procedure SetValue(const Ax, Ay: TUFloat); inline;
   function Transform(const r: TURot2): TUVec2;
   function TransformInv(const r: TURot2): TUVec2;
+  function Transform(const m2: TUMat2): TUVec2;
   function Dot(const v: TUVec2): TUFloat; overload;
   function Cross(const v: TUVec2): TUFloat; overload;
   function Perp: TUVec2; overload;
@@ -1730,6 +1761,8 @@ function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boo
 function UStrExtractNumber(const Str: String; const Offset: Int32 = 1): Int32;
 function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
+function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32 = 1): UInt32;
+function UStrUTF8ToUTF32(const StrUTF8: String): TUInt32Array;
 function UFileToStr(const FileName: String): String;
 function UFileSearch(const Path: String): TUStrArray;
 procedure UCopyFilePrepare(const BufferSize: UInt32 = 1024 * 1024 * 1024);
@@ -1777,6 +1810,8 @@ operator / (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator mod (const v: TUVec2i; const i: Int32): TUVec2i;
 operator := (const v: TUVec2): TUVec2i;
 operator := (const v: TUVec2i): TUVec2;
+operator := (const i: Int32): TUVec2i;
+operator := (const f: TUFloat): TUVec2;
 operator + (const a, b: TUVec3): TUVec3;
 operator - (const a, b: TUVec3): TUVec3;
 operator * (const a, b: TUVec3): TUVec3;
@@ -2587,6 +2622,66 @@ begin
     ]
   );
 end;
+
+function TUMat2Impl.GetElement(const Index: UInt32): TUFloat;
+begin
+  Result := Self[Index shr 1, Index mod 2];
+end;
+
+procedure TUMat2Impl.SetElement(const Index: UInt32; const Value: TUFloat);
+begin
+  Self[Index shr 1, Index mod 2] := Value;
+end;
+
+function TUMat2Impl.GetAxisX: TUVec2;
+begin
+  Result := PUVec2(@Self[0, 0])^;
+end;
+
+procedure TUMat2Impl.SetAxisX(const Value: TUVec2);
+begin
+  PUVec2(@Self[0, 0])^ := Value;
+end;
+
+function TUMat2Impl.GetAxisY: TUVec2;
+begin
+  Result := PUVec2(@Self[1, 0])^;
+end;
+
+procedure TUMat2Impl.SetAxisY(const Value: TUVec2);
+begin
+  PUVec2(@Self[1, 0])^ := Value;
+end;
+
+class function TUMat2Impl.Make(const e00, e10: TUFloat; const e01, e11: TUFloat): TUMat2;
+begin
+  Result[0, 0] := e00;
+  Result[1, 0] := e10;
+  Result[0, 1] := e01;
+  Result[1, 1] := e11;
+end;
+
+procedure TUMat2Impl.SetValue(const e00, e10: TUFloat; const e01, e11: TUFloat);
+begin
+  Self[0, 0] := e00;
+  Self[1, 0] := e10;
+  Self[0, 1] := e01;
+  Self[1, 1] := e11;
+end;
+
+function TUMat2Impl.ToString: String;
+begin
+  Result := Format(
+    '{'#$A +
+    '  %0:0.2f, %1:0.2f'#$A +
+    '  %2:0.2f, %3:0.2f'#$A +
+    '}',
+    [
+      Self[0, 0], Self[1, 0],
+      Self[0, 1], Self[1, 1]
+    ]
+  );
+end;
 // TUMatImpl end
 
 // TUVec2Impl begin
@@ -2676,6 +2771,14 @@ end;
 function TUVec2Impl.TransformInv(const r: TURot2): TUVec2;
 begin
   Result := r.TransformInv(Self);
+end;
+
+function TUVec2Impl.Transform(const m2: TUMat2): TUVec2;
+begin
+  Result := TUVec2.Make(
+    Self[0] * m2[0, 0] + Self[1] * m2[1, 0],
+    Self[0] * m2[0, 1] + Self[1] * m2[1, 1]
+  );
 end;
 
 function TUVec2Impl.Dot(const v: TUVec2): TUFloat;
@@ -9427,7 +9530,7 @@ end;
 
 function UMulVec2Mat3x3(const v: TUVec2; const m: TUMat): TUVec2;
 begin
-  result := TUVec2.Make(
+  Result := TUVec2.Make(
     v.x * m[0, 0] + v.y * m[1, 0],
     v.x * m[0, 1] + v.y * m[1, 1]
   );
@@ -9961,6 +10064,18 @@ begin
   Result[1] := v[1];
 end;
 
+operator := (const i: Int32): TUVec2i;
+begin
+  Result[0] := i;
+  Result[1] := i;
+end;
+
+operator := (const f: TUFloat): TUVec2;
+begin
+  Result[0] := f;
+  Result[1] := f;
+end;
+
 operator + (const a, b: TUVec3): TUVec3;
 begin
   Result[0] := a[0] + b[0];
@@ -10415,6 +10530,76 @@ begin
     fs.Write(Str[1], Length(Str));
   finally
     fs.Free;
+  end;
+end;
+
+function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32): UInt32;
+  var i, CodePoint, StrSize: Int32;
+  var Byte1, Byte2, Byte3, Byte4: Uint8;
+begin
+  StrSize := Length(StrUTF8) - Start;
+  if StrSize < 0 then Exit(0);
+  Byte1 := UInt8(StrUTF8[Start]);
+  if (Byte1 and $80) = 0 then
+  begin
+    NumBytes := 1;
+    Exit(Byte1);
+  end;
+  if (Byte1 and $E0) = $C0 then
+  begin
+    if StrSize < 1 then Exit(0);
+    Byte2 := UInt8(StrUTF8[Start + 1]);
+    NumBytes := 2;
+    Exit(((Byte1 and $1F) shl 6) or (Byte2 and $3F));
+  end;
+  if (Byte1 and $F0) = $E0 then
+  begin
+    if StrSize < 2 then Exit(0);
+    Byte2 := UInt8(StrUTF8[Start + 1]);
+    Byte3 := UInt8(StrUTF8[Start + 2]);
+    NumBytes := 3;
+    Exit(((Byte1 and $0F) shl 12) or ((Byte2 and $3F) shl 6) or (Byte3 and $3F));
+  end;
+  if (Byte1 and $F8) = $F0 then
+  begin
+    if StrSize < 3 then Exit(0);
+    Byte2 := UInt8(StrUTF8[Start + 1]);
+    Byte3 := UInt8(StrUTF8[Start + 2]);
+    Byte4 := UInt8(StrUTF8[Start + 3]);
+    NumBytes := 4;
+    Exit(((Byte1 and $07) shl 18) or ((Byte2 and $3F) shl 12) or ((Byte3 and $3F) shl 6) or (Byte4 and $3F));
+  end;
+  Result := 0;
+  NumBytes := 0;
+end;
+
+function UStrUTF8ToUTF32(const StrUTF8: String): TUInt32Array;
+  function CountCharacters: Int32;
+    var i: Int32;
+    var b: UInt8;
+  begin
+    Result := 0;
+    i := 1;
+    while i <= Length(StrUTF8) do
+    begin
+      Inc(Result);
+      b := UInt8(StrUTF8[i]);
+      if (b and $E0) = $C0 then Inc(i, 2)
+      else if (b and $F0) = $E0 then Inc(i, 3)
+      else if (b and $F8) = $F0 then Inc(i, 4)
+      else Inc(i, 1);
+    end;
+  end;
+  var i, j, n: Int32;
+begin
+  if Length(StrUTF8) = 0 then Exit(nil);
+  Result := nil;
+  SetLength(Result, CountCharacters);
+  j := 1;
+  for i := 0 to High(Result) do
+  begin
+    Result[i] := UStrUTF8ToUTF32(StrUTF8, n, j);
+    Inc(j, n);
   end;
 end;
 
