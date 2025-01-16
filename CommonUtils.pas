@@ -1076,16 +1076,16 @@ public
   generic function Read<T>: T; inline;
   function WriteBuffer(const Buffer: Pointer; const Count: Int64): Int64; inline;
   procedure WriteBool(const Value: Boolean); inline;
-  procedure WriteUInt8(const value: UInt8); inline;
-  procedure WriteUInt16(const value: UInt16); inline;
-  procedure WriteUInt32(const value: UInt32); inline;
-  procedure WriteUInt64(const value: UInt64); inline;
-  procedure WriteInt8(const value: Int8); inline;
-  procedure WriteInt16(const value: Int16); inline;
-  procedure WriteInt32(const value: Int32); inline;
-  procedure WriteInt64(const value: Int64); inline;
-  procedure WriteFloat(const value: Single); inline;
-  procedure WriteDouble(const value: Double); inline;
+  procedure WriteUInt8(const Value: UInt8); inline;
+  procedure WriteUInt16(const Value: UInt16); inline;
+  procedure WriteUInt32(const Value: UInt32); inline;
+  procedure WriteUInt64(const Value: UInt64); inline;
+  procedure WriteInt8(const Value: Int8); inline;
+  procedure WriteInt16(const Value: Int16); inline;
+  procedure WriteInt32(const Value: Int32); inline;
+  procedure WriteInt64(const Value: Int64); inline;
+  procedure WriteFloat(const Value: Single); inline;
+  procedure WriteDouble(const Value: Double); inline;
   procedure WriteStringRaw(const Value: String); inline;
   procedure WriteString(const Value: String); inline;
   procedure WriteStringNT(const Value: String); inline;
@@ -1425,8 +1425,8 @@ private
   function GetAttribute(const Index: Integer): TAttribute; inline;
   function GetAttributeValue(const AttName: String): String;
   function GetAttributeCount: Integer; inline;
-  function GetChild(const Index: Integer): TUXML; inline;
-  function GetChildCount: Integer; inline;
+  function GetChild(const Index: Integer): TUXML;
+  function GetChildCount: Integer;
   function GetChildContent(const NodeName: String): String; inline;
 public
   property Name: String read _Name;
@@ -1665,8 +1665,8 @@ procedure UByteSwap(var v: UInt64); inline; overload;
 procedure UByteSwap(var v: Int16); inline; overload;
 procedure UByteSwap(var v: Int32); inline; overload;
 procedure UByteSwap(var v: Int64); inline; overload;
-generic procedure UByteSwapRecord<T>(var Rec: T); inline;
-generic procedure UByteSwapArray<T>(var Arr: array of T); inline;
+generic procedure UByteSwapRecord<T>(var Rec: T);
+generic procedure UByteSwapArray<T>(var Arr: array of T);
 generic procedure USwap<T>(var a: T; var b: T); inline; overload;
 procedure USwap(var a: Int8; var b: Int8); inline; overload;
 procedure USwap(var a: Int16; var b: Int16); inline; overload;
@@ -1911,6 +1911,7 @@ function TUSwizzle.ToString: String;
   const Names: array[0..3] of AnsiChar = ('X', 'Y', 'Z', 'W');
   var i: Int32;
 begin
+  Result := '';
   SetLength(Result, 4);
   for i := 0 to Length(Result) - 1 do
   begin
@@ -3665,37 +3666,19 @@ begin
 end;
 
 function TUPlaneImpl.OverlapBounds(const Bounds: TUBounds3f): Boolean;
-var MinV, MaxV: TUVec3;
+  var MinV, MaxV: TUVec3;
+  var i: Int32;
 begin
-  if n.x > 0 then
+  for i := 0 to 2 do
+  if n[i] > 0 then
   begin
-    MinV.x := Bounds.Min.x;
-    MaxV.x := Bounds.Max.x;
+    MinV[i] := Bounds.Min[i];
+    MaxV[i] := Bounds.Max[i];
   end
   else
   begin
-    MinV.x := Bounds.Max.x;
-    MaxV.x := Bounds.Min.x;
-  end;
-  if n.y > 0 then
-  begin
-    MinV.y := Bounds.Min.y;
-    MaxV.y := Bounds.Max.y;
-  end
-  else
-  begin
-    MinV.y := Bounds.Max.y;
-    MaxV.y := Bounds.Min.y;
-  end;
-  if n.z > 0 then
-  begin
-    MinV.z := Bounds.Min.z;
-    MaxV.z := Bounds.Max.z;
-  end
-  else
-  begin
-    MinV.z := Bounds.Max.z;
-    MaxV.z := Bounds.Min.z;
+    MinV[i] := Bounds.Max[i];
+    MaxV[i] := Bounds.Min[i];
   end;
   if n.Dot(MinV) <= d then Exit(False);
   if n.Dot(MaxV) < d then Exit(True);
@@ -5097,52 +5080,52 @@ begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt8(const value: UInt8);
+procedure TUStreamHelper.WriteUInt8(const Value: UInt8);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt16(const value: UInt16);
+procedure TUStreamHelper.WriteUInt16(const Value: UInt16);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt32(const value: UInt32);
+procedure TUStreamHelper.WriteUInt32(const Value: UInt32);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt64(const value: UInt64);
+procedure TUStreamHelper.WriteUInt64(const Value: UInt64);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt8(const value: Int8);
+procedure TUStreamHelper.WriteInt8(const Value: Int8);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt16(const value: Int16);
+procedure TUStreamHelper.WriteInt16(const Value: Int16);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt32(const value: Int32);
+procedure TUStreamHelper.WriteInt32(const Value: Int32);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt64(const value: Int64);
+procedure TUStreamHelper.WriteInt64(const Value: Int64);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteFloat(const value: Single);
+procedure TUStreamHelper.WriteFloat(const Value: Single);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteDouble(const value: Double);
+procedure TUStreamHelper.WriteDouble(const Value: Double);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
@@ -8020,6 +8003,7 @@ begin
       Result.NodeType := nt_object;
       specialize UArrAppend<TUJson>(_Elements, Result);
     end;
+    else Exit;
   end;
 end;
 
@@ -8045,6 +8029,7 @@ begin
       Result.Value := Value;
       specialize UArrAppend<TUJson>(_Elements, Result);
     end;
+    else Exit;
   end;
 end;
 
@@ -8171,10 +8156,12 @@ begin
 {$push}{$hints off}FillChar(x, Size, 0);{$pop}
 end;
 
+{$push}{$hints off}
 procedure UMove(out Dest; const Src; const Size: UInt32);
 begin
-{$push}{$hints off}Move(Src, Dest, Size);{$pop}
+  Move(Src, Dest, Size);
 end;
+{$pop}
 
 function UIntToPtr(const i: PtrUInt): Pointer;
 begin
@@ -9314,12 +9301,12 @@ function UFileCRC32(const FileName: String; const CRC: UInt32): UInt32;
   var Buffer: array[0..2048] of UInt8;
   var RemSize, Size: Int64;
 begin
-  Result := 0;
+  Result := CRC;
   fs := TFileStream.Create(FileName, fmOpenRead);
   try
     RemSize := fs.Size;
     repeat
-      Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
+      Size := fs.ReadData(@Buffer, UMin(SizeOf(Buffer), RemSize));
       Result := UCRC32(Result, @Buffer, Size);
       Dec(RemSize, Size);
     until RemSize = 0;
@@ -9333,12 +9320,12 @@ function UFileCRC64(const FileName: String; const CRC: UInt64): UInt64;
   var Buffer: array[0..2048] of UInt8;
   var RemSize, Size: Int64;
 begin
-  Result := 0;
+  Result := CRC;
   fs := TFileStream.Create(FileName, fmOpenRead);
   try
     RemSize := fs.Size;
     repeat
-      Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
+      Size := fs.ReadData(@Buffer, UMin(SizeOf(Buffer), RemSize));
       Result := UCRC64(Result, @Buffer, Size);
       Dec(RemSize, Size);
     until RemSize = 0;
@@ -10354,7 +10341,7 @@ function UStrExprMatch(const Str, Expr: String): TUExprMatch;
     Result := True;
   end;
   var Sequence: TUStrArray;
-  var i, j, s, sl: Int32;
+  var i, j, s: Int32;
   function AdvanceSequence: Boolean;
   begin
     repeat
@@ -10534,7 +10521,7 @@ begin
 end;
 
 function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32): UInt32;
-  var i, CodePoint, StrSize: Int32;
+  var StrSize: Int32;
   var Byte1, Byte2, Byte3, Byte4: Uint8;
 begin
   StrSize := Length(StrUTF8) - Start;

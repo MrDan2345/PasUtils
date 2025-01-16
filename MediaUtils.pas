@@ -3184,7 +3184,7 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
         ReadPoints(0);
         ReadPoints(1);
       end;
-      function ReadCompound(const GlyfHeader: TGlyfHeader; const Depth: Int32): TGlyphRaw;
+      function ReadCompound(const Depth: Int32): TGlyphRaw;
         var i: Int32;
         var n: UInt32;
         var Flags, GlyphIndex: UInt16;
@@ -3195,7 +3195,6 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
         var Xf2x2: TUMat2;
         var InstructionLength: UInt16;
         var FilePos: Int64;
-        var j: Int32;
         const MaxDepth = 6;
       begin
         Result.Bounds := TUBounds2i.Zero;
@@ -3289,16 +3288,16 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
       specialize UByteSwapRecord<TGlyfHeader>(GlyfHeader);
       if GlyfHeader.NumberOfContours < 0 then
       begin
-        Result := ReadCompound(GlyfHeader, Depth);
+        Result := ReadCompound(Depth);
       end
       else
       begin
         Result := ReadSimple(GlyfHeader);
       end;
-      Result.Bounds := TUBounds2i.Make(
-        TUVec2i.Make(GlyfHeader.XMin, GlyfHeader.YMin),
-        TUVec2i.Make(GlyfHeader.XMax, GlyfHeader.YMax)
-      );
+      Result.Bounds := [
+        [GlyfHeader.XMin, GlyfHeader.YMin],
+        [GlyfHeader.XMax, GlyfHeader.YMax]
+      ];
     end;
     function ReconstructContour(const StartIndex, EndIndex: Int32; const Points: TContour): TContour;
       var CurPoint: TContourPoint;
