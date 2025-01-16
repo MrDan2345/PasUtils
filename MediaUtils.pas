@@ -214,6 +214,11 @@ public
 private
   var _Glyphs: TGlyphArray;
   var _CharMap: TCharMapArray;
+  function ReadArr16(const Reader: TUStreamHelper; const Count: UInt16): TUInt16Array;
+  function ReadCmap0(const Reader: TUStreamHelper): Boolean;
+  function ReadCmap4(const Reader: TUStreamHelper): Boolean;
+  function ReadCmap6(const Reader: TUStreamHelper): Boolean;
+  function ReadCmap12(const Reader: TUStreamHelper): Boolean;
 public
   property Glyphs: TGlyphArray read _Glyphs;
   property CharMap: TCharMapArray read _CharMap;
@@ -2603,6 +2608,180 @@ end;
 // TUImageDataPNG end
 
 // TUTrueTypeFont begin
+function TUTrueTypeFont.ReadArr16(
+  const Reader: TUStreamHelper;
+  const Count: UInt16
+): TUInt16Array;
+begin
+  Result := nil;
+  SetLength(Result, Count);
+  Reader.ReadBuffer(@Result[0], Count * SizeOf(Result[0]));
+  specialize UByteSwapArray<UInt16>(Result);
+end;
+
+function TUTrueTypeFont.ReadCmap0(const Reader: TUStreamHelper): Boolean;
+  type THeader0 = record
+    SubtableLength: UInt16;// Length in bytes of the subtable (set to 262 for format 0)
+    Language: UInt16;
+    GlyphIndexArray: array [0..255] of UInt8;
+  end;
+  var Header: THeader0;
+  var c: UInt16;
+begin
+  Reader.ReadBuffer(@Header, SizeOf(Header));
+  specialize UByteSwapRecord<THeader0>(Header);
+  SetLength(_CharMap, 256);
+  for c := 0 to 255 do
+  begin
+    _CharMap[c].CharId := c;
+    _CharMap[c].GlyphId := Header.GlyphIndexArray[c];
+  end;
+  Result := True;
+end;
+
+function TUTrueTypeFont.ReadCmap4(const Reader: TUStreamHelper): Boolean;
+  type THeader4 = record
+    SubtableLength: UInt16;
+    Language: UInt16;
+    SegCountX2: UInt16;// 2 * segCount
+    SearchRange: UInt16;// 2 * (2**FLOOR(log2(segCount)))
+    EntrySelector: UInt16;// log2(searchRange/2)
+    RangeShift: UInt16;// (2 * segCount) - searchRange
+  end;
+  var Header: THeader4;
+  var EndCode: array of UInt16;// [segCount] Ending character code for each segment, last = 0xFFFF.
+  //var ReservedPad: UInt16;// This value should be zero
+  var StartCode: array of UInt16;// [segCount] Starting character code for each segment
+  var IdDelta: array of UInt16;// [segCount] Delta for all character codes in segment
+  var IdRangeOffset: array of UInt16;// [segCount] Offset in bytes to glyph indexArray, or 0
+  var GlyphIndexArray: array of UInt16;// [variable] Glyph index array
+  var SegCount, GlyphIndexCount: UInt16;
+  var i, n: Int32;
+  var c, g: UInt16;
+begin
+  Reader.ReadBuffer(@Header, SizeOf(Header));
+  specialize UByteSwapRecord<THeader4>(Header);
+  SegCount := Header.SegCountX2 shr 1;
+  WriteLn(Header.SubtableLength);
+  WriteLn(Header.Language);
+  WriteLn(SegCount);
+  EndCode := ReadArr16(Reader, SegCount);
+  Reader.Skip(2);
+  StartCode := ReadArr16(Reader, SegCount);
+  IdDelta := ReadArr16(Reader, SegCount);
+  IdRangeOffset := ReadArr16(Reader, SegCount);
+  GlyphIndexCount := (
+    Header.SubtableLength - SizeOf(THeader4) - SizeOf(UInt16) * (4 * SegCount + 2)
+  ) div SizeOf(UInt16);
+  GlyphIndexArray := ReadArr16(Reader, GlyphIndexCount);
+  n := 0;
+  for i := 0 to SegCount - 1 do
+  begin
+    n += EndCode[i] - StartCode[i] + 1;
+  end;
+  SetLength(_CharMap, n);
+  n := 0;
+  for i := 0 to SegCount - 1 do
+  for c := StartCode[i] to EndCode[i] do
+  begin
+    _CharMap[n].CharId := c;
+    _CharMap[n].GlyphId := 0;
+    try
+      if IdRangeOffset[i] = 0 then
+      begin
+        _CharMap[n].GlyphId := (c + IdDelta[i]) mod 65536;
+      end
+      else
+      begin
+        g := IdRangeOffset[i] div 2 + (c - StartCode[i]) - (SegCount - i);
+        _CharMap[n].GlyphId := (GlyphIndexArray[g] + IdDelta[i]) mod 65536;
+      end;
+    finally
+      Inc(n);
+    end;
+  end;
+  specialize UArrSort<TCharMap>(_CharMap);
+  Result := True;
+end;
+
+function TUTrueTypeFont.ReadCmap6(const Reader: TUStreamHelper): Boolean;
+  type THeader6 = record
+    SubtableLength: UInt16;
+    Language: UInt16;
+    FirstCode: UInt16;// First character code of subrange
+    EntryCount: UInt16;// Number of character codes in subrange
+  end;
+  var Header: THeader6;
+  var GlyphIndexArray: array of UInt16;//[entryCount] Array of glyph index values for character codes in the range
+  var i: Int32;
+  var c: UInt16;
+begin
+  Reader.ReadBuffer(@Header, SizeOf(Header));
+  specialize UByteSwapRecord<THeader6>(Header);
+  WriteLn(Header.SubtableLength);
+  WriteLn(Header.Language);
+  WriteLn(Header.EntryCount);
+  GlyphIndexArray := ReadArr16(Reader, Header.EntryCount);
+  SetLength(_CharMap, Header.EntryCount);
+  c := Header.FirstCode;
+  for i := 0 to High(_CharMap) do
+  begin
+    _CharMap[i].CharId := c;
+    _CharMap[i].GlyphId := GlyphIndexArray[i];
+    Inc(c);
+  end;
+  specialize UArrSort<TCharMap>(_CharMap);
+  Result := True;
+end;
+
+function TUTrueTypeFont.ReadCmap12(const Reader: TUStreamHelper): Boolean;
+  type THeader12 = packed record
+    Reserved: UInt16;// Set to 0.
+    SubtableLength: UInt32;// Byte length of this subtable (including the header)
+    Language: UInt32;
+    NumGroups: UInt32;// Number of groupings which follow
+  end;
+  type TGroup = record
+    StartCharCode: UInt32;// First character code in this group
+    EndCharCode: UInt32;// Last character code in this group
+    StartGlyphCode: UInt32;//	Glyph index corresponding to the starting character code; subsequent charcters are mapped to sequential glyphs
+  end;
+  var Header: THeader12;
+  var Groups: array of TGroup;
+  var i: Int32;
+  var j, c, n: Uint32;
+begin
+  Reader.ReadBuffer(@Header, SizeOf(Header));
+  specialize UByteSwapRecord<THeader12>(Header);
+  WriteLn(Header.SubtableLength);
+  WriteLn(Header.Language);
+  WriteLn(Header.NumGroups);
+  Groups := nil;
+  SetLength(Groups, Header.NumGroups);
+  Reader.ReadBuffer(@Groups[0], Length(Groups) * SizeOf(Groups[0]));
+  n := 0;
+  for i := 0 to High(Groups) do
+  begin
+    specialize UByteSwapRecord<TGroup>(Groups[i]);
+    n += Groups[i].EndCharCode - Groups[i].StartCharCode + 1;
+  end;
+  SetLength(_CharMap, n);
+  n := 0;
+  for i := 0 to High(Groups) do
+  begin
+    c := Groups[i].StartGlyphCode;
+    for j := Groups[i].StartCharCode to Groups[i].EndCharCode do
+    begin
+      _CharMap[n].CharId := j;
+      _CharMap[n].GlyphId := c;
+      Inc(n);
+      Inc(c);
+    end;
+  end;
+  specialize UArrSort<TCharMap>(_CharMap);
+  Result := True;
+end;
+
 constructor TUTrueTypeFont.Create(const Reader: TUStreamHelper);
 begin
   Load(Reader);
@@ -2686,12 +2865,10 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
   begin
     Result := ((Flags shr BitIndex) and 1) = 1;
   end;
-  function ReadArr16(const Count: UInt16): TUInt16Array;
+  function ReadF2Dot14: TUFloat;
+    const Rcp = 1 / 16384;
   begin
-    Result := nil;
-    SetLength(Result, Count);
-    Reader.ReadBuffer(@Result[0], Count * SizeOf(Result[0]));
-    specialize UByteSwapArray<UInt16>(Result);
+    Result := UEndianSwap(Reader.ReadInt16) * Rcp;
   end;
   var GlyphTable: UInt32;
   var GlyphOffsets: array of UInt32;
@@ -2700,6 +2877,12 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
       NumberOfContours: Int16;
       XMin, YMin, XMax, YMax: Int16;
     end;
+    type TGlyphRaw = record
+      ContourEnds: array of UInt16;
+      Points: TContour;
+      Bounds: TUBounds2i;
+    end;
+    {
     function ReadSimple(const NumberOfContours: Int32; var Points: TContour): TGlyph;
       var ContourEndPoints: array of UInt16;
       var TotalPoints: UInt32;
@@ -2815,6 +2998,8 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
       end;
       WriteLn('New Glyph ', TotalPoints);
     end;
+    //}
+    {
     function ReadCompound: TGlyph;
       function ReadF2Dot14: TUFloat;
         const Rcp = 1 / 16384;
@@ -2923,180 +3108,245 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
         Reader.Skip(InstructionLength);
       end;
     end;
-    var GlyfHeader: TGlyfHeader;
-    var Points: array of TContourPoint;
-  begin
-    Reader.ReadBuffer(@GlyfHeader, SizeOf(GlyfHeader));
-    specialize UByteSwapRecord<TGlyfHeader>(GlyfHeader);
-    if GlyfHeader.NumberOfContours < 0 then
-    begin
-      Result := ReadCompound;
-    end
-    else
-    begin
-      Points := nil;
-      Result := ReadSimple(GlyfHeader.NumberOfContours, Points);
-    end;
-    Result.IsCompound := GlyfHeader.NumberOfContours < 0;
-    Result.Bounds := [
-      [GlyfHeader.XMin, GlyfHeader.YMin],
-      [GlyfHeader.XMax, GlyfHeader.YMax]
-    ];
-  end;
-  procedure ReadCmap0;
-    type THeader0 = record
-      SubtableLength: UInt16;// Length in bytes of the subtable (set to 262 for format 0)
-      Language: UInt16;
-      GlyphIndexArray: array [0..255] of UInt8;
-    end;
-    var Header: THeader0;
-    var c: UInt16;
-  begin
-    Reader.ReadBuffer(@Header, SizeOf(Header));
-    specialize UByteSwapRecord<THeader0>(Header);
-    SetLength(_CharMap, 256);
-    for c := 0 to 255 do
-    begin
-      _CharMap[c].CharId := c;
-      _CharMap[c].GlyphId := Header.GlyphIndexArray[c];
-    end;
-  end;
-  procedure ReadCmap4;
-    type THeader4 = record
-      SubtableLength: UInt16;
-      Language: UInt16;
-      SegCountX2: UInt16;// 2 * segCount
-      SearchRange: UInt16;// 2 * (2**FLOOR(log2(segCount)))
-      EntrySelector: UInt16;// log2(searchRange/2)
-      RangeShift: UInt16;// (2 * segCount) - searchRange
-    end;
-    var Header: THeader4;
-    var EndCode: array of UInt16;// [segCount] Ending character code for each segment, last = 0xFFFF.
-    var ReservedPad: UInt16;// This value should be zero
-    var StartCode: array of UInt16;// [segCount] Starting character code for each segment
-    var IdDelta: array of UInt16;// [segCount] Delta for all character codes in segment
-    var IdRangeOffset: array of UInt16;// [segCount] Offset in bytes to glyph indexArray, or 0
-    var GlyphIndexArray: array of UInt16;// [variable] Glyph index array
-    var SegCount, GlyphIndexCount: UInt16;
-    var i, n: Int32;
-    var c, g: UInt16;
-  begin
-    Reader.ReadBuffer(@Header, SizeOf(Header));
-    specialize UByteSwapRecord<THeader4>(Header);
-    SegCount := Header.SegCountX2 shr 1;
-    WriteLn(Header.SubtableLength);
-    WriteLn(Header.Language);
-    WriteLn(SegCount);
-    EndCode := ReadArr16(SegCount);
-    Reader.Skip(2);
-    StartCode := ReadArr16(SegCount);
-    IdDelta := ReadArr16(SegCount);
-    IdRangeOffset := ReadArr16(SegCount);
-    GlyphIndexCount := (
-      Header.SubtableLength - SizeOf(THeader) - SizeOf(UInt16) * (4 * SegCount + 2)
-    ) div SizeOf(UInt16);
-    GlyphIndexArray := ReadArr16(GlyphIndexCount);
-    n := 0;
-    for i := 0 to SegCount - 1 do
-    begin
-      n += EndCode[i] - StartCode[i] + 1;
-    end;
-    SetLength(_CharMap, n);
-    n := 0;
-    for i := 0 to SegCount - 1 do
-    for c := StartCode[i] to EndCode[i] do
-    begin
-      _CharMap[n].CharId := c;
-      _CharMap[n].GlyphId := 0;
-      try
-        if IdRangeOffset[i] = 0 then
+    //}
+    //var GlyfHeader: TGlyfHeader;
+    //var Points: array of TContourPoint;
+    function ReadRaw(const Depth: Int32 = 0): TGlyphRaw;
+      function ReadSimple(const GlyfHeader: TGlyfHeader): TGlyphRaw;
+        var TotalPoints: UInt32;
+        var Flags: array of UInt8;
+        procedure ReadFlags;
+          var i: Int32;
+          var Flag, Repeats: UInt8;
         begin
-          _CharMap[n].GlyphId := (c + IdDelta[i]) mod 65536;
-        end
-        else
-        begin
-          g := IdRangeOffset[i] div 2 + (c - StartCode[i]) - (SegCount - i);
-          _CharMap[n].GlyphId := (GlyphIndexArray[g] + IdDelta[i]) mod 65536;
+          Flag := 0;
+          Repeats := 0;
+          for i := 0 to TotalPoints - 1 do
+          begin
+            if Repeats > 0 then
+            begin
+              Dec(Repeats);
+            end
+            else
+            begin
+              Flag := Reader.ReadUInt8;
+              if CheckBit(Flag, 3) then
+              begin
+                Repeats := Reader.ReadUInt8;
+              end;
+            end;
+            Flags[i] := Flag;
+          end;
         end;
-      finally
-        Inc(n);
-      end;
-    end;
-    specialize UArrSort<TCharMap>(_CharMap);
-  end;
-  procedure ReadCmap6;
-    type THeader6 = record
-      SubtableLength: UInt16;
-      Language: UInt16;
-      FirstCode: UInt16;// First character code of subrange
-      EntryCount: UInt16;// Number of character codes in subrange
-    end;
-    var Header: THeader6;
-    var GlyphIndexArray: array of UInt16;//[entryCount] Array of glyph index values for character codes in the range
-    var i: Int32;
-    var c: UInt16;
-  begin
-    Reader.ReadBuffer(@Header, SizeOf(Header));
-    specialize UByteSwapRecord<THeader6>(Header);
-    WriteLn(Header.SubtableLength);
-    WriteLn(Header.Language);
-    WriteLn(Header.EntryCount);
-    GlyphIndexArray := ReadArr16(Header.EntryCount);
-    SetLength(_CharMap, Header.EntryCount);
-    c := Header.FirstCode;
-    for i := 0 to High(_CharMap) do
-    begin
-      _CharMap[i].CharId := c;
-      _CharMap[i].GlyphId := GlyphIndexArray[i];
-      Inc(c);
-    end;
-    specialize UArrSort<TCharMap>(_CharMap);
-  end;
-  procedure ReadCmap12;
-    type THeader12 = packed record
-      Reserved: UInt16;// Set to 0.
-      SubtableLength: UInt32;// Byte length of this subtable (including the header)
-      Language: UInt32;
-      NumGroups: UInt32;// Number of groupings which follow
-    end;
-    type TGroup = record
-      StartCharCode: UInt32;// First character code in this group
-      EndCharCode: UInt32;// Last character code in this group
-      StartGlyphCode: UInt32;//	Glyph index corresponding to the starting character code; subsequent charcters are mapped to sequential glyphs
-    end;
-    var Header: THeader12;
-    var Groups: array of TGroup;
-    var i: Int32;
-    var j, c, n: Uint32;
-  begin
-    Reader.ReadBuffer(@Header, SizeOf(Header));
-    specialize UByteSwapRecord<THeader12>(Header);
-    WriteLn(Header.SubtableLength);
-    WriteLn(Header.Language);
-    WriteLn(Header.NumGroups);
-    Groups := nil;
-    SetLength(Groups, Header.NumGroups);
-    Reader.ReadBuffer(@Groups[0], Length(Groups) * SizeOf(Groups[0]));
-    n := 0;
-    for i := 0 to High(Groups) do
-    begin
-      specialize UByteSwapRecord<TGroup>(Groups[i]);
-      n += Groups[i].EndCharCode - Groups[i].StartCharCode + 1;
-    end;
-    SetLength(_CharMap, n);
-    n := 0;
-    for i := 0 to High(Groups) do
-    begin
-      c := Groups[i].StartGlyphCode;
-      for j := Groups[i].StartCharCode to Groups[i].EndCharCode do
+        procedure ReadPoints(const ValueOffset: UInt8);
+          var i: Int32;
+          var CurValue, NewValue: Int16;
+          var BitSize, BitSignSkip: UInt8;
+        begin
+          BitSize := 1 + ValueOffset;
+          BitSignSkip := 4 + ValueOffset;
+          CurValue := 0;
+          for i := 0 to TotalPoints - 1 do
+          begin
+            Result.Points[i].OnCurve := CheckBit(Flags[i], 0);
+            if CheckBit(Flags[i], BitSize) then
+            begin
+              NewValue := Reader.ReadUInt8;
+              if not CheckBit(Flags[i], BitSignSkip) then
+              begin
+                NewValue := -NewValue;
+              end;
+            end
+            else if not CheckBit(Flags[i], BitSignSkip) then
+            begin
+              NewValue := UEndianSwap(Reader.ReadInt16);
+            end
+            else
+            begin
+              NewValue := 0;
+            end;
+            CurValue := CurValue + NewValue;
+            Result.Points[i].Pos[ValueOffset] := CurValue;
+          end;
+        end;
+        var InstructionLength: UInt16;
       begin
-        _CharMap[n].CharId := j;
-        _CharMap[n].GlyphId := c;
-        Inc(n);
-        Inc(c);
+        if GlyfHeader.NumberOfContours = 0 then Exit;
+        Result.ContourEnds := ReadArr16(Reader, GlyfHeader.NumberOfContours);
+        TotalPoints := Result.ContourEnds[High(Result.ContourEnds)] + 1;
+        InstructionLength := UEndianSwap(Reader.ReadUInt16);
+        Reader.Skip(InstructionLength);
+        Flags := nil;
+        SetLength(Flags, TotalPoints);
+        ReadFlags;
+        Result.Points := nil;
+        SetLength(Result.Points, TotalPoints);
+        ReadPoints(0);
+        ReadPoints(1);
+      end;
+      function ReadCompound(const GlyfHeader: TGlyfHeader; const Depth: Int32): TGlyphRaw;
+        var i: Int32;
+        var n: UInt32;
+        var Flags, GlyphIndex: UInt16;
+        var HaveInstructions: Boolean;
+        var SubGlyph: TGlyphRaw;
+        var Arg1, Arg2: Int32;
+        var Offset: TUVec2i;
+        var Xf2x2: TUMat2;
+        var InstructionLength: UInt16;
+        var FilePos: Int64;
+        var j: Int32;
+        const MaxDepth = 6;
+      begin
+        Result.Bounds := TUBounds2i.Zero;
+        if Depth > MaxDepth then Exit;
+        HaveInstructions := False;
+        repeat
+          Flags := UEndianSwap(Reader.ReadUInt16);
+          HaveInstructions := HaveInstructions or CheckBit(Flags, 8);
+          GlyphIndex := UEndianSwap(Reader.ReadUInt16);
+          FilePos := Reader.Position;
+          Reader.Position := GlyphTable + GlyphOffsets[GlyphIndex];
+          SubGlyph := ReadRaw(Depth + 1);
+          Reader.Position := FilePos;
+          Offset := 0;
+          if CheckBit(Flags, 0) then
+          begin
+            if CheckBit(Flags, 1) then
+            begin
+              Offset.x := UEndianSwap(Reader.ReadInt16);
+              Offset.y := UEndianSwap(Reader.ReadInt16);
+            end
+            else
+            begin
+              Arg1 := UEndianSwap(Reader.ReadUInt16);
+              Arg2 := UEndianSwap(Reader.ReadUInt16);
+              Offset := Result.Points[Arg1].Pos - SubGlyph.Points[Arg2].Pos;
+            end;
+          end
+          else
+          begin
+            if CheckBit(Flags, 1) then
+            begin
+              Offset.x := Reader.ReadInt8;
+              Offset.y := Reader.ReadInt8;
+            end
+            else
+            begin
+              Arg1 := Reader.ReadUInt8;
+              Arg2 := Reader.ReadUInt8;
+              Offset := Result.Points[Arg1].Pos - SubGlyph.Points[Arg2].Pos;
+            end;
+          end;
+          Xf2x2 := TUMat2.Identity;
+          if CheckBit(Flags, 3) then
+          begin
+            Xf2x2[0, 0] := ReadF2Dot14;
+            Xf2x2[1, 1] := Xf2x2[0, 0];
+          end
+          else if CheckBit(Flags, 6) then
+          begin
+            Xf2x2[0, 0] := ReadF2Dot14;
+            Xf2x2[1, 1] := ReadF2Dot14;
+          end
+          else if CheckBit(Flags, 7) then
+          begin
+            Xf2x2[0, 0] := ReadF2Dot14;
+            Xf2x2[0, 1] := ReadF2Dot14;
+            Xf2x2[1, 0] := ReadF2Dot14;
+            Xf2x2[1, 1] := ReadF2Dot14;
+          end;
+          if Length(SubGlyph.Points) > 0 then
+          begin
+            if Length(Result.ContourEnds) > 0 then
+            begin
+              n := Result.ContourEnds[High(Result.ContourEnds)] + 1;
+            end
+            else
+            begin
+              n := 0;
+            end;
+            for i := 0 to High(SubGlyph.Points) do
+            begin
+              SubGlyph.Points[i].Pos := TUVec2i(
+                TUVec2(SubGlyph.Points[i].Pos).Transform(Xf2x2)
+              ) + Offset;
+              SubGlyph.ContourEnds[i] += n;
+            end;
+            specialize UArrAppend<TContourPoint>(Result.Points, SubGlyph.Points);
+            specialize UArrAppend<UInt16>(Result.ContourEnds, SubGlyph.ContourEnds);
+          end;
+        until not CheckBit(Flags, 5);
+        if HaveInstructions then
+        begin
+          InstructionLength := UEndianSwap(Reader.ReadUInt16);
+          Reader.Skip(InstructionLength);
+        end;
+      end;
+      var GlyfHeader: TGlyfHeader;
+    begin
+      Reader.ReadBuffer(@GlyfHeader, SizeOf(GlyfHeader));
+      specialize UByteSwapRecord<TGlyfHeader>(GlyfHeader);
+      if GlyfHeader.NumberOfContours < 0 then
+      begin
+        Result := ReadCompound(GlyfHeader, Depth);
+      end
+      else
+      begin
+        Result := ReadSimple(GlyfHeader);
+      end;
+      Result.Bounds := TUBounds2i.Make(
+        TUVec2i.Make(GlyfHeader.XMin, GlyfHeader.YMin),
+        TUVec2i.Make(GlyfHeader.XMax, GlyfHeader.YMax)
+      );
+    end;
+    function ReconstructContour(const StartIndex, EndIndex: Int32; const Points: TContour): TContour;
+      var CurPoint: TContourPoint;
+      var i, j, n: Int32;
+    begin
+      n := EndIndex - StartIndex + 1;
+      j := EndIndex;
+      for i := StartIndex to EndIndex do
+      begin
+        if (not Points[i].OnCurve)
+        and (not Points[j].OnCurve) then
+        begin
+          Inc(n);
+        end;
+        j := i;
+      end;
+      Result := nil;
+      SetLength(Result, n);
+      CurPoint := Points[EndIndex];
+      j := 0;
+      for i := StartIndex to EndIndex do
+      begin
+        if (not Points[i].OnCurve)
+        and (not CurPoint.OnCurve) then
+        begin
+          Result[j].OnCurve := True;
+          Result[j].Pos := (CurPoint.Pos + Points[i].Pos) div 2;
+          Inc(j);
+        end;
+        CurPoint := Points[i];
+        Result[j] := CurPoint;
+        Inc(j);
       end;
     end;
-    specialize UArrSort<TCharMap>(_CharMap);
+    var GlyphRaw: TGlyphRaw;
+    var i, PointIndex: Int32;
+  begin
+    GlyphRaw := ReadRaw;
+    Result.Bounds := GlyphRaw.Bounds;
+    SetLength(Result.Contours, Length(GlyphRaw.ContourEnds));
+    PointIndex := 0;
+    for i := 0 to High(Result.Contours) do
+    begin
+      Result.Contours[i] := ReconstructContour(
+        PointIndex, GlyphRaw.ContourEnds[i], GlyphRaw.Points
+      );
+      PointIndex := GlyphRaw.ContourEnds[i] + 1;
+    end;
   end;
   var Header: THeader;
   var Tables: array of TTableHeader;
@@ -3200,10 +3450,10 @@ begin
   Reader.Position := CmapOffset + CmapSubtables[CmapId].Offset;
   CmapFormat := UEndianSwap(Reader.ReadUInt16);
   case CmapFormat of
-    0: ReadCmap0;
-    4: ReadCmap4;
-    6: ReadCmap6;
-    12: ReadCmap12;
+    0: ReadCmap0(Reader);
+    4: ReadCmap4(Reader);
+    6: ReadCmap6(Reader);
+    12: ReadCmap12(Reader);
     else Exit(False);
   end;
   Result := True;
