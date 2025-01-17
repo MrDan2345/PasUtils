@@ -3270,6 +3270,9 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
               SubGlyph.Points[i].Pos := TUVec2i(
                 TUVec2(SubGlyph.Points[i].Pos).Transform(Xf2x2)
               ) + Offset;
+            end;
+            for i := 0 to High(SubGlyph.ContourEnds) do
+            begin
               SubGlyph.ContourEnds[i] += n;
             end;
             specialize UArrAppend<TContourPoint>(Result.Points, SubGlyph.Points);
@@ -3432,6 +3435,7 @@ begin
     end;
     Reader.Position := GlyphTable + GlyphOffsets[i];
     _Glyphs[i] := ReadGlyph;
+    WriteLn('Glyph ', i);
   end;
   if not SeekTable('cmap') then Exit(False);
   CmapOffset := Reader.Position;
