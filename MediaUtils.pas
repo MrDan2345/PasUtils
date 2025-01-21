@@ -212,6 +212,7 @@ public
   type TCharMapArray = array of TCharMap;
   type TGlyphArray = array of TGlyph;
 private
+  var _LineHeight: Uint32;
   var _Glyphs: TGlyphArray;
   var _CharMap: TCharMapArray;
   function ReadArr16(const Reader: TUStreamHelper; const Count: UInt16): TUInt16Array;
@@ -220,6 +221,7 @@ private
   function ReadCmap6(const Reader: TUStreamHelper): Boolean;
   function ReadCmap12(const Reader: TUStreamHelper): Boolean;
 public
+  property LineHeight: UInt32 read _LineHeight;
   property Glyphs: TGlyphArray read _Glyphs;
   property CharMap: TCharMapArray read _CharMap;
   constructor Create(const Reader: TUStreamHelper);
@@ -227,7 +229,7 @@ public
   constructor Create(const FileName: String);
   destructor Destroy; override;
   function Load(const Reader: TUStreamHelper): Boolean;
-  function FindGlyph(const CharId: UInt32): UInt32;
+  function FindGlyph(const CharUTF32: UInt32): UInt32;
 end;
 type TUTrueTypeFontShared = specialize TUSharedRef<TUTrueTypeFont>;
 
@@ -3260,6 +3262,7 @@ begin
   Reader.ReadBuffer(@Hhea, SizeOf(Hhea));
   specialize UByteSwapRecord<TTblHhea>(Hhea);
   HorMetrics := nil;
+  _LineHeight := Hhea.Ascender + Hhea.LineGap;
   SetLength(HorMetrics, Hhea.NumberOfHMetrics);
   if not SeekTable('hmtx') then Exit(False);
   Reader.ReadBuffer(@HorMetrics[0], Length(HorMetrics));
@@ -3268,27 +3271,29 @@ begin
     specialize UByteSwapRecord<THorMetric>(HorMetrics[i]);
     _Glyphs[i].Advance := HorMetrics[i].AdvanceWidth;
   end;
-  for i := 0 to (Length(_Glyphs) - Hhea.NumberOfHMetrics) - 1 do
+  for i := Hhea.NumberOfHMetrics to High(_Glyphs) do
   begin
-    _Glyphs[Hhea.NumberOfHMetrics + i].Advance := HorMetrics[High(HorMetrics)].AdvanceWidth;
+    _Glyphs[i].Advance := HorMetrics[High(HorMetrics)].AdvanceWidth;
   end;
   Result := True;
 end;
 
-function TUTrueTypeFont.FindGlyph(const CharId: UInt32): UInt32;
+function TUTrueTypeFont.FindGlyph(const CharUTF32: UInt32): UInt32;
   var l, h, m: UInt32;
 begin
   if Length(_CharMap) = 0 then Exit(0);
   l := 0;
   h := High(_CharMap);
-  while l <= h do
+  if _CharMap[l].CharId > CharUTF32 then Exit(0);
+  if _CharMap[h].CharId < CharUTF32 then Exit(0);
+  while l < h do
   begin
     m := (l + h) shr 1;
-    if _CharMap[m].CharId = CharId then Exit(_CharMap[m].GlyphId)
-    else if _CharMap[m].CharId < CharId then l := m + 1
+    if _CharMap[m].CharId = CharUTF32 then Exit(_CharMap[m].GlyphId)
+    else if _CharMap[m].CharId < CharUTF32 then l := m + 1
     else h := m - 1;
   end;
-  if _CharMap[l].CharId <> CharId then Exit(0);
+  if _CharMap[l].CharId <> CharUTF32 then Exit(0);
   Result := _CharMap[l].GlyphId;
 end;
 
