@@ -3845,69 +3845,13 @@ procedure TUSceneDataDAE.TColladaTriangles.InitializeObject;
       );
     end;
   end;
-  procedure OptimizeSource(const Source: TColladaSource; const Offset: Int32);
-    var i, j, n: Int32;
-    var Match: Boolean;
-    var f0, f1: TUFloat;
-    var Remap: array of array [0..1] of Int32;
-  begin
-    Remap := nil;
-    if Source.DataArray.ArrayType <> at_float then Exit;
-    for i := 0 to Source.Accessor.Count - 1 do
-    begin
-      for j := 0 to i - 1 do
-      begin
-        Match := True;
-        for n := 0 to Source.Accessor.Stride - 1 do
-        begin
-          f0 := Source.DataArray.AsFloat[i * Source.Accessor.Stride + n]^;
-          f1 := Source.DataArray.AsFloat[j * Source.Accessor.Stride + n]^;
-          if f0 <> f1 then
-          begin
-            Match := False;
-            Break;
-          end;
-        end;
-        if Match then
-        begin
-          n := Length(Remap);
-          SetLength(Remap, n + 1);
-          Remap[n][0] := i;
-          Remap[n][1] := j;
-          Break;
-        end;
-      end;
-    end;
-    if Length(Remap) > 0 then
-    begin
-      for i := 0 to Count * 3 - 1 do
-      begin
-        for j := 0 to High(Remap) do
-        if Indices^[i * _InputStride + Offset] = Remap[j][0] then
-        begin
-          Indices^[i * _InputStride + Offset] := Remap[j][1];
-        end;
-      end;
-    end;
-  end;
   var i: Int32;
-  var Root: TColladaRoot;
 begin
   inherited InitializeObject;
   _VertexLayout := nil;
   for i := 0 to High(_Inputs) do
   begin
     ProcessInput(_Inputs[i]);
-  end;
-  Root := GetRoot as TColladaRoot;
-  if Assigned(Root) and (sdo_optimize in Root.Options) then
-  begin
-    for i := 0 to High(_Inputs) do
-    if Assigned(_Inputs[i].Source)
-    and (_Inputs[i].Source is TColladaSource) then
-    begin
-      OptimizeSource(TColladaSource(_Inputs[i].Source), _Inputs[i].Offset);
-    end;
   end;
 end;
 
@@ -6190,26 +6134,24 @@ constructor TUSceneDataDAE.TMeshInterfaceCollada.TSubsetCollada.Create(
   begin
     if not Assigned(Root) then Exit;
     if Root.Swizzle.IsIdentity then Exit;
-    for i := 0 to Length(VertexBuffer) div AttribStride do
+    for i := 0 to (Length(VertexBuffer) div AttribStride) - 1 do
     for j := 0 to High(_VertexDescriptor) do
     begin
       if _VertexDescriptor[j].DataType <> dt_float then Continue;
       Data := _VertexData + i * VertexSize + AttribOffsets[j];
-      if _VertexDescriptor[j].Semantic in [
+      if not (_VertexDescriptor[j].Semantic in [
          as_position, as_normal, as_tangent, as_binormal
-      ] then
-      begin
-        case _VertexDescriptor[j].DataCount of
-          2:
-          begin
-            v2 := DataVec2^;
-            DataVec2^ := v2.Swizzle(Root.Swizzle);
-          end;
-          3:
-          begin
-            v3 := DataVec3^;
-            DataVec3^ := v3.Swizzle(Root.Swizzle);
-          end;
+      ]) then Continue;
+      case _VertexDescriptor[j].DataCount of
+        2:
+        begin
+          v2 := DataVec2^;
+          DataVec2^ := v2.Swizzle(Root.Swizzle);
+        end;
+        3:
+        begin
+          v3 := DataVec3^;
+          DataVec3^ := v3.Swizzle(Root.Swizzle);
         end;
       end;
     end;
