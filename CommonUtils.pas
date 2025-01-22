@@ -9848,13 +9848,13 @@ begin
 end;
 
 function UProj2DPointToSegment(const lv0, lv1, v: TUVec2): TUVec2;
-  var v0, v1, lp: TUVec2;
+  var v0, v1: TUVec2;
   var u: TUFloat;
 begin
   v0 := v - lv0;
   v1 := lv1 - lv0;
   u := UClamp(v0.Dot(v1) / v1.Dot(v1), 0, 1);
-  Result := v0 + v1 * u;
+  Result := lv0 + v1 * u;
 end;
 
 function UProj2DPointToBounds(const b: TUBounds2f; const v: TUVec2): TUVec2;
