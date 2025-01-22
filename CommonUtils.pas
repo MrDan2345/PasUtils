@@ -1746,6 +1746,7 @@ function UXct3Planes(const p1, p2, p3: TUPlane; out xp: TUVec3): Boolean;
 function UXct3DRayPlane(const r: TURay3; const p: TUPlane; out xp: TUVec3; out xd: TUFloat): Boolean;
 function UXct3DRayTriangle(const r: TURay3; const v0, v1, v2: TUVec3; out xp: TUVec3; out xd: TUFloat): Boolean;
 function UProj2DPointToLine(const lv0, lv1, v: TUVec2; out InSegment: Boolean): TUVec2;
+function UProj2DPointToSegment(const lv0, lv1, v: TUVec2): TUVec2;
 function UProj2DPointToBounds(const b: TUBounds2f; const v: TUVec2): TUVec2;
 function UProj3DPointToLine(const lv0, lv1, v: TUVec3; out InSegment: Boolean): TUVec3;
 function UProj3DPointToPlane(const v: TUVec3; const p: TUPlane): TUVec3;
@@ -9844,6 +9845,16 @@ begin
   u := ((v.x - lv0.x) * (lv1.x - lv0.x) + (v.y - lv0.y) * (lv1.y - lv0.y)) / (Sqr(lv1.x - lv0.x) + Sqr(lv1.y - lv0.y));
   Result := TUVec2.Make(lv0.x + u * (lv1.x - lv0.x), lv0.y + u * (lv1.y - lv0.y));
   InSegment := (u >= 0) and (u <= 1);
+end;
+
+function UProj2DPointToSegment(const lv0, lv1, v: TUVec2): TUVec2;
+  var v0, v1, lp: TUVec2;
+  var u: TUFloat;
+begin
+  v0 := v - lv0;
+  v1 := lv1 - lv0;
+  u := UClamp(v0.Dot(v1) / v1.Dot(v1), 0, 1);
+  Result := v0 + v1 * u;
 end;
 
 function UProj2DPointToBounds(const b: TUBounds2f; const v: TUVec2): TUVec2;
