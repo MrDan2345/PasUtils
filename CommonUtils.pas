@@ -9307,7 +9307,7 @@ begin
   try
     RemSize := fs.Size;
     repeat
-      Size := fs.ReadData(@Buffer, UMin(SizeOf(Buffer), RemSize));
+      Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
       Result := UCRC32(Result, @Buffer, Size);
       Dec(RemSize, Size);
     until RemSize = 0;
@@ -9326,7 +9326,7 @@ begin
   try
     RemSize := fs.Size;
     repeat
-      Size := fs.ReadData(@Buffer, UMin(SizeOf(Buffer), RemSize));
+      Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
       Result := UCRC64(Result, @Buffer, Size);
       Dec(RemSize, Size);
     until RemSize = 0;
