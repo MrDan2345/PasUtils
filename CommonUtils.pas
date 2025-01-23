@@ -22,7 +22,7 @@ unit CommonUtils;
 interface
 
 uses
-  SysUtils, Classes, TypInfo, Process, UTF8Process;
+  SysUtils, Classes, TypInfo, Process;
 
 type TUProcedure = procedure of object;
 type TUFunction = function: Boolean of object;
@@ -10767,7 +10767,7 @@ function UExec(
   const WriteConsole: Boolean = True;
   const OnOutput: TUProcedureString = nil
 ): Int32;
-  var Exec: TProcessUTF8;
+  var Exec: TProcess;
   var fs: TFileStream;
   var ExeDir, OutputBuffer, s: String;
   var i: Int32;
@@ -10784,7 +10784,7 @@ begin
   OutputBuffer := '';
   if Length(Dir) > 0 then ExeDir := Dir else ExeDir := ExtractFileDir(ExePath);
   if Length(OutputFile) > 0 then fs := TFileStream.Create(OutputFile, fmCreate);
-  Exec := TProcessUTF8.Create(nil);
+  Exec := TProcess.Create(nil);
   try
     Exec.CurrentDirectory := ExeDir;
     Exec.Executable := ExePath;
