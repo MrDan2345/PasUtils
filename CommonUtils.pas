@@ -408,6 +408,7 @@ public
   class function Make(const s: TUFloat): TUVec2; static; overload; inline;
   class function Dot(const v0, v1: TUVec2): TUFloat; static; overload;
   class function Cross(const v0, v1: TUVec2): TUFloat; static; overload;
+  class function Angle(const v0, v1: TUVec2): TUFloat; static; overload;
   class function Perp(const v: TUVec2): TUVec2; static; overload;
   class function Norm(const v: TUVec2): TUVec2; static; overload;
   class function Reflect(const v, n: TUVec2): TUVec2; static; overload;
@@ -418,6 +419,7 @@ public
   function Transform(const m2: TUMat2): TUVec2;
   function Dot(const v: TUVec2): TUFloat; overload;
   function Cross(const v: TUVec2): TUFloat; overload;
+  function Angle(const v: TUVec2): TUFloat; overload;
   function Perp: TUVec2; overload;
   function Norm: TUVec2; overload;
   function Reflect(const n: TUVec2): TUVec2; overload;
@@ -2728,6 +2730,11 @@ begin
   Result := v0[0] * v1[1] - v0[1] * v1[0];
 end;
 
+class function TUVec2Impl.Angle(const v0, v1: TUVec2): TUFloat;
+begin
+  Result := UArcTan2(v0.x * v1.y - v0.y * v1.x, v0.x * v1.x + v0.y * v1.y);
+end;
+
 class function TUVec2Impl.Perp(const v: TUVec2): TUVec2;
 begin
   Result[0] := -v[1];
@@ -2791,6 +2798,11 @@ end;
 function TUVec2Impl.Cross(const v: TUVec2): TUFloat;
 begin
   Result := Cross(Self, v);
+end;
+
+function TUVec2Impl.Angle(const v: TUVec2): TUFloat;
+begin
+  Result := Angle(Self, v);
 end;
 
 function TUVec2Impl.Perp: TUVec2;
