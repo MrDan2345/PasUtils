@@ -22,7 +22,7 @@ unit CommonUtils;
 interface
 
 uses
-  SysUtils, Classes, TypInfo;
+  SysUtils, Classes, TypInfo, Process, UTF8Process;
 
 type TUProcedure = procedure of object;
 type TUFunction = function: Boolean of object;
@@ -1774,6 +1774,15 @@ procedure UCopyFile(const SrcFile, DstFile: String);
 procedure UCopyDir(const SrcDir, DstDir: String; const LogProc: TUProcedureString = nil);
 procedure ULog(const Text: String; const Offset: Int32 = 0);
 procedure ULogOffset(const Offset: Int32);
+function UExec(
+  const Dir: String;
+  const ExePath: String;
+  const Params: array of String;
+  const OutputFile: String = '';
+  const OutputList: TStringList = nil;
+  const WriteConsole: Boolean = True;
+  const OnOutput: TUProcedureString = nil
+): Int32;
 
 generic procedure UArrSort<T>(var Arr: array of T); overload;
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>); overload;
@@ -9319,7 +9328,7 @@ begin
   try
     RemSize := fs.Size;
     repeat
-      Size := fs.ReadData(@Buffer, UMin(SizeOf(Buffer), RemSize));
+      Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
       Result := UCRC32(Result, @Buffer, Size);
       Dec(RemSize, Size);
     until RemSize = 0;
@@ -9338,7 +9347,7 @@ begin
   try
     RemSize := fs.Size;
     repeat
-      Size := fs.ReadData(@Buffer, UMin(SizeOf(Buffer), RemSize));
+      Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
       Result := UCRC64(Result, @Buffer, Size);
       Dec(RemSize, Size);
     until RemSize = 0;
@@ -10747,6 +10756,80 @@ end;
 procedure ULogOffset(const Offset: Int32);
 begin
   LogOffset += Offset;
+end;
+
+function UExec(
+  const Dir: String;
+  const ExePath: String;
+  const Params: array of String;
+  const OutputFile: String = '';
+  const OutputList: TStringList = nil;
+  const WriteConsole: Boolean = True;
+  const OnOutput: TUProcedureString = nil
+): Int32;
+  var Exec: TProcessUTF8;
+  var fs: TFileStream;
+  var ExeDir, OutputBuffer, s: String;
+  var i: Int32;
+begin
+  if WriteConsole then
+  begin
+    WriteLn('Running: ', ExePath);
+    if Length(Params) > 0 then
+    begin
+      for s in Params do WriteLn('  ', s);
+    end;
+  end;
+  fs := nil;
+  OutputBuffer := '';
+  if Length(Dir) > 0 then ExeDir := Dir else ExeDir := ExtractFileDir(ExePath);
+  if Length(OutputFile) > 0 then fs := TFileStream.Create(OutputFile, fmCreate);
+  Exec := TProcessUTF8.Create(nil);
+  try
+    Exec.CurrentDirectory := ExeDir;
+    Exec.Executable := ExePath;
+    for s in Params do
+    begin
+      Exec.Parameters.Add(s);
+    end;
+    Exec.Options := Exec.Options + [poUsePipes, poStderrToOutPut];
+    Exec.Execute;
+    repeat
+      if Exec.Output.NumBytesAvailable = 0 then
+      begin
+        Sleep(1);
+        Continue;
+      end;
+      SetLength(s, Exec.Output.NumBytesAvailable);
+      Exec.Output.Read(s[1], Length(s));
+      if WriteConsole then Write(s);
+      if Assigned(fs) then fs.Write(s[1], Length(s));
+      if Assigned(OnOutput) or Assigned(OutputList) then
+      begin
+        OutputBuffer += s;
+        repeat
+          i := OutputBuffer.IndexOf(#$A);
+          if i > -1 then
+          begin
+            s := OutputBuffer.Substring(0, i);
+            s := s.TrimRight(#$D);
+            OutputBuffer := OutputBuffer.Remove(0, i + 1);
+            if Assigned(OnOutput) then OnOutput(s);
+            if Assigned(OutputList) then OutputList.Add(s);
+          end;
+        until i = -1;
+      end;
+    until (not Exec.Running) and (Exec.Output.NumBytesAvailable = 0);
+    if (OutputBuffer.Length > 0) then
+    begin
+      if Assigned(OnOutput) then OnOutput(OutputBuffer);
+      if Assigned(OutputList) then OutputList.Add(OutputBuffer);
+    end;
+  finally
+    Result := Exec.ExitCode;
+    Exec.Free;
+    if Assigned(fs) then fs.Free;
+  end;
 end;
 
 generic procedure UArrSort<T>(var Arr: array of T);

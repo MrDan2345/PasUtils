@@ -3093,10 +3093,10 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
       begin
         Result := ReadSimple(GlyfHeader);
       end;
-      Result.Bounds := [
-        [GlyfHeader.XMin, GlyfHeader.YMin],
-        [GlyfHeader.XMax, GlyfHeader.YMax]
-      ];
+      Result.Bounds := TUBounds2i.Make(
+        TUVec2i.Make(GlyfHeader.XMin, GlyfHeader.YMin),
+        TUVec2i.Make(GlyfHeader.XMax, GlyfHeader.YMax)
+      );
     end;
     function ReconstructContour(const StartIndex, EndIndex: Int32; const Points: TContour): TContour;
       var CurPoint: TContourPoint;
