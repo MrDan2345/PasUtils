@@ -1766,6 +1766,7 @@ function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32 = 1): UInt32;
 function UStrUTF8ToUTF32(const StrUTF8: String): TUInt32Array;
+function UStrUTF32ToUTF8(const Code: UInt32): String;
 function UFileToStr(const FileName: String): String;
 function UFileSearch(const Path: String): TUStrArray;
 procedure UCopyFilePrepare(const BufferSize: UInt32 = 1024 * 1024 * 1024);
@@ -10620,6 +10621,27 @@ begin
     Result[i] := UStrUTF8ToUTF32(StrUTF8, n, j);
     Inc(j, n);
   end;
+end;
+
+function UStrUTF32ToUTF8(const Code: UInt32): String;
+begin
+  if Code < $80 then Result := Chr(Code)
+  else if Code < $800 then Result := (
+    Chr($C0 or (Code shr 6)) +
+    Chr($80 or (Code and $3F))
+  )
+  else if Code < $10000 then Result := (
+    Chr($E0 or (Code shr 12)) +
+    Chr($80 or ((Code shr 6) and $3F)) +
+    Chr($80 or (Code and $3F))
+  )
+  else if Code <= $10FFFF then Result := (
+    Chr($F0 or (Code shr 18)) +
+    Chr($80 or ((Code shr 12) and $3F)) +
+    Chr($80 or ((Code shr 6) and $3F)) +
+    Chr($80 or (Code and $3F))
+  )
+  else Result := '';
 end;
 
 function UFileToStr(const FileName: String): String;
