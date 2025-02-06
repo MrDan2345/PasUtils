@@ -2987,7 +2987,7 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
         var HaveInstructions: Boolean;
         var SubGlyph: TGlyphRaw;
         var Arg1, Arg2: Int32;
-        var Offset: TUVec2i;
+        var Offset: TUVec2;
         var Xf2x2: TUMat2;
         var InstructionLength: UInt16;
         var FilePos: Int64;
@@ -3009,8 +3009,8 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
           begin
             if CheckBit(Flags, 1) then
             begin
-              Offset.x := UEndianSwap(Reader.ReadInt16);
-              Offset.y := UEndianSwap(Reader.ReadInt16);
+              Offset.x := ReadF2Dot14;
+              Offset.y := ReadF2Dot14;
             end
             else
             begin
@@ -3032,6 +3032,11 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
               Arg2 := Reader.ReadUInt8;
               Offset := Result.Points[Arg1].Pos - SubGlyph.Points[Arg2].Pos;
             end;
+          end;
+          if CheckBit(Flags, 2) then
+          begin
+            Offset.x := Round(Offset.x);
+            Offset.y := Round(Offset.y);
           end;
           Xf2x2 := TUMat2.Identity;
           if CheckBit(Flags, 3) then
@@ -3064,8 +3069,8 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
             for i := 0 to High(SubGlyph.Points) do
             begin
               SubGlyph.Points[i].Pos := TUVec2i(
-                TUVec2(SubGlyph.Points[i].Pos).Transform(Xf2x2)
-              ) + Offset;
+                TUVec2(SubGlyph.Points[i].Pos).Transform(Xf2x2) + Offset
+              );
             end;
             for i := 0 to High(SubGlyph.ContourEnds) do
             begin
