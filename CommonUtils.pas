@@ -1657,9 +1657,9 @@ generic function UEndianSwap<T>(const v: T): T; inline; overload;
 function UEndianSwap(const v: UInt16): UInt16; inline; overload;
 function UEndianSwap(const v: UInt32): UInt32; inline; overload;
 function UEndianSwap(const v: UInt64): UInt64; inline; overload;
-function UEndianSwap(const v: Int16): UInt16; inline; overload;
-function UEndianSwap(const v: Int32): UInt32; inline; overload;
-function UEndianSwap(const v: Int64): UInt64; inline; overload;
+function UEndianSwap(const v: Int16): Int16; inline; overload;
+function UEndianSwap(const v: Int32): Int32; inline; overload;
+function UEndianSwap(const v: Int64): Int64; inline; overload;
 generic procedure UByteSwap<T>(var v: T); inline; overload;
 procedure UByteSwap(var v: UInt16); inline; overload;
 procedure UByteSwap(var v: UInt32); inline; overload;
@@ -8878,17 +8878,17 @@ begin
   Result := specialize UEndianSwap<UInt64>(v);
 end;
 
-function UEndianSwap(const v: Int16): UInt16;
+function UEndianSwap(const v: Int16): Int16;
 begin
   Result := specialize UEndianSwap<Int16>(v);
 end;
 
-function UEndianSwap(const v: Int32): UInt32;
+function UEndianSwap(const v: Int32): Int32;
 begin
   Result := specialize UEndianSwap<Int32>(v);
 end;
 
-function UEndianSwap(const v: Int64): UInt64;
+function UEndianSwap(const v: Int64): Int64;
 begin
   Result := specialize UEndianSwap<Int64>(v);
 end;

@@ -2980,7 +2980,7 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
         ReadPoints(0);
         ReadPoints(1);
       end;
-      function ReadCompound(const Depth: Int32): TGlyphRaw;
+      function ReadCompound(const Depth: Int32; const Shift: TUVec2i): TGlyphRaw;
         var i: Int32;
         var n: UInt32;
         var Flags, GlyphIndex: UInt16;
@@ -3038,6 +3038,7 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
             Offset.x := Round(Offset.x);
             Offset.y := Round(Offset.y);
           end;
+          Offset := 0;
           Xf2x2 := TUMat2.Identity;
           if CheckBit(Flags, 3) then
           begin
@@ -3056,7 +3057,7 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
             Xf2x2[1, 0] := ReadF2Dot14;
             Xf2x2[1, 1] := ReadF2Dot14;
           end;
-          if Length(SubGlyph.Points) > 0 then
+          if (Length(SubGlyph.Points) > 0) then
           begin
             if Length(Result.ContourEnds) > 0 then
             begin
@@ -3092,7 +3093,7 @@ function TUTrueTypeFont.Load(const Reader: TUStreamHelper): Boolean;
       specialize UByteSwapRecord<TGlyfHeader>(GlyfHeader);
       if GlyfHeader.NumberOfContours < 0 then
       begin
-        Result := ReadCompound(Depth);
+        Result := ReadCompound(Depth, TUVec2i.Make(GlyfHeader.XMin, GlyfHeader.YMin));
       end
       else
       begin
