@@ -61,6 +61,7 @@ const SOCK_SEQPACKET = 5;               { sequential packet socket     }
 
 const INADDR_ANY = UInt32(0);
 const INADDR_NONE = UInt32(-1);
+const SOCKET_ERROR = -1;
 
 //shutdown options
 const SHUT_RD = 0;
@@ -68,6 +69,9 @@ const SHUT_WR = 1;
 const SHUT_RDWR = 2;
 
 const UNET_IPPROTO_IP = 0;
+const UNET_IPPROTO_ICMP = 1;
+
+const ICMP_ECHO = 8;
 
 {$if defined(windows)}
 const SOL_SOCKET = $ffff;
@@ -108,7 +112,7 @@ const SO_CONNECT_TIME = $700C;
 const TCP_NODELAY = $0001;
 const TCP_BSDURGENT = $7000;
 {$else}
-SOL_SOCKET = 1;
+const SOL_SOCKET = 1;
 const SO_DEBUG = 1;
 const SO_REUSEADDR = 2;
 const SO_TYPE = 3;
@@ -258,6 +262,7 @@ type PUIfConf = ^TUIfConf;
 
 type TUSocket = Int32;
 type PUSocket = ^TUSocket;
+const INVALID_SOCKET = TUSocket(not(0));
 
 type TUMacAddrImpl = type helper for TUMacAddr
   const Zero: TUMacAddr = (0, 0, 0, 0, 0, 0);
@@ -737,6 +742,7 @@ function UNetHostName: String;
 function UNetLocalAddr: TUInAddr;
 function UNetLocalMacAddr: TUMacAddr;
 function UNetWakeOnLan(const MacAddr: TUMacAddr): Boolean;
+function UNetPing(const InAddrN: TUInAddr): Boolean;
 
 function HToNl(const Host: UInt32): UInt32; inline;
 function NToHl(const Net: UInt32): UInt32; inline;
@@ -1599,6 +1605,70 @@ begin
     Sock.Close;
   end;
   Result := True;
+end;
+
+function UNetPing(const InAddrN: TUInAddr): Boolean;
+  type TICMPHeader = packed record
+    RequestType: UInt8;
+    Code: UInt8;
+    Checksum: UInt16;
+    Identifier: UInt16;
+    SequenceNumber: UInt16;
+  end;
+  type PICMPHeader = ^TICMPHeader;
+  type TTimeVal = record
+    tv_sec: Int32;
+    tv_usec: Int32;
+  end;
+  function Checksum(const Buffer: Pointer; const BufferSize: UInt16): UInt16;
+    var i: Int32;
+  begin
+    if BufferSize mod 2 = 1 then Exit(0);
+    Result := 0;
+    for i := 0 to (BufferSize shr 1) - 1 do
+    begin
+      Result += PUInt16Arr(Buffer)^[i];
+    end;
+    Result := (Result shr 16) + (Result and $ffff);
+    Result += Result shr 16;
+    Result := not Result;
+  end;
+  var Sock: TUSocket;
+  var Addr: TUSockAddr;
+  var Request: TICMPHeader;
+  var Response: PICMPHeader;
+  var r: Int32;
+  var TimeOut: TTimeVal;
+  var ResponseBuffer: array[0..255] of UInt8;
+  var SockLen: TUSockLen;
+  var ICMPOffset: Int32;
+begin
+  Sock := TUSocket.Create(AF_INET, SOCK_RAW, UNET_IPPROTO_ICMP);
+  if Sock = INVALID_SOCKET then Exit(False);
+  try
+    Addr := TUSockAddr.Default;
+    Addr.sin_addr := InAddrN;
+    UClear(Request, SizeOf(Request));
+    Request.RequestType := ICMP_ECHO;
+    Request.Identifier := GetCurrentProcessId mod 32768;
+    Request.SequenceNumber := 1;
+    Request.Checksum := Checksum(@Request, SizeOf(Request));
+    r := Sock.SendTo(@Request, SizeOf(Request), 0, @Addr, SizeOf(Addr));
+    if r = SOCKET_ERROR then Exit(False);
+    TimeOut.tv_sec := 1;
+    TimeOut.tv_usec := 0;
+    Sock.SetSockOpt(SOL_SOCKET, SO_RCVTIMEO, @TimeOut, SizeOf(TimeOut));
+    SockLen := SizeOf(Addr);
+    r := Sock.RecvFrom(@ResponseBuffer, SizeOf(ResponseBuffer), 0, @Addr, @SockLen);
+    if r = SOCKET_ERROR then Exit(False);
+    ICMPOffset := (ResponseBuffer[0] and $f) * 4;
+    Response := PICMPHeader(@ResponseBuffer[ICMPOffset]);
+    if Response^.RequestType <> 0 then Exit(False);
+    if Response^.Identifier <> Request.Identifier then Exit(False);
+    Result := True;
+  finally
+    Sock.Close;
+  end;
 end;
 
 function HToNl(const Host: UInt32): UInt32;

@@ -22,7 +22,7 @@ unit CommonUtils;
 interface
 
 uses
-  SysUtils, Classes, TypInfo;
+  SysUtils, Classes, TypInfo, Process;
 
 type TUProcedure = procedure of object;
 type TUFunction = function: Boolean of object;
@@ -87,6 +87,11 @@ type PUMat = ^TUMat;
 type TUMatArr = array[UInt32] of TUMat;
 type PUMatArr = ^TUMatArr;
 type TUMatArray = array of TUMat;
+type TUMat2 = array[0..1, 0..1] of TUFloat; // TUMat2Impl
+type PUMat2 = ^TUMat2;
+type TUMat2Arr = array[UInt32] of TUMat2;
+type PUMat2Arr = ^TUMat2Arr;
+type TUMat2Array = array of TUMat2;
 type TUVec2 = array[0..1] of TUFloat; // TUVec2Impl
 type PUVec2 = ^TUVec2;
 type TUVec2Arr = array[UInt32] of TUVec2;
@@ -364,6 +369,31 @@ public
   function ToString: String;
 end;
 
+type TUMat2Impl = type helper for TUMat2
+private
+  function GetElement(const Index: UInt32): TUFloat;
+  procedure SetElement(const Index: UInt32; const Value: TUFloat);
+  function GetAxisX: TUVec2;
+  procedure SetAxisX(const Value: TUVec2);
+  function GetAxisY: TUVec2;
+  procedure SetAxisY(const Value: TUVec2);
+public
+  const Zero: TUMat2 = ((0, 0), (0, 0));
+  const Identity: TUMat2 = ((1, 0), (0, 1));
+  property Element[const Index: UInt32]: TUFloat read GetElement write SetElement; default;
+  property AxisX: TUVec2 read GetAxisX write SetAxisX;
+  property AxisY: TUVec2 read GetAxisY write SetAxisY;
+  class function Make(
+    const e00, e10: TUFloat;
+    const e01, e11: TUFloat
+  ): TUMat2; static;
+  procedure SetValue(
+    const e00, e10: TUFloat;
+    const e01, e11: TUFloat
+  ); inline;
+  function ToString: String;
+end;
+
 type TUVec2Impl = type helper for TUVec2
 private
   function GetX: TUFloat;
@@ -380,6 +410,7 @@ public
   class function Make(const s: TUFloat): TUVec2; static; overload; inline;
   class function Dot(const v0, v1: TUVec2): TUFloat; static; overload;
   class function Cross(const v0, v1: TUVec2): TUFloat; static; overload;
+  class function Angle(const v0, v1: TUVec2): TUFloat; static; overload;
   class function Perp(const v: TUVec2): TUVec2; static; overload;
   class function Norm(const v: TUVec2): TUVec2; static; overload;
   class function Reflect(const v, n: TUVec2): TUVec2; static; overload;
@@ -387,8 +418,10 @@ public
   procedure SetValue(const Ax, Ay: TUFloat); inline;
   function Transform(const r: TURot2): TUVec2;
   function TransformInv(const r: TURot2): TUVec2;
+  function Transform(const m2: TUMat2): TUVec2;
   function Dot(const v: TUVec2): TUFloat; overload;
   function Cross(const v: TUVec2): TUFloat; overload;
+  function Angle(const v: TUVec2): TUFloat; overload;
   function Perp: TUVec2; overload;
   function Norm: TUVec2; overload;
   function Reflect(const n: TUVec2): TUVec2; overload;
@@ -1059,16 +1092,16 @@ public
   generic function Read<T>: T; inline;
   function WriteBuffer(const Buffer: Pointer; const Count: Int64): Int64; inline;
   procedure WriteBool(const Value: Boolean); inline;
-  procedure WriteUInt8(const value: UInt8); inline;
-  procedure WriteUInt16(const value: UInt16); inline;
-  procedure WriteUInt32(const value: UInt32); inline;
-  procedure WriteUInt64(const value: UInt64); inline;
-  procedure WriteInt8(const value: Int8); inline;
-  procedure WriteInt16(const value: Int16); inline;
-  procedure WriteInt32(const value: Int32); inline;
-  procedure WriteInt64(const value: Int64); inline;
-  procedure WriteFloat(const value: Single); inline;
-  procedure WriteDouble(const value: Double); inline;
+  procedure WriteUInt8(const Value: UInt8); inline;
+  procedure WriteUInt16(const Value: UInt16); inline;
+  procedure WriteUInt32(const Value: UInt32); inline;
+  procedure WriteUInt64(const Value: UInt64); inline;
+  procedure WriteInt8(const Value: Int8); inline;
+  procedure WriteInt16(const Value: Int16); inline;
+  procedure WriteInt32(const Value: Int32); inline;
+  procedure WriteInt64(const Value: Int64); inline;
+  procedure WriteFloat(const Value: Single); inline;
+  procedure WriteDouble(const Value: Double); inline;
   procedure WriteStringRaw(const Value: String); inline;
   procedure WriteString(const Value: String); inline;
   procedure WriteStringNT(const Value: String); inline;
@@ -1408,8 +1441,8 @@ private
   function GetAttribute(const Index: Integer): TAttribute; inline;
   function GetAttributeValue(const AttName: String): String;
   function GetAttributeCount: Integer; inline;
-  function GetChild(const Index: Integer): TUXML; inline;
-  function GetChildCount: Integer; inline;
+  function GetChild(const Index: Integer): TUXML;
+  function GetChildCount: Integer;
   function GetChildContent(const NodeName: String): String; inline;
 public
   property Name: String read _Name;
@@ -1546,6 +1579,7 @@ procedure UFinalizeVarRecArr(var arr: array of TVarRec);
 function UIntToBool(const i: Integer): Boolean;
 function UBoolToInt(const b: Boolean): Integer;
 function UBoolToStr(const b: Boolean): String;
+function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
 function UMatToQuat(const m: TUMat): TUQuat;
 function UQuatToMat(const q: TUQuat): TUMat;
 generic function USignOf<T>(const v: T): T;
@@ -1615,6 +1649,12 @@ function ULerp(const a, b: TUQuat; const s: TUFloat): TUQuat; inline; overload;
 function ULerp(const a, b: TUMat; const s: TUFloat): TUMat; inline; overload;
 function UQuatSlerp(const a, b: TUQuat; const s: TUFloat): TUQuat;
 function USmoothStep(const v, MinV, MaxV: TUFloat): TUFloat; inline;
+generic function UBezier<T>(const f0, f1, f2: T; const s: TUFloat): T; inline; overload;
+function UBezier(const v0, v1, v2: TUFloat; const s: TUFloat): TUFloat; inline; overload;
+function UBezier(const v0, v1, v2: TUDouble; const s: TUFloat): TUDouble; inline; overload;
+function UBezier(const v0, v1, v2: TUVec2; const s: TUFloat): TUVec2; inline; overload;
+function UBezier(const v0, v1, v2: TUVec3; const s: TUFloat): TUVec3; inline; overload;
+function UBezier(const v0, v1, v2: TUVec4; const s: TUFloat): TUVec4; inline; overload;
 generic function UBezier<T>(const f0, f1, f2, f3: T; const s: TUFloat): T; inline; overload;
 function UBezier(const v0, v1, v2, v3: TUFloat; const s: TUFloat): TUFloat; inline; overload;
 function UBezier(const v0, v1, v2, v3: TUDouble; const s: TUFloat): TUDouble; inline; overload;
@@ -1631,6 +1671,18 @@ generic function UEndianSwap<T>(const v: T): T; inline; overload;
 function UEndianSwap(const v: UInt16): UInt16; inline; overload;
 function UEndianSwap(const v: UInt32): UInt32; inline; overload;
 function UEndianSwap(const v: UInt64): UInt64; inline; overload;
+function UEndianSwap(const v: Int16): Int16; inline; overload;
+function UEndianSwap(const v: Int32): Int32; inline; overload;
+function UEndianSwap(const v: Int64): Int64; inline; overload;
+generic procedure UByteSwap<T>(var v: T); inline; overload;
+procedure UByteSwap(var v: UInt16); inline; overload;
+procedure UByteSwap(var v: UInt32); inline; overload;
+procedure UByteSwap(var v: UInt64); inline; overload;
+procedure UByteSwap(var v: Int16); inline; overload;
+procedure UByteSwap(var v: Int32); inline; overload;
+procedure UByteSwap(var v: Int64); inline; overload;
+generic procedure UByteSwapRecord<T>(var Rec: T);
+generic procedure UByteSwapArray<T>(var Arr: array of T);
 generic procedure USwap<T>(var a: T; var b: T); inline; overload;
 procedure USwap(var a: Int8; var b: Int8); inline; overload;
 procedure USwap(var a: Int16; var b: Int16); inline; overload;
@@ -1710,6 +1762,7 @@ function UXct3Planes(const p1, p2, p3: TUPlane; out xp: TUVec3): Boolean;
 function UXct3DRayPlane(const r: TURay3; const p: TUPlane; out xp: TUVec3; out xd: TUFloat): Boolean;
 function UXct3DRayTriangle(const r: TURay3; const v0, v1, v2: TUVec3; out xp: TUVec3; out xd: TUFloat): Boolean;
 function UProj2DPointToLine(const lv0, lv1, v: TUVec2; out InSegment: Boolean): TUVec2;
+function UProj2DPointToSegment(const lv0, lv1, v: TUVec2): TUVec2;
 function UProj2DPointToBounds(const b: TUBounds2f; const v: TUVec2): TUVec2;
 function UProj3DPointToLine(const lv0, lv1, v: TUVec3; out InSegment: Boolean): TUVec3;
 function UProj3DPointToPlane(const v: TUVec3; const p: TUPlane): TUVec3;
@@ -1720,9 +1773,14 @@ function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
 function UStrExprMatch(const Str, Expr: String): TUExprMatch;
 function UStrExplode(const Str: String; const Separator: String; const AllowEmpty: Boolean = True): TUStrArray;
 function UStrSubStr(const Str: String; const SubStrStart: Int32; const SubStrLength: Int32 = 0): String;
+function UStrSubPos(const Str, SubStr: String): Int32;
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boolean;
+function UStrExtractNumber(const Str: String; const Offset: Int32 = 1): Int32;
 function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
+function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32 = 1): UInt32;
+function UStrUTF8ToUTF32(const StrUTF8: String): TUInt32Array;
+function UStrUTF32ToUTF8(const Code: UInt32): String;
 function UFileToStr(const FileName: String): String;
 function UFileSearch(const Path: String): TUStrArray;
 procedure UCopyFilePrepare(const BufferSize: UInt32 = 1024 * 1024 * 1024);
@@ -1731,6 +1789,15 @@ procedure UCopyFile(const SrcFile, DstFile: String);
 procedure UCopyDir(const SrcDir, DstDir: String; const LogProc: TUProcedureString = nil);
 procedure ULog(const Text: String; const Offset: Int32 = 0);
 procedure ULogOffset(const Offset: Int32);
+function UExec(
+  const Dir: String;
+  const ExePath: String;
+  const Params: array of String;
+  const OutputFile: String = '';
+  const OutputList: TStringList = nil;
+  const WriteConsole: Boolean = True;
+  const OnOutput: TUProcedureString = nil
+): Int32;
 
 generic procedure UArrSort<T>(var Arr: array of T); overload;
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>); overload;
@@ -1755,11 +1822,14 @@ operator - (const v: TUVec2): TUVec2;
 operator + (const a, b: TUVec2i): TUVec2i;
 operator - (const a, b: TUVec2i): TUVec2i;
 operator * (const a, b: TUVec2i): TUVec2i;
-operator / (const a, b: TUVec2i): TUVec2i;
+operator * (const a: TUVec2i; const b: TUVec2): TUVec2;
+operator / (const a, b: TUVec2i): TUVec2;
+operator div (const a, b: TUVec2i): TUVec2i;
 operator + (const v: TUVec2i; const i: Int32): TUVec2i;
 operator - (const v: TUVec2i; const i: Int32): TUVec2i;
 operator * (const v: TUVec2i; const i: Int32): TUVec2i;
-operator / (const v: TUVec2i; const i: Int32): TUVec2i;
+operator / (const v: TUVec2i; const i: Int32): TUVec2;
+operator div (const v: TUVec2i; const i: Int32): TUVec2i;
 operator + (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator - (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2i; const f: TUFloat): TUVec2;
@@ -1767,6 +1837,8 @@ operator / (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator mod (const v: TUVec2i; const i: Int32): TUVec2i;
 operator := (const v: TUVec2): TUVec2i;
 operator := (const v: TUVec2i): TUVec2;
+operator := (const i: Int32): TUVec2i;
+operator := (const f: TUFloat): TUVec2;
 operator + (const a, b: TUVec3): TUVec3;
 operator - (const a, b: TUVec3): TUVec3;
 operator * (const a, b: TUVec3): TUVec3;
@@ -1781,8 +1853,10 @@ operator + (const a, b: TUVec3i): TUVec3i;
 operator - (const a, b: TUVec3i): TUVec3i;
 operator * (const a, b: TUVec3i): TUVec3i;
 operator * (const v: TUVec3i; const i: Int32): TUVec3i;
-operator / (const a, b: TUVec3i): TUVec3i;
-operator / (const v: TUVec3i; const i: Int32): TUVec3i;
+operator / (const a, b: TUVec3i): TUVec3;
+operator div (const a, b: TUVec3i): TUVec3i;
+operator / (const v: TUVec3i; const i: Int32): TUVec3;
+operator div (const v: TUVec3i; const i: Int32): TUVec3i;
 operator + (const a, b: TUVec4): TUVec4;
 operator - (const a, b: TUVec4): TUVec4;
 operator * (const a, b: TUVec4): TUVec4;
@@ -1864,6 +1938,7 @@ function TUSwizzle.ToString: String;
   const Names: array[0..3] of AnsiChar = ('X', 'Y', 'Z', 'W');
   var i: Int32;
 begin
+  Result := '';
   SetLength(Result, 4);
   for i := 0 to Length(Result) - 1 do
   begin
@@ -2575,6 +2650,66 @@ begin
     ]
   );
 end;
+
+function TUMat2Impl.GetElement(const Index: UInt32): TUFloat;
+begin
+  Result := Self[Index shr 1, Index mod 2];
+end;
+
+procedure TUMat2Impl.SetElement(const Index: UInt32; const Value: TUFloat);
+begin
+  Self[Index shr 1, Index mod 2] := Value;
+end;
+
+function TUMat2Impl.GetAxisX: TUVec2;
+begin
+  Result := PUVec2(@Self[0, 0])^;
+end;
+
+procedure TUMat2Impl.SetAxisX(const Value: TUVec2);
+begin
+  PUVec2(@Self[0, 0])^ := Value;
+end;
+
+function TUMat2Impl.GetAxisY: TUVec2;
+begin
+  Result := PUVec2(@Self[1, 0])^;
+end;
+
+procedure TUMat2Impl.SetAxisY(const Value: TUVec2);
+begin
+  PUVec2(@Self[1, 0])^ := Value;
+end;
+
+class function TUMat2Impl.Make(const e00, e10: TUFloat; const e01, e11: TUFloat): TUMat2;
+begin
+  Result[0, 0] := e00;
+  Result[1, 0] := e10;
+  Result[0, 1] := e01;
+  Result[1, 1] := e11;
+end;
+
+procedure TUMat2Impl.SetValue(const e00, e10: TUFloat; const e01, e11: TUFloat);
+begin
+  Self[0, 0] := e00;
+  Self[1, 0] := e10;
+  Self[0, 1] := e01;
+  Self[1, 1] := e11;
+end;
+
+function TUMat2Impl.ToString: String;
+begin
+  Result := Format(
+    '{'#$A +
+    '  %0:0.2f, %1:0.2f'#$A +
+    '  %2:0.2f, %3:0.2f'#$A +
+    '}',
+    [
+      Self[0, 0], Self[1, 0],
+      Self[0, 1], Self[1, 1]
+    ]
+  );
+end;
 // TUMatImpl end
 
 // TUVec2Impl begin
@@ -2617,6 +2752,11 @@ end;
 class function TUVec2Impl.Cross(const v0, v1: TUVec2): TUFloat;
 begin
   Result := v0[0] * v1[1] - v0[1] * v1[0];
+end;
+
+class function TUVec2Impl.Angle(const v0, v1: TUVec2): TUFloat;
+begin
+  Result := UArcTan2(v0.x * v1.y - v0.y * v1.x, v0.x * v1.x + v0.y * v1.y);
 end;
 
 class function TUVec2Impl.Perp(const v: TUVec2): TUVec2;
@@ -2666,6 +2806,14 @@ begin
   Result := r.TransformInv(Self);
 end;
 
+function TUVec2Impl.Transform(const m2: TUMat2): TUVec2;
+begin
+  Result := TUVec2.Make(
+    Self[0] * m2[0, 0] + Self[1] * m2[1, 0],
+    Self[0] * m2[0, 1] + Self[1] * m2[1, 1]
+  );
+end;
+
 function TUVec2Impl.Dot(const v: TUVec2): TUFloat;
 begin
   Result := Dot(Self, v);
@@ -2674,6 +2822,11 @@ end;
 function TUVec2Impl.Cross(const v: TUVec2): TUFloat;
 begin
   Result := Cross(Self, v);
+end;
+
+function TUVec2Impl.Angle(const v: TUVec2): TUFloat;
+begin
+  Result := Angle(Self, v);
 end;
 
 function TUVec2Impl.Perp: TUVec2;
@@ -3550,37 +3703,19 @@ begin
 end;
 
 function TUPlaneImpl.OverlapBounds(const Bounds: TUBounds3f): Boolean;
-var MinV, MaxV: TUVec3;
+  var MinV, MaxV: TUVec3;
+  var i: Int32;
 begin
-  if n.x > 0 then
+  for i := 0 to 2 do
+  if n[i] > 0 then
   begin
-    MinV.x := Bounds.Min.x;
-    MaxV.x := Bounds.Max.x;
+    MinV[i] := Bounds.Min[i];
+    MaxV[i] := Bounds.Max[i];
   end
   else
   begin
-    MinV.x := Bounds.Max.x;
-    MaxV.x := Bounds.Min.x;
-  end;
-  if n.y > 0 then
-  begin
-    MinV.y := Bounds.Min.y;
-    MaxV.y := Bounds.Max.y;
-  end
-  else
-  begin
-    MinV.y := Bounds.Max.y;
-    MaxV.y := Bounds.Min.y;
-  end;
-  if n.z > 0 then
-  begin
-    MinV.z := Bounds.Min.z;
-    MaxV.z := Bounds.Max.z;
-  end
-  else
-  begin
-    MinV.z := Bounds.Max.z;
-    MaxV.z := Bounds.Min.z;
+    MinV[i] := Bounds.Max[i];
+    MaxV[i] := Bounds.Min[i];
   end;
   if n.Dot(MinV) <= d then Exit(False);
   if n.Dot(MaxV) < d then Exit(True);
@@ -4157,7 +4292,7 @@ end;
 
 function TUBounds3iImpl.GetCenter: TUVec3i;
 begin
-  Result := (Self[0] + Self[1]) / 2;
+  Result := (Self[0] + Self[1]) div 2;
 end;
 
 function TUBounds3iImpl.GetExtent: TUVec3i;
@@ -5128,52 +5263,52 @@ begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt8(const value: UInt8);
+procedure TUStreamHelper.WriteUInt8(const Value: UInt8);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt16(const value: UInt16);
+procedure TUStreamHelper.WriteUInt16(const Value: UInt16);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt32(const value: UInt32);
+procedure TUStreamHelper.WriteUInt32(const Value: UInt32);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt64(const value: UInt64);
+procedure TUStreamHelper.WriteUInt64(const Value: UInt64);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt8(const value: Int8);
+procedure TUStreamHelper.WriteInt8(const Value: Int8);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt16(const value: Int16);
+procedure TUStreamHelper.WriteInt16(const Value: Int16);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt32(const value: Int32);
+procedure TUStreamHelper.WriteInt32(const Value: Int32);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt64(const value: Int64);
+procedure TUStreamHelper.WriteInt64(const Value: Int64);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteFloat(const value: Single);
+procedure TUStreamHelper.WriteFloat(const Value: Single);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteDouble(const value: Double);
+procedure TUStreamHelper.WriteDouble(const Value: Double);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
@@ -8051,6 +8186,7 @@ begin
       Result.NodeType := nt_object;
       specialize UArrAppend<TUJson>(_Elements, Result);
     end;
+    else Exit;
   end;
 end;
 
@@ -8076,6 +8212,7 @@ begin
       Result.Value := Value;
       specialize UArrAppend<TUJson>(_Elements, Result);
     end;
+    else Exit;
   end;
 end;
 
@@ -8202,10 +8339,12 @@ begin
 {$push}{$hints off}FillChar(x, Size, 0);{$pop}
 end;
 
+{$push}{$hints off}
 procedure UMove(out Dest; const Src; const Size: UInt32);
 begin
-{$push}{$hints off}Move(Src, Dest, Size);{$pop}
+  Move(Src, Dest, Size);
 end;
+{$pop}
 
 function UIntToPtr(const i: PtrUInt): Pointer;
 begin
@@ -8336,6 +8475,11 @@ end;
 function UBoolToStr(const b: Boolean): String;
 begin
   if b then Exit('True') else Exit('False');
+end;
+
+function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
+begin
+  if b then Exit(IfTrue) else Exit(IfFalse);
 end;
 
 function UMatToQuat(const m: TUMat): TUQuat;
@@ -8771,6 +8915,38 @@ begin
   Result := x * x * (3 - 2 * x);
 end;
 
+generic function UBezier<T>(const f0, f1, f2: T; const s: TUFloat): T;
+  var si: TUFloat;
+begin
+  si := 1 - s;
+  Result := si * si * f0 + 2 * si * s * f1 + s * s * f2;
+end;
+
+function UBezier(const v0, v1, v2: TUFloat; const s: TUFloat): TUFloat;
+begin
+  Result := specialize UBezier<TUFloat>(v0, v1, v2, s);
+end;
+
+function UBezier(const v0, v1, v2: TUDouble; const s: TUFloat): TUDouble;
+begin
+  Result := specialize UBezier<TUDouble>(v0, v1, v2, s);
+end;
+
+function UBezier(const v0, v1, v2: TUVec2; const s: TUFloat): TUVec2;
+begin
+  Result := specialize UBezier<TUVec2>(v0, v1, v2, s);
+end;
+
+function UBezier(const v0, v1, v2: TUVec3; const s: TUFloat): TUVec3;
+begin
+  Result := specialize UBezier<TUVec3>(v0, v1, v2, s);
+end;
+
+function UBezier(const v0, v1, v2: TUVec4; const s: TUFloat): TUVec4;
+begin
+  Result := specialize UBezier<TUVec4>(v0, v1, v2, s);
+end;
+
 generic function UBezier<T>(const f0, f1, f2, f3: T; const s: TUFloat): T;
   var s2, s3: TUFloat;
 begin
@@ -8860,6 +9036,111 @@ end;
 function UEndianSwap(const v: UInt64): UInt64;
 begin
   Result := specialize UEndianSwap<UInt64>(v);
+end;
+
+function UEndianSwap(const v: Int16): Int16;
+begin
+  Result := specialize UEndianSwap<Int16>(v);
+end;
+
+function UEndianSwap(const v: Int32): Int32;
+begin
+  Result := specialize UEndianSwap<Int32>(v);
+end;
+
+function UEndianSwap(const v: Int64): Int64;
+begin
+  Result := specialize UEndianSwap<Int64>(v);
+end;
+
+generic procedure UByteSwap<T>(var v: T);
+  type TByteArr = array[0..SizeOf(T) - 1] of UInt8;
+  var Arr: TByteArr absolute v;
+  var Tmp: UInt8;
+  var i, j: Int32;
+begin
+  for i := 0 to (Length(Arr) shr 1) - 1 do
+  begin
+    j := High(Arr) - i;
+    Tmp := Arr[i];
+    Arr[i] := Arr[j];
+    Arr[j] := Tmp;
+  end;
+end;
+
+procedure UByteSwap(var v: UInt16);
+begin
+  specialize UByteSwap<UInt16>(v);
+end;
+
+procedure UByteSwap(var v: UInt32);
+begin
+  specialize UByteSwap<UInt32>(v);
+end;
+
+procedure UByteSwap(var v: UInt64);
+begin
+  specialize UByteSwap<UInt64>(v);
+end;
+
+procedure UByteSwap(var v: Int16);
+begin
+  specialize UByteSwap<Int16>(v);
+end;
+
+procedure UByteSwap(var v: Int32);
+begin
+  specialize UByteSwap<Int32>(v);
+end;
+
+procedure UByteSwap(var v: Int64);
+begin
+  specialize UByteSwap<Int64>(v);
+end;
+
+generic procedure UByteSwapRecord<T>(var Rec: T);
+  procedure Swap(const Data: PUInt8Arr; const Count: Int32);
+    var i, j, n: Int32;
+    var Tmp: UInt8;
+  begin
+    n := (Count shr 1);
+    for i := 0 to n - 1 do
+    begin
+      j := Count - 1 - i;
+      Tmp := Data^[i];
+      Data^[i] := Data^[j];
+      Data^[j] := Tmp;
+    end;
+  end;
+  var ti: PTypeInfo;
+  var td: PTypeData;
+  var mf: PManagedField;
+  var i: Int32;
+begin
+  ti := TypeInfo(T);
+  if ti^.Kind <> tkRecord then Exit;
+  td := GetTypeData(ti);
+  mf := PManagedField(Pointer(@td^.TotalFieldCount) + SizeOf(td^.TotalFieldCount));
+  for i := 0 to td^.TotalFieldCount - 1 do
+  try
+    ti := mf^.TypeRef;
+    if not (ti^.Kind in [tkInteger, tkInt64, tkQWord, tkEnumeration]) then Continue;
+    td := GetTypeData(ti);
+    case td^.OrdType of
+      otSWord, otUWord: Swap(Pointer(@Rec) + mf^.FldOffset, 2);
+      otSLong, otULong: Swap(Pointer(@Rec) + mf^.FldOffset, 4);
+      otSQWord, otUQWord: Swap(Pointer(@Rec) + mf^.FldOffset, 8);
+      else Continue;
+    end;
+  finally
+    Inc(mf);
+  end;
+end;
+
+generic procedure UByteSwapArray<T>(var Arr: array of T);
+  var i: Int32;
+begin
+  for i := 0 to High(Arr) do specialize UByteSwap<T>(Arr[i]);
 end;
 
 generic procedure USwap<T>(var a: T; var b: T);
@@ -9203,7 +9484,7 @@ function UFileCRC32(const FileName: String; const CRC: UInt32): UInt32;
   var Buffer: array[0..2048] of UInt8;
   var RemSize, Size: Int64;
 begin
-  Result := 0;
+  Result := CRC;
   fs := TFileStream.Create(FileName, fmOpenRead);
   try
     RemSize := fs.Size;
@@ -9222,7 +9503,7 @@ function UFileCRC64(const FileName: String; const CRC: UInt64): UInt64;
   var Buffer: array[0..2048] of UInt8;
   var RemSize, Size: Int64;
 begin
-  Result := 0;
+  Result := CRC;
   fs := TFileStream.Create(FileName, fmOpenRead);
   try
     RemSize := fs.Size;
@@ -9419,7 +9700,7 @@ end;
 
 function UMulVec2Mat3x3(const v: TUVec2; const m: TUMat): TUVec2;
 begin
-  result := TUVec2.Make(
+  Result := TUVec2.Make(
     v.x * m[0, 0] + v.y * m[1, 0],
     v.x * m[0, 1] + v.y * m[1, 1]
   );
@@ -9748,6 +10029,16 @@ begin
   InSegment := (u >= 0) and (u <= 1);
 end;
 
+function UProj2DPointToSegment(const lv0, lv1, v: TUVec2): TUVec2;
+  var v0, v1: TUVec2;
+  var u: TUFloat;
+begin
+  v0 := v - lv0;
+  v1 := lv1 - lv0;
+  u := UClamp(v0.Dot(v1) / v1.Dot(v1), 0, 1);
+  Result := lv0 + v1 * u;
+end;
+
 function UProj2DPointToBounds(const b: TUBounds2f; const v: TUVec2): TUVec2;
 begin
   Result := UClamp(v, b.Min, b.Max);
@@ -9861,7 +10152,19 @@ begin
   Result[1] := a[1] * b[1];
 end;
 
-operator / (const a, b: TUVec2i): TUVec2i;
+operator * (const a: TUVec2i; const b: TUVec2): TUVec2;
+begin
+  Result[0] := a[0] * b[0];
+  Result[1] := a[1] * b[1];
+end;
+
+operator / (const a, b: TUVec2i): TUVec2;
+begin
+  Result[0] := a[0] / b[0];
+  Result[1] := a[1] / b[1];
+end;
+
+operator div (const a, b: TUVec2i): TUVec2i;
 begin
   Result[0] := a[0] div b[0];
   Result[1] := a[1] div b[1];
@@ -9885,7 +10188,15 @@ begin
   Result[1] := v[1] * i;
 end;
 
-operator / (const v: TUVec2i; const i: Int32): TUVec2i;
+operator / (const v: TUVec2i; const i: Int32): TUVec2;
+  var rcp: TUFloat;
+begin
+  rcp := 1 / i;
+  Result[0] := v[0] * rcp;
+  Result[1] := v[1] * rcp;
+end;
+
+operator div (const v: TUVec2i; const i: Int32): TUVec2i;
 begin
   Result[0] := v[0] div i;
   Result[1] := v[1] div i;
@@ -9931,6 +10242,18 @@ operator := (const v: TUVec2i): TUVec2;
 begin
   Result[0] := v[0];
   Result[1] := v[1];
+end;
+
+operator := (const i: Int32): TUVec2i;
+begin
+  Result[0] := i;
+  Result[1] := i;
+end;
+
+operator := (const f: TUFloat): TUVec2;
+begin
+  Result[0] := f;
+  Result[1] := f;
 end;
 
 operator + (const a, b: TUVec3): TUVec3;
@@ -10029,14 +10352,30 @@ begin
   Result[2] := v[2] * i;
 end;
 
-operator / (const a, b: TUVec3i): TUVec3i;
+operator / (const a, b: TUVec3i): TUVec3;
+begin
+  Result[0] := a[0] / b[0];
+  Result[1] := a[1] / b[1];
+  Result[2] := a[2] / b[2];
+end;
+
+operator div (const a, b: TUVec3i): TUVec3i;
 begin
   Result[0] := a[0] div b[0];
   Result[1] := a[1] div b[1];
   Result[2] := a[2] div b[2];
 end;
 
-operator / (const v: TUVec3i; const i: Int32): TUVec3i;
+operator / (const v: TUVec3i; const i: Int32): TUVec3;
+  var rcp: TUFloat;
+begin
+  rcp := 1 / i;
+  Result[0] := v[0] * rcp;
+  Result[1] := v[1] * rcp;
+  Result[2] := v[2] * rcp;
+end;
+
+operator div (const v: TUVec3i; const i: Int32): TUVec3i;
 begin
   Result[0] := v[0] div i;
   Result[1] := v[1] div i;
@@ -10195,7 +10534,7 @@ function UStrExprMatch(const Str, Expr: String): TUExprMatch;
     Result := True;
   end;
   var Sequence: TUStrArray;
-  var i, j, s, sl: Int32;
+  var i, j, s: Int32;
   function AdvanceSequence: Boolean;
   begin
     repeat
@@ -10302,6 +10641,23 @@ begin
   Move(Str[First], Result[1], Len);
 end;
 
+function UStrSubPos(const Str, SubStr: String): Int32;
+  var i, j: Int32;
+begin
+  for i := 0 to Length(Str) - Length(SubStr) do
+  begin
+    Result := i + 1;
+    for j := 1 to Length(SubStr) do
+    if Str[i + j] <> SubStr[j] then
+    begin
+      Result := 0;
+      Break;
+    end;
+    if Result > 0 then Exit;
+  end;
+  Result := 0;
+end;
+
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean): Boolean;
   var i, n: Integer;
   var af: Boolean;
@@ -10322,6 +10678,23 @@ begin
   Result := True;
 end;
 
+function UStrExtractNumber(const Str: String; const Offset: Int32): Int32;
+  var i, j: Int32;
+  var s: String;
+begin
+  for i := Offset to Length(Str) do
+  begin
+    if not (Str[i] in ['0'..'9']) then Continue;
+    for j := i + 1 to Length(Str) do
+    if not (Str[j] in ['0'..'9']) then
+    begin
+      s := UStrSubStr(Str, i, j - i);
+      Exit(StrToInt(s));
+    end;
+  end;
+  Result := 0;
+end;
+
 function UStrClone(const Str: String): String;
 begin
   Result := '';
@@ -10338,6 +10711,97 @@ begin
   finally
     fs.Free;
   end;
+end;
+
+function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32): UInt32;
+  var StrSize: Int32;
+  var Byte1, Byte2, Byte3, Byte4: Uint8;
+begin
+  StrSize := Length(StrUTF8) - Start;
+  if StrSize < 0 then Exit(0);
+  Byte1 := UInt8(StrUTF8[Start]);
+  if (Byte1 and $80) = 0 then
+  begin
+    NumBytes := 1;
+    Exit(Byte1);
+  end;
+  if (Byte1 and $E0) = $C0 then
+  begin
+    if StrSize < 1 then Exit(0);
+    Byte2 := UInt8(StrUTF8[Start + 1]);
+    NumBytes := 2;
+    Exit(((Byte1 and $1F) shl 6) or (Byte2 and $3F));
+  end;
+  if (Byte1 and $F0) = $E0 then
+  begin
+    if StrSize < 2 then Exit(0);
+    Byte2 := UInt8(StrUTF8[Start + 1]);
+    Byte3 := UInt8(StrUTF8[Start + 2]);
+    NumBytes := 3;
+    Exit(((Byte1 and $0F) shl 12) or ((Byte2 and $3F) shl 6) or (Byte3 and $3F));
+  end;
+  if (Byte1 and $F8) = $F0 then
+  begin
+    if StrSize < 3 then Exit(0);
+    Byte2 := UInt8(StrUTF8[Start + 1]);
+    Byte3 := UInt8(StrUTF8[Start + 2]);
+    Byte4 := UInt8(StrUTF8[Start + 3]);
+    NumBytes := 4;
+    Exit(((Byte1 and $07) shl 18) or ((Byte2 and $3F) shl 12) or ((Byte3 and $3F) shl 6) or (Byte4 and $3F));
+  end;
+  Result := 0;
+  NumBytes := 0;
+end;
+
+function UStrUTF8ToUTF32(const StrUTF8: String): TUInt32Array;
+  function CountCharacters: Int32;
+    var i: Int32;
+    var b: UInt8;
+  begin
+    Result := 0;
+    i := 1;
+    while i <= Length(StrUTF8) do
+    begin
+      Inc(Result);
+      b := UInt8(StrUTF8[i]);
+      if (b and $E0) = $C0 then Inc(i, 2)
+      else if (b and $F0) = $E0 then Inc(i, 3)
+      else if (b and $F8) = $F0 then Inc(i, 4)
+      else Inc(i, 1);
+    end;
+  end;
+  var i, j, n: Int32;
+begin
+  if Length(StrUTF8) = 0 then Exit(nil);
+  Result := nil;
+  SetLength(Result, CountCharacters);
+  j := 1;
+  for i := 0 to High(Result) do
+  begin
+    Result[i] := UStrUTF8ToUTF32(StrUTF8, n, j);
+    Inc(j, n);
+  end;
+end;
+
+function UStrUTF32ToUTF8(const Code: UInt32): String;
+begin
+  if Code < $80 then Result := Chr(Code)
+  else if Code < $800 then Result := (
+    Chr($C0 or (Code shr 6)) +
+    Chr($80 or (Code and $3F))
+  )
+  else if Code < $10000 then Result := (
+    Chr($E0 or (Code shr 12)) +
+    Chr($80 or ((Code shr 6) and $3F)) +
+    Chr($80 or (Code and $3F))
+  )
+  else if Code <= $10FFFF then Result := (
+    Chr($F0 or (Code shr 18)) +
+    Chr($80 or ((Code shr 12) and $3F)) +
+    Chr($80 or ((Code shr 6) and $3F)) +
+    Chr($80 or (Code and $3F))
+  )
+  else Result := '';
 end;
 
 function UFileToStr(const FileName: String): String;
@@ -10474,6 +10938,80 @@ end;
 procedure ULogOffset(const Offset: Int32);
 begin
   LogOffset += Offset;
+end;
+
+function UExec(
+  const Dir: String;
+  const ExePath: String;
+  const Params: array of String;
+  const OutputFile: String = '';
+  const OutputList: TStringList = nil;
+  const WriteConsole: Boolean = True;
+  const OnOutput: TUProcedureString = nil
+): Int32;
+  var Exec: TProcess;
+  var fs: TFileStream;
+  var ExeDir, OutputBuffer, s: String;
+  var i: Int32;
+begin
+  if WriteConsole then
+  begin
+    WriteLn('Running: ', ExePath);
+    if Length(Params) > 0 then
+    begin
+      for s in Params do WriteLn('  ', s);
+    end;
+  end;
+  fs := nil;
+  OutputBuffer := '';
+  if Length(Dir) > 0 then ExeDir := Dir else ExeDir := ExtractFileDir(ExePath);
+  if Length(OutputFile) > 0 then fs := TFileStream.Create(OutputFile, fmCreate);
+  Exec := TProcess.Create(nil);
+  try
+    Exec.CurrentDirectory := ExeDir;
+    Exec.Executable := ExePath;
+    for s in Params do
+    begin
+      Exec.Parameters.Add(s);
+    end;
+    Exec.Options := Exec.Options + [poUsePipes, poStderrToOutPut];
+    Exec.Execute;
+    repeat
+      if Exec.Output.NumBytesAvailable = 0 then
+      begin
+        Sleep(1);
+        Continue;
+      end;
+      SetLength(s, Exec.Output.NumBytesAvailable);
+      Exec.Output.Read(s[1], Length(s));
+      if WriteConsole then Write(s);
+      if Assigned(fs) then fs.Write(s[1], Length(s));
+      if Assigned(OnOutput) or Assigned(OutputList) then
+      begin
+        OutputBuffer += s;
+        repeat
+          i := OutputBuffer.IndexOf(#$A);
+          if i > -1 then
+          begin
+            s := OutputBuffer.Substring(0, i);
+            s := s.TrimRight(#$D);
+            OutputBuffer := OutputBuffer.Remove(0, i + 1);
+            if Assigned(OnOutput) then OnOutput(s);
+            if Assigned(OutputList) then OutputList.Add(s);
+          end;
+        until i = -1;
+      end;
+    until (not Exec.Running) and (Exec.Output.NumBytesAvailable = 0);
+    if (OutputBuffer.Length > 0) then
+    begin
+      if Assigned(OnOutput) then OnOutput(OutputBuffer);
+      if Assigned(OutputList) then OutputList.Add(OutputBuffer);
+    end;
+  finally
+    Result := Exec.ExitCode;
+    Exec.Free;
+    if Assigned(fs) then fs.Free;
+  end;
 end;
 
 generic procedure UArrSort<T>(var Arr: array of T);
