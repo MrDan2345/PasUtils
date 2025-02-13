@@ -845,12 +845,16 @@ public
 end;
 
 type TUBigIntImpl = type helper for TUBigInt
+private
+  function GetSize: Int32;
 public
   const Zero: TUBigInt = (0);
   const One: TUBigInt = (1);
+  property Size: Int32 read GetSize;
   class function Make(const Number: String): TUBigInt; static; overload;
   class function Make(const Number: Int64): TUBigInt; static; overload;
-  procedure SetSign(const IsPositive: Boolean);
+  procedure SetSign(const Positive: Boolean);
+  function IsPositive: Boolean;
   function IsValid: Boolean;
   function ToString: String;
   function ToInt64: Int64;
@@ -4362,6 +4366,11 @@ end;
 // TUBounds3i end
 
 // TUBigInt begin
+function TUBigIntImpl.GetSize: Int32;
+begin
+  Result := Length(Self);
+end;
+
 class function TUBigIntImpl.Make(const Number: String): TUBigInt;
   var i, j, CurByte, NumStart: Int32;
   var IsNegative: Boolean;
@@ -4436,12 +4445,12 @@ begin
   Result.SetSign(Number > 0);
 end;
 
-procedure TUBigIntImpl.SetSign(const IsPositive: Boolean);
+procedure TUBigIntImpl.SetSign(const Positive: Boolean);
   var i: Int32;
 begin
   if Length(Self) = 0 then Exit;
   i := High(Self);
-  if IsPositive then
+  if Positive then
   begin
     Self[i] := Self[i] and $7f;
   end
@@ -4449,6 +4458,12 @@ begin
   begin
     Self[i] := Self[i] or $80;
   end;
+end;
+
+function TUBigIntImpl.IsPositive: Boolean;
+begin
+  if not IsValid then Exit(False);
+  Result := (Self[High(Self)] and $80) = 0;
 end;
 
 function TUBigIntImpl.IsValid: Boolean;
@@ -4461,8 +4476,8 @@ var
   i, j: Int32;
   IsNegative: Boolean;
   Temp: TUBigInt;
-  Digit: Integer;
-  ZeroCount: Integer;
+  Digit: Int32;
+  ZeroCount: Int32;
 begin
   if not Self.IsValid then Exit('0');
   IsNegative := (Self[High(Self)] and $80) <> 0;
@@ -4473,7 +4488,7 @@ begin
     Digit := 0;
     for i := High(Temp) downto Low(Temp) do
     begin
-      Digit := Digit * $ff + Temp[i];
+      Digit := (Digit * 256) + Temp[i];
       Temp[i] := Digit div 10;
       Digit := Digit mod 10;
     end;
