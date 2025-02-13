@@ -149,6 +149,8 @@ type PUBounds2i = ^TUBounds2i;
 type TUBounds3i = array[0..1] of TUVec3i; // TUBounds3iImpl
 type PUBounds3i = ^TUBounds3i;
 
+type TUBigInt = type TUInt8Array; // TUBigIntImpl;
+
 type TUSwizzle = record
 private
   var _Remap: UInt8;
@@ -807,6 +809,18 @@ public
   class function Make(const AVertices: TUVec3iArray): TUBounds3i; static; overload;
   class function Overlap(const a, b: TUBounds3i): Boolean; static; inline;
   function Overlap(const Other: TUBounds3i): Boolean;
+end;
+
+type TUBigIntImpl = type helper for TUBigInt
+public
+  const Zero: TUBigInt = (0);
+  const One: TUBigInt = (1);
+  class function Make(const Number: String): TUBigInt; static; overload;
+  class function Make(const Number: Int64): TUBigInt; static; overload;
+  procedure SetSign(const IsPositive: Boolean);
+  function IsValid: Boolean;
+  function ToString: String;
+  function ToInt64: Int64;
 end;
 
 type TUTransform = record
@@ -4211,6 +4225,152 @@ begin
   Result := Overlap(Self, Other);
 end;
 // TUBounds3i end
+
+// TUBigInt begin
+class function TUBigIntImpl.Make(const Number: String): TUBigInt;
+  var i, j, CurByte, NumStart: Int32;
+  var IsNegative: Boolean;
+  var Value, Carry: UInt16;
+begin
+  NumStart := 1;
+  IsNegative := False;
+  if Number.StartsWith('-') then
+  begin
+    IsNegative := True;
+    Inc(NumStart);
+  end;
+  for i := NumStart to Length(Number) do
+  if not (Number[i] in ['0'..'9']) then Exit(nil);
+  for i := NumStart to Length(Number) do
+  begin
+    if Number[i] <> '0' then Break;
+    Inc(NumStart);
+  end;
+  if NumStart > Length(Number) then Exit(TUBigInt.Zero);
+  Result := nil;
+  SetLength(Result, Length(Number) + 1);
+  UClear(Result[0], Length(Result));
+  CurByte := 0;
+  for i := NumStart to Length(Number) do
+  begin
+    Carry := Ord(Number[i]) - Ord('0');
+    for j := 0 to CurByte do
+    begin
+      Value := Result[j] * 10 + Carry;
+      Result[j] := Value and $ff;
+      Carry := Value shr 8;
+    end;
+    if Carry > 0 then
+    begin
+      Inc(CurByte);
+      Result[CurByte] := Carry;
+    end;
+  end;
+  if Result[CurByte] and $80 > 0 then Inc(CurByte);
+  if IsNegative then Result[CurByte] := Result[CurByte] or $80;
+  i := CurByte + 1;
+  if Length(Result) > i then SetLength(Result, i);
+end;
+
+class function TUBigIntImpl.Make(const Number: Int64): TUBigInt;
+  var Tmp: Int64;
+  var NumArr: array[0..SizeOf(Number) - 1] of UInt8 absolute Tmp;
+  var i, n: Int32;
+begin
+  Tmp := Number;
+  if Number < 0 then Tmp := -Tmp;
+  n := -1;
+  for i := High(NumArr) downto 0 do
+  if NumArr[i] <> 0 then
+  begin
+    n := i;
+    Break;
+  end;
+  if n < 0 then Exit(TUBigInt.Zero);
+  SetLength(Result, n + 1);
+  for i := 0 to n do
+  begin
+    Result[i] := NumArr[i];
+  end;
+  if Result[n] >= $80 then
+  begin
+    i := Length(Result);
+    SetLength(Result, i + 1);
+    Result[i] := 0;
+  end;
+  Result.SetSign(Number > 0);
+end;
+
+procedure TUBigIntImpl.SetSign(const IsPositive: Boolean);
+  var i: Int32;
+begin
+  if Length(Self) = 0 then Exit;
+  i := High(Self);
+  if IsPositive then
+  begin
+    Self[i] := Self[i] and $7f;
+  end
+  else
+  begin
+    Self[i] := Self[i] or $80;
+  end;
+end;
+
+function TUBigIntImpl.IsValid: Boolean;
+begin
+  Result := Length(Self) > 0;
+end;
+
+function TUBigIntImpl.ToString: String;
+var
+  i, j: Int32;
+  IsNegative: Boolean;
+  Temp: TUBigInt;
+  Digit: Integer;
+  ZeroCount: Integer;
+begin
+  if not Self.IsValid then Exit('0');
+  IsNegative := (Self[High(Self)] and $80) <> 0;
+  Temp := Self;
+  if IsNegative then Temp[High(Temp)] := Temp[High(Temp)] and $7f;
+  while (Length(Temp) > 0) and ((Length(Temp) > 1) or (Temp[0] > 0)) do
+  begin
+    Digit := 0;
+    for i := High(Temp) downto Low(Temp) do
+    begin
+      Digit := Digit * $ff + Temp[i];
+      Temp[i] := Digit div 10;
+      Digit := Digit mod 10;
+    end;
+    Result := Chr(Ord('0') + Digit) + Result;
+    while (Length(Temp) > 0) and (Temp[High(Temp)] = 0) do
+    begin
+      SetLength(Temp, Length(Temp) - 1);
+    end;
+  end;
+  ZeroCount := 0;
+  for i := 1 to Length(Result) do
+  begin
+    if Result[i] <> '0' then Break;
+    Inc(ZeroCount);
+  end;
+  Delete(Result, 1, ZeroCount);
+  if Length(Result) = 0 then Exit('0')
+  else if IsNegative then Result := '-' + Result;
+end;
+
+function TUBigIntImpl.ToInt64: Int64;
+  var i, n: Int32;
+  var NumArr: array[0..7] of UInt8 absolute Result;
+begin
+  if not IsValid then Exit(0);
+  n := UMin(7, High(Self));
+  for i := 0 to n do
+  begin
+    NumArr[i] := Self[i];
+  end;
+end;
+// TUBigInt end
 
 // TUTransform begin
 procedure TUTransform.Initialize;
