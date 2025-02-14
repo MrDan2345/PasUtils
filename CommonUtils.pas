@@ -847,17 +847,22 @@ end;
 type TUBigIntImpl = type helper for TUBigInt
 private
   function GetSize: Int32;
+  function Magnitude: TUBigInt;
+  procedure SignMagnitude(const Positive: Boolean);
+  procedure NormalizeMagnitude;
 public
   const Zero: TUBigInt = (0);
   const One: TUBigInt = (1);
   property Size: Int32 read GetSize;
   class function Make(const Number: String): TUBigInt; static; overload;
   class function Make(const Number: Int64): TUBigInt; static; overload;
+  class function Add(const a, b: TUBigInt): TUBigInt; static;
   procedure SetSign(const Positive: Boolean);
   function IsPositive: Boolean;
   function IsValid: Boolean;
   function ToString: String;
   function ToInt64: Int64;
+  function Clone: TUBigInt;
 end;
 
 type TUTransform = record
@@ -4371,6 +4376,42 @@ begin
   Result := Length(Self);
 end;
 
+function TUBigIntImpl.Magnitude: TUBigInt;
+begin
+  Result := Clone;
+  Result[High(Result)] := Result[High(Result)] and $7f;
+  if (Length(Result) < 2) then Exit;
+  if Result[High(Result)] <> 0 then Exit;
+  SetLength(Result, Length(Result) - 1);
+end;
+
+procedure TUBigIntImpl.SignMagnitude(const Positive: Boolean);
+  var i: Int32;
+begin
+  i := High(Self);
+  if (Self[i] and $80) = $80 then
+  begin
+    SetLength(Self, i + 2);
+    Inc(i);
+    Self[i] := 0;
+  end;
+  SetSign(Positive);
+end;
+
+procedure TUBigIntImpl.NormalizeMagnitude;
+  var i, n: Int32;
+begin
+  n := 1;
+  for i := High(Self) downto 0 do
+  if Self[i] <> 0 then
+  begin
+    n := i + 1;
+    Break;
+  end;
+  if Length(Self) = n then Exit;
+  SetLength(Self, n);
+end;
+
 class function TUBigIntImpl.Make(const Number: String): TUBigInt;
   var i, j, CurByte, NumStart: Int32;
   var IsNegative: Boolean;
@@ -4445,10 +4486,100 @@ begin
   Result.SetSign(Number > 0);
 end;
 
+class function TUBigIntImpl.Add(const a, b: TUBigInt): TUBigInt;
+  function AddMag(const MagA, MagB: TUBigInt): TUBigInt;
+    var i, n: Int32;
+    var Carry: UInt16;
+    var ValA, ValB: UInt8;
+  begin
+    Result := nil;
+    SetLength(Result, UMax(Length(MagA), Length(MagB)) + 1);
+    UClear(Result[0], Length(Result));
+    Carry := 0;
+    for i := 0 to High(Result) do
+    begin
+      if i <= High(MagA) then ValA := MagA[i] else ValA := 0;
+      if i <= High(MagB) then ValB := MagB[i] else ValB := 0;
+      Carry += ValA + ValB;
+      Result[i] := Carry and $ff;
+      Carry := Carry shr 8;
+    end;
+    Result.NormalizeMagnitude;
+  end;
+  function SubMag(const MagA, MagB: TUBigInt): TUBigInt;
+    var i: Int32;
+    var ValA, ValB: UInt8;
+    var Carry: Int16;
+  begin
+    Result := nil;
+    SetLength(Result, Length(MagA));
+    UClear(Result[0], Length(Result));
+    Carry := 0;
+    for i := 0 to High(Result) do
+    begin
+      ValA := MagA[i];
+      if i <= High(MagB) then ValB := MagB[i] else ValB := 0;
+      Carry += ValA - ValB;
+      if Carry < 0 then
+      begin
+        Result[i] := 256 + Carry;
+        Carry := -1;
+      end
+      else
+      begin
+        Result[i] := Carry;
+        Carry := 0;
+      end;
+    end;
+    Result.NormalizeMagnitude;
+  end;
+  function CmpMag(const MagA, MagB: TUBigInt): Int8;
+    var i: Int32;
+  begin
+    if Length(MagA) = Length(MagB) then
+    begin
+      for i := High(MagA) downto 0 do
+      begin
+        if MagA[i] > MagB[i] then Exit(1);
+        if MagB[i] > MagA[i] then Exit(-1);
+      end;
+      Exit(0);
+    end;
+    if Length(MagA) > Length(MagB) then Exit(1);
+    Exit(-1);
+  end;
+  var TempA, TempB: TUBigInt;
+  var IsNegativeA, IsNegativeB: Boolean;
+  var Cmp: Int8;
+begin
+  if not (a.IsValid and b.IsValid) then Exit(nil);
+  TempA := a.Magnitude;
+  IsNegativeA := not a.IsPositive;
+  TempB := b.Magnitude;
+  IsNegativeB := not b.IsPositive;
+  if IsNegativeA = IsNegativeB then
+  begin
+    Result := AddMag(TempA, TempB);
+    Result.SignMagnitude(not IsNegativeA);
+  end
+  else
+  begin
+    Cmp := CmpMag(TempB, TempA);
+    if Cmp = 0 then Exit(TUBigInt.Zero);
+    if Cmp = 1 then
+    begin
+      specialize USwap<TUBigInt>(TempA, TempB);
+      specialize USwap<Boolean>(IsNegativeA, IsNegativeB);
+    end;
+    Result := SubMag(TempA, TempB);
+    Result.SignMagnitude(not IsNegativeA);
+  end;
+end;
+
 procedure TUBigIntImpl.SetSign(const Positive: Boolean);
   var i: Int32;
 begin
-  if Length(Self) = 0 then Exit;
+  if not IsValid then Exit;
   i := High(Self);
   if Positive then
   begin
@@ -4472,39 +4603,29 @@ begin
 end;
 
 function TUBigIntImpl.ToString: String;
-var
-  i, j: Int32;
-  IsNegative: Boolean;
-  Temp: TUBigInt;
-  Digit: Int32;
-  ZeroCount: Int32;
+  var i, CurByte: Int32;
+  var IsNegative: Boolean;
+  var Temp: TUBigInt;
+  var Carry: Int16;
 begin
   if not Self.IsValid then Exit('0');
-  IsNegative := (Self[High(Self)] and $80) <> 0;
+  IsNegative := not Self.IsPositive;
   Temp := Self;
   if IsNegative then Temp[High(Temp)] := Temp[High(Temp)] and $7f;
-  while (Length(Temp) > 0) and ((Length(Temp) > 1) or (Temp[0] > 0)) do
+  CurByte := High(Temp);
+  while (CurByte > 0) and (Temp[CurByte] = 0) do Dec(CurByte);
+  while (CurByte > 0) or (Temp[CurByte] > 0) do
   begin
-    Digit := 0;
-    for i := High(Temp) downto Low(Temp) do
+    Carry := 0;
+    for i := CurByte downto 0 do
     begin
-      Digit := (Digit * 256) + Temp[i];
-      Temp[i] := Digit div 10;
-      Digit := Digit mod 10;
+      Carry := (Carry * 256) + Temp[i];
+      Temp[i] := Carry div 10;
+      Carry := Carry mod 10;
     end;
-    Result := Chr(Ord('0') + Digit) + Result;
-    while (Length(Temp) > 0) and (Temp[High(Temp)] = 0) do
-    begin
-      SetLength(Temp, Length(Temp) - 1);
-    end;
+    Result := Chr(Ord('0') + Carry) + Result;
+    while (CurByte > 0) and (Temp[CurByte] = 0) do Dec(CurByte);
   end;
-  ZeroCount := 0;
-  for i := 1 to Length(Result) do
-  begin
-    if Result[i] <> '0' then Break;
-    Inc(ZeroCount);
-  end;
-  Delete(Result, 1, ZeroCount);
   if Length(Result) = 0 then Exit('0')
   else if IsNegative then Result := '-' + Result;
 end;
@@ -4519,6 +4640,14 @@ begin
   begin
     NumArr[i] := Self[i];
   end;
+end;
+
+function TUBigIntImpl.Clone: TUBigInt;
+begin
+  if not IsValid then Exit(nil);
+  Result := nil;
+  SetLength(Result, Length(Self));
+  Move(Self[0], Result[0], Length(Self));
 end;
 // TUBigInt end
 
