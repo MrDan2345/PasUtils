@@ -858,6 +858,7 @@ public
   class function Make(const Number: Int64): TUBigInt; static; overload;
   class function Add(const a, b: TUBigInt): TUBigInt; static;
   class function Sub(const a, b: TUBigInt): TUBigInt; static;
+  class function Mul(const a, b: TUBigInt): TUBigInt; static;
   procedure SetSign(const Positive: Boolean);
   function IsPositive: Boolean;
   function IsValid: Boolean;
@@ -4489,7 +4490,7 @@ end;
 
 class function TUBigIntImpl.Add(const a, b: TUBigInt): TUBigInt;
   function AddMag(const MagA, MagB: TUBigInt): TUBigInt;
-    var i, n: Int32;
+    var i: Int32;
     var Carry: UInt16;
     var ValA, ValB: UInt8;
   begin
@@ -4580,9 +4581,44 @@ end;
 class function TUBigIntImpl.Sub(const a, b: TUBigInt): TUBigInt;
   var NegB: TUBigInt;
 begin
-  NegB := b;
+  if not (a.IsValid and b.IsValid) then Exit(nil);
+  NegB := b.Clone;
   NegB.SetSign(not b.IsPositive);
   Result := Add(a, NegB);
+end;
+
+class function TUBigIntImpl.Mul(const a, b: TUBigInt): TUBigInt;
+  var Positive: Boolean;
+  var TempA, TempB: TUBigInt;
+  var i, j, r: Int32;
+  var Carry: UInt32;
+begin
+  if not (a.IsValid and b.IsValid) then Exit(nil);
+  TempA := a.Magnitude;
+  TempB := b.Magnitude;
+  Result := nil;
+  SetLength(Result, Length(TempA) + Length(TempB));
+  UClear(Result[0], Length(Result));
+  for i := 0 to High(TempA) do
+  begin
+    Carry := 0;
+    for j := 0 to High(TempB) do
+    begin
+      r := i + j;
+      Carry += Result[r] + TempA[i] * TempB[j];
+      Result[r] := UInt8(Carry and $ff);
+      Carry := Carry shr 8;
+    end;
+    while Carry > 0 do
+    begin
+      Inc(r);
+      Carry += Result[r];
+      Result[r] := UInt8(Carry and $ff);
+      Carry := Carry shr 8;
+    end;
+  end;
+  Result.NormalizeMagnitude;
+  Result.SignMagnitude(not ((not a.IsPositive) xor (not b.IsPositive)));
 end;
 
 procedure TUBigIntImpl.SetSign(const Positive: Boolean);
@@ -4623,6 +4659,7 @@ begin
   if IsNegative then Temp[High(Temp)] := Temp[High(Temp)] and $7f;
   CurByte := High(Temp);
   while (CurByte > 0) and (Temp[CurByte] = 0) do Dec(CurByte);
+  Result := '';
   while (CurByte > 0) or (Temp[CurByte] > 0) do
   begin
     Carry := 0;
