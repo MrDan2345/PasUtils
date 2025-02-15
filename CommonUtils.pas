@@ -857,6 +857,7 @@ public
   class function Make(const Number: String): TUBigInt; static; overload;
   class function Make(const Number: Int64): TUBigInt; static; overload;
   class function Add(const a, b: TUBigInt): TUBigInt; static;
+  class function Sub(const a, b: TUBigInt): TUBigInt; static;
   procedure SetSign(const Positive: Boolean);
   function IsPositive: Boolean;
   function IsValid: Boolean;
@@ -4574,6 +4575,14 @@ begin
     Result := SubMag(TempA, TempB);
     Result.SignMagnitude(not IsNegativeA);
   end;
+end;
+
+class function TUBigIntImpl.Sub(const a, b: TUBigInt): TUBigInt;
+  var NegB: TUBigInt;
+begin
+  NegB := b;
+  NegB.SetSign(not b.IsPositive);
+  Result := Add(a, NegB);
 end;
 
 procedure TUBigIntImpl.SetSign(const Positive: Boolean);
