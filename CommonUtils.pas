@@ -846,19 +846,27 @@ end;
 
 type TUBigIntImpl = type helper for TUBigInt
 private
+  procedure ShiftLeft;
   function GetSize: Int32;
   function Magnitude: TUBigInt;
   procedure SignMagnitude(const Positive: Boolean);
   procedure NormalizeMagnitude;
+  class function MagnitudeCmp(const MagA, MagB: TUBigInt): Int8; static;
+  class function MagnitudeSub(const MagA, MagB: TUBigInt): TUBigInt; static;
+  class procedure MagnitudeSubInPlace(var MagA: TUBigInt; const MagB: TUBigInt); static;
 public
   const Zero: TUBigInt = (0);
   const One: TUBigInt = (1);
   property Size: Int32 read GetSize;
   class function Make(const Number: String): TUBigInt; static; overload;
   class function Make(const Number: Int64): TUBigInt; static; overload;
-  class function Add(const a, b: TUBigInt): TUBigInt; static;
-  class function Sub(const a, b: TUBigInt): TUBigInt; static;
-  class function Mul(const a, b: TUBigInt): TUBigInt; static;
+  class function Addition(const a, b: TUBigInt): TUBigInt; static;
+  class function Subtraction(const a, b: TUBigInt): TUBigInt; static;
+  class function Multiplication(const a, b: TUBigInt): TUBigInt; static;
+  class function Division(const a, b: TUBigInt; out Remainder: TUBigInt): TUBigInt; static; overload;
+  class function Division(const a, b: TUBigInt): TUBigInt; static; overload;
+  class function Modulo(const a, b: TUBigInt): TUBigInt; static; overload;
+  class function Compare(const a, b: TUBigInt): Int8; static;
   procedure SetSign(const Positive: Boolean);
   function IsPositive: Boolean;
   function IsValid: Boolean;
@@ -4372,6 +4380,13 @@ begin
 end;
 // TUBounds3i end
 
+procedure TUBigIntImpl.ShiftLeft;
+  var i: Int32;
+begin
+  for i := High(Self) downto 1 do Self[i] := Self[i - 1];
+  Self[0] := 0;
+end;
+
 // TUBigInt begin
 function TUBigIntImpl.GetSize: Int32;
 begin
@@ -4412,6 +4427,63 @@ begin
   end;
   if Length(Self) = n then Exit;
   SetLength(Self, n);
+end;
+
+class function TUBigIntImpl.MagnitudeCmp(const MagA, MagB: TUBigInt): Int8;
+  function FindTop(const Mag: TUBigInt): Int32;
+    var i: Int32;
+  begin
+    for i := High(Mag) downto 0 do
+    if Mag[i] > 0 then Exit(i);
+    Result := 0;
+  end;
+  var i: Int32;
+  var TopA, TopB: Int32;
+begin
+  TopA := FindTop(MagA);
+  TopB := FindTop(MagB);
+  if TopA = TopB then
+  begin
+    for i := TopA downto 0 do
+    begin
+      if MagA[i] > MagB[i] then Exit(1);
+      if MagB[i] > MagA[i] then Exit(-1);
+    end;
+    Exit(0);
+  end;
+  if TopA > TopB then Exit(1);
+  Exit(-1);
+end;
+
+class function TUBigIntImpl.MagnitudeSub(const MagA, MagB: TUBigInt): TUBigInt;
+begin
+  Result := MagA.Clone;
+  MagnitudeSubInPlace(Result, MagB);
+  Result.NormalizeMagnitude;
+end;
+
+class procedure TUBigIntImpl.MagnitudeSubInPlace(var MagA: TUBigInt; const MagB: TUBigInt);
+  var i: Int32;
+  var ValA, ValB: UInt8;
+  var Carry: Int16;
+begin
+  Carry := 0;
+  for i := 0 to High(MagA) do
+  begin
+    ValA := MagA[i];
+    if i <= High(MagB) then ValB := MagB[i] else ValB := 0;
+    Carry += ValA - ValB;
+    if Carry < 0 then
+    begin
+      MagA[i] := 256 + Carry;
+      Carry := -1;
+    end
+    else
+    begin
+      MagA[i] := Carry;
+      Carry := 0;
+    end;
+  end;
 end;
 
 class function TUBigIntImpl.Make(const Number: String): TUBigInt;
@@ -4488,7 +4560,7 @@ begin
   Result.SetSign(Number > 0);
 end;
 
-class function TUBigIntImpl.Add(const a, b: TUBigInt): TUBigInt;
+class function TUBigIntImpl.Addition(const a, b: TUBigInt): TUBigInt;
   function AddMag(const MagA, MagB: TUBigInt): TUBigInt;
     var i: Int32;
     var Carry: UInt16;
@@ -4508,48 +4580,6 @@ class function TUBigIntImpl.Add(const a, b: TUBigInt): TUBigInt;
     end;
     Result.NormalizeMagnitude;
   end;
-  function SubMag(const MagA, MagB: TUBigInt): TUBigInt;
-    var i: Int32;
-    var ValA, ValB: UInt8;
-    var Carry: Int16;
-  begin
-    Result := nil;
-    SetLength(Result, Length(MagA));
-    UClear(Result[0], Length(Result));
-    Carry := 0;
-    for i := 0 to High(Result) do
-    begin
-      ValA := MagA[i];
-      if i <= High(MagB) then ValB := MagB[i] else ValB := 0;
-      Carry += ValA - ValB;
-      if Carry < 0 then
-      begin
-        Result[i] := 256 + Carry;
-        Carry := -1;
-      end
-      else
-      begin
-        Result[i] := Carry;
-        Carry := 0;
-      end;
-    end;
-    Result.NormalizeMagnitude;
-  end;
-  function CmpMag(const MagA, MagB: TUBigInt): Int8;
-    var i: Int32;
-  begin
-    if Length(MagA) = Length(MagB) then
-    begin
-      for i := High(MagA) downto 0 do
-      begin
-        if MagA[i] > MagB[i] then Exit(1);
-        if MagB[i] > MagA[i] then Exit(-1);
-      end;
-      Exit(0);
-    end;
-    if Length(MagA) > Length(MagB) then Exit(1);
-    Exit(-1);
-  end;
   var TempA, TempB: TUBigInt;
   var IsNegativeA, IsNegativeB: Boolean;
   var Cmp: Int8;
@@ -4566,28 +4596,28 @@ begin
   end
   else
   begin
-    Cmp := CmpMag(TempB, TempA);
+    Cmp := MagnitudeCmp(TempB, TempA);
     if Cmp = 0 then Exit(TUBigInt.Zero);
     if Cmp = 1 then
     begin
       specialize USwap<TUBigInt>(TempA, TempB);
       specialize USwap<Boolean>(IsNegativeA, IsNegativeB);
     end;
-    Result := SubMag(TempA, TempB);
+    Result := MagnitudeSub(TempA, TempB);
     Result.SignMagnitude(not IsNegativeA);
   end;
 end;
 
-class function TUBigIntImpl.Sub(const a, b: TUBigInt): TUBigInt;
+class function TUBigIntImpl.Subtraction(const a, b: TUBigInt): TUBigInt;
   var NegB: TUBigInt;
 begin
   if not (a.IsValid and b.IsValid) then Exit(nil);
   NegB := b.Clone;
   NegB.SetSign(not b.IsPositive);
-  Result := Add(a, NegB);
+  Result := Addition(a, NegB);
 end;
 
-class function TUBigIntImpl.Mul(const a, b: TUBigInt): TUBigInt;
+class function TUBigIntImpl.Multiplication(const a, b: TUBigInt): TUBigInt;
   var Positive: Boolean;
   var TempA, TempB: TUBigInt;
   var i, j, r: Int32;
@@ -4621,6 +4651,79 @@ begin
   Result.SignMagnitude(not ((not a.IsPositive) xor (not b.IsPositive)));
 end;
 
+class function TUBigIntImpl.Division(const a, b: TUBigInt; out Remainder: TUBigInt): TUBigInt;
+  var TempA, TempB: TUBigInt;
+  var IsNegativeA, IsNegativeB, ResultIsPositive: Boolean;
+  var Digit: UInt8;
+  var i: Int32;
+  var Cmp: Int8;
+begin
+  if not (a.IsValid and b.IsValid) then Exit(nil);
+  TempA := a.Magnitude;
+  IsNegativeA := not a.IsPositive;
+  TempB := b.Magnitude;
+  IsNegativeB := not b.IsPositive;
+  Remainder := TUBigInt.Zero;
+  if MagnitudeCmp(TempB, TUBigInt.Zero) = 0 then Exit(nil);
+  if MagnitudeCmp(TempA, TUBigInt.Zero) = 0 then Exit(TUBigInt.Zero);
+  if Compare(TempB, TUBigInt.One) = 0 then
+  begin
+    Result := a.Clone;
+    if IsNegativeB then Result.SetSign(IsNegativeA);
+    Exit;
+  end;
+  ResultIsPositive := not ((IsNegativeA) xor (IsNegativeB));
+  Cmp := MagnitudeCmp(TempA, TempB);
+  if Cmp = 0 then
+  begin
+    Result := TUBigInt.One.Clone;
+    Result.SetSign(ResultIsPositive);
+    Exit;
+  end;
+  if Cmp < 0 then
+  begin
+    Remainder := a.Clone;
+    Remainder.SetSign(ResultIsPositive);
+    Exit(TUBigInt.Zero);
+  end;
+  Result := nil;
+  SetLength(Result, Length(TempA));
+  UClear(Result[0], Length(Result));
+  Remainder := nil;
+  SetLength(Remainder, Length(TempB) + 1);
+  UClear(Remainder[0], Length(Result));
+  for i := High(TempA) downto 0 do
+  begin
+    Remainder.ShiftLeft;
+    Remainder[0] := TempA[i];
+    if MagnitudeCmp(TempB, Remainder) > 0 then Continue;
+    Digit := 0;
+    //todo: optimize
+    repeat
+      MagnitudeSubInPlace(Remainder, TempB);
+      Inc(Digit);
+    until MagnitudeCmp(Remainder, TempB) < 0;
+    Result.ShiftLeft;
+    Result[0] := Digit;
+  end;
+  Result.NormalizeMagnitude;
+  Result.SignMagnitude(ResultIsPositive);
+  Remainder.NormalizeMagnitude;
+  Remainder.SignMagnitude(ResultIsPositive);
+end;
+
+class function TUBigIntImpl.Division(const a, b: TUBigInt): TUBigInt;
+  var r: TUBigInt;
+begin
+  Result := Division(a, b, r);
+end;
+
+class function TUBigIntImpl.Modulo(const a, b: TUBigInt): TUBigInt;
+  var r: TUBigInt;
+begin
+  r := Division(a, b, Result);
+end;
+
 procedure TUBigIntImpl.SetSign(const Positive: Boolean);
   var i: Int32;
 begin
@@ -4645,6 +4748,23 @@ end;
 function TUBigIntImpl.IsValid: Boolean;
 begin
   Result := Length(Self) > 0;
+end;
+
+class function TUBigIntImpl.Compare(const a, b: TUBigInt): Int8;
+  var IsNegativeA, IsNegativeB: Boolean;
+  var MagA, MagB: TUBigInt;
+begin
+  IsNegativeA := not a.IsPositive;
+  MagA := a.Magnitude;
+  IsNegativeB := not a.IsPositive;
+  MagB := b.Magnitude;
+  if IsNegativeA <> IsNegativeB then
+  begin
+    if IsNegativeA then Exit(-1);
+    Exit(1);
+  end;
+  Result := MagnitudeCmp(MagA, MagB);
+  if IsNegativeA then Result := -Result;
 end;
 
 function TUBigIntImpl.ToString: String;
