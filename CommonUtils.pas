@@ -153,8 +153,10 @@ type TUBounds2i = array[0..1] of TUVec2i; // TUBounds2iImpl
 type PUBounds2i = ^TUBounds2i;
 type TUBounds3i = array[0..1] of TUVec3i; // TUBounds3iImpl
 type PUBounds3i = ^TUBounds3i;
-
-type TUBigInt = type TUInt8Array; // TUBigIntImpl;
+type TUBigInt = record
+  IsNegative: Boolean;
+  Value: TUInt8Array;
+end;
 
 type TUSwizzle = record
 private
@@ -846,26 +848,39 @@ end;
 
 type TUBigIntImpl = type helper for TUBigInt
 private
-  procedure ShiftLeft;
-  function GetSize: Int32;
-  function Magnitude: TUBigInt;
-  procedure SignMagnitude(const Positive: Boolean);
-  procedure NormalizeMagnitude;
-  class function MagnitudeCmp(const MagA, MagB: TUBigInt): Int8; static;
-  class function MagnitudeSub(const MagA, MagB: TUBigInt): TUBigInt; static;
-  class procedure MagnitudeSubInPlace(var MagA: TUBigInt; const MagB: TUBigInt); static;
-  class function MagnitudeMul(const MagA, MagB: TUBigInt): TUBigInt; static;
-  class function MagnitudeDiv(const MagA, MagB: TUBigInt; out Remainder: TUBigInt): TUBigInt; static;
-  class function MagnitudeMod(const MagA, MagB: TUBigInt): TUBigInt; static;
-  class function RandomMagnitude(const BitSize: Int32): TUBigInt; static;
+  type TUBarrettCtx = record
+  public
+    M: TUInt8Array;
+    Mu: TUInt8Array;
+    procedure SetModulus(const Value: TUInt8Array);
+    function Modulo(const Value: TUInt8Array): TUInt8Array;
+  end;
+  class function MagClone(const Mag: TUInt8Array): TUInt8Array; static;
+  class function MagCmp(const MagA, MagB: TUInt8Array): Int8; static;
+  class function MagAdd(const MagA, MagB: TUInt8Array): TUInt8Array; static;
+  class function MagSub(const MagA, MagB: TUInt8Array): TUInt8Array; static;
+  class procedure MagSubInPlace(var MagA: TUInt8Array; const MagB: TUInt8Array); static;
+  class function MagMul(const MagA, MagB: TUInt8Array): TUInt8Array; static;
+  class function MagDiv(const MagA, MagB: TUInt8Array; out Remainder: TUInt8Array): TUInt8Array; static;
+  class function MagMod(const MagA, MagB: TUInt8Array): TUInt8Array; static;
+  class procedure MagNorm(var Mag: TUInt8Array); static;
+  class function MagRand(const BitLength: Int32): TUInt8Array; static;
+  class function MagModPow(const Base, Exponent, Modulus: TUInt8Array): TUInt8Array; static;
+  class function MagGetBit(const Mag: TUInt8Array; const Index: Int32): Boolean; static;
+  class function MagIsEven(const Mag: TUInt8Array): Boolean; static;
+  class function MagShiftLeftBytes(const Mag: TUInt8Array; const NumBytes: Int32): TUInt8Array; static;
+  class function MagShiftRightBytes(const Mag: TUInt8Array; const NumBytes: Int32): TUInt8Array; static;
+  class procedure MagShiftLeftBytesInPlace(const Mag: TUInt8Array; const NumBytes: Int32); static;
+  class procedure MagShiftRightBytesInPlace(const Mag: TUInt8Array; const NumBytes: Int32); static;
+  procedure Reset(const Size: UInt32);
+  procedure Normalize;
 public
-  const Zero: TUBigInt = (0);
-  const One: TUBigInt = (1);
-  property Size: Int32 read GetSize;
-  class function Make(const Number: String): TUBigInt; static; overload;
-  class function Make(const Number: Int64): TUBigInt; static; overload;
-  class function MakeRandom(const ByteLength: Int32 = 512): TUBigInt; static;
-  class function MakePrime(const ByteLength: Int32 = 512): TUBigInt; static;
+  const Zero: TUBigInt = (IsNegative: False; Value: (0));
+  const One: TUBigInt = (IsNegative: False; Value: (1));
+  class function Make(const Number: Int64): TUBigInt; static;
+  class function Make(const Number: String): TUBigInt; static;
+  class function MakeRandom(const BitLength: Int32 = 4096): TUBigInt; static;
+  class function MakePrime(const BitLength: Int32 = 4096): TUBigInt; static;
   class function Addition(const a, b: TUBigInt): TUBigInt; static;
   class function Subtraction(const a, b: TUBigInt): TUBigInt; static;
   class function Multiplication(const a, b: TUBigInt): TUBigInt; static;
@@ -873,15 +888,17 @@ public
   class function Division(const a, b: TUBigInt): TUBigInt; static; overload;
   class function Modulo(const a, b: TUBigInt): TUBigInt; static;
   class function Compare(const a, b: TUBigInt): Int8; static;
-  class function ModPow(const Base, Exponent, Modulus: TUBigInt): TUBigInt; static;
-  function GetBit(const BitIndex: Int32): Boolean;
-  procedure SetSign(const Positive: Boolean);
-  function IsPositive: Boolean;
-  function IsEven: Boolean;
-  function IsValid: Boolean;
   function ToString: String;
+  function ToHex: String;
   function ToInt64: Int64;
+  function GetBit(const BitIndex: Int32): Boolean;
+  function IsEven: Boolean;
+  function GetSize: Int32;
   function Clone: TUBigInt;
+  function ShiftLeftBytes(const NumBytes: Int32): TUBigInt;
+  function ShiftRightBytes(const NumBytes: Int32): TUBigInt;
+  procedure ShiftLeftBytesInPlace(const NumBytes: Int32);
+  procedure ShiftRightBytesInPlace(const NumBytes: Int32);
 end;
 
 type TUTransform = record
@@ -4389,57 +4406,17 @@ begin
 end;
 // TUBounds3i end
 
-procedure TUBigIntImpl.ShiftLeft;
-  var i: Int32;
-begin
-  for i := High(Self) downto 1 do Self[i] := Self[i - 1];
-  Self[0] := 0;
-end;
-
 // TUBigInt begin
-function TUBigIntImpl.GetSize: Int32;
+class function TUBigIntImpl.MagClone(const Mag: TUInt8Array): TUInt8Array;
 begin
-  Result := Length(Self);
+  Result := nil;
+  if Length(Mag) = 0 then Exit;
+  SetLength(Result, Length(Mag));
+  Move(Mag[0], Result[0], Length(Result));
 end;
 
-function TUBigIntImpl.Magnitude: TUBigInt;
-begin
-  Result := Clone;
-  Result[High(Result)] := Result[High(Result)] and $7f;
-  if (Length(Result) < 2) then Exit;
-  if Result[High(Result)] <> 0 then Exit;
-  SetLength(Result, Length(Result) - 1);
-end;
-
-procedure TUBigIntImpl.SignMagnitude(const Positive: Boolean);
-  var i: Int32;
-begin
-  i := High(Self);
-  if (Self[i] and $80) = $80 then
-  begin
-    SetLength(Self, i + 2);
-    Inc(i);
-    Self[i] := 0;
-  end;
-  SetSign(Positive);
-end;
-
-procedure TUBigIntImpl.NormalizeMagnitude;
-  var i, n: Int32;
-begin
-  n := 1;
-  for i := High(Self) downto 0 do
-  if Self[i] <> 0 then
-  begin
-    n := i + 1;
-    Break;
-  end;
-  if Length(Self) = n then Exit;
-  SetLength(Self, n);
-end;
-
-class function TUBigIntImpl.MagnitudeCmp(const MagA, MagB: TUBigInt): Int8;
-  function FindTop(const Mag: TUBigInt): Int32;
+class function TUBigIntImpl.MagCmp(const MagA, MagB: TUInt8Array): Int8;
+  function FindTop(const Mag: TUInt8Array): Int32;
     var i: Int32;
   begin
     for i := High(Mag) downto 0 do
@@ -4464,14 +4441,34 @@ begin
   Exit(-1);
 end;
 
-class function TUBigIntImpl.MagnitudeSub(const MagA, MagB: TUBigInt): TUBigInt;
+class function TUBigIntImpl.MagAdd(const MagA, MagB: TUInt8Array): TUInt8Array;
+  var i: Int32;
+  var Carry: UInt16;
+  var ValA, ValB: UInt8;
 begin
-  Result := MagA.Clone;
-  MagnitudeSubInPlace(Result, MagB);
-  Result.NormalizeMagnitude;
+  Result := nil;
+  SetLength(Result, UMax(Length(MagA), Length(MagB)) + 1);
+  UClear(Result[0], Length(Result));
+  Carry := 0;
+  for i := 0 to High(Result) do
+  begin
+    if i <= High(MagA) then ValA := MagA[i] else ValA := 0;
+    if i <= High(MagB) then ValB := MagB[i] else ValB := 0;
+    Carry += ValA + ValB;
+    Result[i] := Carry and $ff;
+    Carry := Carry shr 8;
+  end;
+  MagNorm(Result);
 end;
 
-class procedure TUBigIntImpl.MagnitudeSubInPlace(var MagA: TUBigInt; const MagB: TUBigInt);
+class function TUBigIntImpl.MagSub(const MagA, MagB: TUInt8Array): TUInt8Array;
+begin
+  Result := MagClone(MagA);
+  MagSubInPlace(Result, MagB);
+  MagNorm(Result);
+end;
+
+class procedure TUBigIntImpl.MagSubInPlace(var MagA: TUInt8Array; const MagB: TUInt8Array);
   var i: Int32;
   var ValA, ValB: UInt8;
   var Carry: Int16;
@@ -4495,11 +4492,10 @@ begin
   end;
 end;
 
-class function TUBigIntImpl.MagnitudeMul(const MagA, MagB: TUBigInt): TUBigInt;
-  var i, j, r: Int32;
+class function TUBigIntImpl.MagMul(const MagA, MagB: TUInt8Array): TUInt8Array;
+var i, j, r: Int32;
   var Carry: UInt32;
 begin
-  if not (MagA.IsValid and MagB.IsValid) then Exit(nil);
   Result := nil;
   SetLength(Result, Length(MagA) + Length(MagB));
   UClear(Result[0], Length(Result));
@@ -4521,116 +4517,199 @@ begin
       Carry := Carry shr 8;
     end;
   end;
-  Result.NormalizeMagnitude;
+  MagNorm(Result);
 end;
 
-class function TUBigIntImpl.MagnitudeDiv(const MagA, MagB: TUBigInt; out Remainder: TUBigInt): TUBigInt;
+class function TUBigIntImpl.MagDiv(const MagA, MagB: TUInt8Array; out Remainder: TUInt8Array): TUInt8Array;
+  function FindApproxMultiple(const Dividend, Divider: TUInt8Array): Int32;
+    var Top: Int32;
+    var TestA, TestB: Int32;
+  begin
+    for Top := High(Dividend) downto 0 do
+    if Dividend[Top] <> 0 then Break;
+    TestA := Dividend[High(Divider)];
+    if Top > High(Divider) then TestA += Dividend[Top] shl 8;
+    TestB := Divider[High(Divider)];
+    Result := TestA div TestB;
+  end;
+  procedure ShiftLeft(var Mag: TUInt8Array);
+    var i: Int32;
+  begin
+    if Length(Mag) = 0 then Exit;
+    for i := High(Mag) downto 1 do Mag[i] := Mag[i - 1];
+    Mag[0] := 0;
+  end;
   var Digit: UInt8;
   var i: Int32;
   var Cmp: Int8;
 begin
-  if not (MagA.IsValid and MagB.IsValid) then Exit(nil);
-  Remainder := TUBigInt.Zero;
-  if MagnitudeCmp(MagB, TUBigInt.Zero) = 0 then Exit(nil);
-  if MagnitudeCmp(MagA, TUBigInt.Zero) = 0 then Exit(TUBigInt.Zero);
-  if MagnitudeCmp(MagB, TUBigInt.One) = 0 then Exit(MagA.Clone);
-  Cmp := MagnitudeCmp(MagA, MagB);
-  if Cmp = 0 then Exit(TUBigInt.One.Clone);
+  Remainder := [0];
+  if MagCmp(MagB, [0]) = 0 then Exit([0]);
+  if MagCmp(MagA, [0]) = 0 then Exit([0]);
+  if MagCmp(MagB, [1]) = 0 then Exit(MagA);
+  Cmp := MagCmp(MagA, MagB);
+  if Cmp = 0 then Exit([1]);
   if Cmp < 0 then
   begin
-    Remainder := MagA.Clone;
-    Exit(TUBigInt.Zero);
+    Remainder := MagA;
+    Exit([0]);
   end;
   Result := nil;
   SetLength(Result, Length(MagA));
   UClear(Result[0], Length(Result));
   Remainder := nil;
   SetLength(Remainder, Length(MagB) + 1);
-  UClear(Remainder[0], Length(Result));
+  UClear(Remainder[0], Length(Remainder));
   for i := High(MagA) downto 0 do
   begin
-    Remainder.ShiftLeft;
+    ShiftLeft(Remainder);
     Remainder[0] := MagA[i];
-    if MagnitudeCmp(MagB, Remainder) > 0 then Continue;
-    Digit := 0;
-    //todo: optimize
+    if MagCmp(MagB, Remainder) > 0 then Continue;
+    Digit := 0;//UMax(FindApproxMultiple(Remainder, MagB) - 1, 0);
+    if Digit > 0 then
+    begin
+      MagSubInPlace(Remainder, MagMul(MagB, [Digit]));
+    end;
     repeat
-      MagnitudeSubInPlace(Remainder, MagB);
+      MagSubInPlace(Remainder, MagB);
       Inc(Digit);
-    until MagnitudeCmp(Remainder, MagB) < 0;
-    Result.ShiftLeft;
+    until MagCmp(Remainder, MagB) < 0;
+    ShiftLeft(Result);
     Result[0] := Digit;
   end;
-  Result.NormalizeMagnitude;
-  Remainder.NormalizeMagnitude;
+  MagNorm(Result);
+  MagNorm(Remainder);
 end;
 
-class function TUBigIntImpl.MagnitudeMod(const MagA, MagB: TUBigInt): TUBigInt;
+class function TUBigIntImpl.MagMod(const MagA, MagB: TUInt8Array): TUInt8Array;
 begin
-  if not (MagA.IsValid and MagB.IsValid) then Exit(nil);
-  MagnitudeDiv(MagA, MagB, Result);
+  MagDiv(MagA, MagB, Result);
 end;
 
-class function TUBigIntImpl.RandomMagnitude(const BitSize: Int32): TUBigInt;
+class procedure TUBigIntImpl.MagNorm(var Mag: TUInt8Array);
+  var i, n: Int32;
+begin
+  n := 1;
+  for i := High(Mag) downto 0 do
+  if Mag[i] <> 0 then
+  begin
+    n := i + 1;
+    Break;
+  end;
+  if Length(Mag) = n then Exit;
+  SetLength(Mag, n);
+end;
+
+class function TUBigIntImpl.MagRand(const BitLength: Int32): TUInt8Array;
   var i, ByteLength, LastBits: Int32;
 begin
-  ByteLength := BitSize div 8;
-  LastBits := BitSize - (ByteLength * 8);
+  ByteLength := BitLength div 8;
+  LastBits := BitLength - (ByteLength * 8);
   if LastBits > 0 then Inc(ByteLength);
   Result := nil;
   SetLength(Result, ByteLength);
+  UClear(Result[0], Length(Result));
   for i := 0 to High(Result) do Result[i] := Random(256);
   if LastBits > 0 then
   begin
     i := High(Result);
     Result[i] := Result[i] and ($ff shr (8 - LastBits));
   end;
-  Result.NormalizeMagnitude;
+  MagNorm(Result);
 end;
 
-class function TUBigIntImpl.Make(const Number: String): TUBigInt;
-  var i, j, CurByte, NumStart: Int32;
-  var IsNegative: Boolean;
-  var Value, Carry: UInt16;
+class function TUBigIntImpl.MagModPow(const Base, Exponent, Modulus: TUInt8Array): TUInt8Array;
+  var TempBase, Square: TUInt8Array;
+  var i: Int32;
+  var Red: TUBarrettCtx;
 begin
-  NumStart := 1;
-  IsNegative := False;
-  if Number.StartsWith('-') then
+  Result := [1];
+  if MagCmp(Modulus, [1]) = 0 then Exit;
+  //Red.SetModulus(Modulus);
+  //TempBase := Red.Modulo(Base);
+  TempBase := TUBigInt.MagMod(Base, Modulus);
+  for i := 0 to Length(Exponent) * 8 - 1 do
   begin
-    IsNegative := True;
-    Inc(NumStart);
+    if MagGetBit(Exponent, i) then
+    begin
+      Result := MagMul(Result, TempBase);
+      //Result := Red.Modulo(Result);
+      Result := TUBigInt.MagMod(Result, Modulus);
+    end;
+    Square := MagMul(TempBase, TempBase);
+    //TempBase := Red.Modulo(Square);
+    TempBase := TUBigInt.MagMod(Square, Modulus);
   end;
-  for i := NumStart to Length(Number) do
-  if not (Number[i] in ['0'..'9']) then Exit(nil);
-  for i := NumStart to Length(Number) do
-  begin
-    if Number[i] <> '0' then Break;
-    Inc(NumStart);
-  end;
-  if NumStart > Length(Number) then Exit(TUBigInt.Zero);
+  //Result := Red.Modulo(Result);
+  Result := TUBigInt.MagMod(Result, Modulus);
+end;
+
+class function TUBigIntImpl.MagGetBit(const Mag: TUInt8Array; const Index: Int32): Boolean;
+  var ByteIndex: Int32;
+  var SubBit: Int8;
+begin
+  ByteIndex := Index div 8;
+  if ByteIndex > High(Mag) then Exit(False);
+  SubBit := Index - ByteIndex * 8;
+  Result := (Mag[ByteIndex] and (1 shl SubBit)) > 0;
+end;
+
+class function TUBigIntImpl.MagIsEven(const Mag: TUInt8Array): Boolean;
+begin
+  if Length(Mag) = 0 then Exit(True);
+  Result := (Mag[0] and 1) = 0;
+end;
+
+class function TUBigIntImpl.MagShiftLeftBytes(const Mag: TUInt8Array; const NumBytes: Int32): TUInt8Array;
+  var i: Int32;
+begin
   Result := nil;
-  SetLength(Result, Length(Number) + 1);
-  UClear(Result[0], Length(Result));
-  CurByte := 0;
-  for i := NumStart to Length(Number) do
-  begin
-    Carry := Ord(Number[i]) - Ord('0');
-    for j := 0 to CurByte do
-    begin
-      Value := Result[j] * 10 + Carry;
-      Result[j] := Value and $ff;
-      Carry := Value shr 8;
-    end;
-    if Carry > 0 then
-    begin
-      Inc(CurByte);
-      Result[CurByte] := Carry;
-    end;
-  end;
-  if Result[CurByte] and $80 > 0 then Inc(CurByte);
-  if IsNegative then Result[CurByte] := Result[CurByte] or $80;
-  i := CurByte + 1;
-  if Length(Result) > i then SetLength(Result, i);
+  SetLength(Result, Length(Mag));
+  if Length(Result) = 0 then Exit;
+  for i := High(Mag) downto NumBytes do Result[i] := Mag[i - NumBytes];
+  for i := 0 to NumBytes - 1 do
+  Result[i] := 0;
+end;
+
+class function TUBigIntImpl.MagShiftRightBytes(const Mag: TUInt8Array; const NumBytes: Int32): TUInt8Array;
+  var i: Int32;
+begin
+  Result := nil;
+  SetLength(Result, Length(Mag));
+  if Length(Result) = 0 then Exit;
+  for i := 0 to High(Mag) - NumBytes do Result[i] := Mag[i + NumBytes];
+  for i := High(Mag) downto High(Mag) - NumBytes + 1 do
+  Result[i] := 0;
+end;
+
+class procedure TUBigIntImpl.MagShiftLeftBytesInPlace(const Mag: TUInt8Array; const NumBytes: Int32);
+  var i: Int32;
+begin
+  if Length(Mag) = 0 then Exit;
+  for i := High(Mag) downto NumBytes do Mag[i] := Mag[i - NumBytes];
+  for i := 0 to NumBytes - 1 do Mag[i] := 0;
+end;
+
+class procedure TUBigIntImpl.MagShiftRightBytesInPlace(const Mag: TUInt8Array; const NumBytes: Int32);
+  var i: Int32;
+begin
+  if Length(Mag) = 0 then Exit;
+  for i := 0 to High(Mag) - NumBytes do Mag[i] := Mag[i + NumBytes];
+  for i := High(MAg) downto High(Mag) - NumBytes + 1 do
+  Mag[i] := 0;
+end;
+
+procedure TUBigIntImpl.Reset(const Size: UInt32);
+begin
+  Self.IsNegative := False;
+  Self.Value := nil;
+  SetLength(Self.Value, Size);
+  UClear(Self.Value[0], Length(Self.Value));
+end;
+
+procedure TUBigIntImpl.Normalize;
+begin
+  MagNorm(Self.Value);
 end;
 
 class function TUBigIntImpl.Make(const Number: Int64): TUBigInt;
@@ -4638,6 +4717,7 @@ class function TUBigIntImpl.Make(const Number: Int64): TUBigInt;
   var NumArr: array[0..SizeOf(Number) - 1] of UInt8 absolute Tmp;
   var i, n: Int32;
 begin
+  Result.IsNegative := Number < 0;
   Tmp := Number;
   if Number < 0 then Tmp := -Tmp;
   n := -1;
@@ -4648,152 +4728,200 @@ begin
     Break;
   end;
   if n < 0 then Exit(TUBigInt.Zero);
-  SetLength(Result, n + 1);
+  SetLength(Result.Value, n + 1);
   for i := 0 to n do
   begin
-    Result[i] := NumArr[i];
+    Result.Value[i] := NumArr[i];
   end;
-  Result.SignMagnitude(Number >= 0);
 end;
 
-class function TUBigIntImpl.MakeRandom(const ByteLength: Int32): TUBigInt;
-  var i: Int32;
+class function TUBigIntImpl.Make(const Number: String): TUBigInt;
+  procedure FromHex;
+    function HexToInt(const Hex: AnsiChar): UInt8;
+      var c: AnsiChar;
+    begin
+      c := LowerCase(Hex);
+      if c in ['0'..'9'] then Exit(Ord(c) - Ord('0'));
+      if c in ['a'..'f'] then Exit(10 + Ord(c) - Ord('a'));
+      Result := 0;
+    end;
+    var i, n, CurByte, NumStart: Int32;
+    var Digit: UInt8;
+  begin
+    if Length(Number) < 2 then Exit;
+    NumStart := 2;
+    Result.IsNegative := False;
+    for i := 2 to Length(Number) do
+    if not (
+      (LowerCase(Number[i]) in ['a'..'f'])
+      or (Number[i] in ['0'..'9'])
+    ) then Exit;
+    for i := NumStart to Length(Number) do
+    begin
+      if Number[i] <> '0' then Break;
+      Inc(NumStart);
+    end;
+    if NumStart > Length(Number) then Exit;
+    Result.Reset((Length(Number) - NumStart + 1) shr 1);
+    for i := Length(Number) downto NumStart do
+    begin
+      Digit := HexToInt(Number[i]);
+      n := Length(Number) - i;
+      if (n mod 2) = 1 then Digit := Digit shl 4;
+      CurByte := n shr 1;
+      Result.Value[CurByte] := Result.Value[CurByte] or Digit;
+    end;
+  end;
+  procedure FromDec;
+    var i, j, CurByte, NumStart: Int32;
+    var IsNegative: Boolean;
+    var Value, Carry: UInt16;
+  begin
+    NumStart := 1;
+    IsNegative := False;
+    if Number.StartsWith('-') then
+    begin
+      IsNegative := True;
+      Inc(NumStart);
+    end;
+    for i := NumStart to Length(Number) do
+    if not (Number[i] in ['0'..'9']) then Exit;
+    for i := NumStart to Length(Number) do
+    begin
+      if Number[i] <> '0' then Break;
+      Inc(NumStart);
+    end;
+    if NumStart > Length(Number) then Exit;
+    Result.Reset(Length(Number) + 1);
+    Result.IsNegative := IsNegative;
+    CurByte := 0;
+    for i := NumStart to Length(Number) do
+    begin
+      Carry := Ord(Number[i]) - Ord('0');
+      for j := 0 to CurByte do
+      begin
+        Value := Result.Value[j] * 10 + Carry;
+        Result.Value[j] := Value and $ff;
+        Carry := Value shr 8;
+      end;
+      if Carry > 0 then
+      begin
+        Inc(CurByte);
+        Result.Value[CurByte] := Carry;
+      end;
+    end;
+    i := CurByte + 1;
+    if Length(Result.Value) > i then SetLength(Result.Value, i);
+  end;
 begin
-  Result := nil;
-  SetLength(Result, ByteLength);
-  for i := 0 to High(Result) do Result[i] := Random(256);
-  Result.NormalizeMagnitude;
-  Result.SignMagnitude(True);
+  Result := TUBigInt.Zero;
+  if Number.StartsWith('$') then FromHex else FromDec;
 end;
 
-class function TUBigIntImpl.MakePrime(const ByteLength: Int32): TUBigInt;
-  function IsProbablePrime(const Number: TUBigInt; const Iterations: Int32 = 40): Boolean;
-    var d, a, x, NMinus1, r: TUBigInt;
+class function TUBigIntImpl.MakeRandom(const BitLength: Int32): TUBigInt;
+begin
+  Result.IsNegative := False;
+  Result.Value := MagRand(BitLength);
+end;
+
+class function TUBigIntImpl.MakePrime(const BitLength: Int32): TUBigInt;
+  function IsProbablePrime(const Number: TUInt8Array; const Iterations: Int32 = 40): Boolean;
+    var d, a, x, NMinus1, r: TUInt8Array;
     var s, i, j: Int32;
   begin
-    if MagnitudeCmp(Number, TUBigInt.One) <= 0 then Exit(False);
-    if MagnitudeCmp(Number, TUBigInt.Make(3)) <= 0 then Exit(True);
+    if MagCmp(Number, [1]) <= 0 then Exit(False);
+    if MagCmp(Number, [3]) <= 0 then Exit(True);
     s := 0;
-    NMinus1 := Subtraction(Number, TUBigInt.One);
+    NMinus1 := MagSub(Number, [1]);
     d := NMinus1;
-    while d.IsEven do
+    while MagIsEven(d) do
     begin
-      d := MagnitudeDiv(d, TUBigInt.Make(2), r);
+      d := MagDiv(d, [2], r);
       Inc(s);
     end;
     for i := 1 to Iterations do
     begin
-      a := RandomMagnitude(Length(Number) * 8 - 1);
-      x := ModPow(a, d, Number);
-      if MagnitudeCmp(x, TUBigInt.One) = 0 then Continue;
-      if MagnitudeCmp(x, NMinus1) = 0 then Continue;
+      a := MagRand(Length(Number) * 8 - 1);
+      x := MagModPow(a, d, Number);
+      if MagCmp(x, [1]) = 0 then Continue;
+      if MagCmp(x, NMinus1) = 0 then Continue;
       for j := 1 to s - 1 do
       begin
-        x := ModPow(x, TUBigInt.Make(2), Number);
-        if MagnitudeCmp(x, TUBigInt.One) = 0 then Exit(False);
-        if MagnitudeCmp(x, NMinus1) = 0 then Break;
+        x := MagModPow(x, [2], Number);
+        if MagCmp(x, [1]) = 0 then Exit(False);
+        if MagCmp(x, NMinus1) = 0 then Break;
       end;
-      if MagnitudeCmp(x, NMinus1) <> 0 then Exit(False);
+      if MagCmp(x, NMinus1) <> 0 then Exit(False);
     end;
     Result := True;
   end;
+  var n: Int32;
+  var pt, t: UInt64;
 begin
+  pt := GetTickCount64;
+  n := 0;
+  Result.IsNegative := False;
   repeat
-    Result := RandomMagnitude(ByteLength * 8);
-    Result[0] := Result[0] or 1;
-    if Length(Result) < ByteLength then
+    Result.Value := MagRand(BitLength);
+    Result.Value[0] := Result.Value[0] or 1;
+    WriteLn(Result.ToString);
+    //Sleep(1000);
+    Inc(n);
+    if (n mod 10) = 0 then
     begin
-      SetLength(Result, ByteLength);
-      Result[High(Result)] := Random(256) or (1 shl Random(8));
+      t := GetTickCount64;
+      WriteLn(n div 10, ' dt=', t - pt);
+      pt := t;
     end;
-  until IsProbablePrime(Result);
+  until IsProbablePrime(Result.Value, 2);
 end;
 
 class function TUBigIntImpl.Addition(const a, b: TUBigInt): TUBigInt;
-  function AddMag(const MagA, MagB: TUBigInt): TUBigInt;
-    var i: Int32;
-    var Carry: UInt16;
-    var ValA, ValB: UInt8;
-  begin
-    Result := nil;
-    SetLength(Result, UMax(Length(MagA), Length(MagB)) + 1);
-    UClear(Result[0], Length(Result));
-    Carry := 0;
-    for i := 0 to High(Result) do
-    begin
-      if i <= High(MagA) then ValA := MagA[i] else ValA := 0;
-      if i <= High(MagB) then ValB := MagB[i] else ValB := 0;
-      Carry += ValA + ValB;
-      Result[i] := Carry and $ff;
-      Carry := Carry shr 8;
-    end;
-    Result.NormalizeMagnitude;
-  end;
-  var TempA, TempB: TUBigInt;
-  var IsNegativeA, IsNegativeB: Boolean;
   var Cmp: Int8;
 begin
-  if not (a.IsValid and b.IsValid) then Exit(nil);
-  TempA := a.Magnitude;
-  IsNegativeA := not a.IsPositive;
-  TempB := b.Magnitude;
-  IsNegativeB := not b.IsPositive;
-  if IsNegativeA = IsNegativeB then
+  if a.IsNegative = b.IsNegative then
   begin
-    Result := AddMag(TempA, TempB);
-    Result.SignMagnitude(not IsNegativeA);
+    Result.Value := MagAdd(a.Value, b.Value);
+    Result.IsNegative := a.IsNegative;
   end
   else
   begin
-    Cmp := MagnitudeCmp(TempB, TempA);
+    Cmp := MagCmp(a.Value, b.Value);
     if Cmp = 0 then Exit(TUBigInt.Zero);
     if Cmp = 1 then
     begin
-      specialize USwap<TUBigInt>(TempA, TempB);
-      specialize USwap<Boolean>(IsNegativeA, IsNegativeB);
+      Result.Value := MagSub(a.Value, b.Value);
+      Result.IsNegative := a.IsNegative;
+    end
+    else
+    begin
+      Result.Value := MagSub(b.Value, a.Value);
+      Result.IsNegative := b.IsNegative;
     end;
-    Result := MagnitudeSub(TempA, TempB);
-    Result.SignMagnitude(not IsNegativeA);
   end;
 end;
 
 class function TUBigIntImpl.Subtraction(const a, b: TUBigInt): TUBigInt;
-  var NegB: TUBigInt;
+  var Temp: TUBigInt;
 begin
-  if not (a.IsValid and b.IsValid) then Exit(nil);
-  NegB := b.Clone;
-  NegB.SetSign(not b.IsPositive);
-  Result := Addition(a, NegB);
+  Temp := b;
+  Temp.IsNegative := not Temp.IsNegative;
+  Result := Addition(a, Temp);
 end;
 
 class function TUBigIntImpl.Multiplication(const a, b: TUBigInt): TUBigInt;
-  var TempA, TempB: TUBigInt;
-  var i, j, r: Int32;
-  var Carry: UInt32;
 begin
-  if not (a.IsValid and b.IsValid) then Exit(nil);
-  TempA := a.Magnitude;
-  TempB := b.Magnitude;
-  Result := MagnitudeMul(TempA, TempB);
-  Result.SignMagnitude(not ((not a.IsPositive) xor (not b.IsPositive)));
+  Result.Value := MagMul(a.Value, b.Value);
+  Result.IsNegative := (a.IsNegative) xor (b.IsNegative);
 end;
 
 class function TUBigIntImpl.Division(const a, b: TUBigInt; out Remainder: TUBigInt): TUBigInt;
-  var TempA, TempB: TUBigInt;
-  var IsNegativeA, IsNegativeB, ResultIsPositive: Boolean;
-  var Digit: UInt8;
-  var i: Int32;
-  var Cmp: Int8;
+  var ResultIsNegative: Boolean;
 begin
-  if not (a.IsValid and b.IsValid) then Exit(nil);
-  TempA := a.Magnitude;
-  IsNegativeA := not a.IsPositive;
-  TempB := b.Magnitude;
-  IsNegativeB := not b.IsPositive;
-  ResultIsPositive := not ((IsNegativeA) xor (IsNegativeB));
-  Result := MagnitudeDiv(TempA, TempB, Remainder);
-  Result.SignMagnitude(ResultIsPositive);
-  Remainder.SignMagnitude(ResultIsPositive);
+  ResultIsNegative := (a.IsNegative) xor (b.IsNegative);
+  Result.Value := MagDiv(a.Value, b.Value, Remainder.Value);
+  Result.IsNegative := ResultIsNegative;
+  Remainder.IsNegative := ResultIsNegative;
 end;
 
 class function TUBigIntImpl.Division(const a, b: TUBigInt): TUBigInt;
@@ -4803,103 +4931,38 @@ begin
 end;
 
 class function TUBigIntImpl.Modulo(const a, b: TUBigInt): TUBigInt;
-  var r: TUBigInt;
 begin
-  r := Division(a, b, Result);
-end;
-
-procedure TUBigIntImpl.SetSign(const Positive: Boolean);
-  var i: Int32;
-begin
-  if not IsValid then Exit;
-  i := High(Self);
-  if Positive then
-  begin
-    Self[i] := Self[i] and $7f;
-  end
-  else
-  begin
-    Self[i] := Self[i] or $80;
-  end;
-end;
-
-function TUBigIntImpl.IsPositive: Boolean;
-begin
-  if not IsValid then Exit(False);
-  Result := (Self[High(Self)] and $80) = 0;
-end;
-
-function TUBigIntImpl.IsEven: Boolean;
-begin
-  if not IsValid then Exit(False);
-  Result := (Self[0] and 1) = 0;
-end;
-
-function TUBigIntImpl.IsValid: Boolean;
-begin
-  Result := Length(Self) > 0;
+  Division(a, b, Result);
 end;
 
 class function TUBigIntImpl.Compare(const a, b: TUBigInt): Int8;
-  var IsNegativeA, IsNegativeB: Boolean;
-  var MagA, MagB: TUBigInt;
 begin
-  IsNegativeA := not a.IsPositive;
-  MagA := a.Magnitude;
-  IsNegativeB := not a.IsPositive;
-  MagB := b.Magnitude;
-  if IsNegativeA <> IsNegativeB then
+  if a.IsNegative = b.IsNegative then
   begin
-    if IsNegativeA then Exit(-1);
-    Exit(1);
-  end;
-  Result := MagnitudeCmp(MagA, MagB);
-  if IsNegativeA then Result := -Result;
-end;
-
-class function TUBigIntImpl.ModPow(const Base, Exponent, Modulus: TUBigInt): TUBigInt;
-  var TempBase, Square, Tmp: TUBigInt;
-  var i: Int32;
-begin
-  Result := TUBigInt.One.Clone;
-  if MagnitudeCmp(Modulus, TUBigInt.One) = 0 then Exit;
-  TempBase := MagnitudeMod(Base, Modulus);
-  for i := 0 to Length(Exponent) * 8 - 1 do
+    Result := MagCmp(a.Value, b.Value);
+    if a.IsNegative then Result := -Result;
+  end
+  else
   begin
-    if Exponent.GetBit(i) then
+    if (Length(a.Value) = 1) and (Length(b.Value) = 1)
+    and (a.Value[0] = 0) and (b.Value[0] = 0) then
     begin
-      Tmp := Result.Clone;
-      Result := MagnitudeMul(Tmp, TempBase);
-      Tmp := Result.Clone;
-      Result := MagnitudeMod(Tmp, Modulus);
+      Exit(0);
     end;
-    Square := MagnitudeMul(TempBase, TempBase);
-    TempBase := MagnitudeMod(Square, Modulus);
+    if a.IsNegative then Exit(-1);
+    Result := 1;
   end;
-  Result := MagnitudeMod(Result, Modulus);
-end;
-
-function TUBigIntImpl.GetBit(const BitIndex: Int32): Boolean;
-  var ByteIndex: Int32;
-  var SubBit: Int8;
-begin
-  if not IsValid then Exit(False);
-  ByteIndex := BitIndex div 8;
-  if ByteIndex > High(Self) then Exit(False);
-  SubBit := BitIndex - ByteIndex * 8;
-  Result := (Self[ByteIndex] and (1 shl SubBit)) > 0;
 end;
 
 function TUBigIntImpl.ToString: String;
   var i, CurByte: Int32;
-  var IsNegative: Boolean;
-  var Temp: TUBigInt;
   var Carry: Int16;
+  var Temp: TUInt8Array;
 begin
-  if not Self.IsValid then Exit('0');
-  IsNegative := not Self.IsPositive;
-  Temp := Self;
-  if IsNegative then Temp[High(Temp)] := Temp[High(Temp)] and $7f;
+  if Length(Self.Value) = 0 then Exit('0');
+  Temp := nil;
+  SetLength(Temp, Length(Self.Value));
+  Move(Self.Value[0], Temp[0], Length(Self.Value));
   CurByte := High(Temp);
   while (CurByte > 0) and (Temp[CurByte] = 0) do Dec(CurByte);
   Result := '';
@@ -4916,27 +4979,110 @@ begin
     while (CurByte > 0) and (Temp[CurByte] = 0) do Dec(CurByte);
   end;
   if Length(Result) = 0 then Exit('0')
-  else if IsNegative then Result := '-' + Result;
+  else if Self.IsNegative then Result := '-' + Result;
+end;
+
+function TUBigIntImpl.ToHex: String;
+  function IntToHex(const Value: UInt8): AnsiChar;
+  begin
+    if Value < 10 then Exit(AnsiChar(Ord('0') + Value));
+    Exit(AnsiChar(Ord('A') + (Value - 10)));
+  end;
+  var i: Int32;
+begin
+  Result := '';
+  for i := High(Self.Value) downto 0 do
+  begin
+    Result += IntToHex((Self.Value[i] shr 4) and $f);
+    Result += IntToHex(Self.Value[i] and $f);
+  end;
 end;
 
 function TUBigIntImpl.ToInt64: Int64;
   var i, n: Int32;
   var NumArr: array[0..7] of UInt8 absolute Result;
 begin
-  if not IsValid then Exit(0);
-  n := UMin(7, High(Self));
+  if Length(Self.Value) = 0 then Exit(0);
+  Result := 0;
+  n := UMin(7, High(Self.Value));
   for i := 0 to n do
   begin
-    NumArr[i] := Self[i];
+    NumArr[i] := Self.Value[i];
   end;
+  if Self.IsNegative then Result := -Result;
+end;
+
+function TUBigIntImpl.GetBit(const BitIndex: Int32): Boolean;
+begin
+  Result := MagGetBit(Self.Value, BitIndex);
+end;
+
+function TUBigIntImpl.IsEven: Boolean;
+begin
+  Result := MagIsEven(Self.Value);
+end;
+
+function TUBigIntImpl.GetSize: Int32;
+begin
+  Result := Length(Value);
 end;
 
 function TUBigIntImpl.Clone: TUBigInt;
 begin
-  if not IsValid then Exit(nil);
-  Result := nil;
-  SetLength(Result, Length(Self));
-  Move(Self[0], Result[0], Length(Self));
+  Result.IsNegative := IsNegative;
+  Result.Value := nil;
+  if Length(Value) = 0 then Exit;
+  SetLength(Result.Value, Length(Value));
+  Move(Value[0], Result.Value[0], Length(Value));
+end;
+
+function TUBigIntImpl.ShiftLeftBytes(const NumBytes: Int32): TUBigInt;
+begin
+  Result.IsNegative := IsNegative;
+  Result.Value := MagShiftLeftBytes(Value, NumBytes);
+end;
+
+function TUBigIntImpl.ShiftRightBytes(const NumBytes: Int32): TUBigInt;
+begin
+  Result.IsNegative := IsNegative;
+  Result.Value := MagShiftRightBytes(Value, NumBytes);
+end;
+
+procedure TUBigIntImpl.ShiftLeftBytesInPlace(const NumBytes: Int32);
+begin
+  MagShiftLeftBytesInPlace(Value, NumBytes);
+end;
+
+procedure TUBigIntImpl.ShiftRightBytesInPlace(const NumBytes: Int32);
+begin
+  MagShiftRightBytesInPlace(Value, NumBytes);
+end;
+
+procedure TUBigIntImpl.TUBarrettCtx.SetModulus(const Value: TUInt8Array);
+  var b, r: TUInt8Array;
+begin
+  M := Value;
+  b := nil;
+  SetLength(b, 2 * Length(Value));
+  UClear(b[0], Length(b));
+  b[High(b)] := 1;
+  Mu := TUBigInt.MagDiv(b, Value, r);
+end;
+
+function TUBigIntImpl.TUBarrettCtx.Modulo(const Value: TUInt8Array): TUInt8Array;
+  var q: TUInt8Array;
+  var k: Int32;
+begin
+  k := Length(M);
+  if TUBigInt.MagCmp(Value, M) < 0 then Exit(Value);
+  q := TUBigInt.MagMul(TUBigInt.MagShiftRightBytes(Value, k - 1), Mu);
+  TUBigInt.MagShiftRightBytesInPlace(q, k + 1);
+  Result := TUBigInt.MagSub(Value, TUBigInt.MagMul(q, M));
+  while TUBigInt.MagCmp(Result, M) >= 0 do
+  begin
+    TUBigInt.MagSubInPlace(Result, M);
+    TUBigInt.MagNorm(Result);
+  end;
 end;
 // TUBigInt end
 
