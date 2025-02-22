@@ -12,6 +12,8 @@ interface
 uses
 {$if defined(windows)}
   Windows,
+{$elseif defined(linux)}
+  BaseUnix,
 {$endif}
   SysUtils,
   Classes,
@@ -1650,7 +1652,7 @@ begin
     Addr.sin_addr := InAddrN;
     UClear(Request, SizeOf(Request));
     Request.RequestType := ICMP_ECHO;
-    Request.Identifier := GetCurrentProcessId mod 32768;
+    Request.Identifier := GetCurrentThreadId mod 32768;
     Request.SequenceNumber := 1;
     Request.Checksum := Checksum(@Request, SizeOf(Request));
     r := Sock.SendTo(@Request, SizeOf(Request), 0, @Addr, SizeOf(Addr));
