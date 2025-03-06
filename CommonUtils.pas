@@ -981,6 +981,23 @@ public
   class operator Finalize(var v: TUEvent);
 end;
 
+type TUArguments = record
+public
+  type TArg = record
+    Param, Value: String;
+  end;
+  type TArgs = array of TArg;
+strict private
+  var _Args: TArgs;
+  function FindParam(const ParamName: String): Int32;
+  procedure Initialize;
+public
+  property Args: TArgs read _Args;
+  function HasParam(const ParamName: String): Boolean;
+  function ParamValue(const ParamName: String): String;
+  class operator Initialize(var v: TUArguments);
+end;
+
 type TUTimer = record
 strict private
   var _Name: String;
@@ -5339,6 +5356,56 @@ begin
   v.Finalize;
 end;
 // TUEvent end
+
+// TUArguments begin
+function TUArguments.FindParam(const ParamName: String): Int32;
+  var i: Int32;
+  var ParamLC: String;
+begin
+  ParamLC := LowerCase(ParamName);
+  for i := 0 to High(_Args) do
+  if _Args[i].Param = ParamLC then Exit(i);
+  Result := -1;
+end;
+
+procedure TUArguments.Initialize;
+  var i: Int32;
+  var Arg: TStringArray;
+begin
+  if ParamCount = 0 then Exit;
+  SetLength(_Args, ParamCount);
+  for i := 0 to ParamCount - 1 do
+  begin
+    Arg := ParamStr(i + 1).Split('=');
+    if Arg[0].StartsWith('-') then Delete(Arg[0], 1, 1);
+    _Args[i].Param := LowerCase(Arg[0]);
+    if Length(Arg) < 2 then Continue;
+    _Args[i].Value := Arg[1];
+  end;
+  for i := 0 to High(_Args) do
+  begin
+    WriteLn(_Args[i].Param, '=', _Args[i].Value);
+  end;
+end;
+
+function TUArguments.HasParam(const ParamName: String): Boolean;
+begin
+  Result := FindParam(ParamName) > -1;
+end;
+
+function TUArguments.ParamValue(const ParamName: String): String;
+  var i: Int32;
+begin
+  i := FindParam(ParamName);
+  if i = -1 then Exit('');
+  Result := _Args[i].Value;
+end;
+
+class operator TUArguments.Initialize(var v: TUArguments);
+begin
+  v.Initialize;
+end;
+// TUArguments end
 
 // TUTimer begin
 procedure TUTimer.Initialize;

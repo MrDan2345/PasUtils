@@ -12,6 +12,7 @@ interface
 uses
 {$if defined(windows)}
   Windows,
+  WinSock2,
 {$endif}
   SysUtils,
   Classes,
@@ -73,6 +74,7 @@ const UNET_IPPROTO_ICMP = 1;
 
 const ICMP_ECHO = 8;
 
+const UOK = 0;
 {$if defined(windows)}
 const SOL_SOCKET = $ffff;
 const SO_DEBUG = $0001;
@@ -111,6 +113,84 @@ const SO_UPDATE_ACCEPT_CONTEXT = $700B;
 const SO_CONNECT_TIME = $700C;
 const TCP_NODELAY = $0001;
 const TCP_BSDURGENT = $7000;
+
+const IOCPARM_MASK = $7f;
+const IOC_VOID = $20000000;
+const IOC_OUT = $40000000;
+const IOC_IN = $80000000;
+const IOC_INOUT = (IOC_IN or IOC_OUT);
+const FIONREAD = UInt32(IOC_OUT or
+    ((UInt32(SizeOf(UInt32)) and IOCPARM_MASK) shl 16) or
+    (UInt32(UInt8('f')) shl 8) or 127
+);
+const FIONBIO = UInt32(IOC_IN or
+    ((UInt32(SizeOf(UInt32)) and IOCPARM_MASK) shl 16) or
+    (UInt32(UInt8('f')) shl 8) or 126
+);
+const FIOASYNC = UInt32(IOC_IN or
+    ((UInt32(SizeOf(UInt32)) and IOCPARM_MASK) shl 16) or
+    (UInt32(UInt8('f')) shl 8) or 125
+);
+
+const UBASEERR = 10000;
+const UEINTR = UBASEERR + 4;
+const UEBADF = UBASEERR + 9;
+const UEACCES = UBASEERR + 13;
+const UEFAULT = UBASEERR + 14;
+const UEINVAL = UBASEERR + 22;
+const UEMFILE = UBASEERR + 24;
+const UEWOULDBLOCK = UBASEERR + 35;
+const UEINPROGRESS = UBASEERR + 36;
+const UEALREADY = UBASEERR + 37;
+const UENOTSOCK = UBASEERR + 38;
+const UEDESTADDRREQ = UBASEERR + 39;
+const UEMSGSIZE = UBASEERR + 40;
+const UEPROTOTYPE = UBASEERR + 41;
+const UENOPROTOOPT = UBASEERR + 42;
+const UEPROTONOSUPPORT = UBASEERR + 43;
+const UESOCKTNOSUPPORT = UBASEERR + 44;
+const UEOPNOTSUPP = UBASEERR + 45;
+const UEPFNOSUPPORT = UBASEERR + 46;
+const UEAFNOSUPPORT = UBASEERR + 47;
+const UEADDRINUSE = UBASEERR + 48;
+const UEADDRNOTAVAIL = UBASEERR + 49;
+const UENETDOWN = UBASEERR + 50;
+const UENETUNREACH = UBASEERR + 51;
+const UENETRESET = UBASEERR + 52;
+const UECONNABORTED = UBASEERR + 53;
+const UECONNRESET = UBASEERR + 54;
+const UENOBUFS = UBASEERR + 55;
+const UEISCONN = UBASEERR + 56;
+const UENOTCONN = UBASEERR + 57;
+const UESHUTDOWN = UBASEERR + 58;
+const UETOOMANYREFS = UBASEERR + 59;
+const UETIMEDOUT = UBASEERR + 60;
+const UECONNREFUSED = UBASEERR + 61;
+const UELOOP = UBASEERR + 62;
+const UENAMETOOLONG = UBASEERR + 63;
+const UEHOSTDOWN = UBASEERR + 64;
+const UEHOSTUNREACH = UBASEERR + 65;
+const UENOTEMPTY = UBASEERR + 66;
+const UEPROCLIM = UBASEERR + 67;
+const UEUSERS = UBASEERR + 68;
+const UEDQUOT = UBASEERR + 69;
+const UESTALE = UBASEERR + 70;
+const UEREMOTE = UBASEERR + 71;
+const USYSNOTREADY = UBASEERR + 91;
+const UVERNOTSUPPORTED = UBASEERR + 92;
+const UNOTINITIALISED = UBASEERR + 93;
+const UEDISCON = UBASEERR + 101;
+const UENOMORE = UBASEERR + 102;
+const UECANCELLED = UBASEERR + 103;
+const UEINVALIDPROCTABLE = UBASEERR + 104;
+const UEINVALIDPROVIDER = UBASEERR + 105;
+const UEPROVIDERFAILEDINIT = UBASEERR + 106;
+const USYSCALLFAILURE = UBASEERR + 107;
+const USERVICE_NOT_FOUND = UBASEERR + 108;
+const UTYPE_NOT_FOUND = UBASEERR + 109;
+const U_E_NO_MORE = UBASEERR + 110;
+const U_E_CANCELLED = UBASEERR + 111;
+const UEREFUSED = UBASEERR + 112;
 {$else}
 const SOL_SOCKET = 1;
 const SO_DEBUG = 1;
@@ -145,6 +225,13 @@ const SO_TIMESTAMP = 29;
 const SCM_TIMESTAMP = SO_TIMESTAMP;
 const SO_ACCEPTCONN = 30;
 {$endif}
+
+MSG_OOB = $1;
+MSG_PEEK = $2;
+MSG_DONTROUTE = $4;
+MSG_INTERRUPT = $10;
+MSG_MAXIOVLEN = 16;
+MSG_PARTIAL = $8000;
 
 type TUSockLen = UInt32;
 type PUSockLen = ^TUSockLen;
@@ -264,6 +351,29 @@ type TUSocket = Int32;
 type PUSocket = ^TUSocket;
 const INVALID_SOCKET = TUSocket(not(0));
 
+type TTimeVal = record
+  tv_sec: Int32;
+  tv_usec: Int32;
+end;
+type PTimeVal = ^TTimeVal;
+
+{$if defined(windows)}
+type TUFDSet = record
+  const SETSIZE = 64;
+  var fd_count: UInt32;
+  var fd_array: array[0..SETSIZE - 1] of TUSocket;
+end;
+{$else}
+const UFD_MAXFDSET = 1024;
+{$ifdef cpu64}
+type TUFDSetUnit = UInt64;
+{$else}
+type TUFDSetUnit = UInt32;
+{$endif}
+type TUFDSet = array[0..(UFD_MAXFDSET div (8 * SizeOf(TUFDSetUnit))) - 1] of TUFDSetUnit;
+{$endif}
+type PUFDSet = ^TUFDSet;
+
 type TUMacAddrImpl = type helper for TUMacAddr
   const Zero: TUMacAddr = (0, 0, 0, 0, 0, 0);
   const Broadcast: TUMacAddr = ($ff, $ff, $ff, $ff, $ff, $ff);
@@ -272,6 +382,7 @@ end;
 
 type TUInAddrImpl = type helper for TUInAddr
   const Zero: TUInAddr = (Addr32: 0);
+  const Any: TUInAddr = (Addr32: 0);
   const LocalhostH: TUInAddr = (Addr8: (1, 0, 0, 127));
   const LocalhostN: TUInAddr = (Addr8: (127, 0, 0, 1));
   const Broadcast: TUInAddr = (Addr32: $ffffffff);
@@ -350,6 +461,9 @@ type TUSocketImpl = type helper for TUSocket
     const OptName: Int32;
     const OptVal: Int32
   ): Int32;
+  function SelectRead(const TimeoutMs: UInt32 = UInt32(-1)): Int32;
+  function SelectWrite(const TimeoutMs: UInt32 = UInt32(-1)): Int32;
+  function SetBlocking(const Blocking: Boolean): Int32;
   function Shutdown(const How: Int32 = SHUT_RDWR): Int32;
   function Close: Int32;
   function IsValid: Boolean;
@@ -728,7 +842,21 @@ function UNetSetSockOpt(
 function UNetSocketPair(
     Domain: Int32; SockType: Int32; Protocol: Int32; OutSock: PInt32
 ): Int32; call_decl; external SockLib name 'socketpair';
+function USelect(
+    nfds: Int32;
+    ReadFDs, WriteFDs, ExceptFDs: PUFDSet;
+    Timeout: PTimeVal
+): Int32; call_decl; external SockLib name 'select';
+function USelect(
+    const ReadFDs, WriteFDs, ExceptFDs: array of TUSocket;
+    const Timeout: PTimeVal
+): Int32;
 {$if defined(windows)}
+function UNetIOCtl(
+    Sock: Int32;
+    Cmd: UInt32;
+    Arg: PUInt32
+): Int32; call_decl; external SockLib name 'ioctlsocket';
 function UNetClose(
     Sock: Int32
 ): Int32; call_decl; external SockLib name 'closesocket';
@@ -771,6 +899,11 @@ function UNetStrToHostAddr6(const AddrStr: AnsiString): TUInAddr6;
 function UNetNetAddrToStr6(const Addr: TUInAddr6): AnsiString;
 function UNetStrToNetAddr6(const AddrStr: AnsiString): TUInAddr6;
 function UNetTryStrToNetAddr6(const AddrStr: AnsiString; out OutAddr: TUInAddr6): Boolean;
+
+procedure UNetFDZero(out FDSet: TUFDSet);
+procedure UNetFDClr(var FDSet: TUFDSet; const FileDesc: TUSocket);
+function UNetFDIsSet(const FDSet: TUFDSet; const FileDesc: TUSocket): Boolean;
+procedure UNetFDSet(var FDSet: TUFDSet; const FileDesc: TUSocket);
 
 implementation
 
@@ -922,6 +1055,31 @@ begin
   Result := SetSockOpt(SOL_SOCKET, OptName, @OptVal, SizeOf(OptVal));
 end;
 
+function TUSocketImpl.SelectRead(const TimeoutMs: UInt32): Int32;
+  var tv: TTimeVal;
+begin
+  if TimeoutMs = UInt32(-1) then Exit(USelect([Self], [], [], nil));
+  tv.tv_sec := TimeoutMs div 1000;
+  tv.tv_usec := (TimeoutMs mod 1000) * 1000;
+  Result := USelect([Self], [], [], @tv);
+end;
+
+function TUSocketImpl.SelectWrite(const TimeoutMs: UInt32): Int32;
+  var tv: TTimeVal;
+begin
+  if TimeoutMs = UInt32(-1) then Exit(USelect([], [Self], [], nil));
+  tv.tv_sec := TimeoutMs div 1000;
+  tv.tv_usec := (TimeoutMs mod 1000) * 1000;
+  Result := USelect([Self], [], [], @tv);
+end;
+
+function TUSocketImpl.SetBlocking(const Blocking: Boolean): Int32;
+  var Value: UInt32;
+begin
+  Value := UInt32(not Blocking);
+  Result := UNetIOCtl(Self, FIONBIO, @Value);
+end;
+
 function TUSocketImpl.Shutdown(const How: Int32): Int32;
 begin
   Result := UNetShutDown(Self, How);
@@ -930,6 +1088,7 @@ end;
 function TUSocketImpl.Close: Int32;
 begin
   Result := UNetClose(Self);
+  Self := -1;
 end;
 
 function TUSocketImpl.IsValid: Boolean;
@@ -1408,6 +1567,48 @@ begin
   inherited Destroy;
 end;
 
+function USelect(
+  const ReadFDs, WriteFDs, ExceptFDs: array of TUSocket;
+  const Timeout: PTimeVal
+): Int32;
+  var MaxFD: Int32;
+  function MakeSet(const FileDesc: array of TUSocket): TUFDSet;
+    var i: Int32;
+  begin
+    UNetFDZero(Result);
+    if Length(FileDesc) = 0 then Exit;
+    for i := 0 to High(FileDesc) do
+    begin
+      UNetFDSet(Result, FileDesc[i]);
+      if FileDesc[i] > MaxFD then MaxFD := FileDesc[i];
+    end;
+  end;
+  var SetRead, SetWrite, SetExcept: TUFDSet;
+  var PtrRead, PtrWrite, PtrExcept: PUFDSet;
+begin
+  MaxFD := 0;
+  PtrRead := nil;
+  if Length(ReadFDs) > 0 then
+  begin
+    SetRead := MakeSet(ReadFDs);
+    PtrRead := @SetRead;
+  end;
+  PtrWrite := nil;
+  if Length(WriteFDs) > 0 then
+  begin
+    SetWrite := MakeSet(WriteFDs);
+    PtrWrite := @SetWrite;
+  end;
+  PtrExcept := nil;
+  if Length(ExceptFDs) > 0 then
+  begin
+    SetExcept := MakeSet(ExceptFDs);
+    PtrExcept := @SetExcept;
+  end;
+  Result := USelect(MaxFD + 1, @SetRead, nil, nil, Timeout);
+  if Result = -1 then Result := WSAGetLastError;
+end;
+
 function UNetHostName: String;
   var Buffer: array[0..255] of AnsiChar;
 begin
@@ -1616,10 +1817,6 @@ function UNetPing(const InAddrN: TUInAddr): Boolean;
     SequenceNumber: UInt16;
   end;
   type PICMPHeader = ^TICMPHeader;
-  type TTimeVal = record
-    tv_sec: Int32;
-    tv_usec: Int32;
-  end;
   function Checksum(const Buffer: Pointer; const BufferSize: UInt16): UInt16;
     var i: Int32;
   begin
@@ -1870,6 +2067,74 @@ function UNetTryStrToNetAddr6(const AddrStr: AnsiString; out OutAddr: TUInAddr6)
 begin
 
 end;
+
+procedure UNetFDZero(out FDSet: TUFDSet);
+begin
+  UClear(FDSet, SizeOf(FDSet));
+end;
+
+{$if defined(windows)}
+procedure UNetFDClr(var FDSet: TUFDSet; const FileDesc: TUSocket);
+  var i, j: Int32;
+begin
+  for i := 0 to FDSet.fd_count - 1 do
+  begin
+    if FDSet.fd_array[i] <> FileDesc then Continue;
+    for j := i to FDSet.fd_count - 2 do
+    begin
+      FDSet.fd_array[j] := FDSet.fd_array[j + 1];
+    end;
+    Dec(FDSet.fd_count);
+    Break;
+  end;
+end;
+
+function UNetFDIsSet(const FDSet: TUFDSet; const FileDesc: TUSocket): Boolean;
+  var i: Int32;
+begin
+  for i := 0 to FDSet.fd_count - 1 do
+  if FDSet.fd_array[i] = FileDesc then Exit(True);
+  Result := False;
+end;
+
+procedure UNetFDSet(var FDSet: TUFDSet; const FileDesc: TUSocket);
+  var i: Int32;
+begin
+  if FDSet.fd_count = FDSet.SETSIZE then Exit;
+  i := FDSet.fd_count;
+  FDSet.fd_array[i] := FileDesc;
+  Inc(FDSet.fd_count);
+end;
+{$else}
+function UNetFDClr(var FDSet: TUFDSet; const FileDesc: TUSocket): Int32;
+  var i, j: Int32;
+begin
+  i := FileDesc;
+  if (i < 0) or (i >= UFD_MAXFDSET) then Exit(-1);
+  j := i shr 5;
+  FDSet[j] := FDSet[j] and UInt32(not (UInt32(1) shl (i and (1 shl 5 - 1))));
+  Result := 0;
+end;
+
+function UNetFDIsSet(const FDSet: TUFDSet; const FileDesc: TUSocket): Int32;
+  var i: Int32;
+begin
+  i := FileDesc;
+  if (i < 0) or (i >= UFD_MAXFDSET) then Exit(-1);
+  Result := Int32(((FDSet[i shr 5]) and (UInt32(1) shl (i and (1 shl 5 - 1)))) > 0);
+end;
+
+//#define FD_SET(fd, set) ((set)->fds_bits[((fd) / (8 * sizeof(long)))] |= (1UL << ((fd) % (8 * sizeof(long)))))
+procedure UNetFDSet(var FDSet: TUFDSet; const FileDesc: TUSocket);
+  var i, j: Int32;
+  var n: TUFDSetUnit;
+begin
+  i := FileDesc;
+  j := i div (8 * SizeOf(TUFDSetUnit));
+  n := TUFDSetUnit(1) shl (i mod (8 * SizeOf(TUFDSetUnit)));
+  FDSet[j] := FDSet[j] or n;
+end;
+{$endif}
 
 procedure UNetInitialize;
 {$if defined(windows)}
