@@ -1607,7 +1607,7 @@ begin
     PtrExcept := @SetExcept;
   end;
   Result := USelect(MaxFD + 1, @SetRead, nil, nil, Timeout);
-  if Result = -1 then Result := WSAGetLastError;
+  //if Result = -1 then Result := WSAGetLastError;
 end;
 
 function UNetHostName: String;
