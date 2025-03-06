@@ -22,7 +22,7 @@ unit CommonUtils;
 interface
 
 uses
-  SysUtils, Classes, TypInfo;
+  SysUtils, Classes, TypInfo, Process;
 
 type TUProcedure = procedure of object;
 type TUFunction = function: Boolean of object;
@@ -87,6 +87,11 @@ type PUMat = ^TUMat;
 type TUMatArr = array[UInt32] of TUMat;
 type PUMatArr = ^TUMatArr;
 type TUMatArray = array of TUMat;
+type TUMat2 = array[0..1, 0..1] of TUFloat; // TUMat2Impl
+type PUMat2 = ^TUMat2;
+type TUMat2Arr = array[UInt32] of TUMat2;
+type PUMat2Arr = ^TUMat2Arr;
+type TUMat2Array = array of TUMat2;
 type TUVec2 = array[0..1] of TUFloat; // TUVec2Impl
 type PUVec2 = ^TUVec2;
 type TUVec2Arr = array[UInt32] of TUVec2;
@@ -148,6 +153,11 @@ type TUBounds2i = array[0..1] of TUVec2i; // TUBounds2iImpl
 type PUBounds2i = ^TUBounds2i;
 type TUBounds3i = array[0..1] of TUVec3i; // TUBounds3iImpl
 type PUBounds3i = ^TUBounds3i;
+type TUBigInt = record
+  IsNegative: Boolean;
+  Value: TUInt8Array;
+end;
+type TUInt4096 = array[0..128] of UInt32; // TUInt4096Impl
 
 type TUSwizzle = record
 private
@@ -362,6 +372,31 @@ public
   function ToString: String;
 end;
 
+type TUMat2Impl = type helper for TUMat2
+private
+  function GetElement(const Index: UInt32): TUFloat;
+  procedure SetElement(const Index: UInt32; const Value: TUFloat);
+  function GetAxisX: TUVec2;
+  procedure SetAxisX(const Value: TUVec2);
+  function GetAxisY: TUVec2;
+  procedure SetAxisY(const Value: TUVec2);
+public
+  const Zero: TUMat2 = ((0, 0), (0, 0));
+  const Identity: TUMat2 = ((1, 0), (0, 1));
+  property Element[const Index: UInt32]: TUFloat read GetElement write SetElement; default;
+  property AxisX: TUVec2 read GetAxisX write SetAxisX;
+  property AxisY: TUVec2 read GetAxisY write SetAxisY;
+  class function Make(
+    const e00, e10: TUFloat;
+    const e01, e11: TUFloat
+  ): TUMat2; static;
+  procedure SetValue(
+    const e00, e10: TUFloat;
+    const e01, e11: TUFloat
+  ); inline;
+  function ToString: String;
+end;
+
 type TUVec2Impl = type helper for TUVec2
 private
   function GetX: TUFloat;
@@ -378,6 +413,7 @@ public
   class function Make(const s: TUFloat): TUVec2; static; overload; inline;
   class function Dot(const v0, v1: TUVec2): TUFloat; static; overload;
   class function Cross(const v0, v1: TUVec2): TUFloat; static; overload;
+  class function Angle(const v0, v1: TUVec2): TUFloat; static; overload;
   class function Perp(const v: TUVec2): TUVec2; static; overload;
   class function Norm(const v: TUVec2): TUVec2; static; overload;
   class function Reflect(const v, n: TUVec2): TUVec2; static; overload;
@@ -385,8 +421,10 @@ public
   procedure SetValue(const Ax, Ay: TUFloat); inline;
   function Transform(const r: TURot2): TUVec2;
   function TransformInv(const r: TURot2): TUVec2;
+  function Transform(const m2: TUMat2): TUVec2;
   function Dot(const v: TUVec2): TUFloat; overload;
   function Cross(const v: TUVec2): TUFloat; overload;
+  function Angle(const v: TUVec2): TUFloat; overload;
   function Perp: TUVec2; overload;
   function Norm: TUVec2; overload;
   function Reflect(const n: TUVec2): TUVec2; overload;
@@ -809,6 +847,117 @@ public
   function Overlap(const Other: TUBounds3i): Boolean;
 end;
 
+type TUBigIntImpl = type helper for TUBigInt
+private
+  type TUBarrettCtx = record
+  public
+    M: TUInt8Array;
+    Mu: TUInt8Array;
+    procedure SetModulus(const Value: TUInt8Array);
+    function Modulo(const Value: TUInt8Array): TUInt8Array;
+  end;
+  class function MagClone(const Mag: TUInt8Array): TUInt8Array; static;
+  class function MagCmp(const MagA, MagB: TUInt8Array): Int8; static;
+  class function MagAdd(const MagA, MagB: TUInt8Array): TUInt8Array; static;
+  class function MagSub(const MagA, MagB: TUInt8Array): TUInt8Array; static;
+  class procedure MagSubInPlace(var MagA: TUInt8Array; const MagB: TUInt8Array); static;
+  class function MagMul(const MagA, MagB: TUInt8Array): TUInt8Array; static;
+  class function MagDiv(const MagA, MagB: TUInt8Array; out Remainder: TUInt8Array): TUInt8Array; static;
+  class function MagMod(const MagA, MagB: TUInt8Array): TUInt8Array; static;
+  class procedure MagNorm(var Mag: TUInt8Array); static;
+  class function MagRand(const BitLength: Int32): TUInt8Array; static;
+  class function MagModPow(const Base, Exponent, Modulus: TUInt8Array): TUInt8Array; static;
+  class function MagGetBit(const Mag: TUInt8Array; const Index: Int32): Boolean; static;
+  class function MagIsEven(const Mag: TUInt8Array): Boolean; static;
+  class function MagShiftLeftBytes(const Mag: TUInt8Array; const NumBytes: Int32): TUInt8Array; static;
+  class function MagShiftRightBytes(const Mag: TUInt8Array; const NumBytes: Int32): TUInt8Array; static;
+  class procedure MagShiftLeftBytesInPlace(const Mag: TUInt8Array; const NumBytes: Int32); static;
+  class procedure MagShiftRightBytesInPlace(const Mag: TUInt8Array; const NumBytes: Int32); static;
+  procedure Reset(const Size: UInt32);
+  procedure Normalize;
+public
+  const Zero: TUBigInt = (IsNegative: False; Value: (0));
+  const One: TUBigInt = (IsNegative: False; Value: (1));
+  class function Make(const Number: Int64): TUBigInt; static;
+  class function Make(const Number: String): TUBigInt; static;
+  class function MakeRandom(const BitLength: Int32 = 4096): TUBigInt; static;
+  class function MakePrime(const BitLength: Int32 = 4096): TUBigInt; static;
+  class function Addition(const a, b: TUBigInt): TUBigInt; static;
+  class function Subtraction(const a, b: TUBigInt): TUBigInt; static;
+  class function Multiplication(const a, b: TUBigInt): TUBigInt; static;
+  class function Division(const a, b: TUBigInt; out Remainder: TUBigInt): TUBigInt; static; overload;
+  class function Division(const a, b: TUBigInt): TUBigInt; static; overload;
+  class function Modulo(const a, b: TUBigInt): TUBigInt; static;
+  class function Compare(const a, b: TUBigInt): Int8; static;
+  function ToString: String;
+  function ToHex: String;
+  function ToInt64: Int64;
+  function GetBit(const BitIndex: Int32): Boolean;
+  function IsEven: Boolean;
+  function GetSize: Int32;
+  function Clone: TUBigInt;
+  function ShiftLeftBytes(const NumBytes: Int32): TUBigInt;
+  function ShiftRightBytes(const NumBytes: Int32): TUBigInt;
+  procedure ShiftLeftBytesInPlace(const NumBytes: Int32);
+  procedure ShiftRightBytesInPlace(const NumBytes: Int32);
+end;
+
+type TUInt4096Impl = type helper for TUInt4096
+public
+  type TFlag = (if_invalid, if_negative);
+  type TFlgas = set of TFlag;
+strict private
+  const MaxItem = 127;
+  const FlagsItem = 128;
+  const ItemVal: Int64 = 4294967296;
+  function Top: Int32;
+  function CheckFlag(const Flag: TFlag): Boolean;
+  procedure SetFlag(const Flag: TFlag; const Value: Boolean);
+  class function MagCmp(const a, b: TUInt4096): Int8; static;
+  class function MagSub(const a, b: TUInt4096): TUInt4096; static;
+  class function MagAdd(const a, b: TUInt4096): TUInt4096; static;
+  class procedure MagSubInPlace(var a: TUInt4096; const b: TUInt4096); static;
+  class function MagMul(const a, b: TUInt4096): TUInt4096; static;
+  class function MagDiv(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static;
+public
+  const Zero: TUInt4096 = (
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0 // <- flags
+  );
+  const One: TUInt4096 = (
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0
+  );
+  const Invalid: TUInt4096 = (
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1
+  );
+  function IsPositive: Boolean;
+  function IsNegative: Boolean;
+  procedure SetPositive(const Value: Boolean);
+  procedure SetNegative(const Value: Boolean);
+  class function Make(const Number: Int64): TUInt4096; static;
+  class function Make(const Number: String): TUInt4096; static;
+  class function MakeRandom(const BitCount: Int32 = 4096): TUInt4096; static;
+  class function Addition(const a, b: TUInt4096): TUInt4096; static;
+  class function Subtraction(const a, b: TUInt4096): TUInt4096; static;
+  class function Multiplication(const a, b: TUInt4096): TUInt4096; static;
+  class function Division(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static;
+  class function Compare(const a, b: TUInt4096): Int8; static;
+  function ToString: String;
+  function ToHex: String;
+  function BitsUsed: Int32;
+end;
+
 type TUTransform = record
 strict private
   var _Rotation: TUQuat;
@@ -1045,16 +1194,16 @@ public
   generic function Read<T>: T; inline;
   function WriteBuffer(const Buffer: Pointer; const Count: Int64): Int64; inline;
   procedure WriteBool(const Value: Boolean); inline;
-  procedure WriteUInt8(const value: UInt8); inline;
-  procedure WriteUInt16(const value: UInt16); inline;
-  procedure WriteUInt32(const value: UInt32); inline;
-  procedure WriteUInt64(const value: UInt64); inline;
-  procedure WriteInt8(const value: Int8); inline;
-  procedure WriteInt16(const value: Int16); inline;
-  procedure WriteInt32(const value: Int32); inline;
-  procedure WriteInt64(const value: Int64); inline;
-  procedure WriteFloat(const value: Single); inline;
-  procedure WriteDouble(const value: Double); inline;
+  procedure WriteUInt8(const Value: UInt8); inline;
+  procedure WriteUInt16(const Value: UInt16); inline;
+  procedure WriteUInt32(const Value: UInt32); inline;
+  procedure WriteUInt64(const Value: UInt64); inline;
+  procedure WriteInt8(const Value: Int8); inline;
+  procedure WriteInt16(const Value: Int16); inline;
+  procedure WriteInt32(const Value: Int32); inline;
+  procedure WriteInt64(const Value: Int64); inline;
+  procedure WriteFloat(const Value: Single); inline;
+  procedure WriteDouble(const Value: Double); inline;
   procedure WriteStringRaw(const Value: String); inline;
   procedure WriteString(const Value: String); inline;
   procedure WriteStringNT(const Value: String); inline;
@@ -1394,8 +1543,8 @@ private
   function GetAttribute(const Index: Integer): TAttribute; inline;
   function GetAttributeValue(const AttName: String): String;
   function GetAttributeCount: Integer; inline;
-  function GetChild(const Index: Integer): TUXML; inline;
-  function GetChildCount: Integer; inline;
+  function GetChild(const Index: Integer): TUXML;
+  function GetChildCount: Integer;
   function GetChildContent(const NodeName: String): String; inline;
 public
   property Name: String read _Name;
@@ -1624,9 +1773,9 @@ generic function UEndianSwap<T>(const v: T): T; inline; overload;
 function UEndianSwap(const v: UInt16): UInt16; inline; overload;
 function UEndianSwap(const v: UInt32): UInt32; inline; overload;
 function UEndianSwap(const v: UInt64): UInt64; inline; overload;
-function UEndianSwap(const v: Int16): UInt16; inline; overload;
-function UEndianSwap(const v: Int32): UInt32; inline; overload;
-function UEndianSwap(const v: Int64): UInt64; inline; overload;
+function UEndianSwap(const v: Int16): Int16; inline; overload;
+function UEndianSwap(const v: Int32): Int32; inline; overload;
+function UEndianSwap(const v: Int64): Int64; inline; overload;
 generic procedure UByteSwap<T>(var v: T); inline; overload;
 procedure UByteSwap(var v: UInt16); inline; overload;
 procedure UByteSwap(var v: UInt32); inline; overload;
@@ -1634,8 +1783,8 @@ procedure UByteSwap(var v: UInt64); inline; overload;
 procedure UByteSwap(var v: Int16); inline; overload;
 procedure UByteSwap(var v: Int32); inline; overload;
 procedure UByteSwap(var v: Int64); inline; overload;
-generic procedure UByteSwapRecord<T>(var Rec: T); inline;
-generic procedure UByteSwapArray<T>(var Arr: array of T); inline;
+generic procedure UByteSwapRecord<T>(var Rec: T);
+generic procedure UByteSwapArray<T>(var Arr: array of T);
 generic procedure USwap<T>(var a: T; var b: T); inline; overload;
 procedure USwap(var a: Int8; var b: Int8); inline; overload;
 procedure USwap(var a: Int16; var b: Int16); inline; overload;
@@ -1715,6 +1864,7 @@ function UXct3Planes(const p1, p2, p3: TUPlane; out xp: TUVec3): Boolean;
 function UXct3DRayPlane(const r: TURay3; const p: TUPlane; out xp: TUVec3; out xd: TUFloat): Boolean;
 function UXct3DRayTriangle(const r: TURay3; const v0, v1, v2: TUVec3; out xp: TUVec3; out xd: TUFloat): Boolean;
 function UProj2DPointToLine(const lv0, lv1, v: TUVec2; out InSegment: Boolean): TUVec2;
+function UProj2DPointToSegment(const lv0, lv1, v: TUVec2): TUVec2;
 function UProj2DPointToBounds(const b: TUBounds2f; const v: TUVec2): TUVec2;
 function UProj3DPointToLine(const lv0, lv1, v: TUVec3; out InSegment: Boolean): TUVec3;
 function UProj3DPointToPlane(const v: TUVec3; const p: TUPlane): TUVec3;
@@ -1730,6 +1880,9 @@ function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boo
 function UStrExtractNumber(const Str: String; const Offset: Int32 = 1): Int32;
 function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
+function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32 = 1): UInt32;
+function UStrUTF8ToUTF32(const StrUTF8: String): TUInt32Array;
+function UStrUTF32ToUTF8(const Code: UInt32): String;
 function UFileToStr(const FileName: String): String;
 function UFileSearch(const Path: String): TUStrArray;
 procedure UCopyFilePrepare(const BufferSize: UInt32 = 1024 * 1024 * 1024);
@@ -1738,6 +1891,15 @@ procedure UCopyFile(const SrcFile, DstFile: String);
 procedure UCopyDir(const SrcDir, DstDir: String; const LogProc: TUProcedureString = nil);
 procedure ULog(const Text: String; const Offset: Int32 = 0);
 procedure ULogOffset(const Offset: Int32);
+function UExec(
+  const Dir: String;
+  const ExePath: String;
+  const Params: array of String;
+  const OutputFile: String = '';
+  const OutputList: TStringList = nil;
+  const WriteConsole: Boolean = True;
+  const OnOutput: TUProcedureString = nil
+): Int32;
 
 generic procedure UArrSort<T>(var Arr: array of T); overload;
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>); overload;
@@ -1777,6 +1939,8 @@ operator / (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator mod (const v: TUVec2i; const i: Int32): TUVec2i;
 operator := (const v: TUVec2): TUVec2i;
 operator := (const v: TUVec2i): TUVec2;
+operator := (const i: Int32): TUVec2i;
+operator := (const f: TUFloat): TUVec2;
 operator + (const a, b: TUVec3): TUVec3;
 operator - (const a, b: TUVec3): TUVec3;
 operator * (const a, b: TUVec3): TUVec3;
@@ -1876,6 +2040,7 @@ function TUSwizzle.ToString: String;
   const Names: array[0..3] of AnsiChar = ('X', 'Y', 'Z', 'W');
   var i: Int32;
 begin
+  Result := '';
   SetLength(Result, 4);
   for i := 0 to Length(Result) - 1 do
   begin
@@ -2587,6 +2752,66 @@ begin
     ]
   );
 end;
+
+function TUMat2Impl.GetElement(const Index: UInt32): TUFloat;
+begin
+  Result := Self[Index shr 1, Index mod 2];
+end;
+
+procedure TUMat2Impl.SetElement(const Index: UInt32; const Value: TUFloat);
+begin
+  Self[Index shr 1, Index mod 2] := Value;
+end;
+
+function TUMat2Impl.GetAxisX: TUVec2;
+begin
+  Result := PUVec2(@Self[0, 0])^;
+end;
+
+procedure TUMat2Impl.SetAxisX(const Value: TUVec2);
+begin
+  PUVec2(@Self[0, 0])^ := Value;
+end;
+
+function TUMat2Impl.GetAxisY: TUVec2;
+begin
+  Result := PUVec2(@Self[1, 0])^;
+end;
+
+procedure TUMat2Impl.SetAxisY(const Value: TUVec2);
+begin
+  PUVec2(@Self[1, 0])^ := Value;
+end;
+
+class function TUMat2Impl.Make(const e00, e10: TUFloat; const e01, e11: TUFloat): TUMat2;
+begin
+  Result[0, 0] := e00;
+  Result[1, 0] := e10;
+  Result[0, 1] := e01;
+  Result[1, 1] := e11;
+end;
+
+procedure TUMat2Impl.SetValue(const e00, e10: TUFloat; const e01, e11: TUFloat);
+begin
+  Self[0, 0] := e00;
+  Self[1, 0] := e10;
+  Self[0, 1] := e01;
+  Self[1, 1] := e11;
+end;
+
+function TUMat2Impl.ToString: String;
+begin
+  Result := Format(
+    '{'#$A +
+    '  %0:0.2f, %1:0.2f'#$A +
+    '  %2:0.2f, %3:0.2f'#$A +
+    '}',
+    [
+      Self[0, 0], Self[1, 0],
+      Self[0, 1], Self[1, 1]
+    ]
+  );
+end;
 // TUMatImpl end
 
 // TUVec2Impl begin
@@ -2629,6 +2854,11 @@ end;
 class function TUVec2Impl.Cross(const v0, v1: TUVec2): TUFloat;
 begin
   Result := v0[0] * v1[1] - v0[1] * v1[0];
+end;
+
+class function TUVec2Impl.Angle(const v0, v1: TUVec2): TUFloat;
+begin
+  Result := UArcTan2(v0.x * v1.y - v0.y * v1.x, v0.x * v1.x + v0.y * v1.y);
 end;
 
 class function TUVec2Impl.Perp(const v: TUVec2): TUVec2;
@@ -2678,6 +2908,14 @@ begin
   Result := r.TransformInv(Self);
 end;
 
+function TUVec2Impl.Transform(const m2: TUMat2): TUVec2;
+begin
+  Result := TUVec2.Make(
+    Self[0] * m2[0, 0] + Self[1] * m2[1, 0],
+    Self[0] * m2[0, 1] + Self[1] * m2[1, 1]
+  );
+end;
+
 function TUVec2Impl.Dot(const v: TUVec2): TUFloat;
 begin
   Result := Dot(Self, v);
@@ -2686,6 +2924,11 @@ end;
 function TUVec2Impl.Cross(const v: TUVec2): TUFloat;
 begin
   Result := Cross(Self, v);
+end;
+
+function TUVec2Impl.Angle(const v: TUVec2): TUFloat;
+begin
+  Result := Angle(Self, v);
 end;
 
 function TUVec2Impl.Perp: TUVec2;
@@ -3562,37 +3805,19 @@ begin
 end;
 
 function TUPlaneImpl.OverlapBounds(const Bounds: TUBounds3f): Boolean;
-var MinV, MaxV: TUVec3;
+  var MinV, MaxV: TUVec3;
+  var i: Int32;
 begin
-  if n.x > 0 then
+  for i := 0 to 2 do
+  if n[i] > 0 then
   begin
-    MinV.x := Bounds.Min.x;
-    MaxV.x := Bounds.Max.x;
+    MinV[i] := Bounds.Min[i];
+    MaxV[i] := Bounds.Max[i];
   end
   else
   begin
-    MinV.x := Bounds.Max.x;
-    MaxV.x := Bounds.Min.x;
-  end;
-  if n.y > 0 then
-  begin
-    MinV.y := Bounds.Min.y;
-    MaxV.y := Bounds.Max.y;
-  end
-  else
-  begin
-    MinV.y := Bounds.Max.y;
-    MaxV.y := Bounds.Min.y;
-  end;
-  if n.z > 0 then
-  begin
-    MinV.z := Bounds.Min.z;
-    MaxV.z := Bounds.Max.z;
-  end
-  else
-  begin
-    MinV.z := Bounds.Max.z;
-    MaxV.z := Bounds.Min.z;
+    MinV[i] := Bounds.Max[i];
+    MaxV[i] := Bounds.Min[i];
   end;
   if n.Dot(MinV) <= d then Exit(False);
   if n.Dot(MaxV) < d then Exit(True);
@@ -4237,6 +4462,1149 @@ begin
   Result := Overlap(Self, Other);
 end;
 // TUBounds3i end
+
+// TUBigInt begin
+class function TUBigIntImpl.MagClone(const Mag: TUInt8Array): TUInt8Array;
+begin
+  Result := nil;
+  if Length(Mag) = 0 then Exit;
+  SetLength(Result, Length(Mag));
+  Move(Mag[0], Result[0], Length(Result));
+end;
+
+class function TUBigIntImpl.MagCmp(const MagA, MagB: TUInt8Array): Int8;
+  function FindTop(const Mag: TUInt8Array): Int32;
+    var i: Int32;
+  begin
+    for i := High(Mag) downto 0 do
+    if Mag[i] > 0 then Exit(i);
+    Result := 0;
+  end;
+  var i: Int32;
+  var TopA, TopB: Int32;
+begin
+  TopA := FindTop(MagA);
+  TopB := FindTop(MagB);
+  if TopA = TopB then
+  begin
+    for i := TopA downto 0 do
+    begin
+      if MagA[i] > MagB[i] then Exit(1);
+      if MagB[i] > MagA[i] then Exit(-1);
+    end;
+    Exit(0);
+  end;
+  if TopA > TopB then Exit(1);
+  Exit(-1);
+end;
+
+class function TUBigIntImpl.MagAdd(const MagA, MagB: TUInt8Array): TUInt8Array;
+  var i: Int32;
+  var Carry: UInt16;
+  var ValA, ValB: UInt8;
+begin
+  Result := nil;
+  SetLength(Result, UMax(Length(MagA), Length(MagB)) + 1);
+  UClear(Result[0], Length(Result));
+  Carry := 0;
+  for i := 0 to High(Result) do
+  begin
+    if i <= High(MagA) then ValA := MagA[i] else ValA := 0;
+    if i <= High(MagB) then ValB := MagB[i] else ValB := 0;
+    Carry += ValA + ValB;
+    Result[i] := Carry and $ff;
+    Carry := Carry shr 8;
+  end;
+  MagNorm(Result);
+end;
+
+class function TUBigIntImpl.MagSub(const MagA, MagB: TUInt8Array): TUInt8Array;
+begin
+  Result := MagClone(MagA);
+  MagSubInPlace(Result, MagB);
+  MagNorm(Result);
+end;
+
+class procedure TUBigIntImpl.MagSubInPlace(var MagA: TUInt8Array; const MagB: TUInt8Array);
+  var i: Int32;
+  var ValA, ValB: UInt8;
+  var Carry: Int16;
+begin
+  Carry := 0;
+  for i := 0 to High(MagA) do
+  begin
+    ValA := MagA[i];
+    if i <= High(MagB) then ValB := MagB[i] else ValB := 0;
+    Carry += ValA - ValB;
+    if Carry < 0 then
+    begin
+      MagA[i] := 256 + Carry;
+      Carry := -1;
+    end
+    else
+    begin
+      MagA[i] := Carry;
+      Carry := 0;
+    end;
+  end;
+end;
+
+class function TUBigIntImpl.MagMul(const MagA, MagB: TUInt8Array): TUInt8Array;
+  var i, j, r: Int32;
+  var Carry: UInt32;
+begin
+  Result := nil;
+  SetLength(Result, Length(MagA) + Length(MagB));
+  UClear(Result[0], Length(Result));
+  for i := 0 to High(MagA) do
+  begin
+    Carry := 0;
+    for j := 0 to High(MagB) do
+    begin
+      r := i + j;
+      Carry += Result[r] + MagA[i] * MagB[j];
+      Result[r] := UInt8(Carry and $ff);
+      Carry := Carry shr 8;
+    end;
+    while Carry > 0 do
+    begin
+      Inc(r);
+      Carry += Result[r];
+      Result[r] := UInt8(Carry and $ff);
+      Carry := Carry shr 8;
+    end;
+  end;
+  MagNorm(Result);
+end;
+
+class function TUBigIntImpl.MagDiv(const MagA, MagB: TUInt8Array; out Remainder: TUInt8Array): TUInt8Array;
+  function FindApproxMultiple(const Dividend, Divider: TUInt8Array): Int32;
+    var Top: Int32;
+    var TestA, TestB: Int32;
+  begin
+    for Top := High(Dividend) downto 0 do
+    if Dividend[Top] <> 0 then Break;
+    TestA := Dividend[High(Divider)];
+    if Top > High(Divider) then TestA += Dividend[Top] shl 8;
+    TestB := Divider[High(Divider)];
+    Result := TestA div TestB;
+  end;
+  procedure ShiftLeft(var Mag: TUInt8Array);
+    var i: Int32;
+  begin
+    if Length(Mag) = 0 then Exit;
+    for i := High(Mag) downto 1 do Mag[i] := Mag[i - 1];
+    Mag[0] := 0;
+  end;
+  var Digit: UInt8;
+  var i: Int32;
+  var Cmp: Int8;
+begin
+  Remainder := [0];
+  if MagCmp(MagB, [0]) = 0 then Exit([0]);
+  if MagCmp(MagA, [0]) = 0 then Exit([0]);
+  if MagCmp(MagB, [1]) = 0 then Exit(MagA);
+  Cmp := MagCmp(MagA, MagB);
+  if Cmp = 0 then Exit([1]);
+  if Cmp < 0 then
+  begin
+    Remainder := MagA;
+    Exit([0]);
+  end;
+  Result := nil;
+  SetLength(Result, Length(MagA));
+  UClear(Result[0], Length(Result));
+  Remainder := nil;
+  SetLength(Remainder, Length(MagB) + 1);
+  UClear(Remainder[0], Length(Remainder));
+  for i := High(MagA) downto 0 do
+  begin
+    ShiftLeft(Remainder);
+    Remainder[0] := MagA[i];
+    if MagCmp(MagB, Remainder) > 0 then Continue;
+    Digit := 0;//UMax(FindApproxMultiple(Remainder, MagB) - 1, 0);
+    if Digit > 0 then
+    begin
+      MagSubInPlace(Remainder, MagMul(MagB, [Digit]));
+    end;
+    repeat
+      MagSubInPlace(Remainder, MagB);
+      Inc(Digit);
+    until MagCmp(Remainder, MagB) < 0;
+    ShiftLeft(Result);
+    Result[0] := Digit;
+  end;
+  MagNorm(Result);
+  MagNorm(Remainder);
+end;
+
+class function TUBigIntImpl.MagMod(const MagA, MagB: TUInt8Array): TUInt8Array;
+begin
+  MagDiv(MagA, MagB, Result);
+end;
+
+class procedure TUBigIntImpl.MagNorm(var Mag: TUInt8Array);
+  var i, n: Int32;
+begin
+  n := 1;
+  for i := High(Mag) downto 0 do
+  if Mag[i] <> 0 then
+  begin
+    n := i + 1;
+    Break;
+  end;
+  if Length(Mag) = n then Exit;
+  SetLength(Mag, n);
+end;
+
+class function TUBigIntImpl.MagRand(const BitLength: Int32): TUInt8Array;
+  var i, ByteLength, LastBits: Int32;
+begin
+  ByteLength := BitLength div 8;
+  LastBits := BitLength - (ByteLength * 8);
+  if LastBits > 0 then Inc(ByteLength);
+  Result := nil;
+  SetLength(Result, ByteLength);
+  UClear(Result[0], Length(Result));
+  for i := 0 to High(Result) do Result[i] := Random(256);
+  if LastBits > 0 then
+  begin
+    i := High(Result);
+    Result[i] := Result[i] and ($ff shr (8 - LastBits));
+  end;
+  MagNorm(Result);
+end;
+
+class function TUBigIntImpl.MagModPow(const Base, Exponent, Modulus: TUInt8Array): TUInt8Array;
+  var TempBase, Square: TUInt8Array;
+  var i: Int32;
+  var Red: TUBarrettCtx;
+begin
+  Result := [1];
+  if MagCmp(Modulus, [1]) = 0 then Exit;
+  //Red.SetModulus(Modulus);
+  //TempBase := Red.Modulo(Base);
+  TempBase := TUBigInt.MagMod(Base, Modulus);
+  for i := 0 to Length(Exponent) * 8 - 1 do
+  begin
+    if MagGetBit(Exponent, i) then
+    begin
+      Result := MagMul(Result, TempBase);
+      //Result := Red.Modulo(Result);
+      Result := TUBigInt.MagMod(Result, Modulus);
+    end;
+    Square := MagMul(TempBase, TempBase);
+    //TempBase := Red.Modulo(Square);
+    TempBase := TUBigInt.MagMod(Square, Modulus);
+  end;
+  //Result := Red.Modulo(Result);
+  Result := TUBigInt.MagMod(Result, Modulus);
+end;
+
+class function TUBigIntImpl.MagGetBit(const Mag: TUInt8Array; const Index: Int32): Boolean;
+  var ByteIndex: Int32;
+  var SubBit: Int8;
+begin
+  ByteIndex := Index div 8;
+  if ByteIndex > High(Mag) then Exit(False);
+  SubBit := Index - ByteIndex * 8;
+  Result := (Mag[ByteIndex] and (1 shl SubBit)) > 0;
+end;
+
+class function TUBigIntImpl.MagIsEven(const Mag: TUInt8Array): Boolean;
+begin
+  if Length(Mag) = 0 then Exit(True);
+  Result := (Mag[0] and 1) = 0;
+end;
+
+class function TUBigIntImpl.MagShiftLeftBytes(const Mag: TUInt8Array; const NumBytes: Int32): TUInt8Array;
+  var i: Int32;
+begin
+  Result := nil;
+  SetLength(Result, Length(Mag));
+  if Length(Result) = 0 then Exit;
+  for i := High(Mag) downto NumBytes do Result[i] := Mag[i - NumBytes];
+  for i := 0 to NumBytes - 1 do
+  Result[i] := 0;
+end;
+
+class function TUBigIntImpl.MagShiftRightBytes(const Mag: TUInt8Array; const NumBytes: Int32): TUInt8Array;
+  var i: Int32;
+begin
+  Result := nil;
+  SetLength(Result, Length(Mag));
+  if Length(Result) = 0 then Exit;
+  for i := 0 to High(Mag) - NumBytes do Result[i] := Mag[i + NumBytes];
+  for i := High(Mag) downto High(Mag) - NumBytes + 1 do
+  Result[i] := 0;
+end;
+
+class procedure TUBigIntImpl.MagShiftLeftBytesInPlace(const Mag: TUInt8Array; const NumBytes: Int32);
+  var i: Int32;
+begin
+  if Length(Mag) = 0 then Exit;
+  for i := High(Mag) downto NumBytes do Mag[i] := Mag[i - NumBytes];
+  for i := 0 to NumBytes - 1 do Mag[i] := 0;
+end;
+
+class procedure TUBigIntImpl.MagShiftRightBytesInPlace(const Mag: TUInt8Array; const NumBytes: Int32);
+  var i: Int32;
+begin
+  if Length(Mag) = 0 then Exit;
+  for i := 0 to High(Mag) - NumBytes do Mag[i] := Mag[i + NumBytes];
+  for i := High(MAg) downto High(Mag) - NumBytes + 1 do
+  Mag[i] := 0;
+end;
+
+procedure TUBigIntImpl.Reset(const Size: UInt32);
+begin
+  Self.IsNegative := False;
+  Self.Value := nil;
+  SetLength(Self.Value, Size);
+  UClear(Self.Value[0], Length(Self.Value));
+end;
+
+procedure TUBigIntImpl.Normalize;
+begin
+  MagNorm(Self.Value);
+end;
+
+class function TUBigIntImpl.Make(const Number: Int64): TUBigInt;
+  var Tmp: Int64;
+  var NumArr: array[0..SizeOf(Number) - 1] of UInt8 absolute Tmp;
+  var i, n: Int32;
+begin
+  Result.IsNegative := Number < 0;
+  Tmp := Number;
+  if Number < 0 then Tmp := -Tmp;
+  n := -1;
+  for i := High(NumArr) downto 0 do
+  if NumArr[i] <> 0 then
+  begin
+    n := i;
+    Break;
+  end;
+  if n < 0 then Exit(TUBigInt.Zero);
+  SetLength(Result.Value, n + 1);
+  for i := 0 to n do
+  begin
+    Result.Value[i] := NumArr[i];
+  end;
+end;
+
+class function TUBigIntImpl.Make(const Number: String): TUBigInt;
+  procedure FromHex;
+    function HexToInt(const Hex: AnsiChar): UInt8;
+      var c: AnsiChar;
+    begin
+      c := LowerCase(Hex);
+      if c in ['0'..'9'] then Exit(Ord(c) - Ord('0'));
+      if c in ['a'..'f'] then Exit(10 + Ord(c) - Ord('a'));
+      Result := 0;
+    end;
+    var i, n, CurByte, NumStart: Int32;
+    var Digit: UInt8;
+  begin
+    if Length(Number) < 2 then Exit;
+    NumStart := 2;
+    Result.IsNegative := False;
+    for i := 2 to Length(Number) do
+    if not (
+      (LowerCase(Number[i]) in ['a'..'f'])
+      or (Number[i] in ['0'..'9'])
+    ) then Exit;
+    for i := NumStart to Length(Number) do
+    begin
+      if Number[i] <> '0' then Break;
+      Inc(NumStart);
+    end;
+    if NumStart > Length(Number) then Exit;
+    Result.Reset((Length(Number) - NumStart + 1) shr 1);
+    for i := Length(Number) downto NumStart do
+    begin
+      Digit := HexToInt(Number[i]);
+      n := Length(Number) - i;
+      if (n mod 2) = 1 then Digit := Digit shl 4;
+      CurByte := n shr 1;
+      Result.Value[CurByte] := Result.Value[CurByte] or Digit;
+    end;
+  end;
+  procedure FromDec;
+    var i, j, CurByte, NumStart: Int32;
+    var IsNegative: Boolean;
+    var Value, Carry: UInt16;
+  begin
+    NumStart := 1;
+    IsNegative := False;
+    if Number.StartsWith('-') then
+    begin
+      IsNegative := True;
+      Inc(NumStart);
+    end;
+    for i := NumStart to Length(Number) do
+    if not (Number[i] in ['0'..'9']) then Exit;
+    for i := NumStart to Length(Number) do
+    begin
+      if Number[i] <> '0' then Break;
+      Inc(NumStart);
+    end;
+    if NumStart > Length(Number) then Exit;
+    Result.Reset(Length(Number) + 1);
+    Result.IsNegative := IsNegative;
+    CurByte := 0;
+    for i := NumStart to Length(Number) do
+    begin
+      Carry := Ord(Number[i]) - Ord('0');
+      for j := 0 to CurByte do
+      begin
+        Value := Result.Value[j] * 10 + Carry;
+        Result.Value[j] := Value and $ff;
+        Carry := Value shr 8;
+      end;
+      if Carry > 0 then
+      begin
+        Inc(CurByte);
+        Result.Value[CurByte] := Carry;
+      end;
+    end;
+    i := CurByte + 1;
+    if Length(Result.Value) > i then SetLength(Result.Value, i);
+  end;
+begin
+  Result := TUBigInt.Zero;
+  if Number.StartsWith('$') then FromHex else FromDec;
+end;
+
+class function TUBigIntImpl.MakeRandom(const BitLength: Int32): TUBigInt;
+begin
+  Result.IsNegative := False;
+  Result.Value := MagRand(BitLength);
+end;
+
+class function TUBigIntImpl.MakePrime(const BitLength: Int32): TUBigInt;
+  function IsProbablePrime(const Number: TUInt8Array; const Iterations: Int32 = 40): Boolean;
+    var d, a, x, NMinus1, r: TUInt8Array;
+    var s, i, j: Int32;
+  begin
+    if MagCmp(Number, [1]) <= 0 then Exit(False);
+    if MagCmp(Number, [3]) <= 0 then Exit(True);
+    s := 0;
+    NMinus1 := MagSub(Number, [1]);
+    d := NMinus1;
+    while MagIsEven(d) do
+    begin
+      d := MagDiv(d, [2], r);
+      Inc(s);
+    end;
+    for i := 1 to Iterations do
+    begin
+      a := MagRand(Length(Number) * 8 - 1);
+      x := MagModPow(a, d, Number);
+      if MagCmp(x, [1]) = 0 then Continue;
+      if MagCmp(x, NMinus1) = 0 then Continue;
+      for j := 1 to s - 1 do
+      begin
+        x := MagModPow(x, [2], Number);
+        if MagCmp(x, [1]) = 0 then Exit(False);
+        if MagCmp(x, NMinus1) = 0 then Break;
+      end;
+      if MagCmp(x, NMinus1) <> 0 then Exit(False);
+    end;
+    Result := True;
+  end;
+  var n: Int32;
+  var pt, t: UInt64;
+begin
+  pt := GetTickCount64;
+  n := 0;
+  Result.IsNegative := False;
+  repeat
+    Result.Value := MagRand(BitLength);
+    Result.Value[0] := Result.Value[0] or 1;
+    WriteLn(Result.ToString);
+    //Sleep(1000);
+    Inc(n);
+    if (n mod 10) = 0 then
+    begin
+      t := GetTickCount64;
+      WriteLn(n div 10, ' dt=', t - pt);
+      pt := t;
+    end;
+  until IsProbablePrime(Result.Value, 2);
+end;
+
+class function TUBigIntImpl.Addition(const a, b: TUBigInt): TUBigInt;
+  var Cmp: Int8;
+begin
+  if a.IsNegative = b.IsNegative then
+  begin
+    Result.Value := MagAdd(a.Value, b.Value);
+    Result.IsNegative := a.IsNegative;
+  end
+  else
+  begin
+    Cmp := MagCmp(a.Value, b.Value);
+    if Cmp = 0 then Exit(TUBigInt.Zero);
+    if Cmp = 1 then
+    begin
+      Result.Value := MagSub(a.Value, b.Value);
+      Result.IsNegative := a.IsNegative;
+    end
+    else
+    begin
+      Result.Value := MagSub(b.Value, a.Value);
+      Result.IsNegative := b.IsNegative;
+    end;
+  end;
+end;
+
+class function TUBigIntImpl.Subtraction(const a, b: TUBigInt): TUBigInt;
+  var Temp: TUBigInt;
+begin
+  Temp := b;
+  Temp.IsNegative := not Temp.IsNegative;
+  Result := Addition(a, Temp);
+end;
+
+class function TUBigIntImpl.Multiplication(const a, b: TUBigInt): TUBigInt;
+begin
+  Result.Value := MagMul(a.Value, b.Value);
+  Result.IsNegative := (a.IsNegative) xor (b.IsNegative);
+end;
+
+class function TUBigIntImpl.Division(const a, b: TUBigInt; out Remainder: TUBigInt): TUBigInt;
+begin
+  Result.Value := MagDiv(a.Value, b.Value, Remainder.Value);
+  Result.IsNegative := (a.IsNegative) xor (b.IsNegative);
+  Remainder.IsNegative := a.IsNegative;
+end;
+
+class function TUBigIntImpl.Division(const a, b: TUBigInt): TUBigInt;
+  var r: TUBigInt;
+begin
+  Result := Division(a, b, r);
+end;
+
+class function TUBigIntImpl.Modulo(const a, b: TUBigInt): TUBigInt;
+begin
+  Division(a, b, Result);
+end;
+
+class function TUBigIntImpl.Compare(const a, b: TUBigInt): Int8;
+begin
+  if a.IsNegative = b.IsNegative then
+  begin
+    Result := MagCmp(a.Value, b.Value);
+    if a.IsNegative then Result := -Result;
+  end
+  else
+  begin
+    if (Length(a.Value) = 1) and (Length(b.Value) = 1)
+    and (a.Value[0] = 0) and (b.Value[0] = 0) then
+    begin
+      Exit(0);
+    end;
+    if a.IsNegative then Exit(-1);
+    Result := 1;
+  end;
+end;
+
+function TUBigIntImpl.ToString: String;
+  var i, CurByte: Int32;
+  var Carry: Int16;
+  var Temp: TUInt8Array;
+begin
+  if Length(Self.Value) = 0 then Exit('0');
+  Temp := nil;
+  SetLength(Temp, Length(Self.Value));
+  Move(Self.Value[0], Temp[0], Length(Self.Value));
+  CurByte := High(Temp);
+  while (CurByte > 0) and (Temp[CurByte] = 0) do Dec(CurByte);
+  Result := '';
+  while (CurByte > 0) or (Temp[CurByte] > 0) do
+  begin
+    Carry := 0;
+    for i := CurByte downto 0 do
+    begin
+      Carry := (Carry * 256) + Temp[i];
+      Temp[i] := Carry div 10;
+      Carry := Carry mod 10;
+    end;
+    Result := Chr(Ord('0') + Carry) + Result;
+    while (CurByte > 0) and (Temp[CurByte] = 0) do Dec(CurByte);
+  end;
+  if Length(Result) = 0 then Exit('0')
+  else if Self.IsNegative then Result := '-' + Result;
+end;
+
+function TUBigIntImpl.ToHex: String;
+  function IntToHex(const Value: UInt8): AnsiChar;
+  begin
+    if Value < 10 then Exit(AnsiChar(Ord('0') + Value));
+    Exit(AnsiChar(Ord('A') + (Value - 10)));
+  end;
+  var i: Int32;
+begin
+  Result := '';
+  for i := High(Self.Value) downto 0 do
+  begin
+    Result += IntToHex((Self.Value[i] shr 4) and $f);
+    Result += IntToHex(Self.Value[i] and $f);
+  end;
+end;
+
+function TUBigIntImpl.ToInt64: Int64;
+  var i, n: Int32;
+  var NumArr: array[0..7] of UInt8 absolute Result;
+begin
+  if Length(Self.Value) = 0 then Exit(0);
+  Result := 0;
+  n := UMin(7, High(Self.Value));
+  for i := 0 to n do
+  begin
+    NumArr[i] := Self.Value[i];
+  end;
+  if Self.IsNegative then Result := -Result;
+end;
+
+function TUBigIntImpl.GetBit(const BitIndex: Int32): Boolean;
+begin
+  Result := MagGetBit(Self.Value, BitIndex);
+end;
+
+function TUBigIntImpl.IsEven: Boolean;
+begin
+  Result := MagIsEven(Self.Value);
+end;
+
+function TUBigIntImpl.GetSize: Int32;
+begin
+  Result := Length(Value);
+end;
+
+function TUBigIntImpl.Clone: TUBigInt;
+begin
+  Result.IsNegative := IsNegative;
+  Result.Value := nil;
+  if Length(Value) = 0 then Exit;
+  SetLength(Result.Value, Length(Value));
+  Move(Value[0], Result.Value[0], Length(Value));
+end;
+
+function TUBigIntImpl.ShiftLeftBytes(const NumBytes: Int32): TUBigInt;
+begin
+  Result.IsNegative := IsNegative;
+  Result.Value := MagShiftLeftBytes(Value, NumBytes);
+end;
+
+function TUBigIntImpl.ShiftRightBytes(const NumBytes: Int32): TUBigInt;
+begin
+  Result.IsNegative := IsNegative;
+  Result.Value := MagShiftRightBytes(Value, NumBytes);
+end;
+
+procedure TUBigIntImpl.ShiftLeftBytesInPlace(const NumBytes: Int32);
+begin
+  MagShiftLeftBytesInPlace(Value, NumBytes);
+end;
+
+procedure TUBigIntImpl.ShiftRightBytesInPlace(const NumBytes: Int32);
+begin
+  MagShiftRightBytesInPlace(Value, NumBytes);
+end;
+
+procedure TUBigIntImpl.TUBarrettCtx.SetModulus(const Value: TUInt8Array);
+  var b, r: TUInt8Array;
+begin
+  M := Value;
+  b := nil;
+  SetLength(b, 2 * Length(Value));
+  UClear(b[0], Length(b));
+  b[High(b)] := 1;
+  Mu := TUBigInt.MagDiv(b, Value, r);
+end;
+
+function TUBigIntImpl.TUBarrettCtx.Modulo(const Value: TUInt8Array): TUInt8Array;
+  var q: TUInt8Array;
+  var k: Int32;
+begin
+  k := Length(M);
+  if TUBigInt.MagCmp(Value, M) < 0 then Exit(Value);
+  q := TUBigInt.MagMul(TUBigInt.MagShiftRightBytes(Value, k - 1), Mu);
+  TUBigInt.MagShiftRightBytesInPlace(q, k + 1);
+  Result := TUBigInt.MagSub(Value, TUBigInt.MagMul(q, M));
+  while TUBigInt.MagCmp(Result, M) >= 0 do
+  begin
+    TUBigInt.MagSubInPlace(Result, M);
+    TUBigInt.MagNorm(Result);
+  end;
+end;
+// TUBigInt end
+
+// TUInt4096 begin
+function TUInt4096Impl.Top: Int32;
+  var i: Int32;
+begin
+  Result := 0;
+  for i := MaxItem downto 0 do
+  if Self[i] > 0 then Exit(i);
+end;
+
+function TUInt4096Impl.CheckFlag(const Flag: TFlag): Boolean;
+begin
+  Result := Flag in TFlgas(Self[FlagsItem]);
+end;
+
+procedure TUInt4096Impl.SetFlag(const Flag: TFlag; const Value: Boolean);
+begin
+  if Value then TFlgas(Self[FlagsItem]) += [Flag] else TFlgas(Self[FlagsItem]) -= [Flag];
+end;
+
+class function TUInt4096Impl.MagCmp(const a, b: TUInt4096): Int8;
+  var i: Int32;
+  var TopA, TopB: Int32;
+begin
+  TopA := a.Top;
+  TopB := b.Top;
+  if TopA = TopB then
+  begin
+    for i := TopA downto 0 do
+    begin
+      if a[i] > b[i] then Exit(1);
+      if b[i] > a[i] then Exit(-1);
+    end;
+    Exit(0);
+  end;
+  if TopA > TopB then Exit(1);
+  Exit(-1);
+end;
+
+class function TUInt4096Impl.MagSub(const a, b: TUInt4096): TUInt4096;
+begin
+  Result := a;
+  MagSubInPlace(Result, b);
+end;
+
+class function TUInt4096Impl.MagAdd(const a, b: TUInt4096): TUInt4096;
+  var i, n: Int32;
+  var Carry: UInt64;
+begin
+  Result := Zero;
+  n := UMax(a.Top, b.Top);
+  Carry := 0;
+  for i := 0 to n do
+  begin
+    Carry += a[i] + b[i];
+    Result[i] := Carry and $ffffffff;
+    Carry := Carry shr 32;
+  end;
+  if Carry = 0 then Exit;
+  if n >= MaxItem then Exit;
+  Result[n + 1] := UInt32(Carry);
+end;
+
+class procedure TUInt4096Impl.MagSubInPlace(var a: TUInt4096; const b: TUInt4096);
+  var i, n: Int32;
+  var Carry: Int64;
+begin
+  n := a.Top;
+  Carry := 0;
+  for i := 0 to n do
+  begin
+    Carry += a[i] - b[i];
+    if Carry < 0 then
+    begin
+      a[i] := ItemVal + Carry;
+      Carry := -1;
+    end
+    else
+    begin
+      a[i] := Carry;
+      Carry := 0;
+    end;
+  end;
+end;
+
+class function TUInt4096Impl.MagMul(const a, b: TUInt4096): TUInt4096;
+  var i, j, r, TopA, TopB: Int32;
+  var Carry: UInt64;
+begin
+  Result := Zero;
+  TopA := a.Top;
+  TopB := b.Top;
+  for i := 0 to TopA do
+  begin
+    Carry := 0;
+    for j := 0 to TopB do
+    begin
+      r := i + j;
+      if r > MaxItem then Break;
+      Carry += Result[r] + a[i] * b[j];
+      Result[r] := UInt32(Carry and $ffffffff);
+      Carry := Carry shr 32;
+    end;
+    while Carry > 0 do
+    begin
+      Inc(r);
+      if r > MaxItem then Break;
+      Carry += Result[r];
+      Result[r] := UInt32(Carry and $ffffffff);
+      Carry := Carry shr 32;
+    end;
+  end;
+end;
+
+class function TUInt4096Impl.MagDiv(const a, b: TUInt4096; out r: TUInt4096): TUInt4096;
+function FindApproxMultiple(const Dividend, Divider: TUInt4096): Int64;
+    var TopA, TopB: Int32;
+    var TestA, TestB, r: UInt64;
+  begin
+    TopA := Dividend.Top;
+    TopB := Divider.Top;
+    TestA := Dividend[TopB];
+    if TopA > TopB then TestA += UInt64(Dividend[TopA]) shl 32;
+    TestB := Divider[TopB];
+    r := TestA div TestB;
+    WriteLn(TestA - (TestB * r));
+    Result := Int64(r);
+  end;
+  procedure ShiftLeft(var Mag: TUInt4096);
+    var i: Int32;
+  begin
+    for i := MaxItem downto 1 do Mag[i] := Mag[i - 1];
+    Mag[0] := 0;
+  end;
+  var Digit, cd: UInt64;
+  var i, TopA, f: Int32;
+  var Cmp: Int8;
+  var m: TUInt4096;
+begin
+  r := Zero;
+  if MagCmp(b, Zero) = 0 then Exit(Invalid);
+  if MagCmp(a, Zero) = 0 then Exit(Zero);
+  if MagCmp(b, One) = 0 then Exit(a);
+  Cmp := MagCmp(a, b);
+  if Cmp = 0 then Exit(One);
+  if Cmp < 0 then
+  begin
+    r := a;
+    Exit(Zero);
+  end;
+  Result := Zero;
+  TopA := a.Top;
+  for i := TopA downto 0 do
+  begin
+    ShiftLeft(r);
+    r[0] := a[i];
+    if MagCmp(b, r) > 0 then Continue;
+    Digit := UMax(FindApproxMultiple(r, b) - 1, 0);
+    m := MagMul(b, TUInt4096.Make(Digit));
+    f := 0;
+    while MagCmp(r, m) < 0 do
+    begin
+      Dec(Digit);
+      m := MagMul(b, TUInt4096.Make(Digit));
+      Inc(f);
+    end;
+    WriteLn('Fail: ', f);
+    if Digit > 0 then
+    begin
+      MagSubInPlace(r, m);
+    end;
+    while MagCmp(r, b) >= 0 do
+    begin
+      MagSubInPlace(r, b);
+      Inc(Digit);
+    end;
+    {cd := Digit;
+    while cd > 0 do
+    begin
+      m := MagMul(b, TUInt4096.Make(cd));
+      WriteLn(MagCmp(r, m));
+      MagSubInPlace(r, m);
+      cd := UMax(FindApproxMultiple(r, b) - 1, 0);
+      Digit += cd;
+    end;
+    repeat
+      MagSubInPlace(r, b);
+      Inc(Digit);
+    until MagCmp(r, b) < 0;
+    }
+    ShiftLeft(Result);
+    Result[0] := Digit;
+  end;
+end;
+
+function TUInt4096Impl.IsPositive: Boolean;
+begin
+  Result := not CheckFlag(if_negative);
+end;
+
+function TUInt4096Impl.IsNegative: Boolean;
+begin
+  Result := CheckFlag(if_negative);
+end;
+
+procedure TUInt4096Impl.SetPositive(const Value: Boolean);
+begin
+  SetFlag(if_negative, not Value);
+end;
+
+procedure TUInt4096Impl.SetNegative(const Value: Boolean);
+begin
+  SetFlag(if_negative, Value);
+end;
+
+class function TUInt4096Impl.Make(const Number: Int64): TUInt4096;
+  var PosNum: UInt64;
+  var Arr: array[0..1] of UInt32 absolute PosNum;
+  var Pos: Boolean;
+  var i: Int32;
+begin
+  Pos := Number >= 0;
+  if Pos then PosNum := Number else PosNum := UInt64(-Number);
+  Result := TUInt4096.Zero;
+  for i := 0 to High(Arr) do Result[i] := Arr[i];
+  Result.SetPositive(Pos);
+end;
+
+class function TUInt4096Impl.Make(const Number: String): TUInt4096;
+  procedure FromHex;
+    function HexToInt(const Hex: AnsiChar): UInt8;
+      var c: AnsiChar;
+    begin
+      c := LowerCase(Hex);
+      if c in ['0'..'9'] then Exit(Ord(c) - Ord('0'));
+      if c in ['a'..'f'] then Exit(10 + Ord(c) - Ord('a'));
+      Result := 0;
+    end;
+    var i, n, CurItem, NumStart: Int32;
+    var Digit: UInt32;
+  begin
+    if Length(Number) < 2 then Exit;
+    NumStart := 2;
+    for i := 2 to Length(Number) do
+    if not (
+      (LowerCase(Number[i]) in ['a'..'f'])
+      or (Number[i] in ['0'..'9'])
+    ) then Exit;
+    for i := NumStart to Length(Number) do
+    begin
+      if Number[i] <> '0' then Break;
+      Inc(NumStart);
+    end;
+    if NumStart > Length(Number) then Exit;
+    for i := Length(Number) downto NumStart do
+    begin
+      Digit := HexToInt(Number[i]);
+      n := Length(Number) - i;
+      Digit := Digit shl (4 * (n mod 8));
+      CurItem := n shr 3;
+      if CurItem > MaxItem then
+      begin
+        WriteLn('Overflow!');
+        Exit;
+      end;
+      Result[CurItem] := Result[CurItem] or Digit;
+    end;
+  end;
+  procedure FromDec;
+    var i, j, CurItem, NumStart: Int32;
+    var Neg: Boolean;
+    var Value, Carry: UInt64;
+  begin
+    NumStart := 1;
+    Neg := False;
+    if Number.StartsWith('-') then
+    begin
+      Neg := True;
+      Inc(NumStart);
+    end;
+    for i := NumStart to Length(Number) do
+    if not (Number[i] in ['0'..'9']) then Exit;
+    for i := NumStart to Length(Number) do
+    begin
+      if Number[i] <> '0' then Break;
+      Inc(NumStart);
+    end;
+    if NumStart > Length(Number) then Exit;
+    Result.SetNegative(Neg);
+    CurItem := 0;
+    for i := NumStart to Length(Number) do
+    begin
+      Carry := Ord(Number[i]) - Ord('0');
+      for j := 0 to CurItem do
+      begin
+        Value := Result[j] * 10 + Carry;
+        Result[j] := Value and $ffffffff;
+        Carry := Value shr 32;
+      end;
+      if Carry > 0 then
+      begin
+        Inc(CurItem);
+        if CurItem > MaxItem then
+        begin
+          WriteLn('Overflow!');
+          Exit;
+        end;
+        Result[CurItem] := Carry;
+      end;
+    end;
+  end;
+begin
+  Result := TUInt4096.Zero;
+  if Number.StartsWith('$') then FromHex else FromDec;
+end;
+
+class function TUInt4096Impl.MakeRandom(const BitCount: Int32): TUInt4096;
+  var i, ItemCount, LastBits: Int32;
+begin
+  if BitCount > 4096 then Exit(Zero);
+  ItemCount := BitCount shr 5;
+  LastBits := BitCount - (ItemCount * 32);
+  Result := Zero;
+  for i := 0 to ItemCount - 1 do Result[i] := Random(Int64(High(UInt32)));
+  if LastBits = 0 then Exit;
+  Result[ItemCount] := Random(Int64(High(UInt32)));
+  Result[ItemCount] := Result[ItemCount] and ($ffffffff shr (32 - LastBits));
+end;
+
+class function TUInt4096Impl.Addition(const a, b: TUInt4096): TUInt4096;
+  var Cmp: Int8;
+begin
+  if a.IsPositive = b.IsPositive then
+  begin
+    Result := MagAdd(a, b);
+    Result.SetPositive(a.IsPositive);
+  end
+  else
+  begin
+    Cmp := MagCmp(a, b);
+    case Cmp of
+      1:
+      begin
+        Result := MagSub(a, b);
+        Result.SetPositive(a.IsPositive);
+      end;
+      -1:
+      begin
+        Result := MagSub(b, a);
+        Result.SetPositive(b.IsPositive);
+      end;
+      else Exit(Zero);
+    end;
+  end;
+end;
+
+class function TUInt4096Impl.Subtraction(const a, b: TUInt4096): TUInt4096;
+  var Cmp: Int8;
+begin
+  if a.IsPositive = b.IsPositive then
+  begin
+    Cmp := MagCmp(a, b);
+    case Cmp of
+      1:
+      begin
+        Result := MagSub(a, b);
+        Result.SetPositive(a.IsPositive);
+      end;
+      -1:
+      begin
+        Result := MagSub(b, a);
+        Result.SetPositive(b.IsNegative);
+      end;
+      else Exit(Zero);
+    end;
+  end
+  else
+  begin
+    Result := MagAdd(a, b);
+    Result.SetPositive(a.IsPositive);
+  end;
+end;
+
+class function TUInt4096Impl.Multiplication(const a, b: TUInt4096): TUInt4096;
+begin
+  Result := MagMul(a, b);
+  Result.SetNegative(a.IsNegative xor b.IsNegative);
+end;
+
+class function TUInt4096Impl.Division(const a, b: TUInt4096; out r: TUInt4096): TUInt4096;
+begin
+  Result := MagDiv(a, b, r);
+  Result.SetNegative(a.IsNegative xor b.IsNegative);
+  r.SetNegative(a.IsNegative);
+end;
+
+class function TUInt4096Impl.Compare(const a, b: TUInt4096): Int8;
+begin
+  if a.IsPositive = b.IsPositive then
+  begin
+    Result := MagCmp(a, b);
+    if a.IsNegative then Result := -Result;
+  end
+  else
+  begin
+    if (MagCmp(a, Zero) = 0) and (MagCmp(b, Zero) = 0) then Exit(0);
+    if a.IsPositive then Exit(1);
+    Result := -1;
+  end;
+end;
+
+function TUInt4096Impl.ToString: String;
+  var i, CurItem: Int32;
+  var Carry: UInt64;
+  var Temp: TUInt4096;
+begin
+  Temp := Self;
+  Result := '';
+  CurItem := Temp.Top;
+  while (CurItem > 0) or (Temp[CurItem] > 0) do
+  begin
+    Carry := 0;
+    for i := CurItem downto 0 do
+    begin
+      Carry := (Carry shl 32) + Temp[i];
+      Temp[i] := Carry div 10;
+      Carry := Carry mod 10;
+    end;
+    Result := Chr(Ord('0') + Carry) + Result;
+    while (CurItem > 0) and (Temp[CurItem] = 0) do Dec(CurItem);
+  end;
+  if Length(Result) = 0 then Result := '0';
+  if IsNegative then Result := '-' + Result;
+end;
+
+function TUInt4096Impl.ToHex: String;
+  function IntToHex(const Value: UInt8): AnsiChar;
+  begin
+    if Value < 10 then Exit(AnsiChar(Ord('0') + Value));
+    Exit(AnsiChar(Ord('A') + (Value - 10)));
+  end;
+  var Arr: array[0..MaxItem * 4] of UInt8 absolute Self;
+  var i, n: Int32;
+begin
+  Result := '';
+  n := (Self.Top + 1) * 4 - 1;
+  for i := n downto 0 do
+  begin
+    if Arr[i] <> 0 then Break;
+    Dec(n);
+  end;
+  for i := n downto 0 do
+  begin
+    Result += IntToHex((Arr[i] shr 4) and $f);
+    Result += IntToHex(Arr[i] and $f);
+  end;
+  Result := Result.TrimLeft('0');
+  if IsNegative then Result := '-' + Result;
+end;
+
+function TUInt4096Impl.BitsUsed: Int32;
+begin
+
+end;
+// TUInt4096 end
 
 // TUTransform begin
 procedure TUTransform.Initialize;
@@ -4994,52 +6362,52 @@ begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt8(const value: UInt8);
+procedure TUStreamHelper.WriteUInt8(const Value: UInt8);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt16(const value: UInt16);
+procedure TUStreamHelper.WriteUInt16(const Value: UInt16);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt32(const value: UInt32);
+procedure TUStreamHelper.WriteUInt32(const Value: UInt32);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteUInt64(const value: UInt64);
+procedure TUStreamHelper.WriteUInt64(const Value: UInt64);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt8(const value: Int8);
+procedure TUStreamHelper.WriteInt8(const Value: Int8);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt16(const value: Int16);
+procedure TUStreamHelper.WriteInt16(const Value: Int16);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt32(const value: Int32);
+procedure TUStreamHelper.WriteInt32(const Value: Int32);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteInt64(const value: Int64);
+procedure TUStreamHelper.WriteInt64(const Value: Int64);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteFloat(const value: Single);
+procedure TUStreamHelper.WriteFloat(const Value: Single);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
 
-procedure TUStreamHelper.WriteDouble(const value: Double);
+procedure TUStreamHelper.WriteDouble(const Value: Double);
 begin
   _Stream.Write(Value, SizeOf(Value));
 end;
@@ -7917,6 +9285,7 @@ begin
       Result.NodeType := nt_object;
       specialize UArrAppend<TUJson>(_Elements, Result);
     end;
+    else Exit;
   end;
 end;
 
@@ -7942,6 +9311,7 @@ begin
       Result.Value := Value;
       specialize UArrAppend<TUJson>(_Elements, Result);
     end;
+    else Exit;
   end;
 end;
 
@@ -8068,10 +9438,12 @@ begin
 {$push}{$hints off}FillChar(x, Size, 0);{$pop}
 end;
 
+{$push}{$hints off}
 procedure UMove(out Dest; const Src; const Size: UInt32);
 begin
-{$push}{$hints off}Move(Src, Dest, Size);{$pop}
+  Move(Src, Dest, Size);
 end;
+{$pop}
 
 function UIntToPtr(const i: PtrUInt): Pointer;
 begin
@@ -8765,17 +10137,17 @@ begin
   Result := specialize UEndianSwap<UInt64>(v);
 end;
 
-function UEndianSwap(const v: Int16): UInt16;
+function UEndianSwap(const v: Int16): Int16;
 begin
   Result := specialize UEndianSwap<Int16>(v);
 end;
 
-function UEndianSwap(const v: Int32): UInt32;
+function UEndianSwap(const v: Int32): Int32;
 begin
   Result := specialize UEndianSwap<Int32>(v);
 end;
 
-function UEndianSwap(const v: Int64): UInt64;
+function UEndianSwap(const v: Int64): Int64;
 begin
   Result := specialize UEndianSwap<Int64>(v);
 end;
@@ -9211,7 +10583,7 @@ function UFileCRC32(const FileName: String; const CRC: UInt32): UInt32;
   var Buffer: array[0..2048] of UInt8;
   var RemSize, Size: Int64;
 begin
-  Result := 0;
+  Result := CRC;
   fs := TFileStream.Create(FileName, fmOpenRead);
   try
     RemSize := fs.Size;
@@ -9230,7 +10602,7 @@ function UFileCRC64(const FileName: String; const CRC: UInt64): UInt64;
   var Buffer: array[0..2048] of UInt8;
   var RemSize, Size: Int64;
 begin
-  Result := 0;
+  Result := CRC;
   fs := TFileStream.Create(FileName, fmOpenRead);
   try
     RemSize := fs.Size;
@@ -9427,7 +10799,7 @@ end;
 
 function UMulVec2Mat3x3(const v: TUVec2; const m: TUMat): TUVec2;
 begin
-  result := TUVec2.Make(
+  Result := TUVec2.Make(
     v.x * m[0, 0] + v.y * m[1, 0],
     v.x * m[0, 1] + v.y * m[1, 1]
   );
@@ -9756,6 +11128,16 @@ begin
   InSegment := (u >= 0) and (u <= 1);
 end;
 
+function UProj2DPointToSegment(const lv0, lv1, v: TUVec2): TUVec2;
+  var v0, v1: TUVec2;
+  var u: TUFloat;
+begin
+  v0 := v - lv0;
+  v1 := lv1 - lv0;
+  u := UClamp(v0.Dot(v1) / v1.Dot(v1), 0, 1);
+  Result := lv0 + v1 * u;
+end;
+
 function UProj2DPointToBounds(const b: TUBounds2f; const v: TUVec2): TUVec2;
 begin
   Result := UClamp(v, b.Min, b.Max);
@@ -9959,6 +11341,18 @@ operator := (const v: TUVec2i): TUVec2;
 begin
   Result[0] := v[0];
   Result[1] := v[1];
+end;
+
+operator := (const i: Int32): TUVec2i;
+begin
+  Result[0] := i;
+  Result[1] := i;
+end;
+
+operator := (const f: TUFloat): TUVec2;
+begin
+  Result[0] := f;
+  Result[1] := f;
 end;
 
 operator + (const a, b: TUVec3): TUVec3;
@@ -10239,7 +11633,7 @@ function UStrExprMatch(const Str, Expr: String): TUExprMatch;
     Result := True;
   end;
   var Sequence: TUStrArray;
-  var i, j, s, sl: Int32;
+  var i, j, s: Int32;
   function AdvanceSequence: Boolean;
   begin
     repeat
@@ -10418,6 +11812,97 @@ begin
   end;
 end;
 
+function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32): UInt32;
+  var StrSize: Int32;
+  var Byte1, Byte2, Byte3, Byte4: Uint8;
+begin
+  StrSize := Length(StrUTF8) - Start;
+  if StrSize < 0 then Exit(0);
+  Byte1 := UInt8(StrUTF8[Start]);
+  if (Byte1 and $80) = 0 then
+  begin
+    NumBytes := 1;
+    Exit(Byte1);
+  end;
+  if (Byte1 and $E0) = $C0 then
+  begin
+    if StrSize < 1 then Exit(0);
+    Byte2 := UInt8(StrUTF8[Start + 1]);
+    NumBytes := 2;
+    Exit(((Byte1 and $1F) shl 6) or (Byte2 and $3F));
+  end;
+  if (Byte1 and $F0) = $E0 then
+  begin
+    if StrSize < 2 then Exit(0);
+    Byte2 := UInt8(StrUTF8[Start + 1]);
+    Byte3 := UInt8(StrUTF8[Start + 2]);
+    NumBytes := 3;
+    Exit(((Byte1 and $0F) shl 12) or ((Byte2 and $3F) shl 6) or (Byte3 and $3F));
+  end;
+  if (Byte1 and $F8) = $F0 then
+  begin
+    if StrSize < 3 then Exit(0);
+    Byte2 := UInt8(StrUTF8[Start + 1]);
+    Byte3 := UInt8(StrUTF8[Start + 2]);
+    Byte4 := UInt8(StrUTF8[Start + 3]);
+    NumBytes := 4;
+    Exit(((Byte1 and $07) shl 18) or ((Byte2 and $3F) shl 12) or ((Byte3 and $3F) shl 6) or (Byte4 and $3F));
+  end;
+  Result := 0;
+  NumBytes := 0;
+end;
+
+function UStrUTF8ToUTF32(const StrUTF8: String): TUInt32Array;
+  function CountCharacters: Int32;
+    var i: Int32;
+    var b: UInt8;
+  begin
+    Result := 0;
+    i := 1;
+    while i <= Length(StrUTF8) do
+    begin
+      Inc(Result);
+      b := UInt8(StrUTF8[i]);
+      if (b and $E0) = $C0 then Inc(i, 2)
+      else if (b and $F0) = $E0 then Inc(i, 3)
+      else if (b and $F8) = $F0 then Inc(i, 4)
+      else Inc(i, 1);
+    end;
+  end;
+  var i, j, n: Int32;
+begin
+  if Length(StrUTF8) = 0 then Exit(nil);
+  Result := nil;
+  SetLength(Result, CountCharacters);
+  j := 1;
+  for i := 0 to High(Result) do
+  begin
+    Result[i] := UStrUTF8ToUTF32(StrUTF8, n, j);
+    Inc(j, n);
+  end;
+end;
+
+function UStrUTF32ToUTF8(const Code: UInt32): String;
+begin
+  if Code < $80 then Result := Chr(Code)
+  else if Code < $800 then Result := (
+    Chr($C0 or (Code shr 6)) +
+    Chr($80 or (Code and $3F))
+  )
+  else if Code < $10000 then Result := (
+    Chr($E0 or (Code shr 12)) +
+    Chr($80 or ((Code shr 6) and $3F)) +
+    Chr($80 or (Code and $3F))
+  )
+  else if Code <= $10FFFF then Result := (
+    Chr($F0 or (Code shr 18)) +
+    Chr($80 or ((Code shr 12) and $3F)) +
+    Chr($80 or ((Code shr 6) and $3F)) +
+    Chr($80 or (Code and $3F))
+  )
+  else Result := '';
+end;
+
 function UFileToStr(const FileName: String): String;
   var fs: TFileStream;
 begin
@@ -10552,6 +12037,80 @@ end;
 procedure ULogOffset(const Offset: Int32);
 begin
   LogOffset += Offset;
+end;
+
+function UExec(
+  const Dir: String;
+  const ExePath: String;
+  const Params: array of String;
+  const OutputFile: String = '';
+  const OutputList: TStringList = nil;
+  const WriteConsole: Boolean = True;
+  const OnOutput: TUProcedureString = nil
+): Int32;
+  var Exec: TProcess;
+  var fs: TFileStream;
+  var ExeDir, OutputBuffer, s: String;
+  var i: Int32;
+begin
+  if WriteConsole then
+  begin
+    WriteLn('Running: ', ExePath);
+    if Length(Params) > 0 then
+    begin
+      for s in Params do WriteLn('  ', s);
+    end;
+  end;
+  fs := nil;
+  OutputBuffer := '';
+  if Length(Dir) > 0 then ExeDir := Dir else ExeDir := ExtractFileDir(ExePath);
+  if Length(OutputFile) > 0 then fs := TFileStream.Create(OutputFile, fmCreate);
+  Exec := TProcess.Create(nil);
+  try
+    Exec.CurrentDirectory := ExeDir;
+    Exec.Executable := ExePath;
+    for s in Params do
+    begin
+      Exec.Parameters.Add(s);
+    end;
+    Exec.Options := Exec.Options + [poUsePipes, poStderrToOutPut];
+    Exec.Execute;
+    repeat
+      if Exec.Output.NumBytesAvailable = 0 then
+      begin
+        Sleep(1);
+        Continue;
+      end;
+      SetLength(s, Exec.Output.NumBytesAvailable);
+      Exec.Output.Read(s[1], Length(s));
+      if WriteConsole then Write(s);
+      if Assigned(fs) then fs.Write(s[1], Length(s));
+      if Assigned(OnOutput) or Assigned(OutputList) then
+      begin
+        OutputBuffer += s;
+        repeat
+          i := OutputBuffer.IndexOf(#$A);
+          if i > -1 then
+          begin
+            s := OutputBuffer.Substring(0, i);
+            s := s.TrimRight(#$D);
+            OutputBuffer := OutputBuffer.Remove(0, i + 1);
+            if Assigned(OnOutput) then OnOutput(s);
+            if Assigned(OutputList) then OutputList.Add(s);
+          end;
+        until i = -1;
+      end;
+    until (not Exec.Running) and (Exec.Output.NumBytesAvailable = 0);
+    if (OutputBuffer.Length > 0) then
+    begin
+      if Assigned(OnOutput) then OnOutput(OutputBuffer);
+      if Assigned(OutputList) then OutputList.Add(OutputBuffer);
+    end;
+  finally
+    Result := Exec.ExitCode;
+    Exec.Free;
+    if Assigned(fs) then fs.Free;
+  end;
 end;
 
 generic procedure UArrSort<T>(var Arr: array of T);
