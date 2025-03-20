@@ -490,17 +490,32 @@ type TUNet = class
 public
   type TBeacon = class (TURefClass)
   public
+    const Marker = 'UNBP';
+    type TPacketType = (pt_broadcast, pt_bounce);
+    type TPacket = packed record
+      Marker: array[0..3] of AnsiChar;
+      Version: UInt16;
+      PacketType: TPacketType;
+      Addr: TUInAddr;
+      NameLength: UInt16;
+      MessageLength: UInt16;
+      //Name: array[NameLength] of AnsiChar
+      //Message: array[MessageLength] of AnsiChar
+    end;
+    type PPacket = ^TPacket;
     type TPeer = record
       Addr: TUInAddr;
       TimeStamp: UInt64;
+      Name: String;
       Message: String;
     end;
     type TPeerArray = array of TPeer;
   private
+    _Message: String;
     type TBeaconThread = class (TThread)
     public
       var Beacon: TBeacon;
-      var Message: String;
+      var Packet: TUInt8Array;
     end;
     type TListener = class (TBeaconThread)
     private
@@ -523,8 +538,6 @@ public
     var _BroadcastInterval: UInt32;
     var _LocalAddr: TUInAddr;
     var _HostName: String;
-    var _MessageJson: TUJsonRef;
-    var _Message: String;
     var _Listener: TListener;
     var _Broadcaster: TBroadcaster;
     var _Peers: TPeerArray;
@@ -535,9 +548,10 @@ public
     procedure SetActive(const Value: Boolean);
     procedure SetPort(const Value: UInt16);
     procedure SetMessage(const Value: String);
-    procedure AddPeer(const Addr: TUInAddr; const Message: String);
+    procedure AddPeer(const Addr: TUInAddr; const Name: String; const Message: String);
     function GetPeers: TPeerArray;
     procedure ClearOldPeers;
+    function SetupPacket(const PacketType: TPacketType = pt_bounce): TUInt8Array;
   public
     property Enabled: Boolean read _Enabled write SetEnabled;
     property Active: Boolean read _Active write SetActive;
@@ -1144,18 +1158,15 @@ begin
   _Peers := nil;
   if _Enabled then
   begin
-    _MessageJson.Ptr['message'].Value := _Message;
     _Listener := TListener.Create(True);
     _Listener.Beacon := Self;
-    _MessageJson.Ptr['type'].Value := 'bounce';
-    _Listener.Message := _MessageJson.Ptr.AsString;
+    _Listener.Packet := SetupPacket(pt_bounce);
     _Listener.Start;
     if _Active then
     begin
       _Broadcaster := TBroadcaster.Create(True);
       _Broadcaster.Beacon := Self;
-      _MessageJson.Ptr['type'].Value := 'sonar';
-      _Broadcaster.Message := _MessageJson.Ptr.AsString;
+      _Broadcaster.Packet := SetupPacket(pt_broadcast);
       _Broadcaster.Start;
     end;
   end;
@@ -1188,7 +1199,11 @@ begin
   Enabled := True;
 end;
 
-procedure TUNet.TBeacon.AddPeer(const Addr: TUInAddr; const Message: String);
+procedure TUNet.TBeacon.AddPeer(
+  const Addr: TUInAddr;
+  const Name: String;
+  const Message: String
+);
   var i: Int32;
   var Peer: TPeer;
 begin
@@ -1204,6 +1219,7 @@ begin
     ClearOldPeers;
     Peer.Addr := Addr;
     Peer.TimeStamp := GetTickCount64;
+    Peer.Name := Name;
     Peer.Message := Message;
     specialize UArrAppend<TPeer>(_Peers, Peer);
   finally
@@ -1241,6 +1257,25 @@ begin
   end;
 end;
 
+function TUNet.TBeacon.SetupPacket(const PacketType: TPacketType): TUInt8Array;
+  var Size: UInt32;
+  var Offset: Int32;
+begin
+  Result := nil;
+  Size := SizeOf(TPacket) + SizeOf(UInt16) * 2 + Length(_HostName) + Length(_Message);
+  SetLength(Result, Size);
+  PPacket(@Result[0])^.Marker := 'UNBP';
+  PPacket(@Result[0])^.Version := UNetHostToNetShort($0100);
+  PPacket(@Result[0])^.PacketType := PacketType;
+  PPacket(@Result[0])^.Addr := _LocalAddr;
+  PPacket(@Result[0])^.NameLength := UNetHostToNetShort(Length(_HostName));
+  PPacket(@Result[0])^.MessageLength := UNetHostToNetShort(Length(_Message));
+  Offset := SizeOf(TPacket);
+  Move(_HostName[1], Result[Offset], Length(_HostName));
+  Inc(Offset, Length(_HostName));
+  Move(_Message[1], Result[Offset], Length(_Message));
+end;
+
 procedure TUNet.TBeacon.Reset;
 begin
   if not Enabled then Exit;
@@ -1257,11 +1292,6 @@ begin
   _HostName := UNetHostName;
   _BroadcastInterval := 5000;
   _Message := '';
-  _MessageJson := TUJson.Make;
-  _MessageJson.Ptr.AddValue('id', _HostName);
-  _MessageJson.Ptr.AddValue('type', '');
-  _MessageJson.Ptr.AddValue('addr', UNetNetAddrToStr(_LocalAddr));
-  _MessageJson.Ptr.AddValue('message', _Message);
 end;
 
 destructor TUNet.TBeacon.Destroy;
@@ -1273,10 +1303,10 @@ end;
 procedure TUNet.TBeacon.TListener.Execute;
   var SockAddr, OtherAddr: TUSockAddr;
   var OtherAddrLen: TUSockLen;
-  var Buffer: array[0..2047] of AnsiChar;
+  var Buffer: array[0..2047] of UInt8;
   var n: Int32;
-  var Msg: String;
-  var Json: TUJsonRef;
+  var Name, Message: String;
+  var NameLength, MessageLength: UInt16;
 begin
   _Sock := TUSocket.CreateUDP();
   SockAddr := TUSockAddr.Default;
@@ -1289,14 +1319,29 @@ begin
     n := _Sock.RecvFrom(@Buffer, SizeOf(Buffer), 0, @OtherAddr, @OtherAddrLen);
     if n <= 0 then Break;
     if OtherAddr.sin_addr.Addr32 = Beacon.LocalAddr.Addr32 then Continue;
-    Msg := Buffer;
-    Json := TUJson.Load(Msg);
-    if not Json.IsValid then Continue;
-    Beacon.AddPeer(OtherAddr.sin_addr, Json.Ptr['message'].Value);
-    if not (Json.Ptr.Content['type'].Value = 'sonar') then Continue;
+    if n < SizeOf(TPacket) then Continue;
+    if PPacket(@Buffer)^.Marker <> Marker then Continue;
+    if PPacket(@Buffer)^.Version > $0100 then Continue;
+    NameLength := UNetNetToHostShort(PPacket(@Buffer)^.NameLength);
+    MessageLength := UNetNetToHostShort(PPacket(@Buffer)^.MessageLength);
+    if n < SizeOf(TPacket) + NameLength + MessageLength then Continue;
+    Name := '';
+    if NameLength > 0 then
+    begin
+      SetLength(Name, NameLength);
+      Move(Buffer[SizeOf(TPacket)], Name[1], NameLength);
+    end;
+    Message := '';
+    if MessageLength > 0 then
+    begin
+      SetLength(Message, MessageLength);
+      Move(Buffer[SizeOf(TPacket) + NameLength], Message[1], MessageLength);
+    end;
+    Beacon.AddPeer(OtherAddr.sin_addr, Name, Message);
+    if not (PPacket(@Buffer)^.PacketType = pt_broadcast) then Continue;
     OtherAddr.sin_port := UNetHostToNetShort(Beacon.Port);
     n := _Sock.SendTo(
-      @Message[1], Length(Message) + 1, 0,
+      @Packet[0], Length(Packet), 0,
       @OtherAddr, SizeOf(OtherAddr)
     );
   end;
@@ -1315,22 +1360,19 @@ begin
 end;
 
 procedure TUNet.TBeacon.TBroadcaster.Execute;
-  var LocalAddr: TUInAddr;
   var SockAddr: TUSockAddr;
 begin
-  LocalAddr := Beacon.LocalAddr;
   _Sock := TUSocket.CreateUDP();
   _Sock.SetSockOpt(SO_BROADCAST, 1);
   SockAddr := TUSockAddr.Default;
-  SockAddr.sin_addr := LocalAddr;
+  SockAddr.sin_addr := Beacon.LocalAddr;
+  SockAddr.sin_addr.Addr8[3] := 255;
   SockAddr.sin_port := UNetHostToNetShort(Beacon.Port);
   _Event.Unsignal;
   while not Terminated do
   begin
-    SockAddr.sin_addr.Addr8[3] := 255;
-    if SockAddr.sin_addr.Addr32 = LocalAddr.Addr32 then Continue;
     _Sock.SendTo(
-      @Message[1], Length(Message) + 1, 0,
+      @Packet[0], Length(Packet), 0,
       @SockAddr, SizeOf(SockAddr)
     );
     _Event.WaitFor(Beacon.BroadcastInterval);
