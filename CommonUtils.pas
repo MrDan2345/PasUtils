@@ -5291,7 +5291,8 @@ function FindApproxMultiple(const Dividend, Divider: TUInt4096): Int64;
     for i := MaxItem downto 1 do Mag[i] := Mag[i - 1];
     Mag[0] := 0;
   end;
-  var Digit, cd: UInt64;
+  var c: Int8;
+  var Digit, DigitLow, DigitHigh, Diff: UInt64;
   var i, TopA, f: Int32;
   var Cmp: Int8;
   var m: TUInt4096;
@@ -5314,39 +5315,46 @@ begin
     ShiftLeft(r);
     r[0] := a[i];
     if MagCmp(b, r) > 0 then Continue;
+    DigitHigh := High(UInt32) shr 1;
+    DigitLow := 0;
     Digit := UMax(FindApproxMultiple(r, b) - 1, 0);
     m := MagMul(b, TUInt4096.Make(Digit));
-    f := 0;
-    while MagCmp(r, m) < 0 do
+    c := MagCmp(r, m);
+    if c >= 0 then
     begin
-      Dec(Digit);
+      DigitLow := Digit;
+    end
+    else
+    begin
+      DigitHigh := Digit;
+    end;
+    f := 0;
+    Diff := DigitHigh - DigitLow;
+    while Diff > 10 do
+    begin
+      Digit := DigitLow + (Diff shr 1);
       m := MagMul(b, TUInt4096.Make(Digit));
+      c := MagCmp(r, m);
+      if c >= 0 then
+      begin
+        DigitLow := Digit;
+      end
+      else
+      begin
+        DigitHigh := Digit;
+      end;
+      Diff := DigitHigh - DigitLow;
       Inc(f);
     end;
-    WriteLn('Fail: ', f);
-    if Digit > 0 then
-    begin
-      MagSubInPlace(r, m);
-    end;
+    WriteLn('Fails: ', f);
+    Digit := DigitLow;
+    m := MagMul(b, TUInt4096.Make(Digit));
+    MagSubInPlace(r, m);
     while MagCmp(r, b) >= 0 do
     begin
-      MagSubInPlace(r, b);
       Inc(Digit);
-    end;
-    {cd := Digit;
-    while cd > 0 do
-    begin
-      m := MagMul(b, TUInt4096.Make(cd));
-      WriteLn(MagCmp(r, m));
-      MagSubInPlace(r, m);
-      cd := UMax(FindApproxMultiple(r, b) - 1, 0);
-      Digit += cd;
-    end;
-    repeat
       MagSubInPlace(r, b);
-      Inc(Digit);
-    until MagCmp(r, b) < 0;
-    }
+    end;
     ShiftLeft(Result);
     Result[0] := Digit;
   end;
