@@ -919,6 +919,7 @@ strict private
   class procedure MagSubInPlace(var a: TUInt4096; const b: TUInt4096); static;
   class function MagMul(const a, b: TUInt4096): TUInt4096; static;
   class function MagDiv(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static;
+  class function MagIsEven(const Mag: TUInt4096): Boolean; static;
 public
   const Zero: TUInt4096 = (
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -945,17 +946,23 @@ public
   function IsNegative: Boolean;
   procedure SetPositive(const Value: Boolean);
   procedure SetNegative(const Value: Boolean);
+  procedure ShiftRightInPlace(const Bits: Int32);
+  procedure ShiftLeftInPlace(const Bits: Int32);
   class function Make(const Number: Int64): TUInt4096; static;
   class function Make(const Number: String): TUInt4096; static;
   class function MakeRandom(const BitCount: Int32 = 4096): TUInt4096; static;
+  class function MakePrime(const BitCount: Int32 = 4096): TUInt4096; static;
   class function Addition(const a, b: TUInt4096): TUInt4096; static;
   class function Subtraction(const a, b: TUInt4096): TUInt4096; static;
   class function Multiplication(const a, b: TUInt4096): TUInt4096; static;
-  class function Division(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static;
+  class function Division(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static; overload;
+  class function Division(const a, b: TUInt4096): TUInt4096; static; overload;
+  class function Modulo(const a, b: TUInt4096): TUInt4096; static;
   class function Compare(const a, b: TUInt4096): Int8; static;
   function ToString: String;
   function ToHex: String;
   function BitsUsed: Int32;
+  function IsOdd: Boolean;
 end;
 
 type TUTransform = record
@@ -5360,6 +5367,11 @@ begin
   end;
 end;
 
+class function TUInt4096Impl.MagIsEven(const Mag: TUInt4096): Boolean;
+begin
+  Result := (Mag[0] and 1) = 0;
+end;
+
 function TUInt4096Impl.IsPositive: Boolean;
 begin
   Result := not CheckFlag(if_negative);
@@ -5378,6 +5390,30 @@ end;
 procedure TUInt4096Impl.SetNegative(const Value: Boolean);
 begin
   SetFlag(if_negative, Value);
+end;
+
+procedure TUInt4096Impl.ShiftRightInPlace(const Bits: Int32);
+  var t, i, j, b: Int32;
+  var n: UInt32;
+begin
+  t := Top;
+  for i := 0 to Top do
+  begin
+    b := Bits;
+    n := 0;
+    for j := i to Top do
+    begin
+      n := n or Self[j] shr b;
+      b := b shr 32;
+      if b <= 0 then Break;
+    end;
+    Self[i] := n;
+  end;
+end;
+
+procedure TUInt4096Impl.ShiftLeftInPlace(const Bits: Int32);
+begin
+
 end;
 
 class function TUInt4096Impl.Make(const Number: Int64): TUInt4096;
@@ -5494,6 +5530,68 @@ begin
   Result[ItemCount] := Result[ItemCount] and ($ffffffff shr (32 - LastBits));
 end;
 
+class function TUInt4096Impl.MakePrime(const BitCount: Int32): TUInt4096;
+  function IsProbablePrime(const Number: TUInt4096; const Iterations: Int32 = 40): Boolean;
+    function PowerMod(const Base, Exponent, Modulus: TUInt4096): TUInt4096;
+      var x, b, e: TUInt4096;
+    begin
+      b := Base;
+      e := Exponent;
+      Result := TUInt4096.One;
+      while TUInt4096.MagCmp(e, TUInt4096.Zero) > 0 do
+      begin
+        if e.IsOdd then Result := TUInt4096.Modulo(TUInt4096.Multiplication(Result, b), Modulus);
+        //e := e shr 1;
+        //b := (b * b) mod Modulis;
+      end;
+    end;
+    var d, a, x, NMinus1, r: TUInt4096;
+    var s, i, j: Int32;
+  begin
+    if MagCmp(Number, TUInt4096.One) <= 0 then Exit(False);
+    if MagCmp(Number, TUInt4096.Make(3)) <= 0 then Exit(True);
+    s := 0;
+    NMinus1 := MagSub(Number, TUInt4096.One);
+    d := NMinus1;
+    while MagIsEven(d) do
+    begin
+      d := MagDiv(d, TUInt4096.Make(2), r);
+      Inc(s);
+    end;
+    for i := 1 to Iterations do
+    begin
+      a := MakeRandom(BitCount - 1);
+      x := PowerMod(a, d, Number);
+      if MagCmp(x, TUInt4096.One) = 0 then Continue;
+      if MagCmp(x, NMinus1) = 0 then Continue;
+      for j := 1 to s - 1 do
+      begin
+        x := PowerMod(x, TUInt4096.Make(2), Number);
+        if MagCmp(x, TUInt4096.One) = 0 then Exit(False);
+        if MagCmp(x, NMinus1) = 0 then Break;
+      end;
+      if MagCmp(x, NMinus1) <> 0 then Exit(False);
+    end;
+    Result := True;
+  end;
+begin
+  if BitCount < 2 then Exit(TUInt4096.MakeRandom(2));
+  //pt := GetTickCount64;
+  //n := 0;
+  Result := TUInt4096.Zero;
+  repeat
+    Result := MakeRandom(BitCount);
+    WriteLn(Result.ToString);
+    {Inc(n);
+    if (n mod 10) = 0 then
+    begin
+      t := GetTickCount64;
+      WriteLn(n div 10, ' dt=', t - pt);
+      pt := t;
+    end;}
+  until IsProbablePrime(Result, 20);
+end;
+
 class function TUInt4096Impl.Addition(const a, b: TUInt4096): TUInt4096;
   var Cmp: Int8;
 begin
@@ -5559,6 +5657,17 @@ begin
   Result := MagDiv(a, b, r);
   Result.SetNegative(a.IsNegative xor b.IsNegative);
   r.SetNegative(a.IsNegative);
+end;
+
+class function TUInt4096Impl.Division(const a, b: TUInt4096): TUInt4096;
+  var r: TUInt4096;
+begin
+  Result := Division(a, b, r);
+end;
+
+class function TUInt4096Impl.Modulo(const a, b: TUInt4096): TUInt4096;
+begin
+  Division(a, b, Result);
 end;
 
 class function TUInt4096Impl.Compare(const a, b: TUInt4096): Int8;
@@ -5628,6 +5737,11 @@ end;
 function TUInt4096Impl.BitsUsed: Int32;
 begin
 
+end;
+
+function TUInt4096Impl.IsOdd: Boolean;
+begin
+  Result := (Self[0] and 1) = 1;
 end;
 // TUInt4096 end
 

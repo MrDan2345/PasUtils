@@ -18,6 +18,7 @@ uses
   SysUtils,
   Classes,
   CommonUtils,
+  Sockets,
   DateUtils;
 
 {$if defined(windows)}
@@ -225,6 +226,8 @@ const SO_PEERNAME = 28;
 const SO_TIMESTAMP = 29;
 const SCM_TIMESTAMP = SO_TIMESTAMP;
 const SO_ACCEPTCONN = 30;
+
+const FIONBIO = $5421;
 {$endif}
 
 MSG_OOB = $1;
@@ -2149,22 +2152,21 @@ begin
   Inc(FDSet.fd_count);
 end;
 {$else}
-function UNetFDClr(var FDSet: TUFDSet; const FileDesc: TUSocket): Int32;
+procedure UNetFDClr(var FDSet: TUFDSet; const FileDesc: TUSocket);
   var i, j: Int32;
 begin
   i := FileDesc;
-  if (i < 0) or (i >= UFD_MAXFDSET) then Exit(-1);
+  if (i < 0) or (i >= UFD_MAXFDSET) then Exit;
   j := i shr 5;
   FDSet[j] := FDSet[j] and UInt32(not (UInt32(1) shl (i and (1 shl 5 - 1))));
-  Result := 0;
 end;
 
-function UNetFDIsSet(const FDSet: TUFDSet; const FileDesc: TUSocket): Int32;
+function UNetFDIsSet(const FDSet: TUFDSet; const FileDesc: TUSocket): Boolean;
   var i: Int32;
 begin
   i := FileDesc;
-  if (i < 0) or (i >= UFD_MAXFDSET) then Exit(-1);
-  Result := Int32(((FDSet[i shr 5]) and (UInt32(1) shl (i and (1 shl 5 - 1)))) > 0);
+  if (i < 0) or (i >= UFD_MAXFDSET) then Exit(False);
+  Result := ((FDSet[i shr 5]) and (UInt32(1) shl (i and (1 shl 5 - 1)))) > 0;
 end;
 
 //#define FD_SET(fd, set) ((set)->fds_bits[((fd) / (8 * sizeof(long)))] |= (1UL << ((fd) % (8 * sizeof(long)))))
