@@ -1831,27 +1831,35 @@ function UNetWakeOnLan(const MacAddr: TUMacAddr): Boolean;
     Sync: array[0..5] of UInt8;
     MacAddr: array[0..15] of TUMacAddr;
   end;
+  function SendToAddr(const Addr: TUSockAddr; const Repeats: Int32 = 10): Boolean;
+    var i, BytesSent: Int32;
+  begin
+    Result := False;
+    for i := 0 to Repeats - 1 do
+    begin
+      BytesSent := Sock.SendTo(@Msg, SizeOf(Msg), 0, @Addr, SizeOf(Addr));
+      if BytesSent > 0 then Result := True;
+    end;
+  end;
   var Addr: TUSockAddr;
-  var i, BytesSent: Int32;
+  var i: Int32;
 begin
   for i := 0 to High(Msg.Sync) do Msg.Sync[i] := $ff;
   for i := 0 to High(Msg.MacAddr) do Msg.MacAddr[i] := MacAddr;
   Sock := TUSocket.CreateUDP();
   if not Sock.IsValid then Exit(False);
   if Sock.SetSockOpt(SO_BROADCAST, 1) < 0 then Exit(False);
+  Result := False;
   try
     Addr := TUSockAddr.Default;
-    Addr.sin_addr := TUInAddr.Broadcast;
+    Addr.sin_addr := UNetStrToNetAddr('192.168.1.255');
     Addr.sin_port := UNetHostToNetShort(7);
-    for i := 0 to 4 do
-    begin
-      BytesSent := Sock.SendTo(@Msg, SizeOf(Msg), 0, @Addr, SizeOf(Addr));
-      if BytesSent <= 0 then Exit(False);
-    end;
+    Result := Result or SendToAddr(Addr);
+    Addr.sin_addr := TUInAddr.Broadcast;
+    Result := Result or SendToAddr(Addr);
   finally
     Sock.Close;
   end;
-  Result := True;
 end;
 
 function UNetPing(const InAddrN: TUInAddr): Boolean;
