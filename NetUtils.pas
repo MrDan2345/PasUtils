@@ -18,6 +18,7 @@ uses
   SysUtils,
   Classes,
   CommonUtils,
+  Sockets,
   DateUtils;
 
 {$if defined(windows)}
@@ -225,6 +226,8 @@ const SO_PEERNAME = 28;
 const SO_TIMESTAMP = 29;
 const SCM_TIMESTAMP = SO_TIMESTAMP;
 const SO_ACCEPTCONN = 30;
+
+const FIONBIO = $5421;
 {$endif}
 
 MSG_OOB = $1;
@@ -1828,27 +1831,35 @@ function UNetWakeOnLan(const MacAddr: TUMacAddr): Boolean;
     Sync: array[0..5] of UInt8;
     MacAddr: array[0..15] of TUMacAddr;
   end;
+  function SendToAddr(const Addr: TUSockAddr; const Repeats: Int32 = 10): Boolean;
+    var i, BytesSent: Int32;
+  begin
+    Result := False;
+    for i := 0 to Repeats - 1 do
+    begin
+      BytesSent := Sock.SendTo(@Msg, SizeOf(Msg), 0, @Addr, SizeOf(Addr));
+      if BytesSent > 0 then Result := True;
+    end;
+  end;
   var Addr: TUSockAddr;
-  var i, BytesSent: Int32;
+  var i: Int32;
 begin
   for i := 0 to High(Msg.Sync) do Msg.Sync[i] := $ff;
   for i := 0 to High(Msg.MacAddr) do Msg.MacAddr[i] := MacAddr;
   Sock := TUSocket.CreateUDP();
   if not Sock.IsValid then Exit(False);
   if Sock.SetSockOpt(SO_BROADCAST, 1) < 0 then Exit(False);
+  Result := False;
   try
     Addr := TUSockAddr.Default;
     Addr.sin_addr := UNetStrToNetAddr('192.168.1.255');
     Addr.sin_port := UNetHostToNetShort(7);
-    for i := 0 to 4 do
-    begin
-      BytesSent := Sock.SendTo(@Msg, SizeOf(Msg), 0, @Addr, SizeOf(Addr));
-      if BytesSent <= 0 then Exit(False);
-    end;
+    Result := Result or SendToAddr(Addr);
+    Addr.sin_addr := TUInAddr.Broadcast;
+    Result := Result or SendToAddr(Addr);
   finally
     Sock.Close;
   end;
-  Result := True;
 end;
 
 function UNetPing(const InAddrN: TUInAddr): Boolean;
@@ -2149,22 +2160,21 @@ begin
   Inc(FDSet.fd_count);
 end;
 {$else}
-function UNetFDClr(var FDSet: TUFDSet; const FileDesc: TUSocket): Int32;
+procedure UNetFDClr(var FDSet: TUFDSet; const FileDesc: TUSocket);
   var i, j: Int32;
 begin
   i := FileDesc;
-  if (i < 0) or (i >= UFD_MAXFDSET) then Exit(-1);
+  if (i < 0) or (i >= UFD_MAXFDSET) then Exit;
   j := i shr 5;
   FDSet[j] := FDSet[j] and UInt32(not (UInt32(1) shl (i and (1 shl 5 - 1))));
-  Result := 0;
 end;
 
-function UNetFDIsSet(const FDSet: TUFDSet; const FileDesc: TUSocket): Int32;
+function UNetFDIsSet(const FDSet: TUFDSet; const FileDesc: TUSocket): Boolean;
   var i: Int32;
 begin
   i := FileDesc;
-  if (i < 0) or (i >= UFD_MAXFDSET) then Exit(-1);
-  Result := Int32(((FDSet[i shr 5]) and (UInt32(1) shl (i and (1 shl 5 - 1)))) > 0);
+  if (i < 0) or (i >= UFD_MAXFDSET) then Exit(False);
+  Result := ((FDSet[i shr 5]) and (UInt32(1) shl (i and (1 shl 5 - 1)))) > 0;
 end;
 
 //#define FD_SET(fd, set) ((set)->fds_bits[((fd) / (8 * sizeof(long)))] |= (1UL << ((fd) % (8 * sizeof(long)))))
