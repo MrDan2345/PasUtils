@@ -1838,7 +1838,7 @@ begin
   if Sock.SetSockOpt(SO_BROADCAST, 1) < 0 then Exit(False);
   try
     Addr := TUSockAddr.Default;
-    Addr.sin_addr := TUInAddr.Broadcast;
+    Addr.sin_addr := UNetStrToNetAddr('192.168.1.255');
     Addr.sin_port := UNetHostToNetShort(7);
     for i := 0 to 4 do
     begin

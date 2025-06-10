@@ -911,14 +911,17 @@ strict private
   const FlagsItem = 128;
   const ItemVal: Int64 = 4294967296;
   function Top: Int32;
+  function TopBit: Int32;
   function CheckFlag(const Flag: TFlag): Boolean;
   procedure SetFlag(const Flag: TFlag; const Value: Boolean);
+  class function MillerRabinTest(const Number: TUInt4096; const Iterations: Int32): Boolean; static;
   class function MagCmp(const a, b: TUInt4096): Int8; static;
   class function MagSub(const a, b: TUInt4096): TUInt4096; static;
   class function MagAdd(const a, b: TUInt4096): TUInt4096; static;
   class procedure MagSubInPlace(var a: TUInt4096; const b: TUInt4096); static;
   class function MagMul(const a, b: TUInt4096): TUInt4096; static;
   class function MagDiv(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static;
+  class function PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096; static;
 public
   const Zero: TUInt4096 = (
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -941,6 +944,8 @@ public
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     1
   );
+  function IsZero: Boolean;
+  function IsOdd: Boolean;
   function IsPositive: Boolean;
   function IsNegative: Boolean;
   procedure SetPositive(const Value: Boolean);
@@ -948,11 +953,22 @@ public
   class function Make(const Number: Int64): TUInt4096; static;
   class function Make(const Number: String): TUInt4096; static;
   class function MakeRandom(const BitCount: Int32 = 4096): TUInt4096; static;
+  class function MakeRandomRange(const Min, Max: TUInt4096): TUInt4096; static;
   class function Addition(const a, b: TUInt4096): TUInt4096; static;
   class function Subtraction(const a, b: TUInt4096): TUInt4096; static;
   class function Multiplication(const a, b: TUInt4096): TUInt4096; static;
-  class function Division(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static;
+  class function Division(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static; overload;
+  class function Division(const a, b: TUInt4096): TUInt4096; static; overload;
+  class function Modulo(const a, b: TUInt4096): TUint4096; static;
   class function Compare(const a, b: TUInt4096): Int8; static;
+  class function ShrOne(const Number: TUInt4096): TUInt4096; static;
+  class function ShlOne(const Number: TUInt4096): TUInt4096; static;
+  class function ShiftRight(const Number: TUInt4096; const Bits: UInt32): TUInt4096; static;
+  class function ShiftLeft(const Number: TUInt4096; const Bits: UInt32): TUInt4096; static;
+  class function BitAnd(const a, b: TUInt4096): TUInt4096; static;
+  class function BitOr(const a, b: TUInt4096): TUInt4096; static;
+  class function BitXor(const a, b: TUInt4096): TUInt4096; static;
+  class function BitNot(const Number: TUInt4096): TUInt4096; static;
   function ToString: String;
   function ToHex: String;
   function BitsUsed: Int32;
@@ -1850,6 +1866,7 @@ function UArcCos(const x: TUFloat): TUFloat;
 function UArcTan2(const y, x: TUFloat): TUFloat;
 function UPow(const b, e: TUFloat): TUFloat;
 function UPoT(const x: UInt64): UInt64;
+function UTopSetBit(const x: UInt64): UInt8;
 function URandomPi: TUFloat;
 function URandom2Pi: TUFloat;
 function UAddMat(const m0, m1: TUMat): TUMat;
@@ -5167,6 +5184,13 @@ begin
   if Self[i] > 0 then Exit(i);
 end;
 
+function TUInt4096Impl.TopBit: Int32;
+  var t: UInt32;
+begin
+  t := Top;
+  Result := t * 32 + UTopSetBit(Self[t]);
+end;
+
 function TUInt4096Impl.CheckFlag(const Flag: TFlag): Boolean;
 begin
   Result := Flag in TFlgas(Self[FlagsItem]);
@@ -5175,6 +5199,46 @@ end;
 procedure TUInt4096Impl.SetFlag(const Flag: TFlag; const Value: Boolean);
 begin
   if Value then TFlgas(Self[FlagsItem]) += [Flag] else TFlgas(Self[FlagsItem]) -= [Flag];
+end;
+
+class function TUInt4096Impl.MillerRabinTest(const Number: TUInt4096; const Iterations: Int32): Boolean;
+  var Two: TUInt4096;
+  var Cmp: Int8;
+  var i: Int32;
+  var m: UInt32;
+  var d, a, x, n_minus_1, n_minus_2: TUInt4096;
+begin
+  Two := TUInt4096.Make(2);
+  Cmp := Compare(Number, Two);
+  if Cmp < 0 then Exit(False);
+  if Cmp = 0 then Exit(True);
+  if not Number.IsOdd then Exit(False);
+  n_minus_1 := Subtraction(Number, One);
+  d := n_minus_1;
+  m := 0;
+  while not d.IsOdd and (Compare(d, Zero) > 0) do
+  begin
+    d := ShrOne(d);
+    Inc(m);
+  end;
+  //if not d.IsOdd then Exit(False);
+  n_minus_2 := Subtraction(Number, Two);
+  for i := 1 to Iterations do
+  begin
+    a := MakeRandomRange(two, n_minus_2);
+    x := PowMod(a, d, Number);
+    if (Compare(x, One) = 0) or (Compare(x, n_minus_1) = 0) then Continue;
+    while m > 1 do
+    begin
+      x := Multiplication(x, x);
+      x := Modulo(x, Number);
+      if Compare(x, One) = 0 then Exit(False);
+      if Compare(x, n_minus_1) = 0 then Break;
+      Dec(m);
+    end;
+    if not (Compare(x, n_minus_1) = 0) then Exit(False);
+  end;
+  Result := True;
 end;
 
 class function TUInt4096Impl.MagCmp(const a, b: TUInt4096): Int8;
@@ -5285,7 +5349,7 @@ function FindApproxMultiple(const Dividend, Divider: TUInt4096): Int64;
     WriteLn(TestA - (TestB * r));
     Result := Int64(r);
   end;
-  procedure ShiftLeft(var Mag: TUInt4096);
+  procedure ShiftLeftMag(var Mag: TUInt4096);
     var i: Int32;
   begin
     for i := MaxItem downto 1 do Mag[i] := Mag[i - 1];
@@ -5312,7 +5376,7 @@ begin
   TopA := a.Top;
   for i := TopA downto 0 do
   begin
-    ShiftLeft(r);
+    ShiftLeftMag(r);
     r[0] := a[i];
     if MagCmp(b, r) > 0 then Continue;
     DigitHigh := High(UInt32) shr 1;
@@ -5355,9 +5419,43 @@ begin
       Inc(Digit);
       MagSubInPlace(r, b);
     end;
-    ShiftLeft(Result);
+    ShiftLeftMag(Result);
     Result[0] := Digit;
   end;
+end;
+
+class function TUInt4096Impl.PowMod(const Base, Exp, Modulus: TUInt4096
+  ): TUInt4096;
+  var CurBase, CurExp: TUInt4096;
+begin
+  Result := One;
+  CurBase := Modulo(Base, Modulus);
+  CurExp := Exp;
+  while not CurExp.IsZero do
+  begin
+    if CurExp.IsOdd then
+    begin
+      Result := Multiplication(Result, CurBase);
+      Result := Modulo(Result, Modulus);
+    end;
+    CurBase := Multiplication(CurBase, CurBase);
+    CurBase := Modulo(CurBase, Modulus);
+    CurExp := ShrOne(CurExp);
+  end;
+end;
+
+function TUInt4096Impl.IsZero: Boolean;
+  var i: Int32;
+begin
+  if CheckFlag(if_invalid) then Exit(False);
+  for i := 0 to MaxItem do
+  if Self[i] <> 0 then Exit(False);
+  Result := True;
+end;
+
+function TUInt4096Impl.IsOdd: Boolean;
+begin
+  Result := (Self[0] and 1) = 1;
 end;
 
 function TUInt4096Impl.IsPositive: Boolean;
@@ -5494,6 +5592,20 @@ begin
   Result[ItemCount] := Result[ItemCount] and ($ffffffff shr (32 - LastBits));
 end;
 
+class function TUInt4096Impl.MakeRandomRange(const Min, Max: TUInt4096): TUInt4096;
+  var RangeSize: TUInt4096;
+  var NumBits: UInt32;
+begin
+  if Compare(Min, Max) > 0 then Exit(Zero);
+  RangeSize := Subtraction(Max, Min);
+  RangeSize := Addition(RangeSize, One);
+  NumBits := RangeSize.TopBit + 1;
+  repeat
+    Result := MakeRandom(NumBits);
+  until Compare(Result, RangeSize) < 0;
+  Result := Addition(Result, Min);
+end;
+
 class function TUInt4096Impl.Addition(const a, b: TUInt4096): TUInt4096;
   var Cmp: Int8;
 begin
@@ -5561,6 +5673,19 @@ begin
   r.SetNegative(a.IsNegative);
 end;
 
+class function TUInt4096Impl.Division(const a, b: TUInt4096): TUInt4096;
+  var r: TUInt4096;
+begin
+  Result := MagDiv(a, b, r);
+  Result.SetNegative(a.IsNegative xor b.IsNegative);
+end;
+
+class function TUInt4096Impl.Modulo(const a, b: TUInt4096): TUint4096;
+begin
+  MagDiv(a, b, Result);
+  Result.SetNegative(a.IsNegative xor b.IsNegative);
+end;
+
 class function TUInt4096Impl.Compare(const a, b: TUInt4096): Int8;
 begin
   if a.IsPositive = b.IsPositive then
@@ -5573,6 +5698,120 @@ begin
     if (MagCmp(a, Zero) = 0) and (MagCmp(b, Zero) = 0) then Exit(0);
     if a.IsPositive then Exit(1);
     Result := -1;
+  end;
+end;
+
+class function TUInt4096Impl.ShrOne(const Number: TUInt4096): TUInt4096;
+  var i: Int32;
+  var Carry: UInt32;
+begin
+  Result := Zero;
+  Carry := 0;
+  for i := MaxItem downto 1 do
+  begin
+    Result[i] := (Number[i] shr 1) or (Carry shl 31);
+    Carry := Number[i] and 1;
+  end;
+  Result[0] := (Number[0] shr 1) or (Carry shl 31);
+end;
+
+class function TUInt4096Impl.ShlOne(const Number: TUInt4096): TUInt4096;
+  var i: Int32;
+  var Carry: UInt32;
+begin
+  Result := Zero;
+  Carry := 0;
+  for i := 0 to MaxItem - 1 do
+  begin
+    Result[i] := (Number[i] shl 1) or Carry;
+    Carry := (Number[i] shr 31) and 1;
+  end;
+  Result[MaxItem] := (Number[MaxItem] shl 1) or Carry;
+end;
+
+class function TUInt4096Impl.ShiftRight(
+  const Number: TUInt4096;
+  const Bits: UInt32
+): TUInt4096;
+  var i: Int32;
+  var WordShift, BitShift: UInt32;
+  var Carry: UInt32;
+  var SrcIndex, CarrySrcIndex: Int32;
+begin
+  if Bits >= (SizeOf(TUInt4096) * 8) then Exit(Zero);
+  Result := Zero;
+  WordShift := Bits div 32;
+  BitShift := Bits mod 32;
+  for i := MaxItem downto 0 do
+  begin
+    SrcIndex := i + WordShift;
+    if SrcIndex > MaxItem then Continue;
+    Result[i] := Number[SrcIndex] shr BitShift;
+    CarrySrcIndex := SrcIndex + 1;
+    if CarrySrcIndex > MaxItem then Continue;
+    Carry := Number[CarrySrcIndex] shl (32 - BitShift);
+    Result[i] := Result[i] or Carry;
+  end;
+end;
+
+class function TUInt4096Impl.ShiftLeft(
+  const Number: TUInt4096;
+  const Bits: UInt32
+): TUInt4096;
+  var i: Int32;
+  var WordShift, BitShift: UInt32;
+  var Carry: UInt32;
+  var SrcIndex, CarrySrcIndex: Int32;
+begin
+  if Bits >= (SizeOf(TUInt4096) * 8) then Exit(Zero);
+  Result := Zero;
+  WordShift := Bits div 32;
+  BitShift  := Bits mod 32;
+  for i := 0 to MaxItem do
+  begin
+    SrcIndex := i - WordShift;
+    if SrcIndex < 0 then Continue;
+    Result[i] := Number[SrcIndex] shl BitShift;
+    CarrySrcIndex := SrcIndex - 1;
+    if CarrySrcIndex < 0 then Continue;
+    Carry := Number[CarrySrcIndex] shr (32 - BitShift);
+    Result[i] := Result[i] or Carry;
+  end;
+end;
+
+class function TUInt4096Impl.BitAnd(const a, b: TUInt4096): TUInt4096;
+  var i: Int32;
+begin
+  for i := 0 to MaxItem do
+  begin
+    Result[i] := a[i] and b[i];
+  end;
+end;
+
+class function TUInt4096Impl.BitOr(const a, b: TUInt4096): TUInt4096;
+  var i: Int32;
+begin
+  for i := 0 to MaxItem do
+  begin
+    Result[i] := a[i] or b[i];
+  end;
+end;
+
+class function TUInt4096Impl.BitXor(const a, b: TUInt4096): TUInt4096;
+  var i: Int32;
+begin
+  for i := 0 to MaxItem do
+  begin
+    Result[i] := a[i] xor b[i];
+  end;
+end;
+
+class function TUInt4096Impl.BitNot(const Number: TUInt4096): TUInt4096;
+  var i: Int32;
+begin
+  for i := 0 to MaxItem do
+  begin
+    Result[i] := not Number[i];
   end;
 end;
 
@@ -10740,6 +10979,18 @@ begin
     Result := Result or (Result shr (1 shl n));
   end;
   Result += 1;
+end;
+
+function UTopSetBit(const x: UInt64): UInt8;
+  var n: UInt64;
+begin
+  Result := 0;
+  n := x;
+  while n > 0 do
+  begin
+    Inc(Result);
+    n := n shr 1;
+  end;
 end;
 
 function URandomPi: TUFloat;
