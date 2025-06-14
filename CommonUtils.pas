@@ -1950,6 +1950,7 @@ generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
 operator + (const a, b: TUVec2): TUVec2;
 operator - (const a, b: TUVec2): TUVec2;
 operator * (const a, b: TUVec2): TUVec2;
+operator / (const a, b: TUInt4096): TUInt4096;
 operator / (const a, b: TUVec2): TUVec2;
 operator / (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2; const f: TUFloat): TUVec2;
@@ -1961,6 +1962,7 @@ operator * (const a, b: TUVec2i): TUVec2i;
 operator * (const a: TUVec2i; const b: TUVec2): TUVec2;
 operator / (const a, b: TUVec2i): TUVec2;
 operator div (const a, b: TUVec2i): TUVec2i;
+operator div (const a, b: TUInt4096): TUInt4096;
 operator + (const v: TUVec2i; const i: Int32): TUVec2i;
 operator - (const v: TUVec2i; const i: Int32): TUVec2i;
 operator * (const v: TUVec2i; const i: Int32): TUVec2i;
@@ -1971,7 +1973,10 @@ operator - (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator / (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator mod (const v: TUVec2i; const i: Int32): TUVec2i;
+operator mod (const a, b: TUInt4096): TUInt4096;
 operator := (const v: TUVec2): TUVec2i;
+operator := (const v: UInt64): TUInt4096;
+operator := (const v: String): TUInt4096;
 operator := (const v: TUVec2i): TUVec2;
 operator := (const i: Int32): TUVec2i;
 operator := (const f: TUFloat): TUVec2;
@@ -2003,8 +2008,11 @@ operator * (const f: TUFloat; const v: TUVec4): TUVec4;
 operator - (const v: TUVec4): TUVec4;
 operator := (const v: TUVec4): TUBounds2f;
 operator := (const v: TUBounds2f): TUVec4;
+operator + (const a, b: TUInt4096): TUInt4096;
 operator + (const a, b: TUMat): TUMat;
 operator - (const a, b: TUMat): TUMat;
+operator - (const a, b: TUInt4096): TUInt4096;
+operator * (const a, b: TUInt4096): TUInt4096;
 operator * (const a, b: TUMat): TUMat;
 operator * (const m: TUMat; const f: TUFloat): TUMat;
 operator := (const q: TUQuat): TUMat;
@@ -2015,6 +2023,16 @@ operator * (const a, b: TUQuat): TUQuat;
 operator mod (const a, b: TUDouble): TUDouble;
 operator mod (const a, b: TUFloat): TUFloat;
 operator < (const a, b: TUInt32Array): Boolean;
+operator < (const a, b: TUInt4096): Boolean;
+operator <= (const a, b: TUInt4096): Boolean;
+operator > (const a, b: TUInt4096): Boolean;
+operator >= (const a, b: TUInt4096): Boolean;
+operator = (const a, b: TUInt4096): Boolean;
+operator shl (const a: TUInt4096; const b: UInt32): TUInt4096;
+operator shr (const a: TUInt4096; const b: UInt32): TUInt4096;
+operator or (const a, b: TUInt4096): TUInt4096;
+operator and (const a, b: TUInt4096): TUInt4096;
+operator xor (const a, b: TUInt4096): TUInt4096;
 
 const tt_any = [tt_error, tt_eof, tt_symbol, tt_word, tt_keyword, tt_string, tt_number];
 const UPi = 3.14159265359;
@@ -5346,7 +5364,7 @@ function FindApproxMultiple(const Dividend, Divider: TUInt4096): Int64;
     if TopA > TopB then TestA += UInt64(Dividend[TopA]) shl 32;
     TestB := Divider[TopB];
     r := TestA div TestB;
-    WriteLn(TestA - (TestB * r));
+    //WriteLn(TestA - (TestB * r));
     Result := Int64(r);
   end;
   procedure ShiftLeftMag(var Mag: TUInt4096);
@@ -5410,7 +5428,6 @@ begin
       Diff := DigitHigh - DigitLow;
       Inc(f);
     end;
-    WriteLn('Fails: ', f);
     Digit := DigitLow;
     m := MagMul(b, TUInt4096.Make(Digit));
     MagSubInPlace(r, m);
@@ -11527,6 +11544,11 @@ begin
   Result[1] := a[1] * b[1];
 end;
 
+operator / (const a, b: TUInt4096): TUInt4096;
+begin
+  Result := TUInt4096.Division(a, b);
+end;
+
 operator / (const a, b: TUVec2): TUVec2;
 begin
   Result[0] := a[0] / b[0];
@@ -11595,6 +11617,11 @@ begin
   Result[1] := a[1] div b[1];
 end;
 
+operator div (const a, b: TUInt4096): TUInt4096;
+begin
+  Result := TUInt4096.Division(a, b);
+end;
+
 operator + (const v: TUVec2i; const i: Int32): TUVec2i;
 begin
   Result[0] := v[0] + i;
@@ -11657,10 +11684,25 @@ begin
   Result[1] := v[1] mod i;
 end;
 
+operator mod (const a, b: TUInt4096): TUInt4096;
+begin
+  Result := TUInt4096.Modulo(a, b);
+end;
+
 operator := (const v: TUVec2): TUVec2i;
 begin
   Result[0] := Trunc(v[0]);
   Result[1] := Trunc(v[1]);
+end;
+
+operator := (const v: UInt64): TUInt4096;
+begin
+  Result := TUInt4096.Make(v);
+end;
+
+operator := (const v: String): TUInt4096;
+begin
+  Result := TUInt4096.Make(v);
 end;
 
 operator := (const v: TUVec2i): TUVec2;
@@ -11883,14 +11925,29 @@ begin
   Result := PUVec4(@v)^;
 end;
 
+operator + (const a, b: TUInt4096): TUInt4096;
+begin
+  Result := TUInt4096.Addition(a, b);
+end;
+
 operator + (const a, b: TUMat): TUMat;
 begin
   Result := UAddMat(a, b);
 end;
 
+operator - (const a, b: TUInt4096): TUInt4096;
+begin
+  Result := TUInt4096.Subtraction(a, b);
+end;
+
 operator - (const a, b: TUMat): TUMat;
 begin
   Result := USubMat(a, b);
+end;
+
+operator * (const a, b: TUInt4096): TUInt4096;
+begin
+  Result := TUInt4096.Multiplication(a, b);
 end;
 
 operator * (const a, b: TUMat): TUMat;
@@ -11947,6 +12004,56 @@ begin
     if a[i] >= b[i] then Exit(False);
   end;
   Result := True;
+end;
+
+operator < (const a, b: TUInt4096): Boolean;
+begin
+  Result := TUInt4096.Compare(a, b) < 0;
+end;
+
+operator <= (const a, b: TUInt4096): Boolean;
+begin
+  Result := TUInt4096.Compare(a, b) <= 0;
+end;
+
+operator > (const a, b: TUInt4096): Boolean;
+begin
+  Result := TUInt4096.Compare(a, b) > 0;
+end;
+
+operator >= (const a, b: TUInt4096): Boolean;
+begin
+  Result := TUInt4096.Compare(a, b) >= 0;
+end;
+
+operator = (const a, b: TUInt4096): Boolean;
+begin
+  Result := TUInt4096.Compare(a, b) = 0;
+end;
+
+operator shl (const a: TUInt4096; const b: UInt32): TUInt4096;
+begin
+  Result := TUInt4096.ShiftLeft(a, b);
+end;
+
+operator shr (const a: TUInt4096; const b: UInt32): TUInt4096;
+begin
+  Result := TUInt4096.ShiftRight(a, b);
+end;
+
+operator or (const a, b: TUInt4096): TUInt4096;
+begin
+  Result := TUInt4096.BitOr(a, b);
+end;
+
+operator and (const a, b: TUInt4096): TUInt4096;
+begin
+  Result := TUInt4096.BitAnd(a, b);
+end;
+
+operator xor (const a, b: TUInt4096): TUInt4096;
+begin
+  Result := TUInt4096.BitXor(a, b);
 end;
 
 function UStrExprMatch(const Str, Expr: String): TUExprMatch;
