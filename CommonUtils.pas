@@ -954,6 +954,7 @@ public
   class function Make(const Number: String): TUInt4096; static;
   class function MakeRandom(const BitCount: Int32 = 4096): TUInt4096; static;
   class function MakeRandomRange(const Min, Max: TUInt4096): TUInt4096; static;
+  class function MakePrime(const BitCount: Int32 = 4096): TUInt4096; static;
   class function Addition(const a, b: TUInt4096): TUInt4096; static;
   class function Subtraction(const a, b: TUInt4096): TUInt4096; static;
   class function Multiplication(const a, b: TUInt4096): TUInt4096; static;
@@ -5606,6 +5607,14 @@ begin
   Result := Addition(Result, Min);
 end;
 
+class function TUInt4096Impl.MakePrime(const BitCount: Int32): TUInt4096;
+begin
+  repeat
+    Result := MakeRandom(BitCount);
+    Result[0] := Result[0] or 1;
+  until MillerRabinTest(Result, 1);
+end;
+
 class function TUInt4096Impl.Addition(const a, b: TUInt4096): TUInt4096;
   var Cmp: Int8;
 begin
@@ -5866,7 +5875,7 @@ end;
 
 function TUInt4096Impl.BitsUsed: Int32;
 begin
-
+  Result := TopBit;
 end;
 // TUInt4096 end
 
