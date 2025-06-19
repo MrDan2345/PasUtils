@@ -904,12 +904,22 @@ end;
 
 type TUInt4096Impl = type helper for TUInt4096
 public
-  type TFlag = (if_invalid, if_negative);
-  type TFlgas = set of TFlag;
-strict private
   const MaxItem = 127;
   const FlagsItem = 128;
-  const ItemVal: Int64 = 4294967296;
+  const ItemVal: UInt64 = 4294967296;
+  type TFlag = (if_invalid, if_negative);
+  type TFlgas = set of TFlag;
+  type TMontgomeryReduction = record
+    type TContext = record
+      N: TUInt4096;
+      N_prime: UInt32;
+      R2_mod_N: TUInt4096;
+      NumItems: Int32;
+    end;
+    function InitContext(const N: TUInt4096): TContext;
+    function MontMult(const Context: TContext; const a, b: TUInt4096): TUInt4096;
+  end;
+strict private
   function Top: Int32;
   function TopBit: Int32;
   function CheckFlag(const Flag: TFlag): Boolean;
@@ -5876,6 +5886,77 @@ end;
 function TUInt4096Impl.BitsUsed: Int32;
 begin
   Result := TopBit;
+end;
+
+function TUInt4096Impl.TMontgomeryReduction.InitContext(const N: TUInt4096): TContext;
+  var inv: UInt32;
+  var i: Int32;
+  var R2_dividend: TUInt4096;
+begin
+  Result.N := N;
+  Result.NumItems := (MaxItem + 1) shr 1;
+  inv := 1;
+  for i := 1 to 5 do
+  begin
+    inv := inv * (2 - N[0] * inv);
+  end;
+  Result.N_prime := 0 - inv;
+  R2_dividend := Zero;
+  R2_dividend[Result.NumItems - 1] := 1;
+  Result.R2_mod_N := Modulo(R2_dividend, N);
+end;
+
+function TUInt4096Impl.TMontgomeryReduction.MontMult(
+  const Context: TContext; const a, b: TUInt4096
+): TUInt4096;
+  procedure MulAdd(var T: TUInt4096; const Multiplier: UInt32; const Multiplicand: TUInt4096);
+    var i: Int32;
+    var Carry, HighPart: UInt64;
+    var Product: UInt64;
+  begin
+    Carry := 0;
+    for i := 0 to MaxItem do
+    begin
+      Product := UInt64(Multiplier) * Multiplicand[i];
+      HighPart := Product shr 32;
+      T[i] := T[i] + (Product and $ffffffff) + Carry;
+      if T[i] < Carry then HighPart := HighPart + 1;
+      Carry := HighPart;
+    end;
+    i := High(Multiplicand) + 1;
+    while (Carry > 0) and (i <= MaxItem) do
+    begin
+      T[i] := T[i] + Carry;
+      if T[i] < Carry then
+      begin
+        Carry := 1;
+      end
+      else
+      begin
+        Carry := 0;
+      end;
+      Inc(i);
+    end;
+  end;
+  var T: TUInt4096;
+  var m: UInt32;
+  var i: Int32;
+  var ResultIsBig: Boolean;
+begin
+  T := Multiplication(a, b);
+  for i := 0 to Context.NumItems - 1 do
+  begin
+    m := T[i] * Context.N_prime;
+    MulAdd(T, m, Context.N);
+  end;
+  for i := 0 to Context.NumItems - 1 do
+  begin
+    Result[i] := T[i + Context.NumItems];
+  end;
+  if Compare(Result, Context.N) >= 0 then
+  begin
+    Result := Subtraction(Result, Context.N);
+  end;
 end;
 // TUInt4096 end
 
