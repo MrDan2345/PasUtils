@@ -916,8 +916,8 @@ public
       R2_mod_N: TUInt4096;
       NumItems: Int32;
     end;
-    function InitContext(const N: TUInt4096): TContext;
-    function MontMult(const Context: TContext; const a, b: TUInt4096): TUInt4096;
+    class function InitContext(const N: TUInt4096): TContext; static;
+    class function MontMult(const Context: TContext; const a, b: TUInt4096): TUInt4096; static;
   end;
 strict private
   function Top: Int32;
@@ -932,6 +932,7 @@ strict private
   class function MagMul(const a, b: TUInt4096): TUInt4096; static;
   class function MagDiv(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static;
   class function PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096; static;
+  class function PowMod2(const Base, Exp, Modulus: TUInt4096): TUInt4096; static;
 public
   const Zero: TUInt4096 = (
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -962,9 +963,9 @@ public
   procedure SetNegative(const Value: Boolean);
   class function Make(const Number: Int64): TUInt4096; static;
   class function Make(const Number: String): TUInt4096; static;
-  class function MakeRandom(const BitCount: Int32 = 4096): TUInt4096; static;
+  class function MakeRandom(const BitCount: Int32 = 2048): TUInt4096; static;
   class function MakeRandomRange(const Min, Max: TUInt4096): TUInt4096; static;
-  class function MakePrime(const BitCount: Int32 = 4096): TUInt4096; static;
+  class function MakePrime(const BitCount: Int32 = 2048): TUInt4096; static;
   class function Addition(const a, b: TUInt4096): TUInt4096; static;
   class function Subtraction(const a, b: TUInt4096): TUInt4096; static;
   class function Multiplication(const a, b: TUInt4096): TUInt4096; static;
@@ -5255,7 +5256,7 @@ begin
   for i := 1 to Iterations do
   begin
     a := MakeRandomRange(two, n_minus_2);
-    x := PowMod(a, d, Number);
+    x := PowMod2(a, d, Number);
     if (Compare(x, One) = 0) or (Compare(x, n_minus_1) = 0) then Continue;
     while m > 1 do
     begin
@@ -5452,8 +5453,7 @@ begin
   end;
 end;
 
-class function TUInt4096Impl.PowMod(const Base, Exp, Modulus: TUInt4096
-  ): TUInt4096;
+class function TUInt4096Impl.PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096;
   var CurBase, CurExp: TUInt4096;
 begin
   Result := One;
@@ -5470,6 +5470,28 @@ begin
     CurBase := Modulo(CurBase, Modulus);
     CurExp := ShrOne(CurExp);
   end;
+end;
+
+class function TUInt4096Impl.PowMod2(const Base, Exp, Modulus: TUInt4096): TUInt4096;
+  var Context: TMontgomeryReduction.TContext;
+  var Base_mont: TUInt4096;
+  var Result_mont: TUInt4096;
+  var CurrentExponent: TUInt4096;
+begin
+  Context := TMontgomeryReduction.InitContext(Modulus);
+  Base_mont := TMontgomeryReduction.MontMult(Context, Base, Context.R2_mod_N);
+  Result_mont := TMontgomeryReduction.MontMult(Context, One, Context.R2_mod_N);
+  CurrentExponent := Exp;
+  while not CurrentExponent.IsZero do
+  begin
+    if CurrentExponent.IsOdd then
+    begin
+      Result_mont := TMontgomeryReduction.MontMult(Context, Result_mont, Base_mont);
+    end;
+    Base_mont := TMontgomeryReduction.MontMult(Context, Base_mont, Base_mont);
+    CurrentExponent := ShrOne(CurrentExponent);
+  end;
+  Result := TMontgomeryReduction.MontMult(Context, Result_mont, One);
 end;
 
 function TUInt4096Impl.IsZero: Boolean;
@@ -5905,7 +5927,7 @@ begin
   Result := TopBit;
 end;
 
-function TUInt4096Impl.TMontgomeryReduction.InitContext(const N: TUInt4096): TContext;
+class function TUInt4096Impl.TMontgomeryReduction.InitContext(const N: TUInt4096): TContext;
   var inv: UInt32;
   var i: Int32;
   var R2_dividend: TUInt4096;
@@ -5923,7 +5945,7 @@ begin
   Result.R2_mod_N := Modulo(R2_dividend, N);
 end;
 
-function TUInt4096Impl.TMontgomeryReduction.MontMult(
+class function TUInt4096Impl.TMontgomeryReduction.MontMult(
   const Context: TContext; const a, b: TUInt4096
 ): TUInt4096;
   procedure MulAdd(var T: TUInt4096; const Multiplier: UInt32; const Multiplicand: TUInt4096);
