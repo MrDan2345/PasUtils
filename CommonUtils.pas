@@ -11822,6 +11822,11 @@ begin
   Result := v.ToString;
 end;
 
+operator := (const v: Int64): TUInt4096;
+begin
+  Result := TUInt4096.Make(v);
+end;
+
 operator := (const v: TUVec2i): TUVec2;
 begin
   Result[0] := v[0];
