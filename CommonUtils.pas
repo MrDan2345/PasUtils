@@ -919,7 +919,7 @@ public
     class function InitContext(const N: TUInt4096): TContext; static;
     class function MontMult(const Context: TContext; const a, b: TUInt4096): TUInt4096; static;
   end;
-strict private
+public
   function Top: Int32;
   function TopBit: Int32;
   function CheckFlag(const Flag: TFlag): Boolean;
@@ -5235,38 +5235,47 @@ class function TUInt4096Impl.MillerRabinTest(const Number: TUInt4096; const Iter
   var Two: TUInt4096;
   var Cmp: Int8;
   var i: Int32;
-  var m: UInt32;
-  var d, a, x, n_minus_1, n_minus_2: TUInt4096;
+  var m, m_temp: UInt32;
+  var d, a, x, x2, n_minus_1, n_minus_2: TUInt4096;
 begin
-  Two := TUInt4096.Make(2);
+  Two := 2;
   Cmp := Compare(Number, Two);
   if Cmp < 0 then Exit(False);
   if Cmp = 0 then Exit(True);
   if not Number.IsOdd then Exit(False);
-  n_minus_1 := Subtraction(Number, One);
+  n_minus_1 := Number - One;
   d := n_minus_1;
   m := 0;
-  while not d.IsOdd and (Compare(d, Zero) > 0) do
+  while not d.IsOdd and (d > Zero) do
   begin
     d := ShrOne(d);
     Inc(m);
   end;
-  //if not d.IsOdd then Exit(False);
-  n_minus_2 := Subtraction(Number, Two);
+  n_minus_2 := Number - Two;
   for i := 1 to Iterations do
   begin
-    a := MakeRandomRange(two, n_minus_2);
+    a := MakeRandomRange(Two, n_minus_2);
+    x2 := PowMod(a, d, Number);
     x := PowMod2(a, d, Number);
-    if (Compare(x, One) = 0) or (Compare(x, n_minus_1) = 0) then Continue;
-    while m > 1 do
+    if x <> x2 then
     begin
-      x := Multiplication(x, x);
-      x := Modulo(x, Number);
-      if Compare(x, One) = 0 then Exit(False);
-      if Compare(x, n_minus_1) = 0 then Break;
-      Dec(m);
+      WriteLn('PowMod error: ');
+      WriteLn(x2.ToString);
+      WriteLn;
+      WriteLn(x.ToString);
+      WriteLn;
     end;
-    if not (Compare(x, n_minus_1) = 0) then Exit(False);
+    if (x = One) or (x = n_minus_1) then Continue;
+    m_temp := m;
+    while m_temp > 1 do
+    begin
+      x := x * x;
+      x := x mod Number;
+      if x = One then Exit(False);
+      if x = n_minus_1 then Break;
+      Dec(m_temp);
+    end;
+    if not (x = n_minus_1) then Exit(False);
   end;
   Result := True;
 end;
@@ -5366,7 +5375,7 @@ begin
 end;
 
 class function TUInt4096Impl.MagDiv(const a, b: TUInt4096; out r: TUInt4096): TUInt4096;
-function FindApproxMultiple(const Dividend, Divider: TUInt4096): Int64;
+  function FindApproxMultiple(const Dividend, Divider: TUInt4096): Int64;
     var TopA, TopB: Int32;
     var TestA, TestB, r: UInt64;
   begin
@@ -5376,7 +5385,6 @@ function FindApproxMultiple(const Dividend, Divider: TUInt4096): Int64;
     if TopA > TopB then TestA += UInt64(Dividend[TopA]) shl 32;
     TestB := Divider[TopB];
     r := TestA div TestB;
-    //WriteLn(TestA - (TestB * r));
     Result := Int64(r);
   end;
   procedure ShiftLeftMag(var Mag: TUInt4096);
@@ -5409,7 +5417,7 @@ begin
     ShiftLeftMag(r);
     r[0] := a[i];
     if MagCmp(b, r) > 0 then Continue;
-    DigitHigh := High(UInt32) shr 1;
+    DigitHigh := (High(UInt32) + 1) shr 1;
     DigitLow := 0;
     Digit := UMax(FindApproxMultiple(r, b) - 1, 0);
     m := MagMul(b, TUInt4096.Make(Digit));
@@ -5633,13 +5641,16 @@ class function TUInt4096Impl.MakeRandom(const BitCount: Int32): TUInt4096;
   var i, ItemCount, LastBits: Int32;
 begin
   if BitCount > 4096 then Exit(Zero);
-  ItemCount := BitCount shr 5;
-  LastBits := BitCount - (ItemCount * 32);
+  ItemCount := (BitCount + 31) shr 5;
   Result := Zero;
-  for i := 0 to ItemCount - 1 do Result[i] := Random(Int64(High(UInt32)));
+  for i := 0 to ItemCount - 1 do
+  begin
+    Result[i] := (Random($10000) shl 16) or Random($10000);
+  end;
+  LastBits := BitCount mod 32;
   if LastBits = 0 then Exit;
-  Result[ItemCount] := Random(Int64(High(UInt32)));
-  Result[ItemCount] := Result[ItemCount] and ($ffffffff shr (32 - LastBits));
+  i := ItemCount - 1;
+  Result[i] := Result[i] and ($ffffffff shr (32 - LastBits));
 end;
 
 class function TUInt4096Impl.MakeRandomRange(const Min, Max: TUInt4096): TUInt4096;
@@ -5657,11 +5668,16 @@ begin
 end;
 
 class function TUInt4096Impl.MakePrime(const BitCount: Int32): TUInt4096;
+  var TestCount: Int32;
 begin
+  TestCount := 0;
   repeat
     Result := MakeRandom(BitCount);
+    Result := Result or (One shl (BitCount - 1));
     Result[0] := Result[0] or 1;
-  until MillerRabinTest(Result, 1);
+    Inc(TestCount);
+    if TestCount mod 100 = 0 then WriteLn(TestCount);
+  until MillerRabinTest(Result, 4);
 end;
 
 class function TUInt4096Impl.Addition(const a, b: TUInt4096): TUInt4096;
@@ -5930,7 +5946,7 @@ end;
 class function TUInt4096Impl.TMontgomeryReduction.InitContext(const N: TUInt4096): TContext;
   var inv: UInt32;
   var i: Int32;
-  var R2_dividend: TUInt4096;
+  var R_val, R_mod_N: TUInt4096;
 begin
   Result.N := N;
   Result.NumItems := (MaxItem + 1) shr 1;
@@ -5940,9 +5956,13 @@ begin
     inv := inv * (2 - N[0] * inv);
   end;
   Result.N_prime := 0 - inv;
-  R2_dividend := Zero;
-  R2_dividend[Result.NumItems - 1] := 1;
-  Result.R2_mod_N := Modulo(R2_dividend, N);
+  R_val := Zero;
+  R_val[Result.NumItems] := 1;
+  R_mod_N := R_val mod N;
+  Result.R2_mod_N := (R_mod_N * R_mod_N) mod N;
+  WriteLn('N: ', N.ToString);
+  WriteLn('N_prime: ', IntToHex(Result.N_prime));
+  WriteLn('R2_mod_N: ', Result.R2_mod_N.ToString);
 end;
 
 class function TUInt4096Impl.TMontgomeryReduction.MontMult(
