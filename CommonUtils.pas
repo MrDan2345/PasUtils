@@ -931,7 +931,7 @@ public
   class function MagAdd(const a, b: TUInt4096): TUInt4096; static;
   class procedure MagSubInPlace(var a: TUInt4096; const b: TUInt4096); static;
   class function MagMul(const a, b: TUInt4096): TUInt4096; static;
-  class function MagDiv(const Dividend, Divisor: TUInt4096; out Remainder: TUInt4096): TUInt4096; static;
+  class function MagDiv(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static;
   class function PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096; static;
 public
   const Zero: TUInt4096 = (
@@ -959,6 +959,7 @@ public
   function IsOdd: Boolean;
   function IsPositive: Boolean;
   function IsNegative: Boolean;
+  function IsValid: Boolean;
   function ToString: String;
   function ToHex: String;
   function BitsUsed: Int32;
@@ -973,6 +974,7 @@ public
   class function Subtraction(const a, b: TUInt4096): TUInt4096; static;
   class function Multiplication(const a, b: TUInt4096): TUInt4096; static;
   class function Division(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static; overload;
+  class function DivisionModular(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static; overload;
   class function Division(const a, b: TUInt4096): TUInt4096; static; overload;
   class function Modulo(const a, b: TUInt4096): TUint4096; static;
   class function Compare(const a, b: TUInt4096): Int8; static;
@@ -984,6 +986,7 @@ public
   class function BitOr(const a, b: TUInt4096): TUInt4096; static;
   class function BitXor(const a, b: TUInt4096): TUInt4096; static;
   class function BitNot(const Number: TUInt4096): TUInt4096; static;
+  class function GCD(const a, b: TUInt4096): TUInt4096; static;
 end;
 
 type TUTransform = record
@@ -5365,7 +5368,7 @@ begin
   end;
 end;
 
-class function TUInt4096Impl.MagDiv(const Dividend, Divisor: TUInt4096; out Remainder: TUInt4096): TUInt4096;
+class function TUInt4096Impl.MagDiv(const a, b: TUInt4096; out r: TUInt4096): TUInt4096;
   const NumItems = MaxItem + 1;
   function CountLeadingZeros(const Value: UInt32): Integer;
     var TmpValue: UInt32;
@@ -5403,21 +5406,21 @@ class function TUInt4096Impl.MagDiv(const Dividend, Divisor: TUInt4096; out Rema
   var TempProduct, TempSub, CurrentSegment: TUInt4096;
   var RunningRemainder: array[0..128] of UInt32;
 begin
-  if Divisor.IsZero then
+  if b.IsZero then
   begin
-    Remainder := Zero;
+    r := Zero;
+    Exit(Invalid);
+  end;
+  if Compare(a, b) < 0 then
+  begin
+    r := a;
     Exit(Zero);
   end;
-  if Compare(Dividend, Divisor) < 0 then
-  begin
-    Remainder := Dividend;
-    Exit(Zero);
-  end;
-  n := Divisor.Top + 1;
-  m := Dividend.Top + 1;
-  s := CountLeadingZeros(Divisor[n - 1]);
-  NormDivisor := Divisor shl s;
-  NormDividend := Dividend shl s;
+  n := b.Top + 1;
+  m := a.Top + 1;
+  s := CountLeadingZeros(b[n - 1]);
+  NormDivisor := b shl s;
+  NormDividend := a shl s;
   for i := 0 to NumItems - 1 do RunningRemainder[i] := NormDividend[i];
   RunningRemainder[NumItems] := 0;
   v_top := NormDivisor[n - 1];
@@ -5446,9 +5449,9 @@ begin
     for i := 0 to n do RunningRemainder[j + i] := TempSub[i];
     Result[j] := q_hat;
   end;
-  Remainder := Zero;
-  for i := 0 to n - 1 do Remainder[i] := RunningRemainder[i];
-  Remainder := Remainder shr s;
+  r := Zero;
+  for i := 0 to n - 1 do r[i] := RunningRemainder[i];
+  r := r shr s;
 end;
 
 class function TUInt4096Impl.PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096;
@@ -5495,6 +5498,11 @@ end;
 function TUInt4096Impl.IsNegative: Boolean;
 begin
   Result := CheckFlag(if_negative);
+end;
+
+function TUInt4096Impl.IsValid: Boolean;
+begin
+  Result := CheckFlag(if_invalid);
 end;
 
 function TUInt4096Impl.ToString: String;
@@ -5772,6 +5780,21 @@ begin
   r.SetNegative(a.IsNegative);
 end;
 
+class function TUInt4096Impl.DivisionModular(const a, b: TUInt4096; out r: TUInt4096): TUInt4096;
+  var TmpB: TUInt4096;
+begin
+  Result := MagDiv(a, b, r);
+  Result.SetNegative(a.IsNegative xor b.IsNegative);
+  if a.IsNegative and not r.IsZero then
+  begin
+    Result := Result - One;
+    TmpB := b;
+    TmpB.SetNegative(False);
+    r := TmpB - r;
+  end;
+  r.SetNegative(False);
+end;
+
 class function TUInt4096Impl.Division(const a, b: TUInt4096): TUInt4096;
   var r: TUInt4096;
 begin
@@ -5782,7 +5805,7 @@ end;
 class function TUInt4096Impl.Modulo(const a, b: TUInt4096): TUint4096;
 begin
   MagDiv(a, b, Result);
-  Result.SetNegative(a.IsNegative xor b.IsNegative);
+  Result.SetNegative(a.IsNegative);
 end;
 
 class function TUInt4096Impl.Compare(const a, b: TUInt4096): Int8;
@@ -5914,6 +5937,21 @@ begin
   end;
 end;
 
+class function TUInt4096Impl.GCD(const a, b: TUInt4096): TUInt4096;
+  var Temp, Remainder: TUInt4096;
+  var LocalA, LocalB: TUInt4096;
+begin
+  LocalA := a;
+  LocalB := b;
+  while not LocalB.IsZero do
+  begin
+    Remainder := LocalA mod LocalB;
+    LocalA := LocalB;
+    LocalB := Remainder;
+  end;
+  Result := LocalA;
+end;
+
 class function TUInt4096Impl.TMontgomeryReduction.InitContext(const N: TUInt4096): TContext;
   var inv: UInt32;
   var i: Int32;
@@ -5971,7 +6009,7 @@ begin
   begin
     Result[i] := 0;
   end;
-  if Result > Context.N then
+  if Result >= Context.N then
   begin
     Result := Result - Context.N;
   end;
