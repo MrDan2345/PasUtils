@@ -905,6 +905,7 @@ end;
 type TUInt4096Impl = type helper for TUInt4096
 public
   const MaxItem = 127;
+  const ItemCount = MaxItem + 1;
   const FlagsItem = 128;
   const ItemVal: UInt64 = 4294967296;
   type TFlag = (if_invalid, if_negative);
@@ -930,9 +931,8 @@ public
   class function MagAdd(const a, b: TUInt4096): TUInt4096; static;
   class procedure MagSubInPlace(var a: TUInt4096; const b: TUInt4096); static;
   class function MagMul(const a, b: TUInt4096): TUInt4096; static;
-  class function MagDiv(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static;
+  class function MagDiv(const Dividend, Divisor: TUInt4096; out Remainder: TUInt4096): TUInt4096; static;
   class function PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096; static;
-  class function PowMod2(const Base, Exp, Modulus: TUInt4096): TUInt4096; static;
 public
   const Zero: TUInt4096 = (
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -959,6 +959,9 @@ public
   function IsOdd: Boolean;
   function IsPositive: Boolean;
   function IsNegative: Boolean;
+  function ToString: String;
+  function ToHex: String;
+  function BitsUsed: Int32;
   procedure SetPositive(const Value: Boolean);
   procedure SetNegative(const Value: Boolean);
   class function Make(const Number: Int64): TUInt4096; static;
@@ -981,9 +984,6 @@ public
   class function BitOr(const a, b: TUInt4096): TUInt4096; static;
   class function BitXor(const a, b: TUInt4096): TUInt4096; static;
   class function BitNot(const Number: TUInt4096): TUInt4096; static;
-  function ToString: String;
-  function ToHex: String;
-  function BitsUsed: Int32;
 end;
 
 type TUTransform = record
@@ -5236,7 +5236,7 @@ class function TUInt4096Impl.MillerRabinTest(const Number: TUInt4096; const Iter
   var Cmp: Int8;
   var i: Int32;
   var m, m_temp: UInt32;
-  var d, a, x, x2, n_minus_1, n_minus_2: TUInt4096;
+  var d, a, x, n_minus_1, n_minus_2: TUInt4096;
 begin
   Two := 2;
   Cmp := Compare(Number, Two);
@@ -5255,16 +5255,7 @@ begin
   for i := 1 to Iterations do
   begin
     a := MakeRandomRange(Two, n_minus_2);
-    x2 := PowMod(a, d, Number);
-    x := PowMod2(a, d, Number);
-    if x <> x2 then
-    begin
-      WriteLn('PowMod error: ');
-      WriteLn(x2.ToString);
-      WriteLn;
-      WriteLn(x.ToString);
-      WriteLn;
-    end;
+    x := PowMod(a, d, Number);
     if (x = One) or (x = n_minus_1) then Continue;
     m_temp := m;
     while m_temp > 1 do
@@ -5374,113 +5365,93 @@ begin
   end;
 end;
 
-class function TUInt4096Impl.MagDiv(const a, b: TUInt4096; out r: TUInt4096): TUInt4096;
-  function FindApproxMultiple(const Dividend, Divider: TUInt4096): Int64;
-    var TopA, TopB: Int32;
-    var TestA, TestB, r: UInt64;
+class function TUInt4096Impl.MagDiv(const Dividend, Divisor: TUInt4096; out Remainder: TUInt4096): TUInt4096;
+  const NumItems = MaxItem + 1;
+  function CountLeadingZeros(const Value: UInt32): Integer;
+    var TmpValue: UInt32;
   begin
-    TopA := Dividend.Top;
-    TopB := Divider.Top;
-    TestA := Dividend[TopB];
-    if TopA > TopB then TestA += UInt64(Dividend[TopA]) shl 32;
-    TestB := Divider[TopB];
-    r := TestA div TestB;
-    Result := Int64(r);
+    if Value = 0 then Exit(32);
+    TmpValue := Value;
+    Result := 0;
+    if TmpValue <= $0000ffff then begin Result += 16; TmpValue := TmpValue shl 16; end;
+    if TmpValue <= $00ffffff then begin Result += 8; TmpValue := TmpValue shl 8; end;
+    if TmpValue <= $0fffffff then begin Result += 4; TmpValue := TmpValue shl 4; end;
+    if TmpValue <= $3fffffff then begin Result += 2; TmpValue := TmpValue shl 2; end;
+    if TmpValue <= $7fffffff then begin Result += 1; end;
   end;
-  procedure ShiftLeftMag(var Mag: TUInt4096);
+  function MultiplyByWord(const A: TUInt4096; const Word: UInt32; const NumWords: Integer): TUInt4096;
     var i: Int32;
+    var Carry: UInt64;
+    var Product: UInt64;
   begin
-    for i := MaxItem downto 1 do Mag[i] := Mag[i - 1];
-    Mag[0] := 0;
+    Result := Zero;
+    Carry := 0;
+    for i := 0 to NumWords - 1 do
+    begin
+      Product := UInt64(A[i]) * Word + Carry;
+      Result[i] := Product and $ffffffff;
+      Carry := Product shr 32;
+    end;
+    if NumWords < NumItems then
+    Result[NumWords] := Carry;
   end;
-  var c: Int8;
-  var Digit, DigitLow, DigitHigh, Diff: UInt64;
-  var i, TopA, f: Int32;
-  var Cmp: Int8;
-  var m: TUInt4096;
+  var NormDividend, NormDivisor: TUInt4096;
+  var m, n, s, j, i: Int32;
+  var q_hat: UInt64;
+  var r_hat: UInt64;
+  var u_top, v_top: UInt32;
+  var TempProduct, TempSub, CurrentSegment: TUInt4096;
+  var RunningRemainder: array[0..128] of UInt32;
 begin
-  r := Zero;
-  if MagCmp(b, Zero) = 0 then Exit(Invalid);
-  if MagCmp(a, Zero) = 0 then Exit(Zero);
-  if MagCmp(b, One) = 0 then Exit(a);
-  Cmp := MagCmp(a, b);
-  if Cmp = 0 then Exit(One);
-  if Cmp < 0 then
+  if Divisor.IsZero then
   begin
-    r := a;
+    Remainder := Zero;
     Exit(Zero);
   end;
-  Result := Zero;
-  TopA := a.Top;
-  for i := TopA downto 0 do
+  if Compare(Dividend, Divisor) < 0 then
   begin
-    ShiftLeftMag(r);
-    r[0] := a[i];
-    if MagCmp(b, r) > 0 then Continue;
-    DigitHigh := (High(UInt32) + 1) shr 1;
-    DigitLow := 0;
-    Digit := UMax(FindApproxMultiple(r, b) - 1, 0);
-    m := MagMul(b, TUInt4096.Make(Digit));
-    c := MagCmp(r, m);
-    if c >= 0 then
+    Remainder := Dividend;
+    Exit(Zero);
+  end;
+  n := Divisor.Top + 1;
+  m := Dividend.Top + 1;
+  s := CountLeadingZeros(Divisor[n - 1]);
+  NormDivisor := Divisor shl s;
+  NormDividend := Dividend shl s;
+  for i := 0 to NumItems - 1 do RunningRemainder[i] := NormDividend[i];
+  RunningRemainder[NumItems] := 0;
+  v_top := NormDivisor[n - 1];
+  Result := Zero;
+  for j := (m - n) downto 0 do
+  begin
+    u_top := RunningRemainder[j + n];
+    if u_top = v_top then
     begin
-      DigitLow := Digit;
+      q_hat := $ffffffff;
     end
     else
     begin
-      DigitHigh := Digit;
+      r_hat := (UInt64(u_top) shl 32) + RunningRemainder[j + n - 1];
+      q_hat := r_hat div v_top;
     end;
-    f := 0;
-    Diff := DigitHigh - DigitLow;
-    while Diff > 10 do
+    TempProduct := MultiplyByWord(NormDivisor, q_hat, n);
+    CurrentSegment := Zero;
+    for i := 0 to n do CurrentSegment[i] := RunningRemainder[j + i];
+    while Compare(TempProduct, CurrentSegment) > 0 do
     begin
-      Digit := DigitLow + (Diff shr 1);
-      m := MagMul(b, TUInt4096.Make(Digit));
-      c := MagCmp(r, m);
-      if c >= 0 then
-      begin
-        DigitLow := Digit;
-      end
-      else
-      begin
-        DigitHigh := Digit;
-      end;
-      Diff := DigitHigh - DigitLow;
-      Inc(f);
+      q_hat := q_hat - 1;
+      TempProduct := TempProduct - NormDivisor;
     end;
-    Digit := DigitLow;
-    m := MagMul(b, TUInt4096.Make(Digit));
-    MagSubInPlace(r, m);
-    while MagCmp(r, b) >= 0 do
-    begin
-      Inc(Digit);
-      MagSubInPlace(r, b);
-    end;
-    ShiftLeftMag(Result);
-    Result[0] := Digit;
+    TempSub := CurrentSegment - TempProduct;
+    for i := 0 to n do RunningRemainder[j + i] := TempSub[i];
+    Result[j] := q_hat;
   end;
+  Remainder := Zero;
+  for i := 0 to n - 1 do Remainder[i] := RunningRemainder[i];
+  Remainder := Remainder shr s;
 end;
 
 class function TUInt4096Impl.PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096;
-  var CurBase, CurExp: TUInt4096;
-begin
-  Result := One;
-  CurBase := Modulo(Base, Modulus);
-  CurExp := Exp;
-  while not CurExp.IsZero do
-  begin
-    if CurExp.IsOdd then
-    begin
-      Result := Multiplication(Result, CurBase);
-      Result := Modulo(Result, Modulus);
-    end;
-    CurBase := Multiplication(CurBase, CurBase);
-    CurBase := Modulo(CurBase, Modulus);
-    CurExp := ShrOne(CurExp);
-  end;
-end;
-
-class function TUInt4096Impl.PowMod2(const Base, Exp, Modulus: TUInt4096): TUInt4096;
   var Context: TMontgomeryReduction.TContext;
   var Base_mont: TUInt4096;
   var Result_mont: TUInt4096;
@@ -5524,6 +5495,60 @@ end;
 function TUInt4096Impl.IsNegative: Boolean;
 begin
   Result := CheckFlag(if_negative);
+end;
+
+function TUInt4096Impl.ToString: String;
+  var i, CurItem: Int32;
+  var Carry: UInt64;
+  var Temp: TUInt4096;
+begin
+  Temp := Self;
+  Result := '';
+  CurItem := Temp.Top;
+  while (CurItem > 0) or (Temp[CurItem] > 0) do
+  begin
+    Carry := 0;
+    for i := CurItem downto 0 do
+    begin
+      Carry := (Carry shl 32) + Temp[i];
+      Temp[i] := Carry div 10;
+      Carry := Carry mod 10;
+    end;
+    Result := Chr(Ord('0') + Carry) + Result;
+    while (CurItem > 0) and (Temp[CurItem] = 0) do Dec(CurItem);
+  end;
+  if Length(Result) = 0 then Result := '0';
+  if IsNegative then Result := '-' + Result;
+end;
+
+function TUInt4096Impl.ToHex: String;
+  function IntToHex(const Value: UInt8): AnsiChar;
+  begin
+    if Value < 10 then Exit(AnsiChar(Ord('0') + Value));
+    Exit(AnsiChar(Ord('A') + (Value - 10)));
+  end;
+  var Arr: array[0..MaxItem * 4] of UInt8 absolute Self;
+  var i, n: Int32;
+begin
+  Result := '';
+  n := (Self.Top + 1) * 4 - 1;
+  for i := n downto 0 do
+  begin
+    if Arr[i] <> 0 then Break;
+    Dec(n);
+  end;
+  for i := n downto 0 do
+  begin
+    Result += IntToHex((Arr[i] shr 4) and $f);
+    Result += IntToHex(Arr[i] and $f);
+  end;
+  Result := Result.TrimLeft('0');
+  if IsNegative then Result := '-' + Result;
+end;
+
+function TUInt4096Impl.BitsUsed: Int32;
+begin
+  Result := TopBit + 1;
 end;
 
 procedure TUInt4096Impl.SetPositive(const Value: Boolean);
@@ -5677,7 +5702,7 @@ begin
     Result[0] := Result[0] or 1;
     Inc(TestCount);
     if TestCount mod 100 = 0 then WriteLn(TestCount);
-  until MillerRabinTest(Result, 4);
+  until MillerRabinTest(Result, 20);
 end;
 
 class function TUInt4096Impl.Addition(const a, b: TUInt4096): TUInt4096;
@@ -5812,7 +5837,7 @@ class function TUInt4096Impl.ShiftRight(
   var Carry: UInt32;
   var SrcIndex, CarrySrcIndex: Int32;
 begin
-  if Bits >= (SizeOf(TUInt4096) * 8) then Exit(Zero);
+  if Bits >= (ItemCount * 32) then Exit(Zero);
   Result := Zero;
   WordShift := Bits div 32;
   BitShift := Bits mod 32;
@@ -5822,7 +5847,7 @@ begin
     if SrcIndex > MaxItem then Continue;
     Result[i] := Number[SrcIndex] shr BitShift;
     CarrySrcIndex := SrcIndex + 1;
-    if CarrySrcIndex > MaxItem then Continue;
+    if (CarrySrcIndex > MaxItem) or (BitShift = 0) then Continue;
     Carry := Number[CarrySrcIndex] shl (32 - BitShift);
     Result[i] := Result[i] or Carry;
   end;
@@ -5837,7 +5862,7 @@ class function TUInt4096Impl.ShiftLeft(
   var Carry: UInt32;
   var SrcIndex, CarrySrcIndex: Int32;
 begin
-  if Bits >= (SizeOf(TUInt4096) * 8) then Exit(Zero);
+  if Bits >= (ItemCount * 32) then Exit(Zero);
   Result := Zero;
   WordShift := Bits div 32;
   BitShift  := Bits mod 32;
@@ -5847,7 +5872,7 @@ begin
     if SrcIndex < 0 then Continue;
     Result[i] := Number[SrcIndex] shl BitShift;
     CarrySrcIndex := SrcIndex - 1;
-    if CarrySrcIndex < 0 then Continue;
+    if (CarrySrcIndex < 0) or (BitShift = 0) then Continue;
     Carry := Number[CarrySrcIndex] shr (32 - BitShift);
     Result[i] := Result[i] or Carry;
   end;
@@ -5889,60 +5914,6 @@ begin
   end;
 end;
 
-function TUInt4096Impl.ToString: String;
-  var i, CurItem: Int32;
-  var Carry: UInt64;
-  var Temp: TUInt4096;
-begin
-  Temp := Self;
-  Result := '';
-  CurItem := Temp.Top;
-  while (CurItem > 0) or (Temp[CurItem] > 0) do
-  begin
-    Carry := 0;
-    for i := CurItem downto 0 do
-    begin
-      Carry := (Carry shl 32) + Temp[i];
-      Temp[i] := Carry div 10;
-      Carry := Carry mod 10;
-    end;
-    Result := Chr(Ord('0') + Carry) + Result;
-    while (CurItem > 0) and (Temp[CurItem] = 0) do Dec(CurItem);
-  end;
-  if Length(Result) = 0 then Result := '0';
-  if IsNegative then Result := '-' + Result;
-end;
-
-function TUInt4096Impl.ToHex: String;
-  function IntToHex(const Value: UInt8): AnsiChar;
-  begin
-    if Value < 10 then Exit(AnsiChar(Ord('0') + Value));
-    Exit(AnsiChar(Ord('A') + (Value - 10)));
-  end;
-  var Arr: array[0..MaxItem * 4] of UInt8 absolute Self;
-  var i, n: Int32;
-begin
-  Result := '';
-  n := (Self.Top + 1) * 4 - 1;
-  for i := n downto 0 do
-  begin
-    if Arr[i] <> 0 then Break;
-    Dec(n);
-  end;
-  for i := n downto 0 do
-  begin
-    Result += IntToHex((Arr[i] shr 4) and $f);
-    Result += IntToHex(Arr[i] and $f);
-  end;
-  Result := Result.TrimLeft('0');
-  if IsNegative then Result := '-' + Result;
-end;
-
-function TUInt4096Impl.BitsUsed: Int32;
-begin
-  Result := TopBit;
-end;
-
 class function TUInt4096Impl.TMontgomeryReduction.InitContext(const N: TUInt4096): TContext;
   var inv: UInt32;
   var i: Int32;
@@ -5960,61 +5931,49 @@ begin
   R_val[Result.NumItems] := 1;
   R_mod_N := R_val mod N;
   Result.R2_mod_N := (R_mod_N * R_mod_N) mod N;
-  WriteLn('N: ', N.ToString);
-  WriteLn('N_prime: ', IntToHex(Result.N_prime));
-  WriteLn('R2_mod_N: ', Result.R2_mod_N.ToString);
 end;
 
 class function TUInt4096Impl.TMontgomeryReduction.MontMult(
   const Context: TContext; const a, b: TUInt4096
 ): TUInt4096;
-  procedure MulAdd(var T: TUInt4096; const Multiplier: UInt32; const Multiplicand: TUInt4096);
-    var i: Int32;
-    var Carry, HighPart: UInt64;
-    var Product: UInt64;
-  begin
-    Carry := 0;
-    for i := 0 to MaxItem do
-    begin
-      Product := UInt64(Multiplier) * Multiplicand[i];
-      HighPart := Product shr 32;
-      T[i] := T[i] + (Product and $ffffffff) + Carry;
-      if T[i] < Carry then HighPart := HighPart + 1;
-      Carry := HighPart;
-    end;
-    i := High(Multiplicand) + 1;
-    while (Carry > 0) and (i <= MaxItem) do
-    begin
-      T[i] := T[i] + Carry;
-      if T[i] < Carry then
-      begin
-        Carry := 1;
-      end
-      else
-      begin
-        Carry := 0;
-      end;
-      Inc(i);
-    end;
-  end;
   var T: TUInt4096;
   var m: UInt32;
-  var i: Int32;
-  var ResultIsBig: Boolean;
+  var i, j, k: Int32;
+  var Carry: UInt64;
+  var Product, Sum: UInt64;
 begin
-  T := Multiplication(a, b);
+  T := a * b;
   for i := 0 to Context.NumItems - 1 do
   begin
     m := T[i] * Context.N_prime;
-    MulAdd(T, m, Context.N);
+    Carry := 0;
+    for j := 0 to Context.NumItems - 1 do
+    begin
+      Product := UInt64(m) * Context.N[j];
+      Sum := UInt64(T[i + j]) + (Product and $ffffffff) + Carry;
+      T[i + j] := Sum and $ffffffff;
+      Carry := (Product shr 32) + (Sum shr 32);
+    end;
+    k := i + Context.NumItems;
+    while (Carry > 0) and (k <= MaxItem) do
+    begin
+      Sum := UInt64(T[k]) + Carry;
+      T[k] := Sum and $ffffffff;
+      Carry := Sum shr 32;
+      Inc(k);
+    end;
   end;
   for i := 0 to Context.NumItems - 1 do
   begin
     Result[i] := T[i + Context.NumItems];
   end;
-  if Compare(Result, Context.N) >= 0 then
+  for i := Context.NumItems to MaxItem do
   begin
-    Result := Subtraction(Result, Context.N);
+    Result[i] := 0;
+  end;
+  if Result > Context.N then
+  begin
+    Result := Result - Context.N;
   end;
 end;
 // TUInt4096 end
