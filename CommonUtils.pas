@@ -5502,7 +5502,7 @@ end;
 
 function TUInt4096Impl.IsValid: Boolean;
 begin
-  Result := CheckFlag(if_invalid);
+  Result := not CheckFlag(if_invalid);
 end;
 
 function TUInt4096Impl.ToString: String;
@@ -5781,16 +5781,13 @@ begin
 end;
 
 class function TUInt4096Impl.DivisionModular(const a, b: TUInt4096; out r: TUInt4096): TUInt4096;
-  var TmpB: TUInt4096;
 begin
   Result := MagDiv(a, b, r);
   Result.SetNegative(a.IsNegative xor b.IsNegative);
   if a.IsNegative and not r.IsZero then
   begin
     Result := Result - One;
-    TmpB := b;
-    TmpB.SetNegative(False);
-    r := TmpB - r;
+    r := b - r;
   end;
   r.SetNegative(False);
 end;
