@@ -907,8 +907,8 @@ public
   const MaxItem = 127;
   const ItemCount = MaxItem + 1;
   const FlagsItem = 128;
-  const ItemVal: UInt64 = 4294967296;
-  type TFlag = (if_invalid, if_negative);
+  const ItemVal: Int64 = 4294967296;
+  type TFlag = (if_invalid, if_negative, if_overflow);
   type TFlgas = set of TFlag;
   type TMontgomeryReduction = record
     type TContext = record
@@ -924,7 +924,7 @@ public
   function Top: Int32;
   function TopBit: Int32;
   function CheckFlag(const Flag: TFlag): Boolean;
-  procedure SetFlag(const Flag: TFlag; const Value: Boolean);
+  procedure SetFlag(const Flag: TFlag; const Value: Boolean = True);
   class function MillerRabinTest(const Number: TUInt4096; const Iterations: Int32): Boolean; static;
   class function MagCmp(const a, b: TUInt4096): Int8; static;
   class function MagSub(const a, b: TUInt4096): TUInt4096; static;
@@ -5263,8 +5263,9 @@ begin
     m_temp := m;
     while m_temp > 1 do
     begin
-      x := x * x;
-      x := x mod Number;
+      //x := x * x;
+      //x := x mod Number;
+      x := PowMod(x, Two, Number);
       if x = One then Exit(False);
       if x = n_minus_1 then Break;
       Dec(m_temp);
@@ -5308,7 +5309,7 @@ begin
   Carry := 0;
   for i := 0 to n do
   begin
-    Carry += a[i] + b[i];
+    Carry += UInt64(a[i]) + UInt64(b[i]);
     Result[i] := Carry and $ffffffff;
     Carry := Carry shr 32;
   end;
@@ -5325,7 +5326,7 @@ begin
   Carry := 0;
   for i := 0 to n do
   begin
-    Carry += a[i] - b[i];
+    Carry += Int64(a[i]) - Int64(b[i]);
     if Carry < 0 then
     begin
       a[i] := ItemVal + Carry;
@@ -5341,30 +5342,43 @@ end;
 
 class function TUInt4096Impl.MagMul(const a, b: TUInt4096): TUInt4096;
   var i, j, r, TopA, TopB: Int32;
-  var Carry: UInt64;
+  var Carry, Product, Sum: UInt64;
 begin
   Result := Zero;
   TopA := a.Top;
   TopB := b.Top;
+  if (TopA + TopB + 1) >= MaxItem then
+  begin
+    //potential overflow
+  end;
   for i := 0 to TopA do
   begin
     Carry := 0;
     for j := 0 to TopB do
     begin
       r := i + j;
-      if r > MaxItem then Break;
-      Carry += Result[r] + a[i] * b[j];
-      Result[r] := UInt32(Carry and $ffffffff);
-      Carry := Carry shr 32;
+      Product := UInt64(a[i]) * UInt64(b[j]);
+      Sum := UInt64(Result[r]) + Product + Carry;
+      Result[r] := Sum and $ffffffff;
+      Carry := Sum shr 32;
     end;
-    while Carry > 0 do
+    //if Carry = 0 then Continue;
+    j := i + TopB + 1;
+    while (Carry > 0) and (j <= 127) do
     begin
-      Inc(r);
-      if r > MaxItem then Break;
-      Carry += Result[r];
-      Result[r] := UInt32(Carry and $ffffffff);
-      Carry := Carry shr 32;
+      Sum := UInt64(Result[j]) + Carry;
+      Result[j] := Sum and $FFFFFFFF;
+      Carry := Sum shr 32;
+      Inc(j);
     end;
+    //r := i + TopB + 1;
+    //if r > MaxItem then
+    //begin
+    //  Result.SetFlag(if_overflow);
+    //  WriteLn('TUInt4096 multiplication overflow!');
+    //  Continue;
+    //end;
+    //Result[r] := Result[r] + UInt32(Carry);
   end;
 end;
 
@@ -5417,10 +5431,10 @@ begin
     Exit(Zero);
   end;
   n := b.Top + 1;
-  m := a.Top + 1;
   s := CountLeadingZeros(b[n - 1]);
   NormDivisor := b shl s;
   NormDividend := a shl s;
+  m := NormDividend.Top + 1;
   for i := 0 to NumItems - 1 do RunningRemainder[i] := NormDividend[i];
   RunningRemainder[NumItems] := 0;
   v_top := NormDivisor[n - 1];
@@ -5710,7 +5724,7 @@ begin
     Result[0] := Result[0] or 1;
     Inc(TestCount);
     if TestCount mod 100 = 0 then WriteLn(TestCount);
-  until MillerRabinTest(Result, 20);
+  until MillerRabinTest(Result, 100);
 end;
 
 class function TUInt4096Impl.Addition(const a, b: TUInt4096): TUInt4096;
@@ -5942,7 +5956,7 @@ begin
   LocalB := b;
   while not LocalB.IsZero do
   begin
-    Remainder := LocalA mod LocalB;
+    DivisionModular(LocalA, LocalB, Remainder);
     LocalA := LocalB;
     LocalB := Remainder;
   end;
@@ -5952,10 +5966,10 @@ end;
 class function TUInt4096Impl.TMontgomeryReduction.InitContext(const N: TUInt4096): TContext;
   var inv: UInt32;
   var i: Int32;
-  var R_val, R_mod_N: TUInt4096;
+  var R_val, R2_val, R_mod_N: TUInt4096;
 begin
   Result.N := N;
-  Result.NumItems := (MaxItem + 1) shr 1;
+  Result.NumItems := N.Top + 1;
   inv := 1;
   for i := 1 to 5 do
   begin
@@ -5964,8 +5978,9 @@ begin
   Result.N_prime := 0 - inv;
   R_val := Zero;
   R_val[Result.NumItems] := 1;
-  R_mod_N := R_val mod N;
-  Result.R2_mod_N := (R_mod_N * R_mod_N) mod N;
+  DivisionModular(R_val, N, R_mod_N);
+  R2_val := MagMul(R_mod_N, R_mod_N);
+  DivisionModular(R2_val, N, Result.R2_mod_N);
 end;
 
 class function TUInt4096Impl.TMontgomeryReduction.MontMult(
