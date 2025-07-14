@@ -974,7 +974,7 @@ public
   class function Subtraction(const a, b: TUInt4096): TUInt4096; static;
   class function Multiplication(const a, b: TUInt4096): TUInt4096; static;
   class function Division(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static; overload;
-  class function DivisionModular(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static; overload;
+  //class function DivisionModular(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static; overload;
   class function Division(const a, b: TUInt4096): TUInt4096; static; overload;
   class function Modulo(const a, b: TUInt4096): TUint4096; static;
   class function Compare(const a, b: TUInt4096): Int8; static;
@@ -5793,7 +5793,7 @@ begin
   Result.SetNegative(a.IsNegative xor b.IsNegative);
   r.SetNegative(a.IsNegative);
 end;
-
+{
 class function TUInt4096Impl.DivisionModular(const a, b: TUInt4096; out r: TUInt4096): TUInt4096;
 begin
   Result := MagDiv(a, b, r);
@@ -5805,7 +5805,7 @@ begin
   end;
   r.SetNegative(False);
 end;
-
+}
 class function TUInt4096Impl.Division(const a, b: TUInt4096): TUInt4096;
   var r: TUInt4096;
 begin
@@ -5956,7 +5956,7 @@ begin
   LocalB := b;
   while not LocalB.IsZero do
   begin
-    DivisionModular(LocalA, LocalB, Remainder);
+    Remainder := LocalA mod LocalB;
     LocalA := LocalB;
     LocalB := Remainder;
   end;
@@ -5978,9 +5978,9 @@ begin
   Result.N_prime := 0 - inv;
   R_val := Zero;
   R_val[Result.NumItems] := 1;
-  DivisionModular(R_val, N, R_mod_N);
+  R_mod_N := R_val mod N;
   R2_val := MagMul(R_mod_N, R_mod_N);
-  DivisionModular(R2_val, N, Result.R2_mod_N);
+  Result.R2_mod_N := R2_val mod N;
 end;
 
 class function TUInt4096Impl.TMontgomeryReduction.MontMult(
