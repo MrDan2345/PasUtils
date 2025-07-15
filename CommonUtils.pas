@@ -158,6 +158,7 @@ type TUBigInt = record
   Value: TUInt8Array;
 end;
 type TUInt4096 = array[0..128] of UInt32; // TUInt4096Impl
+type TUInt4096Array = array of TUInt4096;
 
 type TUSwizzle = record
 private
@@ -932,7 +933,6 @@ public
   class procedure MagSubInPlace(var a: TUInt4096; const b: TUInt4096); static;
   class function MagMul(const a, b: TUInt4096): TUInt4096; static;
   class function MagDiv(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static;
-  class function PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096; static;
 public
   const Zero: TUInt4096 = (
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -974,7 +974,6 @@ public
   class function Subtraction(const a, b: TUInt4096): TUInt4096; static;
   class function Multiplication(const a, b: TUInt4096): TUInt4096; static;
   class function Division(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static; overload;
-  //class function DivisionModular(const a, b: TUInt4096; out r: TUInt4096): TUInt4096; static; overload;
   class function Division(const a, b: TUInt4096): TUInt4096; static; overload;
   class function Modulo(const a, b: TUInt4096): TUint4096; static;
   class function Compare(const a, b: TUInt4096): Int8; static;
@@ -986,7 +985,7 @@ public
   class function BitOr(const a, b: TUInt4096): TUInt4096; static;
   class function BitXor(const a, b: TUInt4096): TUInt4096; static;
   class function BitNot(const Number: TUInt4096): TUInt4096; static;
-  class function GCD(const a, b: TUInt4096): TUInt4096; static;
+  class function PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096; static;
 end;
 
 type TUTransform = record
@@ -5263,8 +5262,6 @@ begin
     m_temp := m;
     while m_temp > 1 do
     begin
-      //x := x * x;
-      //x := x mod Number;
       x := PowMod(x, Two, Number);
       if x = One then Exit(False);
       if x = n_minus_1 then Break;
@@ -5466,28 +5463,6 @@ begin
   r := Zero;
   for i := 0 to n - 1 do r[i] := RunningRemainder[i];
   r := r shr s;
-end;
-
-class function TUInt4096Impl.PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096;
-  var Context: TMontgomeryReduction.TContext;
-  var Base_mont: TUInt4096;
-  var Result_mont: TUInt4096;
-  var CurrentExponent: TUInt4096;
-begin
-  Context := TMontgomeryReduction.InitContext(Modulus);
-  Base_mont := TMontgomeryReduction.MontMult(Context, Base, Context.R2_mod_N);
-  Result_mont := TMontgomeryReduction.MontMult(Context, One, Context.R2_mod_N);
-  CurrentExponent := Exp;
-  while not CurrentExponent.IsZero do
-  begin
-    if CurrentExponent.IsOdd then
-    begin
-      Result_mont := TMontgomeryReduction.MontMult(Context, Result_mont, Base_mont);
-    end;
-    Base_mont := TMontgomeryReduction.MontMult(Context, Base_mont, Base_mont);
-    CurrentExponent := ShrOne(CurrentExponent);
-  end;
-  Result := TMontgomeryReduction.MontMult(Context, Result_mont, One);
 end;
 
 function TUInt4096Impl.IsZero: Boolean;
@@ -5793,19 +5768,7 @@ begin
   Result.SetNegative(a.IsNegative xor b.IsNegative);
   r.SetNegative(a.IsNegative);
 end;
-{
-class function TUInt4096Impl.DivisionModular(const a, b: TUInt4096; out r: TUInt4096): TUInt4096;
-begin
-  Result := MagDiv(a, b, r);
-  Result.SetNegative(a.IsNegative xor b.IsNegative);
-  if a.IsNegative and not r.IsZero then
-  begin
-    Result := Result - One;
-    r := b - r;
-  end;
-  r.SetNegative(False);
-end;
-}
+
 class function TUInt4096Impl.Division(const a, b: TUInt4096): TUInt4096;
   var r: TUInt4096;
 begin
@@ -5948,19 +5911,26 @@ begin
   end;
 end;
 
-class function TUInt4096Impl.GCD(const a, b: TUInt4096): TUInt4096;
-  var Temp, Remainder: TUInt4096;
-  var LocalA, LocalB: TUInt4096;
+class function TUInt4096Impl.PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096;
+  var Context: TMontgomeryReduction.TContext;
+  var Base_mont: TUInt4096;
+  var Result_mont: TUInt4096;
+  var CurrentExponent: TUInt4096;
 begin
-  LocalA := a;
-  LocalB := b;
-  while not LocalB.IsZero do
+  Context := TMontgomeryReduction.InitContext(Modulus);
+  Base_mont := TMontgomeryReduction.MontMult(Context, Base, Context.R2_mod_N);
+  Result_mont := TMontgomeryReduction.MontMult(Context, One, Context.R2_mod_N);
+  CurrentExponent := Exp;
+  while not CurrentExponent.IsZero do
   begin
-    Remainder := LocalA mod LocalB;
-    LocalA := LocalB;
-    LocalB := Remainder;
+    if CurrentExponent.IsOdd then
+    begin
+      Result_mont := TMontgomeryReduction.MontMult(Context, Result_mont, Base_mont);
+    end;
+    Base_mont := TMontgomeryReduction.MontMult(Context, Base_mont, Base_mont);
+    CurrentExponent := ShrOne(CurrentExponent);
   end;
-  Result := LocalA;
+  Result := TMontgomeryReduction.MontMult(Context, Result_mont, One);
 end;
 
 class function TUInt4096Impl.TMontgomeryReduction.InitContext(const N: TUInt4096): TContext;
