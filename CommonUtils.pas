@@ -5690,15 +5690,15 @@ begin
 end;
 
 class function TUInt4096Impl.MakePrime(const BitCount: Int32): TUInt4096;
-  var TestCount: Int32;
+  //var TestCount: Int32;
 begin
-  TestCount := 0;
+  //TestCount := 0;
   repeat
     Result := MakeRandom(BitCount);
     Result := Result or (One shl (BitCount - 1));
     Result[0] := Result[0] or 1;
-    Inc(TestCount);
-    if TestCount mod 100 = 0 then WriteLn(TestCount);
+    //Inc(TestCount);
+    //if TestCount mod 100 = 0 then WriteLn(TestCount);
   until MillerRabinTest(Result, 100);
 end;
 

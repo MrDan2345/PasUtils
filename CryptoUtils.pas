@@ -21,6 +21,7 @@ uses
   CommonUtils;
 
 type TURSAKey = record
+  Size: UInt32; // bit size
   n: TUInt4096; // modulus
   e: TUInt4096; // public exponent
   d: TUInt4096; // private exponent
@@ -42,13 +43,13 @@ function UModInverse(const e, phi: TUInt4096): TUInt4096;
 function UGCD(const a, b: TUInt4096): TUInt4096;
 function UPowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096;
 function UMillerRabinTest(const Number: TUInt4096; const Iterations: Int32 = 50): Boolean;
-function UMakePrime(const BitCount: Int32 = 2048): TUInt4096;
+function UMakePrime(const BitCount: Int32 = 1024): TUInt4096;
 function UMakePrimes(
   const PrimeCount: Int32;
   const BitCount: Int32 = 2048;
   const ThreadCount: Int32 = 8
 ): TUInt4096Array;
-function UMakeRSAKey(const BitCount: UInt32 = 2048): TURSAKey;
+function UMakeRSAKey(const BitCount: UInt32 = 2048; const Threads: Int32 = 16): TURSAKey;
 function UPackData(
   const Data: Pointer;
   const DataSize: UInt32;
@@ -69,28 +70,23 @@ function UUnpackStr(
 function UEncrypt(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSAKey;
-  const KeySize: UInt32 = 2048
+  const Key: TURSAKey
 ): TUInt4096;
 function UEncrypt(
   const Data: TUInt8Array;
-  const Key: TURSAKey;
-  const KeySize: UInt32 = 2048
+  const Key: TURSAKey
 ): TUInt4096;
 function UEncryptStr(
   const Str: String;
-  const Key: TURSAKey;
-  const KeySize: UInt32 = 2048
+  const Key: TURSAKey
 ): TUInt4096;
 function UDecryptStr(
   const Cipher: TUInt4096;
-  const Key: TURSAKey;
-  const KeySize: UInt32 = 2048
+  const Key: TURSAKey
 ): String;
 function UDecrypt(
   const Cipher: TUInt4096;
-  const Key: TURSAKey;
-  const KeySize: UInt32 = 2048
+  const Key: TURSAKey
 ): TUInt8Array;
 
 implementation
@@ -353,19 +349,19 @@ begin
   end;
 end;
 
-function UMakeRSAKey(const BitCount: UInt32): TURSAKey;
-  var p, q, n, phi, phi_test, e, d, test_n, p_min_1, q_min_1, p_min_1_test, q_min_1_test: TUInt4096;
+function UMakeRSAKey(const BitCount: UInt32; const Threads: Int32): TURSAKey;
+  var p, q, n, phi, e, d: TUInt4096;
   var PrimeSizeInBits: Int32;
-  var IsKeyValid: Boolean;
   var Primes: TUInt4096Array;
 begin
+  Result.Size := 0;
   Result.n := TUInt4096.Invalid;
   Result.e := TUInt4096.Invalid;
   Result.d := TUInt4096.Invalid;
   PrimeSizeInBits := BitCount shr 1;
   e := 65537;
   repeat
-    Primes := UMakePrimes(2, PrimeSizeInBits, 32);
+    Primes := UMakePrimes(2, PrimeSizeInBits, Threads);
     if Length(Primes) < 2 then Exit;
     p := Primes[0];
     q := Primes[1];
@@ -376,6 +372,7 @@ begin
     phi := (p - TUInt4096.One) * (q - TUInt4096.One);
   until UGCD(e, phi) = TUInt4096.One;
   d := UModInverse(e, phi);
+  Result.Size := BitCount;
   Result.n := n;
   Result.e := e;
   Result.d := d;
@@ -458,54 +455,49 @@ end;
 function UEncrypt(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSAKey;
-  const KeySize: UInt32
+  const Key: TURSAKey
 ): TUInt4096;
   var Block: TUInt4096;
 begin
-  Block := UPackData(Data, DataSize, KeySize);
+  Block := UPackData(Data, DataSize, Key.Size);
   if not Block.IsValid then Exit(TUInt4096.Invalid);
   Result := UPowMod(Block, Key.e, Key.n);
 end;
 
 function UEncrypt(
   const Data: TUInt8Array;
-  const Key: TURSAKey;
-  const KeySize: UInt32
+  const Key: TURSAKey
 ): TUInt4096;
 begin
-  Result := UEncrypt(@Data[0], Length(Data), Key, KeySize);
+  Result := UEncrypt(@Data[0], Length(Data), Key);
 end;
 
 function UEncryptStr(
   const Str: String;
-  const Key: TURSAKey;
-  const KeySize: UInt32
+  const Key: TURSAKey
 ): TUInt4096;
 begin
-  Result := UEncrypt(@Str[1], Length(Str), Key, KeySize);
+  Result := UEncrypt(@Str[1], Length(Str), Key);
 end;
 
 function UDecryptStr(
   const Cipher: TUInt4096;
-  const Key: TURSAKey;
-  const KeySize: UInt32
+  const Key: TURSAKey
 ): String;
   var Block: TUInt4096;
 begin
   Block := UPowMod(Cipher, Key.d, Key.n);
-  Result := UUnpackStr(Block, KeySize);
+  Result := UUnpackStr(Block, Key.Size);
 end;
 
 function UDecrypt(
   const Cipher: TUInt4096;
-  const Key: TURSAKey;
-  const KeySize: UInt32
+  const Key: TURSAKey
 ): TUInt8Array;
   var Block: TUInt4096;
 begin
   Block := UPowMod(Cipher, Key.d, Key.n);
-  Result := UUnpackData(Block, KeySize);
+  Result := UUnpackData(Block, Key.Size);
 end;
 
 end.
