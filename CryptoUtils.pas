@@ -20,6 +20,8 @@ uses
   Classes,
   CommonUtils;
 
+type TUSHA256Digest = array[0..31] of UInt8;
+
 type TURSAKey = record
   Size: UInt32; // bit size
   n: TUInt4096; // modulus
@@ -39,6 +41,9 @@ public
   function Mul(const a, b: TUInt4096): TUInt4096;
 end;
 
+function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
+function USHA256(const Data: TUInt8Array): TUSHA256Digest;
+function USHA256(const Data: String): TUSHA256Digest;
 function UModInverse(const e, phi: TUInt4096): TUInt4096;
 function UGCD(const a, b: TUInt4096): TUInt4096;
 function UPowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096;
@@ -159,6 +164,125 @@ begin
   begin
     Result := Result - N;
   end;
+end;
+
+function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
+  function RightRotate(const Value: UInt32; const Amount: Int32): UInt32;
+  begin
+    Result := (Value shr Amount) or (Value shl (32 - Amount));
+  end;
+  const K: array[0..63] of UInt32 = (
+    $428a2f98, $71374491, $b5c0fbcf, $e9b5dba5, $3956c25b, $59f111f1, $923f82a4, $ab1c5ed5,
+    $d807aa98, $12835b01, $243185be, $550c7dc3, $72be5d74, $80deb1fe, $9bdc06a7, $c19bf174,
+    $e49b69c1, $efbe4786, $0fc19dc6, $240ca1cc, $2de92c6f, $4a7484aa, $5cb0a9dc, $76f988da,
+    $983e5152, $a831c66d, $b00327c8, $bf597fc7, $c6e00bf3, $d5a79147, $06ca6351, $14292967,
+    $27b70a85, $2e1b2138, $4d2c6dfc, $53380d13, $650a7354, $766a0abb, $81c2c92e, $92722c85,
+    $a2bfe8a1, $a81a664b, $c24b8b70, $c76c51a3, $d192e819, $d6990624, $f40e3585, $106aa070,
+    $19a4c116, $1e376c08, $2748774c, $34b0bcb5, $391c0cb3, $4ed8aa4a, $5b9cca4f, $682e6ff3,
+    $748f82ee, $78a5636f, $84c87814, $8cc70208, $90befffa, $a4506ceb, $bef9a3f7, $c67178f2
+  );
+  var Hash: array[0..7] of UInt32 = (
+    $6a09e667, $bb67ae85, $3c6ef372, $a54ff53a,
+    $510e527f, $9b05688c, $1f83d9ab, $5be0cd19
+  );
+  var DataBytes: PUInt8Arr absolute Data;
+  var wv: array[0..7] of UInt32;
+  var a: UInt32 absolute wv[0];
+  var b: UInt32 absolute wv[1];
+  var c: UInt32 absolute wv[2];
+  var d: UInt32 absolute wv[3];
+  var e: UInt32 absolute wv[4];
+  var f: UInt32 absolute wv[5];
+  var g: UInt32 absolute wv[6];
+  var h: UInt32 absolute wv[7];
+  var s0, s1, ch, maj, temp1, temp2: UInt32;
+  var w: array[0..63] of UInt32;
+  var PaddedMessage: TUInt8Array;
+  var OriginalLength: UInt64;
+  var PaddedLength: Integer;
+  var i, j, ChunkStart: Integer;
+begin
+  OriginalLength := DataSize;
+  PaddedLength := DataSize + 1;
+  while (PaddedLength mod 64) <> 56 do
+  begin
+    Inc(PaddedLength);
+  end;
+  PaddedLength := PaddedLength + 8;
+  PaddedMessage := nil;
+  SetLength(PaddedMessage, PaddedLength);
+  for i := 0 to DataSize - 1 do
+  begin
+    PaddedMessage[i] := DataBytes^[i];
+  end;
+  PaddedMessage[DataSize] := $80;
+  for i := DataSize + 1 to PaddedLength - 9 do
+  begin
+    PaddedMessage[i] := 0;
+  end;
+  OriginalLength := OriginalLength * 8;
+  for i := 0 to 7 do
+  begin
+    PaddedMessage[PaddedLength - 8 + i] := (OriginalLength shr (8 * (7 - i))) and $ff;
+  end;
+  ChunkStart := 0;
+  while ChunkStart < PaddedLength do
+  begin
+    for i := 0 to 15 do
+    begin
+      j := ChunkStart + i * 4;
+      w[i] := (
+        (UInt32(PaddedMessage[j]) shl 24) or
+        (UInt32(PaddedMessage[j + 1]) shl 16) or
+        (UInt32(PaddedMessage[j + 2]) shl 8) or
+        UInt32(PaddedMessage[j + 3])
+      );
+    end;
+    for i := 16 to 63 do
+    begin
+      s0 := RightRotate(w[i - 15], 7) xor RightRotate(w[i - 15], 18) xor (w[i - 15] shr 3);
+      s1 := RightRotate(w[i - 2], 17) xor RightRotate(w[i - 2], 19) xor (w[i - 2] shr 10);
+      w[i] := w[i - 16] + s0 + w[i - 7] + s1;
+    end;
+    for i := 0 to High(Hash) do wv[i] := Hash[i];
+    for i := 0 to 63 do
+    begin
+      s1 := RightRotate(e, 6) xor RightRotate(e, 11) xor RightRotate(e, 25);
+      ch := (e and f) xor ((not e) and g);
+      temp1 := h + s1 + ch + K[i] + w[i];
+      s0 := RightRotate(a, 2) xor RightRotate(a, 13) xor RightRotate(a, 22);
+      maj := (a and b) xor (a and c) xor (b and c);
+      temp2 := s0 + maj;
+      h := g;
+      g := f;
+      f := e;
+      e := d + temp1;
+      d := c;
+      c := b;
+      b := a;
+      a := temp1 + temp2;
+    end;
+    for i := 0 to High(Hash) do Hash[i] += wv[i];
+    Inc(ChunkStart, 64);
+  end;
+  for i := 0 to High(Hash) do
+  begin
+    j := i * 4;
+    Result[j] := (Hash[i] shr 24) and $ff;
+    Result[j + 1] := (Hash[i] shr 16) and $ff;
+    Result[j + 2] := (Hash[i] shr 8) and $ff;
+    Result[j + 3] := Hash[i] and $ff;
+  end;
+end;
+
+function USHA256(const Data: TUInt8Array): TUSHA256Digest;
+begin
+  Result := USHA256(@Data[0], Length(Data));
+end;
+
+function USHA256(const Data: String): TUSHA256Digest;
+begin
+  Result := USHA256(@Data[1], Length(Data));
 end;
 
 function UModInverse(const e, phi: TUInt4096): TUInt4096;

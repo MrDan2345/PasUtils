@@ -5311,7 +5311,11 @@ begin
     Carry := Carry shr 32;
   end;
   if Carry = 0 then Exit;
-  if n >= MaxItem then Exit;
+  if n >= MaxItem then
+  begin
+    Result.SetFlag(if_overflow);
+    Exit;
+  end;
   Result[n + 1] := UInt32(Carry);
 end;
 
@@ -5344,10 +5348,6 @@ begin
   Result := Zero;
   TopA := a.Top;
   TopB := b.Top;
-  if (TopA + TopB + 1) >= MaxItem then
-  begin
-    //potential overflow
-  end;
   for i := 0 to TopA do
   begin
     Carry := 0;
@@ -5359,23 +5359,19 @@ begin
       Result[r] := Sum and $ffffffff;
       Carry := Sum shr 32;
     end;
-    //if Carry = 0 then Continue;
     j := i + TopB + 1;
-    while (Carry > 0) and (j <= 127) do
+    while (Carry > 0) do
     begin
+      if (j > MaxItem) then
+      begin
+        Result.SetFlag(if_overflow);
+        Break;
+      end;
       Sum := UInt64(Result[j]) + Carry;
       Result[j] := Sum and $FFFFFFFF;
       Carry := Sum shr 32;
       Inc(j);
     end;
-    //r := i + TopB + 1;
-    //if r > MaxItem then
-    //begin
-    //  Result.SetFlag(if_overflow);
-    //  WriteLn('TUInt4096 multiplication overflow!');
-    //  Continue;
-    //end;
-    //Result[r] := Result[r] + UInt32(Carry);
   end;
 end;
 
