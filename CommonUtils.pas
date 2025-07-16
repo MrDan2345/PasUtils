@@ -1729,6 +1729,8 @@ function UIntToBool(const i: Integer): Boolean;
 function UBoolToInt(const b: Boolean): Integer;
 function UBoolToStr(const b: Boolean): String;
 function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
+function UBytesToHex(const Bytes: TUInt8Array): String;
+function UHexToBytes(const Hex: String): TUInt8Array;
 function UMatToQuat(const m: TUMat): TUQuat;
 function UQuatToMat(const q: TUQuat): TUMat;
 generic function USignOf<T>(const v: T): T;
@@ -10017,6 +10019,36 @@ end;
 function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
 begin
   if b then Exit(IfTrue) else Exit(IfFalse);
+end;
+
+function UBytesToHex(const Bytes: TUInt8Array): String;
+  var i: Int32;
+begin
+  Result := '';
+  for i := 0 to High(Bytes) do
+  begin
+    Result += IntToHex(Bytes[i], 2);
+  end;
+end;
+
+function UHexToBytes(const Hex: String): TUInt8Array;
+  var ByteCount: Int32;
+  var i, j: Int32;
+begin
+  for i := 1 to Length(Hex) do
+  if not (Hex[i] in ['0'..'9', 'A'..'Z', 'a'..'z']) then
+  begin
+    Exit(nil);
+  end;
+  if Length(Hex) mod 2 <> 0 then Exit(nil);
+  ByteCount := Length(Hex) div 2;
+  Result := nil;
+  SetLength(Result, ByteCount);
+  for i := 0 to ByteCount - 1 do
+  begin
+    j := i * 2;
+    Result[i] := UInt8(StrToInt('$' + Hex[j] + Hex[j + 1]));
+  end;
 end;
 
 function UMatToQuat(const m: TUMat): TUQuat;
