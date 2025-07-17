@@ -99,6 +99,10 @@ function UEncrypt_AES_PKCS7_ECB_256(
   const Data: TUInt8Array;
   const Key: TUAES256Key
 ): TUInt8Array;
+function UDecrypt_AES_PKCS7_ECB_256(
+  const Cipher: TUInt8Array;
+  const Key: TUAES256Key
+): TUInt8Array;
 
 implementation
 
@@ -630,12 +634,10 @@ begin
   Result := UUnpackData(Block, Key.Size);
 end;
 
-function UEncrypt_AES_PKCS7_ECB_256(
-  const Data: TUInt8Array;
-  const Key: TUAES256Key
-): TUInt8Array;
-  type TAESBlock = array[0..3, 0..3] of UInt8;
-  type TAESExpandedKey = array[0..14] of TAESBlock;
+type TUAES = record
+private
+  type TBlock = array[0..3, 0..3] of UInt8;
+  type TExpandedKey = array[0..14] of TBlock;
   const SBox: array[0..255] of UInt8 = (
     $63, $7c, $77, $7b, $f2, $6b, $6f, $c5, $30, $01, $67, $2b, $fe, $d7, $ab, $76,
     $ca, $82, $c9, $7d, $fa, $59, $47, $f0, $ad, $d4, $a2, $af, $9c, $a4, $72, $c0,
@@ -654,97 +656,162 @@ function UEncrypt_AES_PKCS7_ECB_256(
     $e1, $f8, $98, $11, $69, $d9, $8e, $94, $9b, $1e, $87, $e9, $ce, $55, $28, $df,
     $8c, $a1, $89, $0d, $bf, $e6, $42, $68, $41, $99, $2d, $0f, $b0, $54, $bb, $16
   );
+  const InvSBox: array[0..255] of UInt8 = (
+    $52, $09, $6a, $d5, $30, $36, $a5, $38, $bf, $40, $a3, $9e, $81, $f3, $d7, $fb,
+    $7c, $e3, $39, $82, $9b, $2f, $ff, $87, $34, $8e, $43, $44, $c4, $de, $e9, $cb,
+    $54, $7b, $94, $32, $a6, $c2, $23, $3d, $ee, $4c, $95, $0b, $42, $fa, $c3, $4e,
+    $08, $2e, $a1, $66, $28, $d9, $24, $b2, $76, $5b, $a2, $49, $6d, $8b, $d1, $25,
+    $72, $f8, $f6, $64, $86, $68, $98, $16, $d4, $a4, $5c, $cc, $5d, $65, $b6, $92,
+    $6c, $70, $48, $50, $fd, $ed, $b9, $da, $5e, $15, $46, $57, $a7, $8d, $9d, $84,
+    $90, $d8, $ab, $00, $8c, $bc, $d3, $0a, $f7, $e4, $58, $05, $b8, $b3, $45, $06,
+    $d0, $2c, $1e, $8f, $ca, $3f, $0f, $02, $c1, $af, $bd, $03, $01, $13, $8a, $6b,
+    $3a, $91, $11, $41, $4f, $67, $dc, $ea, $97, $f2, $cf, $ce, $f0, $b4, $e6, $73,
+    $96, $ac, $74, $22, $e7, $ad, $35, $85, $e2, $f9, $37, $e8, $1c, $75, $df, $6e,
+    $47, $f1, $1a, $71, $1d, $29, $c5, $89, $6f, $b7, $62, $0e, $aa, $18, $be, $1b,
+    $fc, $56, $3e, $4b, $c6, $d2, $79, $20, $9a, $db, $c0, $fe, $78, $cd, $5a, $f4,
+    $1f, $dd, $a8, $33, $88, $07, $c7, $31, $b1, $12, $10, $59, $27, $80, $ec, $5f,
+    $60, $51, $7f, $a9, $19, $b5, $4a, $0d, $2d, $e5, $7a, $9f, $93, $c9, $9c, $ef,
+    $a0, $e0, $3b, $4d, $ae, $2a, $f5, $b0, $c8, $eb, $bb, $3c, $83, $53, $99, $61,
+    $17, $2b, $04, $7e, $ba, $77, $d6, $26, $e1, $69, $14, $63, $55, $21, $0c, $7d
+  );
   const Rcon: array[1..10] of UInt8 = (
     $01, $02, $04, $08, $10, $20, $40, $80, $1b, $36
   );
-  function PadData_PKCS7(const Data: TUInt8Array; const BlockSize: Integer): TUInt8Array;
-    var i, PadLen: Int32;
+  class function KeyExpansion(const Key: TUAES256Key): TExpandedKey; static;
+  class function PadData_PKCS7(const Data: TUInt8Array; const BlockSize: Int32): TUInt8Array; static;
+  class function UnpadData_PKCS7(const Data: TUInt8Array): TUInt8Array; static;
+  class procedure AddRoundKey(var State: TBlock; const RoundKey: TBlock); static;
+  class function GMul(a, b: UInt8): UInt8; static;
+  class function Encrypt_AES_PKCS7_ECB_256(
+    const Data: TUInt8Array;
+    const Key: TUAES256Key
+  ): TUInt8Array; static;
+  class function Decrypt_AES_PKCS7_ECB_256(
+    const Cipher: TUInt8Array;
+    const Key: TUAES256Key
+  ): TUInt8Array; static;
+end;
+
+class function TUAES.KeyExpansion(const Key: TUAES256Key): TExpandedKey;
+  type TWord = array[0..3] of UInt8;
+  var w: array[0..59] of TWord;
+  var Temp: TWord;
+  var i, j, k: Int32;
+  var t_byte: UInt8;
+begin
+  for i := 0 to 7 do
+  for j := 0 to 3 do
   begin
-    PadLen := BlockSize - (Length(Data) mod BlockSize);
-    if PadLen = 0 then PadLen := BlockSize;
-    Result := nil;
-    SetLength(Result, Length(Data) + PadLen);
-    if Length(Data) > 0 then
-    begin
-      Move(Data[0], Result[0], Length(Data));
-    end;
-    for i := Length(Data) to High(Result) do
-    begin
-      Result[i] := UInt8(PadLen);
-    end;
+    w[i][j] := Key[i * 4 + j];
   end;
-  function GMul(a, b: UInt8): UInt8;
-    var p: UInt8;
-    var i: Int32;
+  i := 8;
+  for i := 8 to 59 do
   begin
-    p := 0;
-    for i := 0 to 7 do
+    Temp := w[i - 1];
+    if (i mod 8) = 0 then
     begin
-      if (b and 1) <> 0 then
-      begin
-        p := p xor a;
-      end;
-      if (a and $80) <> 0 then
-      begin
-        a := (a shl 1) xor $1b
-      end
-      else
-      begin
-        a := a shl 1;
-      end;
-      b := b shr 1;
+      t_byte := Temp[0];
+      Temp[0] := Temp[1]; Temp[1] := Temp[2]; Temp[2] := Temp[3]; Temp[3] := t_byte;
+      for j := 0 to 3 do Temp[j] := TUAES.SBox[Temp[j]];
+      Temp[0] := Temp[0] xor TUAES.Rcon[i div 8];
+    end
+    else if (i mod 8) = 4 then
+    begin
+      for j := 0 to 3 do Temp[j] := TUAES.SBox[Temp[j]];
     end;
-    Result := p;
-  end;
-  function KeyExpansion(const Key: TUAES256Key): TAESExpandedKey;
-    type TWord = array[0..3] of UInt8;
-    var w: array[0..59] of TWord;
-    var Temp: TWord;
-    var i, j, k: Int32;
-    var t_byte: UInt8;
-  begin
-    for i := 0 to 7 do
     for j := 0 to 3 do
     begin
-      w[i][j] := Key[i * 4 + j];
-    end;
-    i := 8;
-    for i := 8 to 59 do
-    begin
-      Temp := w[i - 1];
-      if (i mod 8) = 0 then
-      begin
-        t_byte := Temp[0];
-        Temp[0] := Temp[1]; Temp[1] := Temp[2]; Temp[2] := Temp[3]; Temp[3] := t_byte;
-        for j := 0 to 3 do Temp[j] := SBox[Temp[j]];
-        Temp[0] := Temp[0] xor Rcon[i div 8];
-      end
-      else if (i mod 8) = 4 then
-      begin
-        for j := 0 to 3 do Temp[j] := SBox[Temp[j]];
-      end;
-      for j := 0 to 3 do
-      begin
-        w[i][j] := w[i - 8][j] xor Temp[j];
-      end;
-    end;
-    for i := 0 to 14 do
-    for j := 0 to 3 do
-    for k := 0 to 3 do
-    begin
-      Result[i][k, j] := w[i * 4 + j][k];
+      w[i][j] := w[i - 8][j] xor Temp[j];
     end;
   end;
-  procedure SubBytes(var State: TAESBlock);
+  for i := 0 to 14 do
+  for j := 0 to 3 do
+  for k := 0 to 3 do
+  begin
+    Result[i][k, j] := w[i * 4 + j][k];
+  end;
+end;
+
+class function TUAES.PadData_PKCS7(const Data: TUInt8Array; const BlockSize: Int32): TUInt8Array;
+  var i, PadLen: Int32;
+begin
+  PadLen := BlockSize - (Length(Data) mod BlockSize);
+  if PadLen = 0 then PadLen := BlockSize;
+  Result := nil;
+  SetLength(Result, Length(Data) + PadLen);
+  if Length(Data) > 0 then
+  begin
+    Move(Data[0], Result[0], Length(Data));
+  end;
+  for i := Length(Data) to High(Result) do
+  begin
+    Result[i] := UInt8(PadLen);
+  end;
+end;
+
+class function TUAES.UnpadData_PKCS7(const Data: TUInt8Array): TUInt8Array;
+  var PadLen, i: Integer;
+begin
+  if Length(Data) = 0 then Exit(Data);
+  PadLen := Data[High(Data)];
+  if (PadLen = 0) or (PadLen > Length(Data)) then Exit(nil);
+  for i := Length(Data) - PadLen to High(Data) - 1 do
+  begin
+    if Data[i] <> PadLen then Exit(nil);
+  end;
+  SetLength(Result, Length(Data) - PadLen);
+  if Length(Result) = 0 then Exit;
+  Move(Data[0], Result[0], Length(Result));
+end;
+
+class procedure TUAES.AddRoundKey(var State: TBlock; const RoundKey: TBlock);
+  var r, c: Int32;
+begin
+  for r := 0 to 3 do
+  for c := 0 to 3 do
+  begin
+    State[r, c] := State[r, c] xor RoundKey[r, c];
+  end;
+end;
+
+class function TUAES.GMul(a, b: UInt8): UInt8;
+  var p: UInt8;
+  var i: Int32;
+begin
+  p := 0;
+  for i := 0 to 7 do
+  begin
+    if (b and 1) <> 0 then
+    begin
+      p := p xor a;
+    end;
+    if (a and $80) <> 0 then
+    begin
+      a := (a shl 1) xor $1b
+    end
+    else
+    begin
+      a := a shl 1;
+    end;
+    b := b shr 1;
+  end;
+  Result := p;
+end;
+
+class function TUAES.Encrypt_AES_PKCS7_ECB_256(
+  const Data: TUInt8Array;
+  const Key: TUAES256Key
+): TUInt8Array;
+  procedure SubBytes(var State: TBlock);
     var r, c: Int32;
   begin
     for r := 0 to 3 do
     for c := 0 to 3 do
     begin
-      State[r, c] := SBox[State[r, c]];
+      State[r, c] := TUAES.SBox[State[r, c]];
     end;
   end;
-  procedure ShiftRows(var State: TAESBlock);
+  procedure ShiftRows(var State: TBlock);
     var Temp: UInt8;
   begin
     Temp := State[1, 0];
@@ -754,7 +821,7 @@ function UEncrypt_AES_PKCS7_ECB_256(
     Temp := State[3, 3];
     State[3, 3] := State[3, 2]; State[3, 2] := State[3, 1]; State[3, 1] := State[3, 0]; State[3, 0] := Temp;
   end;
-  procedure MixColumns(var State: TAESBlock);
+  procedure MixColumns(var State: TBlock);
     var c, r: Int32;
     var a: array[0..3] of UInt8;
   begin
@@ -767,18 +834,9 @@ function UEncrypt_AES_PKCS7_ECB_256(
       State[3, c] := GMul(a[0], 3) xor GMul(a[1], 1) xor GMul(a[2], 1) xor GMul(a[3], 2);
     end;
   end;
-  procedure AddRoundKey(var State: TAESBlock; const RoundKey: TAESBlock);
-    var r, c: Int32;
-  begin
-    for r := 0 to 3 do
-    for c := 0 to 3 do
-    begin
-      State[r, c] := State[r, c] xor RoundKey[r, c];
-    end;
-  end;
-  var ExpandedKey: TAESExpandedKey;
+  var ExpandedKey: TExpandedKey;
   var PaddedData: TUInt8Array;
-  var State: TAESBlock;
+  var State: TBlock;
   var i, r, c, Round: Int32;
 begin
   ExpandedKey := KeyExpansion(Key);
@@ -809,6 +867,90 @@ begin
       Result[i * 16 + r + 4 * c] := State[r, c];
     end;
   end;
+end;
+
+class function TUAES.Decrypt_AES_PKCS7_ECB_256(
+  const Cipher: TUInt8Array;
+  const Key: TUAES256Key
+): TUInt8Array;
+  procedure InvSubBytes(var State: TBlock);
+    var r, c: Int32;
+  begin
+    for r := 0 to 3 do
+    for c := 0 to 3 do
+    begin
+      State[r, c] := InvSBox[State[r, c]];
+    end;
+  end;
+  procedure InvShiftRows(var State: TBlock);
+    var Temp: UInt8;
+  begin
+    Temp := State[1, 3]; State[1, 3] := State[1, 2]; State[1, 2] := State[1, 1]; State[1, 1] := State[1, 0]; State[1, 0] := Temp;
+    Temp := State[2, 0]; State[2, 0] := State[2, 2]; State[2, 2] := Temp; Temp := State[2, 1]; State[2, 1] := State[2, 3]; State[2, 3] := Temp;
+    Temp := State[3, 0]; State[3, 0] := State[3, 1]; State[3, 1] := State[3, 2]; State[3, 2] := State[3, 3]; State[3, 3] := Temp;
+  end;
+  procedure InvMixColumns(var State: TBlock);
+    var c, r: Int32;
+    var a: array[0..3] of UInt8;
+  begin
+    for c := 0 to 3 do
+    begin
+      for r := 0 to 3 do a[r] := State[r, c];
+      State[0, c] := GMul(a[0], $0e) xor GMul(a[1], $0b) xor GMul(a[2], $0d) xor GMul(a[3], $09);
+      State[1, c] := GMul(a[0], $09) xor GMul(a[1], $0e) xor GMul(a[2], $0b) xor GMul(a[3], $0d);
+      State[2, c] := GMul(a[0], $0d) xor GMul(a[1], $09) xor GMul(a[2], $0e) xor GMul(a[3], $0b);
+      State[3, c] := GMul(a[0], $0b) xor GMul(a[1], $0d) xor GMul(a[2], $09) xor GMul(a[3], $0e);
+    end;
+  end;
+  var ExpandedKey: TExpandedKey;
+  var State: TBlock;
+  var DataPadded: TUInt8Array;
+  var i, r, c, Round: Int32;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  DataPadded := nil;
+  SetLength(DataPadded, Length(Cipher));
+  for i := 0 to (Length(Cipher) div 16) - 1 do
+  begin
+    for r := 0 to 3 do
+    for c := 0 to 3 do
+    begin
+      State[r, c] := Cipher[i * 16 + r + 4 * c];
+    end;
+    AddRoundKey(State, ExpandedKey[14]);
+    for Round := 13 downto 1 do
+    begin
+      InvShiftRows(State);
+      InvSubBytes(State);
+      AddRoundKey(State, ExpandedKey[Round]);
+      InvMixColumns(State);
+    end;
+    InvShiftRows(State);
+    InvSubBytes(State);
+    AddRoundKey(State, ExpandedKey[0]);
+    for r := 0 to 3 do
+    for c := 0 to 3 do
+    begin
+      DataPadded[i * 16 + r + 4 * c] := State[r, c];
+    end;
+  end;
+  Result := UnpadData_PKCS7(DataPadded);
+end;
+
+function UEncrypt_AES_PKCS7_ECB_256(
+  const Data: TUInt8Array;
+  const Key: TUAES256Key
+): TUInt8Array;
+begin
+  Result := TUAES.Encrypt_AES_PKCS7_ECB_256(Data, Key);
+end;
+
+function UDecrypt_AES_PKCS7_ECB_256(
+  const Cipher: TUInt8Array;
+  const Key: TUAES256Key
+): TUInt8Array;
+begin
+  Result := TUAES.Decrypt_AES_PKCS7_ECB_256(Cipher, Key);
 end;
 
 end.
