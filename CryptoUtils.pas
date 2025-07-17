@@ -118,6 +118,11 @@ private
     const Key: TKey256;
     const IV: TInitVector
   ): TUInt8Array; static;
+  class function Process_AES_CTR_256(
+    const Input: TUInt8Array;
+    const Key: TKey256;
+    const IV: TInitVector
+  ): TUInt8Array; static;
 end;
 
 function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
@@ -186,6 +191,16 @@ function UEncrypt_AES_PKCS7_CBC_256(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 function UDecrypt_AES_PKCS7_CBC_256(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey256;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+function UEncrypt_AES_CTR_256(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey256;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+function UDecrypt_AES_CTR_256(
   const Cipher: TUInt8Array;
   const Key: TUAES.TKey256;
   const IV: TUAES.TInitVector
@@ -1054,6 +1069,43 @@ begin
   Result := UnpadData_PKCS7(DataPadded);
 end;
 
+class function TUAES.Process_AES_CTR_256(
+  const Input: TUInt8Array;
+  const Key: TKey256;
+  const IV: TInitVector
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+  var State: TBlock;
+  var CounterBlock, KeystreamBlock: TInitVector;
+  var i, j: Int32;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := nil;
+  SetLength(Result, Length(Input));
+  CounterBlock := IV;
+  for i := 0 to High(Input) do
+  begin
+    if (i mod 16) = 0 then
+    begin
+      for j := 0 to 15 do
+      begin
+        State[j mod 4, j div 4] := CounterBlock[j];
+      end;
+      CipherBlock(State, ExpandedKey);
+      for j := 0 to 15 do
+      begin
+        KeystreamBlock[j] := State[j mod 4, j div 4];
+      end;
+      for j := 15 downto 0 do
+      begin
+        Inc(CounterBlock[j]);
+        if CounterBlock[j] <> 0 then Break;
+      end;
+    end;
+    Result[i] := Input[i] xor KeystreamBlock[i mod 16];
+  end;
+end;
+
 function UEncrypt_AES_PKCS7_ECB_256(
   const Data: TUInt8Array;
   const Key: TUAES.TKey256
@@ -1086,6 +1138,24 @@ function UDecrypt_AES_PKCS7_CBC_256(
 ): TUInt8Array;
 begin
   Result := TUAES.Decrypt_AES_PKCS7_CBC_256(Cipher, Key, IV);
+end;
+
+function UEncrypt_AES_CTR_256(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey256;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_CTR_256(Data, Key, IV);
+end;
+
+function UDecrypt_AES_CTR_256(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey256;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_CTR_256(Cipher, Key, IV);
 end;
 
 end.
