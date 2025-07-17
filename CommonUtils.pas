@@ -1731,6 +1731,8 @@ function UBoolToStr(const b: Boolean): String;
 function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
 function UBytesToHex(const Bytes: TUInt8Array): String;
 function UHexToBytes(const Hex: String): TUInt8Array;
+function UStrToBytes(const Str: String): TUInt8Array;
+function UBytesToString(const Bytes: TUInt8Array): String;
 function UMatToQuat(const m: TUMat): TUQuat;
 function UQuatToMat(const q: TUQuat): TUMat;
 generic function USignOf<T>(const v: T): T;
@@ -10049,6 +10051,20 @@ begin
     j := i * 2 + 1;
     Result[i] := UInt8(StrToInt('$' + Hex[j] + Hex[j + 1]));
   end;
+end;
+
+function UStrToBytes(const Str: String): TUInt8Array;
+begin
+  Result := nil;
+  SetLength(Result, Length(Str));
+  Move(Str[1], Result[0], Length(Str));
+end;
+
+function UBytesToString(const Bytes: TUInt8Array): String;
+begin
+  Result := '';
+  SetLength(Result, Length(Bytes));
+  Move(Bytes[0], Result[1], Length(Bytes));
 end;
 
 function UMatToQuat(const m: TUMat): TUQuat;

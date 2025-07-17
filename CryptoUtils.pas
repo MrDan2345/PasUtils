@@ -45,9 +45,13 @@ type TUAES = record
 public
   type TKey256 = array[0..31] of UInt8;
   type TInitVector = array[0..15] of UInt8;
+  type TTag = array[0..15] of UInt8;
 private
   type TBlock = array[0..3, 0..3] of UInt8;
   type TExpandedKey = array[0..14] of TBlock;
+  const InitVectorZero: TInitVector = (
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+  );
   const SBox: array[0..255] of UInt8 = (
     $63, $7c, $77, $7b, $f2, $6b, $6f, $c5, $30, $01, $67, $2b, $fe, $d7, $ab, $76,
     $ca, $82, $c9, $7d, $fa, $59, $47, $f0, $ad, $d4, $a2, $af, $9c, $a4, $72, $c0,
@@ -87,6 +91,7 @@ private
   const Rcon: array[1..10] of UInt8 = (
     $01, $02, $04, $08, $10, $20, $40, $80, $1b, $36
   );
+  class procedure GF128_Mul(var X: TInitVector; const Y: TInitVector); static;
   class function KeyExpansion(const Key: TKey256): TExpandedKey; static;
   class function PadData_PKCS7(const Data: TUInt8Array; const BlockSize: Int32): TUInt8Array; static;
   class function UnpadData_PKCS7(const Data: TUInt8Array): TUInt8Array; static;
@@ -122,6 +127,14 @@ private
     const Input: TUInt8Array;
     const Key: TKey256;
     const IV: TInitVector
+  ): TUInt8Array; static;
+  class function Process_AES_GCM_256(
+    const Input: TUInt8Array;
+    const Key: TKey256;
+    const Nonce: TInitVector;
+    const AAD: TUInt8Array;
+    const IsEncrypting: Boolean;
+    out AuthTag: TTag
   ): TUInt8Array; static;
 end;
 
@@ -204,6 +217,20 @@ function UDecrypt_AES_CTR_256(
   const Cipher: TUInt8Array;
   const Key: TUAES.TKey256;
   const IV: TUAES.TInitVector
+): TUInt8Array;
+function UEncrypt_AES_GCM_256(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey256;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
+): TUInt8Array;
+function UDecrypt_AES_GCM_256(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey256;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
 ): TUInt8Array;
 
 implementation
@@ -311,8 +338,8 @@ function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
   var w: array[0..63] of UInt32;
   var PaddedMessage: TUInt8Array;
   var OriginalLength: UInt64;
-  var PaddedLength: Integer;
-  var i, j, ChunkStart: Integer;
+  var PaddedLength: Int32;
+  var i, j, ChunkStart: Int32;
 begin
   OriginalLength := DataSize;
   PaddedLength := DataSize + 1;
@@ -736,6 +763,35 @@ begin
   Result := UUnpackData(Block, Key.Size);
 end;
 
+class procedure TUAES.GF128_Mul(var X: TInitVector; const Y: TInitVector);
+  const R_REDUCTION_BYTE = $E1;
+  var V: TUAES.TInitVector;
+  var Z: TUAES.TInitVector;
+  var i, j: Int32;
+  var lsb_set: Boolean;
+begin
+  Z := InitVectorZero;
+  V := Y;
+  for i := 0 to 127 do
+  begin
+    if (X[i div 8] and (1 shl (7 - (i mod 8)))) <> 0 then
+    begin
+      for j := 0 to 15 do Z[j] := Z[j] xor V[j];
+    end;
+    lsb_set := (V[15] and 1) <> 0;
+    for j := 15 downto 1 do
+    begin
+      V[j] := (V[j] shr 1) or (V[j - 1] shl 7);
+    end;
+    V[0] := V[0] shr 1;
+    if lsb_set then
+    begin
+      V[0] := V[0] xor R_REDUCTION_BYTE;
+    end;
+  end;
+  X := Z;
+end;
+
 class function TUAES.KeyExpansion(const Key: TKey256): TExpandedKey;
   type TWord = array[0..3] of UInt8;
   var w: array[0..59] of TWord;
@@ -794,7 +850,7 @@ begin
 end;
 
 class function TUAES.UnpadData_PKCS7(const Data: TUInt8Array): TUInt8Array;
-  var PadLen, i: Integer;
+  var PadLen, i: Int32;
 begin
   if Length(Data) = 0 then Exit(Data);
   PadLen := Data[High(Data)];
@@ -1106,6 +1162,138 @@ begin
   end;
 end;
 
+class function TUAES.Process_AES_GCM_256(
+  const Input: TUInt8Array;
+  const Key: TKey256;
+  const Nonce: TInitVector;
+  const AAD: TUInt8Array;
+  const IsEncrypting: Boolean;
+  out AuthTag: TTag
+): TUInt8Array;
+  procedure IncrementCounterBlock(var Block: TInitVector);
+    var i: Int32;
+  begin
+    for i := 15 downto 12 do
+    begin
+      Inc(Block[i]);
+      if Block[i] <> 0 then Break;
+    end;
+  end;
+  var ExpandedKey: TExpandedKey;
+  var H, J0, S, Counter, Keystream, LastBlock: TInitVector;
+  var State: TBlock;
+  var i, j, BlockCount: Int32;
+  var DataToHash: TUInt8Array;
+  var LenBlock: TInitVector;
+  var LenAAD: UInt64;
+  var LenC: UInt64;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  for i := 0 to 3 do
+  for j := 0 to 3 do
+  begin
+    State[i, j] := 0;
+  end;
+  CipherBlock(State, ExpandedKey);
+  for i := 0 to 15 do
+  begin
+    H[i] := State[i mod 4, i div 4];
+  end;
+  for i := 0 to 11 do J0[i] := Nonce[i];
+  J0[12] := 0; J0[13] := 0; J0[14] := 0; J0[15] := 1;
+  S := InitVectorZero;
+  Counter := J0;
+  IncrementCounterBlock(Counter);
+  BlockCount := Length(AAD) div 16;
+  for i := 0 to BlockCount - 1 do
+  begin
+    for j := 0 to 15 do
+    begin
+      S[j] := S[j] xor AAD[i * 16 + j];
+    end;
+    GF128_Mul(S, H);
+  end;
+  if (Length(AAD) mod 16) <> 0 then
+  begin
+    LastBlock := InitVectorZero;
+    for j := 0 to (Length(AAD) mod 16) - 1 do
+    begin
+      LastBlock[j] := AAD[BlockCount*16 + j];
+    end;
+    for j := 0 to 15 do
+    begin
+      S[j] := S[j] xor LastBlock[j];
+    end;
+    GF128_Mul(S, H);
+  end;
+  Result := nil;
+  SetLength(Result, Length(Input));
+  for i := 0 to Length(Input) - 1 do
+  begin
+    if (i mod 16) = 0 then
+    begin
+      for j := 0 to 15 do
+      begin
+        State[j mod 4, j div 4] := Counter[j];
+      end;
+      CipherBlock(State, ExpandedKey);
+      for j := 0 to 15 do
+      begin
+        Keystream[j] := State[j mod 4, j div 4];
+      end;
+      IncrementCounterBlock(Counter);
+    end;
+    Result[i] := Input[i] xor Keystream[i mod 16];
+  end;
+  if IsEncrypting then DataToHash := Result else DataToHash := Input;
+  BlockCount := Length(DataToHash) div 16;
+  for i := 0 to BlockCount - 1 do
+  begin
+    for j := 0 to 15 do
+    begin
+      S[j] := S[j] xor DataToHash[i * 16 + j];
+    end;
+    GF128_Mul(S, H);
+  end;
+  if (Length(DataToHash) mod 16) <> 0 then
+  begin
+    LastBlock := InitVectorZero;
+    for j := 0 to (Length(DataToHash) mod 16) - 1 do
+    begin
+      LastBlock[j] := DataToHash[BlockCount * 16 + j];
+    end;
+    for j := 0 to 15 do
+    begin
+      S[j] := S[j] xor LastBlock[j];
+    end;
+    GF128_Mul(S, H);
+  end;
+  LenAAD := UInt64(Length(AAD)) * 8;
+  LenC := UInt64(Length(DataToHash)) * 8;
+  for i := 0 to 7 do
+  begin
+    LenBlock[i] := UInt8(LenAAD shr (56 - i * 8));
+  end;
+  for i := 0 to 7 do
+  begin
+    LenBlock[8 + i] := UInt8(LenC shr (56 - i * 8));
+  end;
+  for j := 0 to 15 do
+  begin
+    S[j] := S[j] xor LenBlock[j];
+  end;
+  GF128_Mul(S, H);
+  for j := 0 to 15 do
+  begin
+    State[j mod 4, j div 4] := J0[j];
+  end;
+  CipherBlock(State, ExpandedKey);
+  for j := 0 to 15 do
+  begin
+    AuthTag[j] := State[j mod 4, j div 4] xor S[j];
+  end;
+end;
+
 function UEncrypt_AES_PKCS7_ECB_256(
   const Data: TUInt8Array;
   const Key: TUAES.TKey256
@@ -1156,6 +1344,28 @@ function UDecrypt_AES_CTR_256(
 ): TUInt8Array;
 begin
   Result := TUAES.Process_AES_CTR_256(Cipher, Key, IV);
+end;
+
+function UEncrypt_AES_GCM_256(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey256;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_GCM_256(Data, Key, Nonce, AAD, True, AuthTag);
+end;
+
+function UDecrypt_AES_GCM_256(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey256;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_GCM_256(Cipher, Key, Nonce, AAD, False, AuthTag);
 end;
 
 end.
