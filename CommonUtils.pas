@@ -10046,7 +10046,7 @@ begin
   SetLength(Result, ByteCount);
   for i := 0 to ByteCount - 1 do
   begin
-    j := i * 2;
+    j := i * 2 + 1;
     Result[i] := UInt8(StrToInt('$' + Hex[j] + Hex[j + 1]));
   end;
 end;
