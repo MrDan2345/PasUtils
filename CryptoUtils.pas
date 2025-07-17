@@ -1042,9 +1042,6 @@ begin
     for j := 0 to 15 do
     begin
       CurCipherBlock[j] := Cipher[i * 16 + j];
-    end;
-    for j := 0 to 15 do
-    begin
       State[j mod 4, j div 4] := CurCipherBlock[j];
     end;
     InvCipherBlock(State, ExpandedKey);
