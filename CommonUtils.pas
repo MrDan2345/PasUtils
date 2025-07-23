@@ -1887,6 +1887,9 @@ function UPoT(const x: UInt64): UInt64;
 function UTopSetBit(const x: UInt64): UInt8;
 function URandomPi: TUFloat;
 function URandom2Pi: TUFloat;
+function UThreadRandomize: UInt32;
+function UThreadRandom(const Size: UInt32): UInt32;
+function UThreadRandom(var RandomSeed: UInt32; const Size: UInt32): UInt32;
 function UAddMat(const m0, m1: TUMat): TUMat;
 function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 function USubMat(const m0, m1: TUMat): TUMat;
@@ -2061,6 +2064,8 @@ const URcp255 = 1 / 255;
 const UEps = 1E-5;
 const UDegToRad = UPi / 180;
 const URadToDeg = 180 / UPi;
+
+threadvar UThreadRandomSeed: UInt32;
 
 implementation
 
@@ -5660,18 +5665,18 @@ begin
 end;
 
 class function TUInt4096Impl.MakeRandom(const BitCount: Int32): TUInt4096;
-  var i, ItemCount, LastBits: Int32;
+  var i, ItCount, LastBits: Int32;
 begin
   if BitCount > 4096 then Exit(Zero);
-  ItemCount := (BitCount + 31) shr 5;
+  ItCount := (BitCount + 31) shr 5;
   Result := Zero;
-  for i := 0 to ItemCount - 1 do
+  for i := 0 to ItCount - 1 do
   begin
-    Result[i] := (Random($10000) shl 16) or Random($10000);
+    Result[i] := (UThreadRandom($10000) shl 16) or UThreadRandom($10000);
   end;
   LastBits := BitCount mod 32;
   if LastBits = 0 then Exit;
-  i := ItemCount - 1;
+  i := ItCount - 1;
   Result[i] := Result[i] and ($ffffffff shr (32 - LastBits));
 end;
 
@@ -11173,6 +11178,24 @@ end;
 function URandom2Pi: TUFloat;
 begin
   Result := Random * 2 * Pi;
+end;
+
+function UThreadRandomize: UInt32;
+begin
+  UThreadRandomSeed := TThread.GetTickCount;
+  Result := UThreadRandomSeed;
+end;
+
+function UThreadRandom(const Size: UInt32): UInt32;
+begin
+  Result := UThreadRandom(UThreadRandomSeed, Size);
+end;
+
+function UThreadRandom(var RandomSeed: UInt32; const Size: UInt32): UInt32;
+begin
+  RandomSeed := (RandomSeed * 1664525) + 1013904223;
+  if Size < 2 then Exit(0);
+  Result := UInt32((UInt64(RandomSeed) * UInt64(Size)) shr 32);
 end;
 
 function UAddMat(const m0, m1: TUMat): TUMat;
