@@ -961,12 +961,14 @@ public
   function IsNegative: Boolean;
   function IsValid: Boolean;
   function ToString: String;
+  function ToBase64: String;
   function ToHex: String;
   function BitsUsed: Int32;
   procedure SetPositive(const Value: Boolean);
   procedure SetNegative(const Value: Boolean);
   class function Make(const Number: Int64): TUInt4096; static;
   class function Make(const Number: String): TUInt4096; static;
+  class function FromBase64(const Base64: String): TUInt4096; static;
   class function MakeRandom(const BitCount: Int32 = 2048): TUInt4096; static;
   class function MakeRandomRange(const Min, Max: TUInt4096): TUInt4096; static;
   class function MakePrime(const BitCount: Int32 = 2048): TUInt4096; static;
@@ -1731,6 +1733,8 @@ function UBoolToStr(const b: Boolean): String;
 function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
 function UBytesToHex(const Bytes: TUInt8Array): String;
 function UHexToBytes(const Hex: String): TUInt8Array;
+function UBytesToBase64(const Bytes: TUInt8Array): String;
+function UBase64ToBytes(const Base64: String): TUInt8Array;
 function UStrToBytes(const Str: String): TUInt8Array;
 function UBytesToString(const Bytes: TUInt8Array): String;
 function UMatToQuat(const m: TUMat): TUQuat;
@@ -5523,6 +5527,26 @@ begin
   if IsNegative then Result := '-' + Result;
 end;
 
+function TUInt4096Impl.ToBase64: String;
+  var AsBytes: array[0..(MaxItem + 1) * 4 - 1] of UInt8 absolute Self;
+  var Bytes: TUInt8Array;
+  var i, TopByte: Int32;
+begin
+  Result := '';
+  TopByte := -1;
+  for i := High(AsBytes) downto 0 do
+  if AsBytes[i] > 0 then
+  begin
+    TopByte := i;
+    Break;
+  end;
+  if TopByte = -1 then Exit;
+  Bytes := nil;
+  SetLength(Bytes, TopByte + 1);
+  Move(Self, Bytes[0], Length(Bytes));
+  Result := UBytesToBase64(Bytes);
+end;
+
 function TUInt4096Impl.ToHex: String;
   function IntToHex(const Value: UInt8): AnsiChar;
   begin
@@ -5662,6 +5686,16 @@ class function TUInt4096Impl.Make(const Number: String): TUInt4096;
 begin
   Result := TUInt4096.Zero;
   if Number.StartsWith('$') then FromHex else FromDec;
+end;
+
+class function TUInt4096Impl.FromBase64(const Base64: String): TUInt4096;
+  var Bytes: TUInt8Array;
+  var n: Int32;
+begin
+  Bytes := UBase64ToBytes(Base64);
+  n := UMin(Length(Bytes), (MaxItem + 1) * 4);
+  Result := Zero;
+  Move(Bytes[0], Result[0], n);
 end;
 
 class function TUInt4096Impl.MakeRandom(const BitCount: Int32): TUInt4096;
@@ -10055,6 +10089,120 @@ begin
   begin
     j := i * 2 + 1;
     Result[i] := UInt8(StrToInt('$' + Hex[j] + Hex[j + 1]));
+  end;
+end;
+
+function UBytesToBase64(const Bytes: TUInt8Array): String;
+  const Base64Chars: array[0..63] of AnsiChar = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  var i, j, Len: Int32;
+  var B1, B2, B3: UInt8;
+  var Padding: Int32;
+begin
+  Result := '';
+  Len := Length(Bytes);
+  if Len = 0 then Exit;
+  Padding := (3 - (Len mod 3)) mod 3;
+  SetLength(Result, ((Len + 2) div 3) * 4);
+  j := 1;
+  i := 0;
+  while i < Len do
+  begin
+    B1 := Bytes[i];
+    Inc(i);
+    if i < Len then B2 := Bytes[i] else B2 := 0;
+    Inc(i);
+    if i < Len then B3 := Bytes[i] else B3 := 0;
+    Inc(i);
+    Result[j] := Base64Chars[((B1 shr 2) and $3F)];
+    Inc(j);
+    Result[j] := Base64Chars[(((B1 shl 4) or (B2 shr 4)) and $3F)];
+    Inc(j);
+    Result[j] := Base64Chars[(((B2 shl 2) or (B3 shr 6)) and $3F)];
+    Inc(j);
+    Result[j] := Base64Chars[(B3 and $3F)];
+    Inc(j);
+  end;
+  if Padding = 0 then Exit;
+  for i := 0 to Padding - 1 do
+  begin
+    Result[Length(Result) - i] := '=';
+  end;
+end;
+
+function UBase64ToBytes(const Base64: String): TUInt8Array;
+  function CharToBase64Index(C: Char): Int32;
+  begin
+    case C of
+      'A'..'Z': Result := Ord(C) - Ord('A');
+      'a'..'z': Result := Ord(C) - Ord('a') + 26;
+      '0'..'9': Result := Ord(C) - Ord('0') + 52;
+      '+': Result := 62;
+      '/': Result := 63;
+      '=': Result := -1;
+      else Result := -2;
+    end;
+  end;
+  var i, j, Len, PaddingCount: Int32;
+  var C1, C2, C3, C4: Int32;
+  var B1, B2, B3: UInt8;
+begin
+  Result := nil;
+  if Base64 = '' then Exit;
+  for i := 1 to Length(Base64) do
+  if not (Base64[i] in ['A'..'Z', 'a'..'z', '0'..'9', '+', '/', '=']) then
+  begin
+    WriteLn('Invalid Character: ', Base64[i]);
+    Exit;
+  end;
+  Len := Length(Base64);
+  if (Len = 0) or (Len mod 4 <> 0) then Exit;
+  PaddingCount := 0;
+  if (Len > 0) and (Base64[Len] = '=') then
+  begin
+    Inc(PaddingCount);
+    if (Len > 1) and (Base64[Len - 1] = '=') then
+    begin
+      Inc(PaddingCount);
+    end;
+  end;
+  SetLength(Result, (Len div 4) * 3 - PaddingCount);
+  j := 0;
+  i := 1;
+  while i <= Len do
+  begin
+    C1 := CharToBase64Index(Base64[i]);
+    Inc(i);
+    C2 := CharToBase64Index(Base64[i]);
+    Inc(i);
+    C3 := CharToBase64Index(Base64[i]);
+    Inc(i);
+    C4 := CharToBase64Index(Base64[i]);
+    Inc(i);
+    if (C1 < 0) or (C2 < 0) then Exit;
+    B1 := (C1 shl 2) or (C2 shr 4);
+    if j < Length(Result) then
+    begin
+      Result[j] := B1;
+      Inc(j);
+    end;
+    if C3 >= 0 then
+    begin
+      B2 := ((C2 and $0F) shl 4) or (C3 shr 2);
+      if j < Length(Result) then
+      begin
+        Result[j] := B2;
+        Inc(j);
+      end;
+    end;
+    if C4 >= 0 then
+    begin
+      B3 := ((C3 and $03) shl 6) or C4;
+      if j < Length(Result) then
+      begin
+        Result[j] := B3;
+        Inc(j);
+      end;
+    end;
   end;
 end;
 
