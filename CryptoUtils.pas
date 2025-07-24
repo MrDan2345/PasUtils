@@ -36,6 +36,7 @@ public
     function Size: Uint32; // bit size
     function IsPrivate: Boolean;
     function IsCRT: Boolean;
+    class function MakeInvalid: TKey; static;
   end;
 public
   type TMakePrimeContext = record
@@ -251,6 +252,8 @@ function USHA256(const Data: TUInt8Array): TUSHA256Digest;
 function USHA256(const Data: String): TUSHA256Digest;
 
 function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
+function UExportRSAKey(const Key: TURSA.TKey): String;
+function UImportRSAKey(const Key: String): TURSA.TKey;
 
 function UMakeRSAKey(
   const BitCount: UInt32;
@@ -357,6 +360,18 @@ end;
 function TURSA.TKey.IsCRT: Boolean;
 begin
   Result := p.IsValid and q.IsValid and exp1.IsValid and exp2.IsValid and c.IsValid;
+end;
+
+class function TURSA.TKey.MakeInvalid: TURSA.TKey;
+begin
+  Result.n := TUInt4096.Invalid;
+  Result.e := TUInt4096.Invalid;
+  Result.d := TUInt4096.Invalid;
+  Result.p := TUInt4096.Invalid;
+  Result.q := TUInt4096.Invalid;
+  Result.exp1 := TUInt4096.Invalid;
+  Result.exp2 := TUInt4096.Invalid;
+  Result.c := TUInt4096.Invalid;
 end;
 
 procedure TURSA.TMakePrimeThread.Execute;
@@ -1204,6 +1219,221 @@ begin
   Result := nil;
   SetLength(Result, MaskLen);
   Move(T[0], Result[0], MaskLen);
+end;
+
+function UExportRSAKey(const Key: TURSA.TKey): String;
+  function PackDER(const Number: TUInt4096): TUInt8Array;
+    const ByteCount = (TUInt4096Impl.MaxItem + 1) * 4;
+    var AsBytes: array[0..ByteCount - 1] of UInt8 absolute Number;
+    var i, j, TopByte: Int32;
+  begin
+    Result := nil;
+    TopByte := 0;
+    for i := High(AsBytes) downto 0 do
+    if AsBytes[i] > 0 then
+    begin
+      TopByte := i;
+      Break;
+    end;
+    j := Int32(AsBytes[TopByte] and $80 > 0);
+    SetLength(Result, TopByte + j + 1);
+    if j = 1 then Result[0] := 0;
+    for i := 0 to TopByte do
+    begin
+      Result[TopByte + j - i] := AsBytes[i];
+    end;
+  end;
+  function EncodeTLV(const Tag: UInt8; const Value: TUInt8Array): TUInt8Array;
+    var len, tempLen, numLenBytes, i: Int32;
+    var lenBytes: TUInt8Array;
+  begin
+    len := Length(Value);
+    if len < 128 then
+    begin
+      SetLength(lenBytes, 1);
+      lenBytes[0] := Byte(len);
+    end
+    else
+    begin
+      tempLen := len;
+      numLenBytes := 0;
+      while tempLen > 0 do
+      begin
+        Inc(numLenBytes);
+        tempLen := tempLen shr 8;
+      end;
+      SetLength(lenBytes, 1 + numLenBytes);
+      lenBytes[0] := $80 or Byte(numLenBytes);
+      tempLen := len;
+      for i := numLenBytes downto 1 do
+      begin
+        lenBytes[i] := Byte(tempLen and $FF);
+        tempLen := tempLen shr 8;
+      end;
+    end;
+    Result := specialize UArrConcat<TUInt8Array>([[Tag], lenBytes, Value]);
+  end;
+  var ver, n, e, d, p, q, exp1, exp2, coeff: TUInt8Array;
+  var AllIntegers, SequenceContent: TUInt8Array;
+  var i, j, Returns, ReturnsTotal, Remainder: Int32;
+  var Base64: String;
+  const Header: String = '-----BEGIN RSA PRIVATE KEY-----';
+  const Footer: String = '-----END RSA PRIVATE KEY-----';
+begin
+  ver := PackDER(TUInt4096.Zero);
+  n := PackDER(Key.n);
+  e := PackDER(Key.e);
+  d := PackDER(Key.d);
+  p := PackDER(Key.p);
+  q := PackDER(Key.q);
+  exp1 := PackDER(Key.exp1);
+  exp2 := PackDER(Key.exp2);
+  coeff := PackDER(Key.c);
+  AllIntegers := specialize UArrConcat<TUInt8Array>([
+    EncodeTLV($02, ver),
+    EncodeTLV($02, n),
+    EncodeTLV($02, e),
+    EncodeTLV($02, d),
+    EncodeTLV($02, p),
+    EncodeTLV($02, q),
+    EncodeTLV($02, exp1),
+    EncodeTLV($02, exp2),
+    EncodeTLV($02, coeff)
+  ]);
+  SequenceContent := EncodeTLV($30, AllIntegers);
+  Base64 := UBytesToBase64(SequenceContent);
+  Returns := Length(Base64) div 64;
+  ReturnsTotal := Returns + 1;
+  Remainder := Length(Base64) mod 64;
+  if Remainder > 0 then Inc(ReturnsTotal);
+  Result := '';
+  SetLength(Result,
+    Length(Header) + Length(Footer) + Length(Base64) + 2 * ReturnsTotal
+  );
+  i := 1;
+  Move(Header[1], Result[i], Length(Header)); Inc(i, Length(Header));
+  Result[i] := #$d; Inc(i);
+  Result[i] := #$a; Inc(i);
+  for j := 0 to Returns - 1 do
+  begin
+    Move(Base64[j * 64 + 1], Result[i], 64);
+    Inc(i, 64);
+    Result[i] := #$d; Inc(i);
+    Result[i] := #$a; Inc(i);
+  end;
+  if Remainder > 0 then
+  begin
+    Move(Base64[Returns * 64 + 1], Result[i], Remainder);
+    Inc(i, Remainder);
+    Result[i] := #$d; Inc(i);
+    Result[i] := #$a; Inc(i);
+  end;
+  Move(Footer[1], Result[i], Length(Footer));
+end;
+
+function UImportRSAKey(const Key: String): TURSA.TKey;
+  function UnpackDER(const Bytes: TUInt8Array): TUInt4096;
+    const ByteCount = (TUInt4096Impl.MaxItem + 1) * 4;
+    var AsBytes: array[0..ByteCount - 1] of UInt8 absolute Result;
+    var i, StartIndex, CopyCount: Int32;
+  begin
+    Result := TUInt4096.Zero;
+    if Length(Bytes) = 0 then Exit;
+    StartIndex := Int32(Bytes[0] = 0);
+    CopyCount := UMin(Length(Bytes) - StartIndex, ByteCount);
+    for i := 0 to CopyCount - 1 do
+    begin
+      AsBytes[i] := Bytes[High(Bytes) - i];
+    end;
+  end;
+  procedure DecodeTLV(const Data: TUInt8Array; var Index: Integer; out Tag: Byte; out Value: TUInt8Array);
+    var len, numLenBytes, i: Integer;
+  begin
+    //if Index >= Length(Data) then
+    //  raise EArgumentException.Create('ASN.1 Parse Error: Unexpected end of data.');
+
+    // 1. Read the Tag
+    Tag := Data[Index];
+    Inc(Index);
+
+    // 2. Read the Length
+    len := Data[Index];
+    Inc(Index);
+    if (len and $80) <> 0 then // Long form
+    begin
+      numLenBytes := len and $7F;
+      if (Index + numLenBytes) > Length(Data) then
+        raise EArgumentException.Create('ASN.1 Parse Error: Invalid length field.');
+
+      len := 0;
+      for i := 1 to numLenBytes do
+      begin
+        len := (len shl 8) or Data[Index];
+        Inc(Index);
+      end;
+    end;
+
+    // 3. Read the Value
+    if (Index + len) > Length(Data) then
+      raise EArgumentException.Create('ASN.1 Parse Error: Value length exceeds data length.');
+
+    SetLength(Value, len);
+    if len > 0 then
+      System.Move(Data[Index], Value[0], len);
+    Inc(Index, len);
+  end;
+  var Str: String;
+  var KeyStart, KeyEnd, Index, i: Integer;
+  var Tag: Byte;
+  var SequenceContent, IntegerValue: TUInt8Array;
+  var Components: array of TUInt4096;
+  const Header: String = '-----BEGIN RSA PRIVATE KEY-----';
+  const Footer: String = '-----END RSA PRIVATE KEY-----';
+begin
+  Result := TURSA.TKey.MakeInvalid;
+  KeyStart := Key.IndexOf(Header);
+  if KeyStart = -1 then Exit;
+  KeyStart += Length(Header);
+  KeyEnd := Key.IndexOf(Footer);
+  if KeyEnd < -1 then Exit;
+  if KeyStart > KeyEnd then Exit;
+  Str := Key.Substring(KeyStart, KeyEnd - KeyStart);
+  Str := Str.Replace(#$d#$a, '', [rfReplaceAll]);
+
+  {
+  Index := 0;
+  // 1. Decode the outer SEQUENCE
+  DecodeTLV(DERData, Index, Tag, SequenceContent);
+  if Tag <> $30 then
+    raise EArgumentException.Create('Invalid DER format: Expected a SEQUENCE.');
+
+  // 2. Decode all the INTEGERs inside the sequence
+  Index := 0;
+  SetLength(Components, 9); // We expect 9 integers for a PKCS#1 key
+  i := 0;
+  while (Index < Length(SequenceContent)) and (i < 9) do
+  begin
+    DecodeTLV(SequenceContent, Index, Tag, IntegerValue);
+    if Tag <> $02 then
+      raise EArgumentException.Create('Invalid DER format: Expected an INTEGER.');
+    Components[i] := UnpackDER(IntegerValue);
+    Inc(i);
+  end;
+
+  if i <> 9 then
+    raise EArgumentException.Create('Invalid DER format: Incorrect number of components in key.');
+
+  // 3. Assign the components to the TKey record
+  // Order is: version, n, e, d, p, q, exp1, exp2, c
+  Result.n    := Components[1];
+  Result.e    := Components[2];
+  Result.d    := Components[3];
+  Result.p    := Components[4];
+  Result.q    := Components[5];
+  Result.exp1 := Components[6];
+  Result.exp2 := Components[7];
+  Result.c    := Components[8];
+  }
 end;
 
 function UMakeRSAKey(const BitCount: UInt32; const Threads: Int32): TURSA.TKey;

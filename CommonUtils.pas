@@ -1971,6 +1971,7 @@ generic procedure UArrRemove<T>(var Arr: specialize TUArray<T>; const Item: T);
 generic function UArrPop<T>(var Arr: specialize TUArray<T>): T;
 generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
 generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
+generic function UArrConcat<T>(const Arr: array of T): T;
 
 operator + (const a, b: TUVec2): TUVec2;
 operator - (const a, b: TUVec2): TUVec2;
@@ -13051,6 +13052,24 @@ begin
   Arr := nil;
 end;
 
+generic function UArrConcat<T>(const Arr: array of T): T;
+  var i, n: Int32;
+begin
+  n := 0;
+  for i := 0 to High(Arr) do
+  begin
+    Inc(n, Length(Arr[i]));
+  end;
+  Result := nil;
+  if n = 0 then Exit;
+  SetLength(Result, n);
+  n := 0;
+  for i := 0 to High(Arr) do
+  begin
+    Move(Arr[i][0], Result[n], Length(Arr[i]) * SizeOf(Arr[i][0]));
+    Inc(n, Length(Arr[i]));
+  end;
+end;
 // Functions end
 
 
