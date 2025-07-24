@@ -28,7 +28,14 @@ public
     n: TUInt4096; // modulus
     e: TUInt4096; // public exponent
     d: TUInt4096; // private exponent
+    p: TUInt4096; // first prime
+    q: TUInt4096; // second prime
+    exp1: TUInt4096; // d mod (p - 1)
+    exp2: TUInt4096; // d mod (q - 1)
+    c: TUInt4096; // q^-1 mod p
     function Size: Uint32; // bit size
+    function IsPrivate: Boolean;
+    function IsCRT: Boolean;
   end;
 public
   type TMakePrimeContext = record
@@ -120,6 +127,14 @@ public
     const Cipher: TUInt4096;
     const Key: TURSA.TKey
   ): TUInt8Array; static;
+  class function Decrypt_CRT(
+    const Cipher: TUInt4096;
+    const Key: TURSA.TKey
+  ): TUInt4096; static;
+  class function Decrypt(
+    const Cipher: TUInt4096;
+    const Key: TURSA.TKey
+  ): TUInt4096; static;
 end;
 
 type TUMontgomeryReduction = record
@@ -334,6 +349,16 @@ begin
   Result := (n.Top + 1) * 32;
 end;
 
+function TURSA.TKey.IsPrivate: Boolean;
+begin
+  Result := d.IsValid or IsCRT;
+end;
+
+function TURSA.TKey.IsCRT: Boolean;
+begin
+  Result := p.IsValid and q.IsValid and exp1.IsValid and exp2.IsValid and c.IsValid;
+end;
+
 procedure TURSA.TMakePrimeThread.Execute;
   var Number: TUInt4096;
   var i: Int32;
@@ -530,13 +555,19 @@ class function TURSA.MakeKey(
   const BitCount: UInt32;
   const Threads: Int32
 ): TURSA.TKey;
-  var p, q, n, phi, e, d: TUInt4096;
+  var p, q, n, phi, e, d, One, p_minus_1, q_minus_1: TUInt4096;
   var PrimeSizeInBits: Int32;
   var Primes: TUInt4096Array;
 begin
+  One := TUInt4096.One;
   Result.n := TUInt4096.Invalid;
   Result.e := TUInt4096.Invalid;
   Result.d := TUInt4096.Invalid;
+  Result.q := TUInt4096.Invalid;
+  Result.p := TUInt4096.Invalid;
+  Result.exp1 := TUInt4096.Invalid;
+  Result.exp2 := TUInt4096.Invalid;
+  Result.c := TUInt4096.Invalid;
   PrimeSizeInBits := BitCount shr 1;
   e := 65537;
   repeat
@@ -546,12 +577,19 @@ begin
     q := Primes[1];
     if p = q then Continue;
     n := p * q;
-    phi := (p - TUInt4096.One) * (q - TUInt4096.One);
-  until (p <> q) and (GCD(e, phi) = TUInt4096.One);
+    p_minus_1 := p - One;
+    q_minus_1 := q - One;
+    phi := p_minus_1 * q_minus_1;
+  until (p <> q) and (GCD(e, phi) = One);
   d := ModInverse(e, phi);
   Result.n := n;
   Result.e := e;
   Result.d := d;
+  Result.q := q;
+  Result.p := p;
+  Result.exp1 := d mod p_minus_1;
+  Result.exp2 := d mod q_minus_1;
+  Result.c := ModInverse(q, p);
 end;
 
 class function TURSA.PackData_PKCS1(
@@ -769,7 +807,7 @@ class function TURSA.Decrypt_PKCS1_Str(
 ): String;
   var Block: TUInt4096;
 begin
-  Block := PowMod(Cipher, Key.d, Key.n);
+  Block := Decrypt(Cipher, Key);
   Result := UnpackStr_PKCS1(Block, Key.Size);
 end;
 
@@ -779,7 +817,7 @@ class function TURSA.Decrypt_PKCS1(
 ): TUInt8Array;
   var Block: TUInt4096;
 begin
-  Block := PowMod(Cipher, Key.d, Key.n);
+  Block := Decrypt(Cipher, Key);
   Result := UnpackData_PKCS1(Block, Key.Size);
 end;
 
@@ -791,7 +829,6 @@ class function TURSA.Encrypt_OAEP(
   var Block: TUInt4096;
 begin
   Block := PackData_OAEP(Data, DataSize, Key.Size);
-  WriteLn('Pack: ', Block.ToString);
   if not Block.IsValid then Exit(TUInt4096.Invalid);
   Result := PowMod(Block, Key.e, Key.n);
 end;
@@ -802,8 +839,7 @@ class function TURSA.Decrypt_OAEP_Str(
 ): String;
   var Block: TUInt4096;
 begin
-  Block := PowMod(Cipher, Key.d, Key.n);
-  WriteLn('Unpack: ', Block.ToString);
+  Block := Decrypt(Cipher, Key);
   Result := UnpackStr_OAEP(Block, Key.Size);
 end;
 
@@ -813,8 +849,41 @@ class function TURSA.Decrypt_OAEP(
 ): TUInt8Array;
   var Block: TUInt4096;
 begin
-  Block := PowMod(Cipher, Key.d, Key.n);
+  Block := Decrypt(Cipher, Key);
   Result := UnpackData_OAEP(Block, Key.Size);
+end;
+
+class function TURSA.Decrypt_CRT(
+  const Cipher: TUInt4096;
+  const Key: TURSA.TKey
+): TUInt4096;
+  var m1, m2, h, c_mod_p, c_mod_q: TUInt4096;
+begin
+  c_mod_p := Cipher mod Key.p;
+  c_mod_q := Cipher mod Key.q;
+  m1 := PowMod(c_mod_p, Key.exp1, Key.p);
+  m2 := PowMod(c_mod_q, Key.exp2, Key.q);
+  if m1 < m2 then
+  begin
+    h := m1 + Key.p;
+    h := h - m2;
+  end
+  else
+  begin
+    h := m1 - m2;
+  end;
+  h := h * Key.c;
+  h := h mod Key.p;
+  Result := m2 + (h * Key.q);
+end;
+
+class function TURSA.Decrypt(
+  const Cipher: TUInt4096;
+  const Key: TURSA.TKey
+): TUInt4096;
+begin
+  if Key.IsCRT then Exit(Decrypt_CRT(Cipher, Key));
+  Result := PowMod(Cipher, Key.d, Key.n);
 end;
 
 procedure TUMontgomeryReduction.Init(const Modulus: TUInt4096);
