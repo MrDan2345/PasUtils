@@ -10123,7 +10123,6 @@ begin
     Result[j] := Base64Chars[(B3 and $3F)];
     Inc(j);
   end;
-  if Padding = 0 then Exit;
   for i := 0 to Padding - 1 do
   begin
     Result[Length(Result) - i] := '=';

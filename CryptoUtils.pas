@@ -34,11 +34,15 @@ public
     exp2: TUInt4096; // d mod (q - 1)
     c: TUInt4096; // q^-1 mod p
     function Size: Uint32; // bit size
+    function IsPublic: Boolean;
     function IsPrivate: Boolean;
     function IsCRT: Boolean;
     class function MakeInvalid: TKey; static;
   end;
 public
+  const RSA_OID: array[0..8] of UInt8 = (
+    $2A, $86, $48, $86, $F7, $0D, $01, $01, $01
+  ); //rsaEncryption (1.2.840.113549.1.1.1)
   type TMakePrimeContext = record
     BitCount: Int32;
     Primes: array of TUInt4096;
@@ -58,6 +62,12 @@ public
   class function PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096; static;
   class function MillerRabinTest(const Number: TUInt4096; const Iterations: Int32 = 50): Boolean; static;
   class function XORBytes(const a, b: TUInt8Array): TUInt8Array; static;
+  class function PackDER(const Number: TUInt4096): TUInt8Array; static;
+  class function UnpackDER(const Bytes: TUInt8Array): TUInt4096; static;
+  class function EncodeTLV(const Tag: UInt8; const Value: TUInt8Array): TUInt8Array; static;
+  class function DecodeTLV(const Data: TUInt8Array; var Index: Int32; out Tag: UInt8): TUInt8Array; static;
+  class function ASN1ToBase64(const DataASN: TUInt8Array; const Header, Footer: String): String; static;
+  class function Base64ToASN1(const Base64: String; const Header, Footer: String): TUInt8Array; static;
   class function MakePrime(const BitCount: Int32 = 1024): TUInt4096; static;
   class function MakePrimes(
     const PrimeCount: Int32;
@@ -136,6 +146,19 @@ public
     const Cipher: TUInt4096;
     const Key: TURSA.TKey
   ): TUInt4096; static;
+  class function ExportKeyPrivate_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array; static;
+  class function ExportKeyPublic_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array; static;
+  class function ImportKeyPrivate_PKCS1_DER(const Key: TUInt8Array): TURSA.TKey; static;
+  class function ImportKeyPublic_PKCS1_DER(const Key: TUInt8Array): TURSA.TKey; static;
+  class function ExportKeyPrivate_PKCS1(const Key: TURSA.TKey): String; static;
+  class function ExportKeyPublic_PKCS1(const Key: TURSA.TKey): String; static;
+  class function ExportKeyPrivate_PKCS8(const Key: TURSA.TKey): String; static;
+  class function ExportKeyPublic_X509(const Key: TURSA.TKey): String; static;
+  class function ImportKeyPrivate_PKCS1(const Key: String): TURSA.TKey; static;
+  class function ImportKeyPublic_PKCS1(const Key: String): TURSA.TKey; static;
+  class function ImportKey_PKCS1(const Key: String): TURSA.TKey; static;
+  class function ImportKeyPrivate_PKCS8(const Key: String): TURSA.TKey; static;
+  class function ImportKeyPublic_X509(const Key: String): TURSA.TKey; static;
 end;
 
 type TUMontgomeryReduction = record
@@ -152,6 +175,8 @@ end;
 
 type TUAES = record
 public
+  type TKey128 = array[0..15] of UInt8;
+  type TKey192 = array[0..23] of UInt8;
   type TKey256 = array[0..31] of UInt8;
   type TInitVector = array[0..15] of UInt8;
   type TTag = array[0..15] of UInt8;
@@ -201,6 +226,8 @@ private
     $01, $02, $04, $08, $10, $20, $40, $80, $1b, $36
   );
   class procedure GF128_Mul(var X: TInitVector; const Y: TInitVector); static;
+  class function KeyExpansion(const Key: TKey128): TExpandedKey; static;
+  class function KeyExpansion(const Key: TKey192): TExpandedKey; static;
   class function KeyExpansion(const Key: TKey256): TExpandedKey; static;
   class function PadData_PKCS7(const Data: TUInt8Array; const BlockSize: Int32): TUInt8Array; static;
   class function UnpadData_PKCS7(const Data: TUInt8Array): TUInt8Array; static;
@@ -209,22 +236,80 @@ private
   class procedure SubBytes(var State: TBlock); static;
   class procedure ShiftRows(var State: TBlock); static;
   class procedure MixColumns(var State: TBlock); static;
-  class procedure CipherBlock(var State: TBlock; const ExpandedKey: TExpandedKey); static;
+  class procedure CipherBlock(var State: TBlock; const ExpandedKey: TExpandedKey; const NumRounds: Int32); static;
   class procedure InvSubBytes(var State: TBlock); static;
   class procedure InvShiftRows(var State: TBlock); static;
   class procedure InvMixColumns(var State: TBlock); static;
-  class procedure InvCipherBlock(var State: TBlock; const ExpandedKey: TExpandedKey); static;
+  class procedure InvCipherBlock(var State: TBlock; const ExpandedKey: TExpandedKey; const NumRounds: Int32); static;
+  class function Encrypt_AES_PKCS7_ECB(
+    const Data: TUInt8Array;
+    const ExpandedKey: TExpandedKey;
+    const NumRounds: Int32
+  ): TUInt8Array; static;
+  class function Encrypt_AES_PKCS7_ECB_128(
+    const Data: TUInt8Array;
+    const Key: TKey128
+  ): TUInt8Array; static;
+  class function Encrypt_AES_PKCS7_ECB_192(
+    const Data: TUInt8Array;
+    const Key: TKey192
+  ): TUInt8Array; static;
   class function Encrypt_AES_PKCS7_ECB_256(
     const Data: TUInt8Array;
     const Key: TKey256
+  ): TUInt8Array; static;
+  class function Decrypt_AES_PKCS7_ECB(
+    const Cipher: TUInt8Array;
+    const ExpandedKey: TExpandedKey;
+    const NumRounds: Int32
+  ): TUInt8Array; static;
+  class function Decrypt_AES_PKCS7_ECB_128(
+    const Cipher: TUInt8Array;
+    const Key: TKey128
+  ): TUInt8Array; static;
+  class function Decrypt_AES_PKCS7_ECB_192(
+    const Cipher: TUInt8Array;
+    const Key: TKey192
   ): TUInt8Array; static;
   class function Decrypt_AES_PKCS7_ECB_256(
     const Cipher: TUInt8Array;
     const Key: TKey256
   ): TUInt8Array; static;
+  class function Encrypt_AES_PKCS7_CBC(
+    const Data: TUInt8Array;
+    const ExpandedKey: TExpandedKey;
+    const IV: TInitVector;
+    const NumRounds: Int32
+  ): TUInt8Array; static;
+  class function Encrypt_AES_PKCS7_CBC_128(
+    const Data: TUInt8Array;
+    const Key: TKey128;
+    const IV: TInitVector
+  ): TUInt8Array; static;
+  class function Encrypt_AES_PKCS7_CBC_192(
+    const Data: TUInt8Array;
+    const Key: TKey192;
+    const IV: TInitVector
+  ): TUInt8Array; static;
   class function Encrypt_AES_PKCS7_CBC_256(
     const Data: TUInt8Array;
     const Key: TKey256;
+    const IV: TInitVector
+  ): TUInt8Array; static;
+  class function Decrypt_AES_PKCS7_CBC(
+    const Cipher: TUInt8Array;
+    const ExpandedKey: TExpandedKey;
+    const IV: TInitVector;
+    const NumRounds: Int32
+  ): TUInt8Array; static;
+  class function Decrypt_AES_PKCS7_CBC_128(
+    const Cipher: TUInt8Array;
+    const Key: TKey128;
+    const IV: TInitVector
+  ): TUInt8Array; static;
+  class function Decrypt_AES_PKCS7_CBC_192(
+    const Cipher: TUInt8Array;
+    const Key: TKey192;
     const IV: TInitVector
   ): TUInt8Array; static;
   class function Decrypt_AES_PKCS7_CBC_256(
@@ -232,10 +317,51 @@ private
     const Key: TKey256;
     const IV: TInitVector
   ): TUInt8Array; static;
+  class function Process_AES_CTR(
+    const Input: TUInt8Array;
+    const ExpandedKey: TExpandedKey;
+    const IV: TInitVector;
+    const NumRounds: Int32
+  ): TUInt8Array; static;
+  class function Process_AES_CTR_128(
+    const Input: TUInt8Array;
+    const Key: TKey128;
+    const IV: TInitVector
+  ): TUInt8Array; static;
+  class function Process_AES_CTR_192(
+    const Input: TUInt8Array;
+    const Key: TKey192;
+    const IV: TInitVector
+  ): TUInt8Array; static;
   class function Process_AES_CTR_256(
     const Input: TUInt8Array;
     const Key: TKey256;
     const IV: TInitVector
+  ): TUInt8Array; static;
+  class function Process_AES_GCM(
+    const Input: TUInt8Array;
+    const ExpandedKey: TExpandedKey;
+    const Nonce: TInitVector;
+    const AAD: TUInt8Array;
+    const IsEncrypting: Boolean;
+    const NumRounds: Int32;
+    out AuthTag: TTag
+  ): TUInt8Array; static;
+  class function Process_AES_GCM_128(
+    const Input: TUInt8Array;
+    const Key: TKey128;
+    const Nonce: TInitVector;
+    const AAD: TUInt8Array;
+    const IsEncrypting: Boolean;
+    out AuthTag: TTag
+  ): TUInt8Array; static;
+  class function Process_AES_GCM_192(
+    const Input: TUInt8Array;
+    const Key: TKey192;
+    const Nonce: TInitVector;
+    const AAD: TUInt8Array;
+    const IsEncrypting: Boolean;
+    out AuthTag: TTag
   ): TUInt8Array; static;
   class function Process_AES_GCM_256(
     const Input: TUInt8Array;
@@ -252,8 +378,6 @@ function USHA256(const Data: TUInt8Array): TUSHA256Digest;
 function USHA256(const Data: String): TUSHA256Digest;
 
 function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
-function UExportRSAKey(const Key: TURSA.TKey): String;
-function UImportRSAKey(const Key: String): TURSA.TKey;
 
 function UMakeRSAKey(
   const BitCount: UInt32;
@@ -302,6 +426,22 @@ function UDecrypt_RSA_OAEP(
   const Key: TURSA.TKey
 ): TUInt8Array;
 
+function UEncrypt_AES_PKCS7_ECB_128(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey128
+): TUInt8Array;
+function UDecrypt_AES_PKCS7_ECB_128(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey128
+): TUInt8Array;
+function UEncrypt_AES_PKCS7_ECB_192(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey192
+): TUInt8Array;
+function UDecrypt_AES_PKCS7_ECB_192(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey192
+): TUInt8Array;
 function UEncrypt_AES_PKCS7_ECB_256(
   const Data: TUInt8Array;
   const Key: TUAES.TKey256
@@ -309,6 +449,26 @@ function UEncrypt_AES_PKCS7_ECB_256(
 function UDecrypt_AES_PKCS7_ECB_256(
   const Cipher: TUInt8Array;
   const Key: TUAES.TKey256
+): TUInt8Array;
+function UEncrypt_AES_PKCS7_CBC_128(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+function UDecrypt_AES_PKCS7_CBC_128(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+function UEncrypt_AES_PKCS7_CBC_192(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+function UDecrypt_AES_PKCS7_CBC_192(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const IV: TUAES.TInitVector
 ): TUInt8Array;
 function UEncrypt_AES_PKCS7_CBC_256(
   const Data: TUInt8Array;
@@ -320,6 +480,26 @@ function UDecrypt_AES_PKCS7_CBC_256(
   const Key: TUAES.TKey256;
   const IV: TUAES.TInitVector
 ): TUInt8Array;
+function UEncrypt_AES_CTR_128(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+function UDecrypt_AES_CTR_128(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+function UEncrypt_AES_CTR_192(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+function UDecrypt_AES_CTR_192(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
 function UEncrypt_AES_CTR_256(
   const Data: TUInt8Array;
   const Key: TUAES.TKey256;
@@ -329,6 +509,34 @@ function UDecrypt_AES_CTR_256(
   const Cipher: TUInt8Array;
   const Key: TUAES.TKey256;
   const IV: TUAES.TInitVector
+): TUInt8Array;
+function UEncrypt_AES_GCM_128(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
+): TUInt8Array;
+function UDecrypt_AES_GCM_128(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
+): TUInt8Array;
+function UEncrypt_AES_GCM_192(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
+): TUInt8Array;
+function UDecrypt_AES_GCM_192(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
 ): TUInt8Array;
 function UEncrypt_AES_GCM_256(
   const Data: TUInt8Array;
@@ -352,9 +560,14 @@ begin
   Result := (n.Top + 1) * 32;
 end;
 
+function TURSA.TKey.IsPublic: Boolean;
+begin
+  Result := n.IsValid and e.IsValid;
+end;
+
 function TURSA.TKey.IsPrivate: Boolean;
 begin
-  Result := d.IsValid or IsCRT;
+  Result := (n.IsValid and d.IsValid) or IsCRT;
 end;
 
 function TURSA.TKey.IsCRT: Boolean;
@@ -362,7 +575,7 @@ begin
   Result := p.IsValid and q.IsValid and exp1.IsValid and exp2.IsValid and c.IsValid;
 end;
 
-class function TURSA.TKey.MakeInvalid: TURSA.TKey;
+class function TURSA.TKey.MakeInvalid: TKey;
 begin
   Result.n := TUInt4096.Invalid;
   Result.e := TUInt4096.Invalid;
@@ -513,6 +726,163 @@ begin
   SetLength(Result, Length(a));
   for i := 0 to High(Result) do
   Result[i] := a[i] xor b[i];
+end;
+
+class function TURSA.PackDER(const Number: TUInt4096): TUInt8Array;
+  const ByteCount = (TUInt4096Impl.MaxItem + 1) * 4;
+  var AsBytes: array[0..ByteCount - 1] of UInt8 absolute Number;
+  var i, j, TopByte: Int32;
+begin
+  Result := nil;
+  TopByte := 0;
+  for i := High(AsBytes) downto 0 do
+  if AsBytes[i] > 0 then
+  begin
+    TopByte := i;
+    Break;
+  end;
+  j := Int32(AsBytes[TopByte] and $80 > 0);
+  SetLength(Result, TopByte + j + 1);
+  if j = 1 then Result[0] := 0;
+  for i := 0 to TopByte do
+  begin
+    Result[TopByte + j - i] := AsBytes[i];
+  end;
+end;
+
+class function TURSA.UnpackDER(const Bytes: TUInt8Array): TUInt4096;
+  const ByteCount = (TUInt4096Impl.MaxItem + 1) * 4;
+  var AsBytes: array[0..ByteCount - 1] of UInt8 absolute Result;
+  var i, StartIndex, CopyCount: Int32;
+begin
+  Result := TUInt4096.Zero;
+  if Length(Bytes) = 0 then Exit;
+  StartIndex := Int32(Bytes[0] = 0);
+  CopyCount := UMin(Length(Bytes) - StartIndex, ByteCount);
+  for i := 0 to CopyCount - 1 do
+  begin
+    AsBytes[i] := Bytes[High(Bytes) - i];
+  end;
+end;
+
+class function TURSA.EncodeTLV(
+  const Tag: UInt8;
+  const Value: TUInt8Array
+): TUInt8Array;
+  var Len, TempLen, NumLenBytes, i: Int32;
+  var LenBytes: TUInt8Array;
+begin
+  Len := Length(Value);
+  if Len < 128 then
+  begin
+    SetLength(LenBytes, 1);
+    LenBytes[0] := Byte(Len);
+  end
+  else
+  begin
+    TempLen := Len;
+    NumLenBytes := 0;
+    while TempLen > 0 do
+    begin
+      Inc(NumLenBytes);
+      TempLen := TempLen shr 8;
+    end;
+    SetLength(LenBytes, 1 + NumLenBytes);
+    LenBytes[0] := $80 or Byte(NumLenBytes);
+    TempLen := Len;
+    for i := NumLenBytes downto 1 do
+    begin
+      LenBytes[i] := Byte(TempLen and $FF);
+      TempLen := TempLen shr 8;
+    end;
+  end;
+  Result := specialize UArrConcat<TUInt8Array>([[Tag], LenBytes, Value]);
+end;
+
+class function TURSA.DecodeTLV(
+  const Data: TUInt8Array;
+  var Index: Int32;
+  out Tag: UInt8
+): TUInt8Array;
+  var Len, NumLenBytes, i: Int32;
+begin
+  Result := nil;
+  if Index >= Length(Data) then Exit;
+  Tag := Data[Index]; Inc(Index);
+  Len := Data[Index]; Inc(Index);
+  if (Len and $80) <> 0 then
+  begin
+    NumLenBytes := Len and $7F;
+    if (Index + NumLenBytes) > Length(Data) then Exit;
+    Len := 0;
+    for i := 1 to NumLenBytes do
+    begin
+      Len := (Len shl 8) or Data[Index];
+      Inc(Index);
+    end;
+  end;
+  if (Index + Len) > Length(Data) then Exit;
+  SetLength(Result, Len);
+  if Len > 0 then
+  begin
+    Move(Data[Index], Result[0], Len);
+  end;
+  Inc(Index, Len);
+end;
+
+class function TURSA.ASN1ToBase64(
+  const DataASN: TUInt8Array;
+  const Header, Footer: String
+): String;
+  var Base64: String;
+  var i, j, Returns, ReturnsTotal, Remainder: Int32;
+begin
+  Base64 := UBytesToBase64(DataASN);
+  Returns := Length(Base64) div 64;
+  ReturnsTotal := Returns + 1;
+  Remainder := Length(Base64) mod 64;
+  if Remainder > 0 then Inc(ReturnsTotal);
+  Result := '';
+  SetLength(Result,
+    Length(Header) + Length(Footer) + Length(Base64) + 2 * ReturnsTotal
+  );
+  i := 1;
+  Move(Header[1], Result[i], Length(Header)); Inc(i, Length(Header));
+  Result[i] := #$d; Inc(i);
+  Result[i] := #$a; Inc(i);
+  for j := 0 to Returns - 1 do
+  begin
+    Move(Base64[j * 64 + 1], Result[i], 64);
+    Inc(i, 64);
+    Result[i] := #$d; Inc(i);
+    Result[i] := #$a; Inc(i);
+  end;
+  if Remainder > 0 then
+  begin
+    Move(Base64[Returns * 64 + 1], Result[i], Remainder);
+    Inc(i, Remainder);
+    Result[i] := #$d; Inc(i);
+    Result[i] := #$a; Inc(i);
+  end;
+  Move(Footer[1], Result[i], Length(Footer));
+end;
+
+class function TURSA.Base64ToASN1(
+  const Base64: String;
+  const Header, Footer: String
+): TUInt8Array;
+  var Str: String;
+  var KeyStart, KeyEnd: Int32;
+begin
+  KeyStart := Base64.IndexOf(Header);
+  if KeyStart = -1 then Exit(nil);
+  KeyStart += Length(Header);
+  KeyEnd := Base64.IndexOf(Footer);
+  if KeyEnd < -1 then Exit(nil);
+  if KeyStart > KeyEnd then Exit(nil);
+  Str := Base64.Substring(KeyStart, KeyEnd - KeyStart);
+  Str := Str.Replace(#$d#$a, '', [rfReplaceAll]);
+  Result := UBase64ToBytes(Str);
 end;
 
 class function TURSA.MakePrime(const BitCount: Int32): TUInt4096;
@@ -901,6 +1271,281 @@ begin
   Result := PowMod(Cipher, Key.d, Key.n);
 end;
 
+class function TURSA.ExportKeyPrivate_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array;
+begin
+  Result := EncodeTLV($30,
+    specialize UArrConcat<TUInt8Array>([
+      EncodeTLV($02, PackDER(TUInt4096.Zero)),//version
+      EncodeTLV($02, PackDER(Key.n)),
+      EncodeTLV($02, PackDER(Key.e)),
+      EncodeTLV($02, PackDER(Key.d)),
+      EncodeTLV($02, PackDER(Key.p)),
+      EncodeTLV($02, PackDER(Key.q)),
+      EncodeTLV($02, PackDER(Key.exp1)),
+      EncodeTLV($02, PackDER(Key.exp2)),
+      EncodeTLV($02, PackDER(Key.c))
+    ])
+  );
+end;
+
+class function TURSA.ExportKeyPublic_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array;
+begin
+  Result := EncodeTLV($30,
+    specialize UArrConcat<TUInt8Array>([
+      EncodeTLV($02, PackDER(Key.n)),
+      EncodeTLV($02, PackDER(Key.e))
+    ])
+  );
+end;
+
+class function TURSA.ImportKeyPrivate_PKCS1_DER(const Key: TUInt8Array): TURSA.TKey;
+  var Index, i: Int32;
+  var Tag: UInt8;
+  var SequenceContent, IntValue: TUInt8Array;
+  var Components: array [0..7] of TUInt4096 absolute Result;
+begin
+  Index := 0;
+  SequenceContent := DecodeTLV(Key, Index, Tag);
+  if Tag <> $30 then Exit;
+  Index := 0;
+  i := 0;
+  while (Index < Length(SequenceContent))
+  and (i <= Length(Components)) do
+  try
+    IntValue := DecodeTLV(SequenceContent, Index, Tag);
+    if Tag <> $02 then Exit;
+    if i = 0 then Continue;
+    Components[i - 1] := UnpackDER(IntValue);
+  finally
+    Inc(i);
+  end;
+end;
+
+class function TURSA.ImportKeyPublic_PKCS1_DER(const Key: TUInt8Array): TURSA.TKey;
+  var Index, i: Int32;
+  var Tag: UInt8;
+  var SequenceContent, IntValue: TUInt8Array;
+  var Components: array [0..1] of TUInt4096 absolute Result;
+begin
+  Index := 0;
+  SequenceContent := DecodeTLV(Key, Index, Tag);
+  if Tag <> $30 then Exit;
+  Index := 0;
+  i := 0;
+  while (Index < Length(SequenceContent))
+  and (i < Length(Components)) do
+  try
+    IntValue := DecodeTLV(SequenceContent, Index, Tag);
+    if Tag <> $02 then Exit;
+    Components[i] := UnpackDER(IntValue);
+  finally
+    Inc(i);
+  end;
+end;
+
+class function TURSA.ExportKeyPrivate_PKCS1(const Key: TURSA.TKey): String;
+  const Header: String = '-----BEGIN RSA PRIVATE KEY-----';
+  const Footer: String = '-----END RSA PRIVATE KEY-----';
+begin
+  Result := ASN1ToBase64(ExportKeyPrivate_PKCS1_DER(Key), Header, Footer);
+end;
+
+class function TURSA.ExportKeyPublic_PKCS1(const Key: TURSA.TKey): String;
+  const Header: String = '-----BEGIN RSA PUBLIC KEY-----';
+  const Footer: String = '-----END RSA PUBLIC KEY-----';
+begin
+  Result := ASN1ToBase64(ExportKeyPublic_PKCS1_DER(Key), Header, Footer);
+end;
+
+class function TURSA.ExportKeyPrivate_PKCS8(const Key: TURSA.TKey): String;
+  var version_bytes, pkcs1_der, octet_string_sequence: TUInt8Array;
+  var oid_sequence, null_sequence, algid_content, algid_sequence, SequenceContent: TUInt8Array;
+  const Header: String = '-----BEGIN PRIVATE KEY-----';
+  const Footer: String = '-----END PRIVATE KEY-----';
+begin
+  pkcs1_der := ExportKeyPrivate_PKCS1_DER(Key);
+  octet_string_sequence := EncodeTLV($04, pkcs1_der);
+  oid_sequence := EncodeTLV($06, RSA_OID);
+  null_sequence := EncodeTLV($05, []);
+  algid_content := specialize UArrConcat<TUInt8Array>([oid_sequence, null_sequence]);
+  algid_sequence := EncodeTLV($30, algid_content);
+  version_bytes := EncodeTLV($02, [0]);
+  SequenceContent := EncodeTLV($30,
+    specialize UArrConcat<TUInt8Array>([
+      version_bytes,
+      algid_sequence,
+      octet_string_sequence
+    ])
+  );
+  Result := ASN1ToBase64(SequenceContent, Header, Footer);
+end;
+
+class function TURSA.ExportKeyPublic_X509(const Key: TURSA.TKey): String;
+  var KeyContent: TUInt8Array;
+  var BitStringWrapper: TUInt8Array;
+  var AlgIdContent: TUInt8Array;
+  var SequenceContent: TUInt8Array;
+  const Header: String = '-----BEGIN PUBLIC KEY-----';
+  const Footer: String = '-----END PUBLIC KEY-----';
+begin
+  KeyContent := specialize UArrConcat<TUInt8Array>([
+    EncodeTLV($02, PackDER(Key.n)),
+    EncodeTLV($02, PackDER(Key.e))
+  ]);
+  BitStringWrapper := specialize UArrConcat<TUInt8Array>([
+    [$00],
+    EncodeTLV($30, KeyContent)
+  ]);
+  AlgIdContent := specialize UArrConcat<TUInt8Array>([
+    EncodeTLV($06, RSA_OID),
+    EncodeTLV($05, [])
+  ]);
+  SequenceContent := EncodeTLV(
+    $30,
+    specialize UArrConcat<TUInt8Array>([
+      EncodeTLV($30, AlgIdContent),
+      EncodeTLV($03, BitStringWrapper)
+    ])
+  );
+  Result := ASN1ToBase64(SequenceContent, Header, Footer);
+end;
+
+class function TURSA.ImportKeyPrivate_PKCS1(const Key: String): TURSA.TKey;
+  const Header = '-----BEGIN RSA PRIVATE KEY-----';
+  const Footer = '-----END RSA PRIVATE KEY-----';
+  var DERData: TUInt8Array;
+begin
+  Result := TKey.MakeInvalid;
+  DERData := Base64ToASN1(Key, Header, Footer);
+  if Length(DERData) = 0 then Exit;
+  Result := ImportKeyPrivate_PKCS1_DER(DERData);
+end;
+
+class function TURSA.ImportKeyPublic_PKCS1(const Key: String): TURSA.TKey;
+  const Header = '-----BEGIN RSA PUBLIC KEY-----';
+  const Footer = '-----END RSA PUBLIC KEY-----';
+  var DERData: TUInt8Array;
+begin
+  Result := TKey.MakeInvalid;
+  DERData := Base64ToASN1(Key, Header, Footer);
+  if Length(DERData) = 0 then Exit;
+  Result := ImportKeyPublic_PKCS1_DER(DERData);
+end;
+
+class function TURSA.ImportKey_PKCS1(const Key: String): TURSA.TKey;
+  type TKeyType = record
+    Header: String;
+    Footer: String;
+    Components: array of Int32;
+  end;
+  const KeyTypes: array of TKeyType = (
+    (
+      Header: '-----BEGIN RSA PRIVATE KEY-----';
+      Footer: '-----END RSA PRIVATE KEY-----';
+      Components: (-1, 0, 1, 2, 3, 4, 5, 6, 7)
+    ),
+    (
+      Header: '-----BEGIN RSA PUBLIC KEY-----';
+      Footer: '-----END RSA PUBLIC KEY-----';
+      Components: (0, 1)
+    )
+  );
+  var Index, i, k: Integer;
+  var Tag: Byte;
+  var SequenceContent, IntegerValue: TUInt8Array;
+  var Components: array [0..7] of TUInt4096 absolute Result;
+  var DataDER: TUInt8Array;
+begin
+  Result := TKey.MakeInvalid;
+  k := -1;
+  for i := 0 to High(KeyTypes) do
+  begin
+    DataDER := Base64ToASN1(Key, KeyTypes[i].Header, KeyTypes[i].Footer);
+    if Length(DataDER) = 0 then Continue;
+    k := i;
+    Break;
+  end;
+  if k = -1 then Exit;
+  Index := 0;
+  SequenceContent := DecodeTLV(DataDER, Index, Tag);
+  if Tag <> $30 then Exit;
+  Index := 0;
+  i := 0;
+  while (Index < Length(SequenceContent))
+  and (i < Length(KeyTypes[k].Components)) do
+  try
+    IntegerValue := DecodeTLV(SequenceContent, Index, Tag);
+    if Tag <> $02 then Exit;
+    if KeyTypes[k].Components[i] = -1 then Continue;
+    Components[KeyTypes[k].Components[i]] := UnpackDER(IntegerValue);
+  finally
+    Inc(i);
+  end;
+end;
+
+class function TURSA.ImportKeyPrivate_PKCS8(const Key: String): TURSA.TKey;
+  var Index, i: Int32;
+  var Tag: UInt8;
+  var DERData, MainContent, VersionContent, AlgIdContent, AlgId, PKCS1_Content: TUInt8Array;
+  const Header = '-----BEGIN PRIVATE KEY-----';
+  const Footer = '-----END PRIVATE KEY-----';
+begin
+  Result := TKey.MakeInvalid;
+  DERData := Base64ToASN1(Key, Header, Footer);
+  Index := 0;
+  MainContent := DecodeTLV(DERData, Index, Tag);
+  if Tag <> $30 then Exit;
+  Index := 0;
+  VersionContent := DecodeTLV(MainContent, Index, Tag);
+  if Tag <> $02 then Exit;
+  if not UnpackDER(VersionContent).IsZero then Exit;
+  AlgIdContent := DecodeTLV(MainContent, Index, Tag);
+  if Tag <> $30 then Exit;
+  i := 0;
+  AlgId := DecodeTLV(AlgIdContent, i, Tag);
+  if (Tag <> $06) or (Length(AlgId) <> Length(RSA_OID)) then Exit;
+  for i := 0 to High(RSA_OID) do if AlgId[i] <> RSA_OID[i] then Exit;
+  PKCS1_Content := DecodeTLV(MainContent, Index, Tag);
+  if Tag <> $04 then Exit;
+  Result := ImportKeyPrivate_PKCS1_DER(PKCS1_Content);
+end;
+
+class function TURSA.ImportKeyPublic_X509(const Key: String): TURSA.TKey;
+  var Index, i: Int32;
+  var Tag: UInt8;
+  var DERData: TUInt8Array;
+  var MainContent, AlgIdContent, AlgId, BitStringContent, PKCS1_Content: TUInt8Array;
+  var n_bytes, e_bytes: TUInt8Array;
+  const Header: String = '-----BEGIN PUBLIC KEY-----';
+  const Footer: String = '-----END PUBLIC KEY-----';
+begin
+  Result := TKey.MakeInvalid;
+  Index := 0;
+  DERData := Base64ToASN1(Key, Header, Footer);
+  MainContent := DecodeTLV(DERData, Index, Tag);
+  if Tag <> $30 then Exit;
+  Index := 0;
+  AlgIdContent := DecodeTLV(MainContent, Index, Tag);
+  if Tag <> $30 then Exit;
+  i := 0;
+  AlgId := DecodeTLV(AlgIdContent, i, Tag);
+  if (Tag <> $06) or (Length(AlgId) <> Length(RSA_OID)) then Exit;
+  for i := 0 to High(RSA_OID) do if AlgId[i] <> RSA_OID[i] then Exit;
+  BitStringContent := DecodeTLV(MainContent, Index, Tag);
+  if Tag <> $03 then Exit;
+  if (Length(BitStringContent) = 0) or (BitStringContent[0] <> 0) then Exit;
+  Index := 1;
+  PKCS1_Content := DecodeTLV(BitStringContent, Index, Tag);
+  if Tag <> $30 then Exit;
+  Index := 0;
+  n_bytes := DecodeTLV(PKCS1_Content, Index, Tag);
+  if Tag <> $02 then Exit;
+  e_bytes := DecodeTLV(PKCS1_Content, Index, Tag);
+  if Tag <> $02 then Exit;
+  Result.n := UnpackDER(n_bytes);
+  Result.e := UnpackDER(e_bytes);
+end;
+
 procedure TUMontgomeryReduction.Init(const Modulus: TUInt4096);
   var inv: UInt32;
   var i: Int32;
@@ -1221,221 +1866,6 @@ begin
   Move(T[0], Result[0], MaskLen);
 end;
 
-function UExportRSAKey(const Key: TURSA.TKey): String;
-  function PackDER(const Number: TUInt4096): TUInt8Array;
-    const ByteCount = (TUInt4096Impl.MaxItem + 1) * 4;
-    var AsBytes: array[0..ByteCount - 1] of UInt8 absolute Number;
-    var i, j, TopByte: Int32;
-  begin
-    Result := nil;
-    TopByte := 0;
-    for i := High(AsBytes) downto 0 do
-    if AsBytes[i] > 0 then
-    begin
-      TopByte := i;
-      Break;
-    end;
-    j := Int32(AsBytes[TopByte] and $80 > 0);
-    SetLength(Result, TopByte + j + 1);
-    if j = 1 then Result[0] := 0;
-    for i := 0 to TopByte do
-    begin
-      Result[TopByte + j - i] := AsBytes[i];
-    end;
-  end;
-  function EncodeTLV(const Tag: UInt8; const Value: TUInt8Array): TUInt8Array;
-    var len, tempLen, numLenBytes, i: Int32;
-    var lenBytes: TUInt8Array;
-  begin
-    len := Length(Value);
-    if len < 128 then
-    begin
-      SetLength(lenBytes, 1);
-      lenBytes[0] := Byte(len);
-    end
-    else
-    begin
-      tempLen := len;
-      numLenBytes := 0;
-      while tempLen > 0 do
-      begin
-        Inc(numLenBytes);
-        tempLen := tempLen shr 8;
-      end;
-      SetLength(lenBytes, 1 + numLenBytes);
-      lenBytes[0] := $80 or Byte(numLenBytes);
-      tempLen := len;
-      for i := numLenBytes downto 1 do
-      begin
-        lenBytes[i] := Byte(tempLen and $FF);
-        tempLen := tempLen shr 8;
-      end;
-    end;
-    Result := specialize UArrConcat<TUInt8Array>([[Tag], lenBytes, Value]);
-  end;
-  var ver, n, e, d, p, q, exp1, exp2, coeff: TUInt8Array;
-  var AllIntegers, SequenceContent: TUInt8Array;
-  var i, j, Returns, ReturnsTotal, Remainder: Int32;
-  var Base64: String;
-  const Header: String = '-----BEGIN RSA PRIVATE KEY-----';
-  const Footer: String = '-----END RSA PRIVATE KEY-----';
-begin
-  ver := PackDER(TUInt4096.Zero);
-  n := PackDER(Key.n);
-  e := PackDER(Key.e);
-  d := PackDER(Key.d);
-  p := PackDER(Key.p);
-  q := PackDER(Key.q);
-  exp1 := PackDER(Key.exp1);
-  exp2 := PackDER(Key.exp2);
-  coeff := PackDER(Key.c);
-  AllIntegers := specialize UArrConcat<TUInt8Array>([
-    EncodeTLV($02, ver),
-    EncodeTLV($02, n),
-    EncodeTLV($02, e),
-    EncodeTLV($02, d),
-    EncodeTLV($02, p),
-    EncodeTLV($02, q),
-    EncodeTLV($02, exp1),
-    EncodeTLV($02, exp2),
-    EncodeTLV($02, coeff)
-  ]);
-  SequenceContent := EncodeTLV($30, AllIntegers);
-  Base64 := UBytesToBase64(SequenceContent);
-  Returns := Length(Base64) div 64;
-  ReturnsTotal := Returns + 1;
-  Remainder := Length(Base64) mod 64;
-  if Remainder > 0 then Inc(ReturnsTotal);
-  Result := '';
-  SetLength(Result,
-    Length(Header) + Length(Footer) + Length(Base64) + 2 * ReturnsTotal
-  );
-  i := 1;
-  Move(Header[1], Result[i], Length(Header)); Inc(i, Length(Header));
-  Result[i] := #$d; Inc(i);
-  Result[i] := #$a; Inc(i);
-  for j := 0 to Returns - 1 do
-  begin
-    Move(Base64[j * 64 + 1], Result[i], 64);
-    Inc(i, 64);
-    Result[i] := #$d; Inc(i);
-    Result[i] := #$a; Inc(i);
-  end;
-  if Remainder > 0 then
-  begin
-    Move(Base64[Returns * 64 + 1], Result[i], Remainder);
-    Inc(i, Remainder);
-    Result[i] := #$d; Inc(i);
-    Result[i] := #$a; Inc(i);
-  end;
-  Move(Footer[1], Result[i], Length(Footer));
-end;
-
-function UImportRSAKey(const Key: String): TURSA.TKey;
-  function UnpackDER(const Bytes: TUInt8Array): TUInt4096;
-    const ByteCount = (TUInt4096Impl.MaxItem + 1) * 4;
-    var AsBytes: array[0..ByteCount - 1] of UInt8 absolute Result;
-    var i, StartIndex, CopyCount: Int32;
-  begin
-    Result := TUInt4096.Zero;
-    if Length(Bytes) = 0 then Exit;
-    StartIndex := Int32(Bytes[0] = 0);
-    CopyCount := UMin(Length(Bytes) - StartIndex, ByteCount);
-    for i := 0 to CopyCount - 1 do
-    begin
-      AsBytes[i] := Bytes[High(Bytes) - i];
-    end;
-  end;
-  procedure DecodeTLV(const Data: TUInt8Array; var Index: Integer; out Tag: Byte; out Value: TUInt8Array);
-    var len, numLenBytes, i: Integer;
-  begin
-    //if Index >= Length(Data) then
-    //  raise EArgumentException.Create('ASN.1 Parse Error: Unexpected end of data.');
-
-    // 1. Read the Tag
-    Tag := Data[Index];
-    Inc(Index);
-
-    // 2. Read the Length
-    len := Data[Index];
-    Inc(Index);
-    if (len and $80) <> 0 then // Long form
-    begin
-      numLenBytes := len and $7F;
-      if (Index + numLenBytes) > Length(Data) then
-        raise EArgumentException.Create('ASN.1 Parse Error: Invalid length field.');
-
-      len := 0;
-      for i := 1 to numLenBytes do
-      begin
-        len := (len shl 8) or Data[Index];
-        Inc(Index);
-      end;
-    end;
-
-    // 3. Read the Value
-    if (Index + len) > Length(Data) then
-      raise EArgumentException.Create('ASN.1 Parse Error: Value length exceeds data length.');
-
-    SetLength(Value, len);
-    if len > 0 then
-      System.Move(Data[Index], Value[0], len);
-    Inc(Index, len);
-  end;
-  var Str: String;
-  var KeyStart, KeyEnd, Index, i: Integer;
-  var Tag: Byte;
-  var SequenceContent, IntegerValue: TUInt8Array;
-  var Components: array of TUInt4096;
-  const Header: String = '-----BEGIN RSA PRIVATE KEY-----';
-  const Footer: String = '-----END RSA PRIVATE KEY-----';
-begin
-  Result := TURSA.TKey.MakeInvalid;
-  KeyStart := Key.IndexOf(Header);
-  if KeyStart = -1 then Exit;
-  KeyStart += Length(Header);
-  KeyEnd := Key.IndexOf(Footer);
-  if KeyEnd < -1 then Exit;
-  if KeyStart > KeyEnd then Exit;
-  Str := Key.Substring(KeyStart, KeyEnd - KeyStart);
-  Str := Str.Replace(#$d#$a, '', [rfReplaceAll]);
-
-  {
-  Index := 0;
-  // 1. Decode the outer SEQUENCE
-  DecodeTLV(DERData, Index, Tag, SequenceContent);
-  if Tag <> $30 then
-    raise EArgumentException.Create('Invalid DER format: Expected a SEQUENCE.');
-
-  // 2. Decode all the INTEGERs inside the sequence
-  Index := 0;
-  SetLength(Components, 9); // We expect 9 integers for a PKCS#1 key
-  i := 0;
-  while (Index < Length(SequenceContent)) and (i < 9) do
-  begin
-    DecodeTLV(SequenceContent, Index, Tag, IntegerValue);
-    if Tag <> $02 then
-      raise EArgumentException.Create('Invalid DER format: Expected an INTEGER.');
-    Components[i] := UnpackDER(IntegerValue);
-    Inc(i);
-  end;
-
-  if i <> 9 then
-    raise EArgumentException.Create('Invalid DER format: Incorrect number of components in key.');
-
-  // 3. Assign the components to the TKey record
-  // Order is: version, n, e, d, p, q, exp1, exp2, c
-  Result.n    := Components[1];
-  Result.e    := Components[2];
-  Result.d    := Components[3];
-  Result.p    := Components[4];
-  Result.q    := Components[5];
-  Result.exp1 := Components[6];
-  Result.exp2 := Components[7];
-  Result.c    := Components[8];
-  }
-end;
-
 function UMakeRSAKey(const BitCount: UInt32; const Threads: Int32): TURSA.TKey;
 begin
   Result := TURSA.MakeKey(BitCount, Threads);
@@ -1550,6 +1980,80 @@ begin
     end;
   end;
   X := Z;
+end;
+
+class function TUAES.KeyExpansion(const Key: TKey128): TExpandedKey;
+  type TWord = array[0..3] of UInt8;
+  var w: array[0..43] of TWord;
+  var Temp: TWord;
+  var i, j, k: Int32;
+  var t_byte: UInt8;
+begin
+  for i := 0 to 3 do
+  for j := 0 to 3 do
+  begin
+    w[i][j] := Key[i * 4 + j];
+  end;
+  i := 4;
+  while i < 44 do
+  begin
+    Temp := w[i - 1];
+    if (i mod 4) = 0 then
+    begin
+      t_byte := Temp[0];
+      Temp[0] := Temp[1]; Temp[1] := Temp[2]; Temp[2] := Temp[3]; Temp[3] := t_byte;
+      for j := 0 to 3 do Temp[j] := SBox[Temp[j]];
+      Temp[0] := Temp[0] xor Rcon[i div 4];
+    end;
+    for j := 0 to 3 do
+    begin
+      w[i][j] := w[i - 4][j] xor Temp[j];
+    end;
+    Inc(i);
+  end;
+  for i := 0 to 10 do
+  for j := 0 to 3 do
+  for k := 0 to 3 do
+  begin
+    Result[i][k, j] := w[i * 4 + j][k];
+  end;
+end;
+
+class function TUAES.KeyExpansion(const Key: TKey192): TExpandedKey;
+  type TWord = array[0..3] of UInt8;
+  var w: array[0..51] of TWord;
+  var Temp: TWord;
+  var i, j, k: Int32;
+  var t_byte: UInt8;
+begin
+  for i := 0 to 5 do
+  for j := 0 to 3 do
+  begin
+    w[i][j] := Key[i * 4 + j];
+  end;
+  i := 6;
+  while i < 52 do
+  begin
+    Temp := w[i - 1];
+    if (i mod 6) = 0 then
+    begin
+      t_byte := Temp[0];
+      Temp[0] := Temp[1]; Temp[1] := Temp[2]; Temp[2] := Temp[3]; Temp[3] := t_byte;
+      for j := 0 to 3 do Temp[j] := SBox[Temp[j]];
+      Temp[0] := Temp[0] xor Rcon[i div 6];
+    end;
+    for j := 0 to 3 do
+    begin
+      w[i][j] := w[i - 6][j] xor Temp[j];
+    end;
+    Inc(i);
+  end;
+  for i := 0 to 12 do
+  for j := 0 to 3 do
+  for k := 0 to 3 do
+  begin
+    Result[i][k, j] := w[i * 4 + j][k];
+  end;
 end;
 
 class function TUAES.KeyExpansion(const Key: TKey256): TExpandedKey;
@@ -1695,12 +2199,13 @@ end;
 
 class procedure TUAES.CipherBlock(
   var State: TBlock;
-  const ExpandedKey: TExpandedKey
+  const ExpandedKey: TExpandedKey;
+  const NumRounds: Int32
 );
   var Round: Int32;
 begin
   AddRoundKey(State, ExpandedKey[0]);
-  for Round := 1 to 13 do
+  for Round := 1 to NumRounds - 1 do
   begin
     SubBytes(State);
     ShiftRows(State);
@@ -1709,7 +2214,7 @@ begin
   end;
   SubBytes(State);
   ShiftRows(State);
-  AddRoundKey(State, ExpandedKey[14]);
+  AddRoundKey(State, ExpandedKey[NumRounds]);
 end;
 
 class procedure TUAES.InvSubBytes(var State: TBlock);
@@ -1746,12 +2251,13 @@ end;
 
 class procedure TUAES.InvCipherBlock(
   var State: TBlock;
-  const ExpandedKey: TExpandedKey
+  const ExpandedKey: TExpandedKey;
+  const NumRounds: Int32
 );
   var Round: Int32;
 begin
-  AddRoundKey(State, ExpandedKey[14]);
-  for Round := 13 downto 1 do
+  AddRoundKey(State, ExpandedKey[NumRounds]);
+  for Round := NumRounds - 1 downto 1 do
   begin
     InvShiftRows(State);
     InvSubBytes(State);
@@ -1763,16 +2269,15 @@ begin
   AddRoundKey(State, ExpandedKey[0]);
 end;
 
-class function TUAES.Encrypt_AES_PKCS7_ECB_256(
+class function TUAES.Encrypt_AES_PKCS7_ECB(
   const Data: TUInt8Array;
-  const Key: TKey256
+  const ExpandedKey: TExpandedKey;
+  const NumRounds: Int32
 ): TUInt8Array;
-  var ExpandedKey: TExpandedKey;
   var PaddedData: TUInt8Array;
   var State: TBlock;
   var i, r, c: Int32;
 begin
-  ExpandedKey := KeyExpansion(Key);
   PaddedData := PadData_PKCS7(Data, 16);
   Result := nil;
   SetLength(Result, Length(PaddedData));
@@ -1783,7 +2288,7 @@ begin
     begin
       State[r, c] := PaddedData[i * 16 + r + 4 * c];
     end;
-    CipherBlock(State, ExpandedKey);
+    CipherBlock(State, ExpandedKey, NumRounds);
     for r := 0 to 3 do
     for c := 0 to 3 do
     begin
@@ -1792,16 +2297,45 @@ begin
   end;
 end;
 
-class function TUAES.Decrypt_AES_PKCS7_ECB_256(
-  const Cipher: TUInt8Array;
+class function TUAES.Encrypt_AES_PKCS7_ECB_128(
+  const Data: TUInt8Array;
+  const Key: TKey128
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Encrypt_AES_PKCS7_ECB(Data, ExpandedKey, 10);
+end;
+
+class function TUAES.Encrypt_AES_PKCS7_ECB_192(
+  const Data: TUInt8Array;
+  const Key: TKey192
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Encrypt_AES_PKCS7_ECB(Data, ExpandedKey, 12);
+end;
+
+class function TUAES.Encrypt_AES_PKCS7_ECB_256(
+  const Data: TUInt8Array;
   const Key: TKey256
 ): TUInt8Array;
   var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Encrypt_AES_PKCS7_ECB(Data, ExpandedKey, 14);
+end;
+
+class function TUAES.Decrypt_AES_PKCS7_ECB(
+  const Cipher: TUInt8Array;
+  const ExpandedKey: TExpandedKey;
+  const NumRounds: Int32
+): TUInt8Array;
   var State: TBlock;
   var DataPadded: TUInt8Array;
   var i, r, c: Int32;
 begin
-  ExpandedKey := KeyExpansion(Key);
   DataPadded := nil;
   SetLength(DataPadded, Length(Cipher));
   for i := 0 to (Length(Cipher) div 16) - 1 do
@@ -1811,7 +2345,7 @@ begin
     begin
       State[r, c] := Cipher[i * 16 + r + 4 * c];
     end;
-    InvCipherBlock(State, ExpandedKey);
+    InvCipherBlock(State, ExpandedKey, NumRounds);
     for r := 0 to 3 do
     for c := 0 to 3 do
     begin
@@ -1821,18 +2355,47 @@ begin
   Result := UnpadData_PKCS7(DataPadded);
 end;
 
-class function TUAES.Encrypt_AES_PKCS7_CBC_256(
-  const Data: TUInt8Array;
-  const Key: TKey256;
-  const IV: TInitVector
+class function TUAES.Decrypt_AES_PKCS7_ECB_128(
+  const Cipher: TUInt8Array;
+  const Key: TKey128
 ): TUInt8Array;
   var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Decrypt_AES_PKCS7_ECB(Cipher, ExpandedKey, 10);
+end;
+
+class function TUAES.Decrypt_AES_PKCS7_ECB_192(
+  const Cipher: TUInt8Array;
+  const Key: TKey192
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Decrypt_AES_PKCS7_ECB(Cipher, ExpandedKey, 12);
+end;
+
+class function TUAES.Decrypt_AES_PKCS7_ECB_256(
+  const Cipher: TUInt8Array;
+  const Key: TKey256
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Decrypt_AES_PKCS7_ECB(Cipher, ExpandedKey, 14);
+end;
+
+class function TUAES.Encrypt_AES_PKCS7_CBC(
+  const Data: TUInt8Array;
+  const ExpandedKey: TExpandedKey;
+  const IV: TInitVector;
+  const NumRounds: Int32
+): TUInt8Array;
   var PaddedData: TUInt8Array;
   var PrevCipherBlock: TInitVector;
   var State: TBlock;
   var i, j, r: Int32;
 begin
-  ExpandedKey := KeyExpansion(Key);
   PaddedData := PadData_PKCS7(Data, 16);
   Result := nil;
   SetLength(Result, Length(PaddedData));
@@ -1843,7 +2406,7 @@ begin
     begin
       State[j mod 4, j div 4] := PaddedData[i * 16 + j] xor PrevCipherBlock[j];
     end;
-    CipherBlock(State, ExpandedKey);
+    CipherBlock(State, ExpandedKey, NumRounds);
     for j := 0 to 15 do
     begin
       r := i * 16 + j;
@@ -1853,18 +2416,50 @@ begin
   end;
 end;
 
-class function TUAES.Decrypt_AES_PKCS7_CBC_256(
-  const Cipher: TUInt8Array;
+class function TUAES.Encrypt_AES_PKCS7_CBC_128(
+  const Data: TUInt8Array;
+  const Key: TKey128;
+  const IV: TInitVector
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Encrypt_AES_PKCS7_CBC(Data, ExpandedKey, IV, 10);
+end;
+
+class function TUAES.Encrypt_AES_PKCS7_CBC_192(
+  const Data: TUInt8Array;
+  const Key: TKey192;
+  const IV: TInitVector
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Encrypt_AES_PKCS7_CBC(Data, ExpandedKey, IV, 12);
+end;
+
+class function TUAES.Encrypt_AES_PKCS7_CBC_256(
+  const Data: TUInt8Array;
   const Key: TKey256;
   const IV: TInitVector
 ): TUInt8Array;
   var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Encrypt_AES_PKCS7_CBC(Data, ExpandedKey, IV, 14);
+end;
+
+class function TUAES.Decrypt_AES_PKCS7_CBC(
+  const Cipher: TUInt8Array;
+  const ExpandedKey: TExpandedKey;
+  const IV: TInitVector;
+  const NumRounds: Int32
+): TUInt8Array;
   var State: TBlock;
   var DataPadded: TUInt8Array;
   var PrevCipherBlock, CurCipherBlock: TInitVector;
   var i, j: Int32;
 begin
-  ExpandedKey := KeyExpansion(Key);
   DataPadded := nil;
   SetLength(DataPadded, Length(Cipher));
   PrevCipherBlock := IV;
@@ -1875,7 +2470,7 @@ begin
       CurCipherBlock[j] := Cipher[i * 16 + j];
       State[j mod 4, j div 4] := CurCipherBlock[j];
     end;
-    InvCipherBlock(State, ExpandedKey);
+    InvCipherBlock(State, ExpandedKey, NumRounds);
     for j := 0 to 15 do
     begin
       DataPadded[i * 16 + j] := State[j mod 4, j div 4] xor PrevCipherBlock[j];
@@ -1885,17 +2480,49 @@ begin
   Result := UnpadData_PKCS7(DataPadded);
 end;
 
-class function TUAES.Process_AES_CTR_256(
-  const Input: TUInt8Array;
+class function TUAES.Decrypt_AES_PKCS7_CBC_128(
+  const Cipher: TUInt8Array;
+  const Key: TKey128;
+  const IV: TInitVector
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Decrypt_AES_PKCS7_CBC(Cipher, ExpandedKey, IV, 10);
+end;
+
+class function TUAES.Decrypt_AES_PKCS7_CBC_192(
+  const Cipher: TUInt8Array;
+  const Key: TKey192;
+  const IV: TInitVector
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Decrypt_AES_PKCS7_CBC(Cipher, ExpandedKey, IV, 12);
+end;
+
+class function TUAES.Decrypt_AES_PKCS7_CBC_256(
+  const Cipher: TUInt8Array;
   const Key: TKey256;
   const IV: TInitVector
 ): TUInt8Array;
   var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Decrypt_AES_PKCS7_CBC(Cipher, ExpandedKey, IV, 14);
+end;
+
+class function TUAES.Process_AES_CTR(
+  const Input: TUInt8Array;
+  const ExpandedKey: TExpandedKey;
+  const IV: TInitVector;
+  const NumRounds: Int32
+): TUInt8Array;
   var State: TBlock;
   var CounterBlock, KeystreamBlock: TInitVector;
   var i, j: Int32;
 begin
-  ExpandedKey := KeyExpansion(Key);
   Result := nil;
   SetLength(Result, Length(Input));
   CounterBlock := IV;
@@ -1907,7 +2534,7 @@ begin
       begin
         State[j mod 4, j div 4] := CounterBlock[j];
       end;
-      CipherBlock(State, ExpandedKey);
+      CipherBlock(State, ExpandedKey, NumRounds);
       for j := 0 to 15 do
       begin
         KeystreamBlock[j] := State[j mod 4, j div 4];
@@ -1922,12 +2549,46 @@ begin
   end;
 end;
 
-class function TUAES.Process_AES_GCM_256(
+class function TUAES.Process_AES_CTR_128(
+  const Input: TUInt8Array;
+  const Key: TKey128;
+  const IV: TInitVector
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Process_AES_CTR(Input, ExpandedKey, IV, 10);
+end;
+
+class function TUAES.Process_AES_CTR_192(
+  const Input: TUInt8Array;
+  const Key: TKey192;
+  const IV: TInitVector
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Process_AES_CTR(Input, ExpandedKey, IV, 12);
+end;
+
+class function TUAES.Process_AES_CTR_256(
   const Input: TUInt8Array;
   const Key: TKey256;
+  const IV: TInitVector
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Process_AES_CTR(Input, ExpandedKey, IV, 14);
+end;
+
+class function TUAES.Process_AES_GCM(
+  const Input: TUInt8Array;
+  const ExpandedKey: TExpandedKey;
   const Nonce: TInitVector;
   const AAD: TUInt8Array;
   const IsEncrypting: Boolean;
+  const NumRounds: Int32;
   out AuthTag: TTag
 ): TUInt8Array;
   procedure IncrementCounterBlock(var Block: TInitVector);
@@ -1939,7 +2600,6 @@ class function TUAES.Process_AES_GCM_256(
       if Block[i] <> 0 then Break;
     end;
   end;
-  var ExpandedKey: TExpandedKey;
   var H, J0, S, Counter, Keystream, LastBlock: TInitVector;
   var State: TBlock;
   var i, j, BlockCount: Int32;
@@ -1948,13 +2608,12 @@ class function TUAES.Process_AES_GCM_256(
   var LenAAD: UInt64;
   var LenC: UInt64;
 begin
-  ExpandedKey := KeyExpansion(Key);
   for i := 0 to 3 do
   for j := 0 to 3 do
   begin
     State[i, j] := 0;
   end;
-  CipherBlock(State, ExpandedKey);
+  CipherBlock(State, ExpandedKey, NumRounds);
   for i := 0 to 15 do
   begin
     H[i] := State[i mod 4, i div 4];
@@ -1978,7 +2637,7 @@ begin
     LastBlock := InitVectorZero;
     for j := 0 to (Length(AAD) mod 16) - 1 do
     begin
-      LastBlock[j] := AAD[BlockCount*16 + j];
+      LastBlock[j] := AAD[BlockCount * 16 + j];
     end;
     for j := 0 to 15 do
     begin
@@ -1996,7 +2655,7 @@ begin
       begin
         State[j mod 4, j div 4] := Counter[j];
       end;
-      CipherBlock(State, ExpandedKey);
+      CipherBlock(State, ExpandedKey, NumRounds);
       for j := 0 to 15 do
       begin
         Keystream[j] := State[j mod 4, j div 4];
@@ -2047,11 +2706,91 @@ begin
   begin
     State[j mod 4, j div 4] := J0[j];
   end;
-  CipherBlock(State, ExpandedKey);
+  CipherBlock(State, ExpandedKey, NumRounds);
   for j := 0 to 15 do
   begin
     AuthTag[j] := State[j mod 4, j div 4] xor S[j];
   end;
+end;
+
+class function TUAES.Process_AES_GCM_128(
+  const Input: TUInt8Array;
+  const Key: TKey128;
+  const Nonce: TInitVector;
+  const AAD: TUInt8Array;
+  const IsEncrypting: Boolean;
+  out AuthTag: TTag
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Process_AES_GCM(
+    Input, ExpandedKey, Nonce, AAD, IsEncrypting, 10, AuthTag
+  );
+end;
+
+class function TUAES.Process_AES_GCM_192(
+  const Input: TUInt8Array;
+  const Key: TKey192;
+  const Nonce: TInitVector;
+  const AAD: TUInt8Array;
+  const IsEncrypting: Boolean;
+  out AuthTag: TTag
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Process_AES_GCM(
+    Input, ExpandedKey, Nonce, AAD, IsEncrypting, 12, AuthTag
+  );
+end;
+
+class function TUAES.Process_AES_GCM_256(
+  const Input: TUInt8Array;
+  const Key: TKey256;
+  const Nonce: TInitVector;
+  const AAD: TUInt8Array;
+  const IsEncrypting: Boolean;
+  out AuthTag: TTag
+): TUInt8Array;
+  var ExpandedKey: TExpandedKey;
+begin
+  ExpandedKey := KeyExpansion(Key);
+  Result := Process_AES_GCM(
+    Input, ExpandedKey, Nonce, AAD, IsEncrypting, 14, AuthTag
+  );
+end;
+
+function UEncrypt_AES_PKCS7_ECB_128(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey128
+): TUInt8Array;
+begin
+  Result := TUAES.Encrypt_AES_PKCS7_ECB_128(Data, Key);
+end;
+
+function UDecrypt_AES_PKCS7_ECB_128(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey128
+): TUInt8Array;
+begin
+  Result := TUAES.Decrypt_AES_PKCS7_ECB_128(Cipher, Key);
+end;
+
+function UEncrypt_AES_PKCS7_ECB_192(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey192
+): TUInt8Array;
+begin
+  Result := TUAES.Encrypt_AES_PKCS7_ECB_192(Data, Key);
+end;
+
+function UDecrypt_AES_PKCS7_ECB_192(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey192
+): TUInt8Array;
+begin
+  Result := TUAES.Decrypt_AES_PKCS7_ECB_192(Cipher, Key);
 end;
 
 function UEncrypt_AES_PKCS7_ECB_256(
@@ -2068,6 +2807,42 @@ function UDecrypt_AES_PKCS7_ECB_256(
 ): TUInt8Array;
 begin
   Result := TUAES.Decrypt_AES_PKCS7_ECB_256(Cipher, Key);
+end;
+
+function UEncrypt_AES_PKCS7_CBC_128(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUAES.Encrypt_AES_PKCS7_CBC_128(Data, Key, IV);
+end;
+
+function UDecrypt_AES_PKCS7_CBC_128(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUAES.Decrypt_AES_PKCS7_CBC_128(Cipher, Key, IV);
+end;
+
+function UEncrypt_AES_PKCS7_CBC_192(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUAES.Encrypt_AES_PKCS7_CBC_192(Data, Key, IV);
+end;
+
+function UDecrypt_AES_PKCS7_CBC_192(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUAES.Decrypt_AES_PKCS7_CBC_192(Cipher, Key, IV);
 end;
 
 function UEncrypt_AES_PKCS7_CBC_256(
@@ -2088,6 +2863,42 @@ begin
   Result := TUAES.Decrypt_AES_PKCS7_CBC_256(Cipher, Key, IV);
 end;
 
+function UEncrypt_AES_CTR_128(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_CTR_128(Data, Key, IV);
+end;
+
+function UDecrypt_AES_CTR_128(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_CTR_128(Cipher, Key, IV);
+end;
+
+function UEncrypt_AES_CTR_192(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_CTR_192(Data, Key, IV);
+end;
+
+function UDecrypt_AES_CTR_192(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const IV: TUAES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_CTR_192(Cipher, Key, IV);
+end;
+
 function UEncrypt_AES_CTR_256(
   const Data: TUInt8Array;
   const Key: TUAES.TKey256;
@@ -2104,6 +2915,50 @@ function UDecrypt_AES_CTR_256(
 ): TUInt8Array;
 begin
   Result := TUAES.Process_AES_CTR_256(Cipher, Key, IV);
+end;
+
+function UEncrypt_AES_GCM_128(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_GCM_128(Data, Key, Nonce, AAD, True, AuthTag);
+end;
+
+function UDecrypt_AES_GCM_128(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey128;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_GCM_128(Cipher, Key, Nonce, AAD, False, AuthTag);
+end;
+
+function UEncrypt_AES_GCM_192(
+  const Data: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_GCM_192(Data, Key, Nonce, AAD, True, AuthTag);
+end;
+
+function UDecrypt_AES_GCM_192(
+  const Cipher: TUInt8Array;
+  const Key: TUAES.TKey192;
+  const Nonce: TUAES.TInitVector;
+  const AAD: TUInt8Array;
+  out AuthTag: TUAES.TTag
+): TUInt8Array;
+begin
+  Result := TUAES.Process_AES_GCM_192(Cipher, Key, Nonce, AAD, False, AuthTag);
 end;
 
 function UEncrypt_AES_GCM_256(
