@@ -241,104 +241,104 @@ private
   class procedure InvShiftRows(var State: TBlock); static;
   class procedure InvMixColumns(var State: TBlock); static;
   class procedure InvCipherBlock(var State: TBlock; const ExpandedKey: TExpandedKey; const NumRounds: Int32); static;
-  class function Encrypt_AES_PKCS7_ECB(
+  class function Encrypt_PKCS7_ECB(
     const Data: TUInt8Array;
     const ExpandedKey: TExpandedKey;
     const NumRounds: Int32
   ): TUInt8Array; static;
-  class function Encrypt_AES_PKCS7_ECB_128(
+  class function Encrypt_PKCS7_ECB_128(
     const Data: TUInt8Array;
     const Key: TKey128
   ): TUInt8Array; static;
-  class function Encrypt_AES_PKCS7_ECB_192(
+  class function Encrypt_PKCS7_ECB_192(
     const Data: TUInt8Array;
     const Key: TKey192
   ): TUInt8Array; static;
-  class function Encrypt_AES_PKCS7_ECB_256(
+  class function Encrypt_PKCS7_ECB_256(
     const Data: TUInt8Array;
     const Key: TKey256
   ): TUInt8Array; static;
-  class function Decrypt_AES_PKCS7_ECB(
+  class function Decrypt_PKCS7_ECB(
     const Cipher: TUInt8Array;
     const ExpandedKey: TExpandedKey;
     const NumRounds: Int32
   ): TUInt8Array; static;
-  class function Decrypt_AES_PKCS7_ECB_128(
+  class function Decrypt_PKCS7_ECB_128(
     const Cipher: TUInt8Array;
     const Key: TKey128
   ): TUInt8Array; static;
-  class function Decrypt_AES_PKCS7_ECB_192(
+  class function Decrypt_PKCS7_ECB_192(
     const Cipher: TUInt8Array;
     const Key: TKey192
   ): TUInt8Array; static;
-  class function Decrypt_AES_PKCS7_ECB_256(
+  class function Decrypt_PKCS7_ECB_256(
     const Cipher: TUInt8Array;
     const Key: TKey256
   ): TUInt8Array; static;
-  class function Encrypt_AES_PKCS7_CBC(
+  class function Encrypt_PKCS7_CBC(
     const Data: TUInt8Array;
     const ExpandedKey: TExpandedKey;
     const IV: TInitVector;
     const NumRounds: Int32
   ): TUInt8Array; static;
-  class function Encrypt_AES_PKCS7_CBC_128(
+  class function Encrypt_PKCS7_CBC_128(
     const Data: TUInt8Array;
     const Key: TKey128;
     const IV: TInitVector
   ): TUInt8Array; static;
-  class function Encrypt_AES_PKCS7_CBC_192(
+  class function Encrypt_PKCS7_CBC_192(
     const Data: TUInt8Array;
     const Key: TKey192;
     const IV: TInitVector
   ): TUInt8Array; static;
-  class function Encrypt_AES_PKCS7_CBC_256(
+  class function Encrypt_PKCS7_CBC_256(
     const Data: TUInt8Array;
     const Key: TKey256;
     const IV: TInitVector
   ): TUInt8Array; static;
-  class function Decrypt_AES_PKCS7_CBC(
+  class function Decrypt_PKCS7_CBC(
     const Cipher: TUInt8Array;
     const ExpandedKey: TExpandedKey;
     const IV: TInitVector;
     const NumRounds: Int32
   ): TUInt8Array; static;
-  class function Decrypt_AES_PKCS7_CBC_128(
+  class function Decrypt_PKCS7_CBC_128(
     const Cipher: TUInt8Array;
     const Key: TKey128;
     const IV: TInitVector
   ): TUInt8Array; static;
-  class function Decrypt_AES_PKCS7_CBC_192(
+  class function Decrypt_PKCS7_CBC_192(
     const Cipher: TUInt8Array;
     const Key: TKey192;
     const IV: TInitVector
   ): TUInt8Array; static;
-  class function Decrypt_AES_PKCS7_CBC_256(
+  class function Decrypt_PKCS7_CBC_256(
     const Cipher: TUInt8Array;
     const Key: TKey256;
     const IV: TInitVector
   ): TUInt8Array; static;
-  class function Process_AES_CTR(
+  class function Process_CTR(
     const Input: TUInt8Array;
     const ExpandedKey: TExpandedKey;
     const IV: TInitVector;
     const NumRounds: Int32
   ): TUInt8Array; static;
-  class function Process_AES_CTR_128(
+  class function Process_CTR_128(
     const Input: TUInt8Array;
     const Key: TKey128;
     const IV: TInitVector
   ): TUInt8Array; static;
-  class function Process_AES_CTR_192(
+  class function Process_CTR_192(
     const Input: TUInt8Array;
     const Key: TKey192;
     const IV: TInitVector
   ): TUInt8Array; static;
-  class function Process_AES_CTR_256(
+  class function Process_CTR_256(
     const Input: TUInt8Array;
     const Key: TKey256;
     const IV: TInitVector
   ): TUInt8Array; static;
-  class function Process_AES_GCM(
+  class function Process_GCM(
     const Input: TUInt8Array;
     const ExpandedKey: TExpandedKey;
     const Nonce: TInitVector;
@@ -347,7 +347,7 @@ private
     const NumRounds: Int32;
     out AuthTag: TTag
   ): TUInt8Array; static;
-  class function Process_AES_GCM_128(
+  class function Process_GCM_128(
     const Input: TUInt8Array;
     const Key: TKey128;
     const Nonce: TInitVector;
@@ -355,7 +355,7 @@ private
     const IsEncrypting: Boolean;
     out AuthTag: TTag
   ): TUInt8Array; static;
-  class function Process_AES_GCM_192(
+  class function Process_GCM_192(
     const Input: TUInt8Array;
     const Key: TKey192;
     const Nonce: TInitVector;
@@ -363,7 +363,7 @@ private
     const IsEncrypting: Boolean;
     out AuthTag: TTag
   ): TUInt8Array; static;
-  class function Process_AES_GCM_256(
+  class function Process_GCM_256(
     const Input: TUInt8Array;
     const Key: TKey256;
     const Nonce: TInitVector;
@@ -371,6 +371,107 @@ private
     const IsEncrypting: Boolean;
     out AuthTag: TTag
   ): TUInt8Array; static;
+end;
+
+type TUDES = record
+public
+  type TKey = array[0..7] of UInt8;
+  type TInitVector = array[0..7] of UInt8;
+private
+  type T64BitBlock = UInt64;
+  type T48BitKey = array[0..5] of UInt8;
+  type TSubKeys = array[0..15] of T48BitKey;
+  const IP: array[0..63] of UInt8 = ( // Initial Permutation
+    58, 50, 42, 34, 26, 18, 10, 2, 60, 52, 44, 36, 28, 20, 12, 4,
+    62, 54, 46, 38, 30, 22, 14, 6, 64, 56, 48, 40, 32, 24, 16, 8,
+    57, 49, 41, 33, 25, 17, 9, 1, 59, 51, 43, 35, 27, 19, 11, 3,
+    61, 53, 45, 37, 29, 21, 13, 5, 63, 55, 47, 39, 31, 23, 15, 7
+  );
+  const FP: array[0..63] of UInt8 = ( // Final Permutation (FP), the inverse of IP
+    40, 8, 48, 16, 56, 24, 64, 32, 39, 7, 47, 15, 55, 23, 63, 31,
+    38, 6, 46, 14, 54, 22, 62, 30, 37, 5, 45, 13, 53, 21, 61, 29,
+    36, 4, 44, 12, 52, 20, 60, 28, 35, 3, 43, 11, 51, 19, 59, 27,
+    34, 2, 42, 10, 50, 18, 58, 26, 33, 1, 41, 9, 49, 17, 57, 25
+  );
+  const PC1: array[0..55] of UInt8 = ( // Permuted Choice 1 (PC-1) for key schedule
+    57, 49, 41, 33, 25, 17, 9, 1, 58, 50, 42, 34, 26, 18,
+    10, 2, 59, 51, 43, 35, 27, 19, 11, 3, 60, 52, 44, 36,
+    63, 55, 47, 39, 31, 23, 15, 7, 62, 54, 46, 38, 30, 22,
+    14, 6, 61, 53, 45, 37, 29, 21, 13, 5, 28, 20, 12, 4
+  );
+  const PC2: array[0..47] of UInt8 = ( // Permuted Choice 2 (PC-2) for key schedule
+    14, 17, 11, 24, 1, 5, 3, 28, 15, 6, 21, 10,
+    23, 19, 12, 4, 26, 8, 16, 7, 27, 20, 13, 2,
+    41, 52, 31, 37, 47, 55, 30, 40, 51, 45, 33, 48,
+    44, 49, 39, 56, 34, 53, 46, 42, 50, 36, 29, 32
+  );
+  const E: array[0..47] of UInt8 = ( // Expansion Permutation (E) for round function
+    32, 1, 2, 3, 4, 5, 4, 5, 6, 7, 8, 9,
+    8, 9, 10, 11, 12, 13, 12, 13, 14, 15, 16, 17,
+    16, 17, 18, 19, 20, 21, 20, 21, 22, 23, 24, 25,
+    24, 25, 26, 27, 28, 29, 28, 29, 30, 31, 32, 1
+  );
+  const P: array[0..31] of UInt8 = ( // Permutation (P) for round function
+    16, 7, 20, 21, 29, 12, 28, 17, 1, 15, 23, 26, 5, 18, 31, 10,
+    2, 8, 24, 14, 32, 27, 3, 9, 19, 13, 30, 6, 22, 11, 4, 25
+  );
+  const SBoxes: array[0..7, 0..63] of UInt8 = ( // S-Boxes (8 tables)
+    ( // S1
+      14,4,13,1,2,15,11,8,3,10,6,12,5,9,0,7,
+      0,15,7,4,14,2,13,1,10,6,12,11,9,5,3,8,
+      4,1,14,8,13,6,2,11,15,12,9,7,3,10,5,0,
+      15,12,8,2,4,9,1,7,5,11,3,14,10,0,6,13
+    ), ( // S2
+      15,1,8,14,6,11,3,4,9,7,2,13,12,0,5,10,
+      3,13,4,7,15,2,8,14,12,0,1,10,6,9,11,5,
+      0,14,7,11,10,4,13,1,5,8,12,6,9,3,2,15,
+      13,8,10,1,3,15,4,2,11,6,7,12,0,5,14,9
+    ), ( // S3
+      10,0,9,14,6,3,15,5,1,13,12,7,11,4,2,8,
+      13,7,0,9,3,4,6,10,2,8,5,14,12,11,15,1,
+      13,6,4,9,8,15,3,0,11,1,2,12,5,10,14,7,
+      1,10,13,0,6,9,8,7,4,15,14,3,11,5,2,12
+    ), ( // S4
+      7,13,14,3,0,6,9,10,1,2,8,5,11,12,4,15,
+      13,8,11,5,6,15,0,3,4,7,2,12,1,10,14,9,
+      10,6,9,0,12,11,7,13,15,1,3,14,5,2,8,4,
+      3,15,0,6,10,1,13,8,9,4,5,11,12,7,2,14
+    ), ( // S5
+      2,12,4,1,7,10,11,6,8,5,3,15,13,0,14,9,
+      14,11,2,12,4,7,13,1,5,0,15,10,3,9,8,6,
+      4,2,1,11,10,13,7,8,15,9,12,5,6,3,0,14,
+      11,8,12,7,1,14,2,13,6,15,0,9,10,4,5,3
+    ), ( // S6
+      12,1,10,15,9,2,6,8,0,13,3,4,14,7,5,11,
+      10,15,4,2,7,12,9,5,6,1,13,14,0,11,3,8,
+      9,14,15,5,2,8,12,3,7,0,4,10,1,13,11,6,
+      4,3,2,12,9,5,15,10,11,14,1,7,6,0,8,13
+    ), ( // S7
+      4,11,2,14,15,0,8,13,3,12,9,7,5,10,6,1,
+      13,0,11,7,4,9,1,10,14,3,5,12,2,15,8,6,
+      1,4,11,13,12,3,7,14,10,15,6,8,0,5,9,2,
+      6,11,13,8,1,4,10,7,9,5,0,15,14,2,3,12
+    ), ( // S8
+      13,2,8,4,6,15,11,1,10,9,3,14,5,0,12,7,
+      1,15,13,8,10,3,7,4,12,5,6,11,0,14,9,2,
+      7,11,4,1,9,12,14,2,0,6,10,13,15,3,5,8,
+      2,1,14,7,4,10,8,13,15,12,9,0,3,5,6,11
+    )
+  );
+  const KeyShifts: array[0..15] of UInt8 = ( // Key schedule shifts
+    1,1,2,2,2,2,2,2,1,2,2,2,2,2,2,1
+  );
+  class function Permute(const Input: T64BitBlock; const Table: array of Byte; const InSize, OutSize: Int32): T64BitBlock; static;
+  class function GenerateSubKeys(const Key: TKey): TSubKeys; static;
+  class function FeistelF(R: UInt32; const SubKey: T48BitKey): UInt32; static;
+  class procedure ProcessDESBlock(var Block: T64BitBlock; const SubKeys: TSubKeys; const IsEncrypting: Boolean); static;
+  class function PadData_PKCS7(const Data: TUInt8Array; const BlockSize: Int32): TUInt8Array; static;
+  class function UnpadData_PKCS7(const Data: TUInt8Array): TUInt8Array; static;
+  class function Encrypt_PKCS7_ECB(const Data: TUInt8Array; const Key: TKey): TUInt8Array; static;
+  class function Decrypt_PKCS7_ECB(const Cipher: TUInt8Array; const Key: TKey): TUInt8Array; static;
+  class function Encrypt_PKCS7_CBC(const Data: TUInt8Array; const Key: TKey; const IV: TInitVector): TUInt8Array; static;
+  class function Decrypt_PKCS7_CBC(const Cipher: TUInt8Array; const Key: TKey; const IV: TInitVector): TUInt8Array; static;
+  class function Process_CTR(const Input: TUInt8Array; const Key: TKey; const Nonce: TInitVector): TUInt8Array; static;
 end;
 
 function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
@@ -551,6 +652,35 @@ function UDecrypt_AES_GCM_256(
   const Nonce: TUAES.TInitVector;
   const AAD: TUInt8Array;
   out AuthTag: TUAES.TTag
+): TUInt8Array;
+
+function UEncrypt_DES_PKCS7_ECB(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey
+): TUInt8Array;
+function UDecrypt_DES_PKCS7_ECB(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey
+): TUInt8Array;
+function UEncrypt_DES_PKCS7_CBC(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey;
+  const IV: TUDES.TInitVector
+): TUInt8Array;
+function UDecrypt_DES_PKCS7_CBC(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey;
+  const IV: TUDES.TInitVector
+): TUInt8Array;
+function UEncrypt_DES_PKCS7_CTR(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey;
+  const Nonce: TUDES.TInitVector
+): TUInt8Array;
+function UDecrypt_DES_PKCS7_CTR(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey;
+  const Nonce: TUDES.TInitVector
 ): TUInt8Array;
 
 implementation
@@ -2269,7 +2399,7 @@ begin
   AddRoundKey(State, ExpandedKey[0]);
 end;
 
-class function TUAES.Encrypt_AES_PKCS7_ECB(
+class function TUAES.Encrypt_PKCS7_ECB(
   const Data: TUInt8Array;
   const ExpandedKey: TExpandedKey;
   const NumRounds: Int32
@@ -2297,37 +2427,37 @@ begin
   end;
 end;
 
-class function TUAES.Encrypt_AES_PKCS7_ECB_128(
+class function TUAES.Encrypt_PKCS7_ECB_128(
   const Data: TUInt8Array;
   const Key: TKey128
 ): TUInt8Array;
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Encrypt_AES_PKCS7_ECB(Data, ExpandedKey, 10);
+  Result := Encrypt_PKCS7_ECB(Data, ExpandedKey, 10);
 end;
 
-class function TUAES.Encrypt_AES_PKCS7_ECB_192(
+class function TUAES.Encrypt_PKCS7_ECB_192(
   const Data: TUInt8Array;
   const Key: TKey192
 ): TUInt8Array;
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Encrypt_AES_PKCS7_ECB(Data, ExpandedKey, 12);
+  Result := Encrypt_PKCS7_ECB(Data, ExpandedKey, 12);
 end;
 
-class function TUAES.Encrypt_AES_PKCS7_ECB_256(
+class function TUAES.Encrypt_PKCS7_ECB_256(
   const Data: TUInt8Array;
   const Key: TKey256
 ): TUInt8Array;
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Encrypt_AES_PKCS7_ECB(Data, ExpandedKey, 14);
+  Result := Encrypt_PKCS7_ECB(Data, ExpandedKey, 14);
 end;
 
-class function TUAES.Decrypt_AES_PKCS7_ECB(
+class function TUAES.Decrypt_PKCS7_ECB(
   const Cipher: TUInt8Array;
   const ExpandedKey: TExpandedKey;
   const NumRounds: Int32
@@ -2355,37 +2485,37 @@ begin
   Result := UnpadData_PKCS7(DataPadded);
 end;
 
-class function TUAES.Decrypt_AES_PKCS7_ECB_128(
+class function TUAES.Decrypt_PKCS7_ECB_128(
   const Cipher: TUInt8Array;
   const Key: TKey128
 ): TUInt8Array;
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Decrypt_AES_PKCS7_ECB(Cipher, ExpandedKey, 10);
+  Result := Decrypt_PKCS7_ECB(Cipher, ExpandedKey, 10);
 end;
 
-class function TUAES.Decrypt_AES_PKCS7_ECB_192(
+class function TUAES.Decrypt_PKCS7_ECB_192(
   const Cipher: TUInt8Array;
   const Key: TKey192
 ): TUInt8Array;
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Decrypt_AES_PKCS7_ECB(Cipher, ExpandedKey, 12);
+  Result := Decrypt_PKCS7_ECB(Cipher, ExpandedKey, 12);
 end;
 
-class function TUAES.Decrypt_AES_PKCS7_ECB_256(
+class function TUAES.Decrypt_PKCS7_ECB_256(
   const Cipher: TUInt8Array;
   const Key: TKey256
 ): TUInt8Array;
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Decrypt_AES_PKCS7_ECB(Cipher, ExpandedKey, 14);
+  Result := Decrypt_PKCS7_ECB(Cipher, ExpandedKey, 14);
 end;
 
-class function TUAES.Encrypt_AES_PKCS7_CBC(
+class function TUAES.Encrypt_PKCS7_CBC(
   const Data: TUInt8Array;
   const ExpandedKey: TExpandedKey;
   const IV: TInitVector;
@@ -2416,7 +2546,7 @@ begin
   end;
 end;
 
-class function TUAES.Encrypt_AES_PKCS7_CBC_128(
+class function TUAES.Encrypt_PKCS7_CBC_128(
   const Data: TUInt8Array;
   const Key: TKey128;
   const IV: TInitVector
@@ -2424,10 +2554,10 @@ class function TUAES.Encrypt_AES_PKCS7_CBC_128(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Encrypt_AES_PKCS7_CBC(Data, ExpandedKey, IV, 10);
+  Result := Encrypt_PKCS7_CBC(Data, ExpandedKey, IV, 10);
 end;
 
-class function TUAES.Encrypt_AES_PKCS7_CBC_192(
+class function TUAES.Encrypt_PKCS7_CBC_192(
   const Data: TUInt8Array;
   const Key: TKey192;
   const IV: TInitVector
@@ -2435,10 +2565,10 @@ class function TUAES.Encrypt_AES_PKCS7_CBC_192(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Encrypt_AES_PKCS7_CBC(Data, ExpandedKey, IV, 12);
+  Result := Encrypt_PKCS7_CBC(Data, ExpandedKey, IV, 12);
 end;
 
-class function TUAES.Encrypt_AES_PKCS7_CBC_256(
+class function TUAES.Encrypt_PKCS7_CBC_256(
   const Data: TUInt8Array;
   const Key: TKey256;
   const IV: TInitVector
@@ -2446,10 +2576,10 @@ class function TUAES.Encrypt_AES_PKCS7_CBC_256(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Encrypt_AES_PKCS7_CBC(Data, ExpandedKey, IV, 14);
+  Result := Encrypt_PKCS7_CBC(Data, ExpandedKey, IV, 14);
 end;
 
-class function TUAES.Decrypt_AES_PKCS7_CBC(
+class function TUAES.Decrypt_PKCS7_CBC(
   const Cipher: TUInt8Array;
   const ExpandedKey: TExpandedKey;
   const IV: TInitVector;
@@ -2480,7 +2610,7 @@ begin
   Result := UnpadData_PKCS7(DataPadded);
 end;
 
-class function TUAES.Decrypt_AES_PKCS7_CBC_128(
+class function TUAES.Decrypt_PKCS7_CBC_128(
   const Cipher: TUInt8Array;
   const Key: TKey128;
   const IV: TInitVector
@@ -2488,10 +2618,10 @@ class function TUAES.Decrypt_AES_PKCS7_CBC_128(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Decrypt_AES_PKCS7_CBC(Cipher, ExpandedKey, IV, 10);
+  Result := Decrypt_PKCS7_CBC(Cipher, ExpandedKey, IV, 10);
 end;
 
-class function TUAES.Decrypt_AES_PKCS7_CBC_192(
+class function TUAES.Decrypt_PKCS7_CBC_192(
   const Cipher: TUInt8Array;
   const Key: TKey192;
   const IV: TInitVector
@@ -2499,10 +2629,10 @@ class function TUAES.Decrypt_AES_PKCS7_CBC_192(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Decrypt_AES_PKCS7_CBC(Cipher, ExpandedKey, IV, 12);
+  Result := Decrypt_PKCS7_CBC(Cipher, ExpandedKey, IV, 12);
 end;
 
-class function TUAES.Decrypt_AES_PKCS7_CBC_256(
+class function TUAES.Decrypt_PKCS7_CBC_256(
   const Cipher: TUInt8Array;
   const Key: TKey256;
   const IV: TInitVector
@@ -2510,10 +2640,10 @@ class function TUAES.Decrypt_AES_PKCS7_CBC_256(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Decrypt_AES_PKCS7_CBC(Cipher, ExpandedKey, IV, 14);
+  Result := Decrypt_PKCS7_CBC(Cipher, ExpandedKey, IV, 14);
 end;
 
-class function TUAES.Process_AES_CTR(
+class function TUAES.Process_CTR(
   const Input: TUInt8Array;
   const ExpandedKey: TExpandedKey;
   const IV: TInitVector;
@@ -2549,7 +2679,7 @@ begin
   end;
 end;
 
-class function TUAES.Process_AES_CTR_128(
+class function TUAES.Process_CTR_128(
   const Input: TUInt8Array;
   const Key: TKey128;
   const IV: TInitVector
@@ -2557,10 +2687,10 @@ class function TUAES.Process_AES_CTR_128(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Process_AES_CTR(Input, ExpandedKey, IV, 10);
+  Result := Process_CTR(Input, ExpandedKey, IV, 10);
 end;
 
-class function TUAES.Process_AES_CTR_192(
+class function TUAES.Process_CTR_192(
   const Input: TUInt8Array;
   const Key: TKey192;
   const IV: TInitVector
@@ -2568,10 +2698,10 @@ class function TUAES.Process_AES_CTR_192(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Process_AES_CTR(Input, ExpandedKey, IV, 12);
+  Result := Process_CTR(Input, ExpandedKey, IV, 12);
 end;
 
-class function TUAES.Process_AES_CTR_256(
+class function TUAES.Process_CTR_256(
   const Input: TUInt8Array;
   const Key: TKey256;
   const IV: TInitVector
@@ -2579,10 +2709,10 @@ class function TUAES.Process_AES_CTR_256(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Process_AES_CTR(Input, ExpandedKey, IV, 14);
+  Result := Process_CTR(Input, ExpandedKey, IV, 14);
 end;
 
-class function TUAES.Process_AES_GCM(
+class function TUAES.Process_GCM(
   const Input: TUInt8Array;
   const ExpandedKey: TExpandedKey;
   const Nonce: TInitVector;
@@ -2713,7 +2843,7 @@ begin
   end;
 end;
 
-class function TUAES.Process_AES_GCM_128(
+class function TUAES.Process_GCM_128(
   const Input: TUInt8Array;
   const Key: TKey128;
   const Nonce: TInitVector;
@@ -2724,12 +2854,12 @@ class function TUAES.Process_AES_GCM_128(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Process_AES_GCM(
+  Result := Process_GCM(
     Input, ExpandedKey, Nonce, AAD, IsEncrypting, 10, AuthTag
   );
 end;
 
-class function TUAES.Process_AES_GCM_192(
+class function TUAES.Process_GCM_192(
   const Input: TUInt8Array;
   const Key: TKey192;
   const Nonce: TInitVector;
@@ -2740,12 +2870,12 @@ class function TUAES.Process_AES_GCM_192(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Process_AES_GCM(
+  Result := Process_GCM(
     Input, ExpandedKey, Nonce, AAD, IsEncrypting, 12, AuthTag
   );
 end;
 
-class function TUAES.Process_AES_GCM_256(
+class function TUAES.Process_GCM_256(
   const Input: TUInt8Array;
   const Key: TKey256;
   const Nonce: TInitVector;
@@ -2756,9 +2886,292 @@ class function TUAES.Process_AES_GCM_256(
   var ExpandedKey: TExpandedKey;
 begin
   ExpandedKey := KeyExpansion(Key);
-  Result := Process_AES_GCM(
+  Result := Process_GCM(
     Input, ExpandedKey, Nonce, AAD, IsEncrypting, 14, AuthTag
   );
+end;
+
+class function TUDES.Permute(
+  const Input: T64BitBlock;
+  const Table: array of UInt8;
+  const InSize, OutSize: Int32
+): T64BitBlock;
+  var i: Int32;
+begin
+  Result := 0;
+  for i := 0 to OutSize - 1 do
+  begin
+    if (Input shr (InSize - Table[i])) and 1 = 1 then
+    begin
+      Result := Result or (UInt64(1) shl (OutSize - 1 - i));
+    end;
+  end;
+end;
+
+class function TUDES.GenerateSubKeys(const Key: TKey): TSubKeys;
+  var i, j: Int32;
+  var Key64: T64BitBlock;
+  var Key56: T64BitBlock;
+  var CombinedKey: T64BitBlock;
+  var SubKey48: T64BitBlock;
+  var C, D: UInt32;
+begin
+  Key64 := 0;
+  for i := 0 to 7 do
+  begin
+    Key64 := (Key64 shl 8) or Key[i];
+  end;
+  Key56 := Permute(Key64, PC1, 64, 56);
+  C := (Key56 shr 28) and $fffffff;
+  D := Key56 and $fffffff;
+  for i := 0 to 15 do
+  begin
+    for j := 1 to KeyShifts[i] do
+    begin
+      C := ((C shl 1) and $fffffff) or (C shr 27);
+      D := ((D shl 1) and $fffffff) or (D shr 27);
+    end;
+    CombinedKey := (UInt64(C) shl 28) or D;
+    SubKey48 := Permute(CombinedKey, PC2, 56, 48);
+    for j := 0 to 5 do
+    begin
+      Result[i][j] := (SubKey48 shr (40 - j * 8)) and $ff;
+    end;
+  end;
+end;
+
+class function TUDES.FeistelF(R: UInt32; const SubKey: T48BitKey): UInt32;
+  var i, row, col: Int32;
+  var ExpandedR, XorResult: UInt64;
+  var SBoxInput: UInt8;
+  var SBoxOutput: UInt32;
+  var SubKey64: UInt64;
+begin
+  ExpandedR := Permute(R, E, 32, 48);
+  SubKey64 := 0;
+  for i := 0 to 5 do
+  begin
+    SubKey64 := (SubKey64 shl 8) or SubKey[i];
+  end;
+  XorResult := ExpandedR xor SubKey64;
+  SBoxOutput := 0;
+  for i := 0 to 7 do
+  begin
+    SBoxInput := (XorResult shr (42 - i * 6)) and $3f;
+    row := ((SBoxInput and $20) shr 4) or (SBoxInput and $01);
+    col := (SBoxInput and $1e) shr 1;
+    SBoxOutput := (SBoxOutput shl 4) or SBoxes[i, row * 16 + col];
+  end;
+  Result := UInt32(Permute(SBoxOutput, P, 32, 32));
+end;
+
+class procedure TUDES.ProcessDESBlock(
+  var Block: T64BitBlock;
+  const SubKeys: TSubKeys;
+  const IsEncrypting: Boolean
+);
+  var i: Int32;
+  var L, R, Temp: UInt32;
+begin
+  Block := Permute(Block, IP, 64, 64);
+  L := (Block shr 32) and $ffffffff;
+  R := Block and $ffffffff;
+  for i := 0 to 15 do
+  begin
+    Temp := R;
+    if IsEncrypting then
+    begin
+      R := L xor FeistelF(R, SubKeys[i])
+    end
+    else
+    begin
+      R := L xor FeistelF(R, SubKeys[15 - i]);
+    end;
+    L := Temp;
+  end;
+  Block := (UInt64(R) shl 32) or L;
+  Block := Permute(Block, FP, 64, 64);
+end;
+
+class function TUDES.PadData_PKCS7(
+  const Data: TUInt8Array;
+  const BlockSize: Int32
+): TUInt8Array;
+  var i, PadLen: Int32;
+begin
+  Result := nil;
+  PadLen := BlockSize - (Length(Data) mod BlockSize);
+  if (PadLen = 0) and (Length(Data) > 0) then PadLen := BlockSize;
+  if Length(Data) = 0 then PadLen := BlockSize;
+  SetLength(Result, Length(Data) + PadLen);
+  if Length(Data) > 0 then Move(Data[0], Result[0], Length(Data));
+  for i := Length(Data) to High(Result) do Result[i] := Byte(PadLen);
+end;
+
+class function TUDES.UnpadData_PKCS7(const Data: TUInt8Array): TUInt8Array;
+  var PadLen, i: Int32;
+begin
+  Result := nil;
+  if Length(Data) = 0 then Exit;
+  PadLen := Data[High(Data)];
+  if (PadLen = 0) or (PadLen > 8) or (PadLen > Length(Data)) then Exit;
+  for i := Length(Data) - PadLen to High(Data) do
+  begin
+    if Data[i] <> PadLen then Exit;
+  end;
+  SetLength(Result, Length(Data) - PadLen);
+  if Length(Result) = 0 then Exit;
+  Move(Data[0], Result[0], Length(Result));
+end;
+
+class function TUDES.Encrypt_PKCS7_ECB(
+  const Data: TUInt8Array;
+  const Key: TKey
+): TUInt8Array;
+  var SubKeys: TSubKeys;
+  var PaddedData: TUInt8Array;
+  var Block: T64BitBlock;
+  var i, j: Int32;
+begin
+  Result := nil;
+  SubKeys := GenerateSubKeys(Key);
+  PaddedData := PadData_PKCS7(Data, 8);
+  SetLength(Result, Length(PaddedData));
+  for i := 0 to (Length(PaddedData) div 8) - 1 do
+  begin
+    Block := 0;
+    for j := 0 to 7 do
+    begin
+      Block := (Block shl 8) or PaddedData[i * 8 + j];
+    end;
+    ProcessDESBlock(Block, SubKeys, True);
+    for j := 0 to 7 do
+    begin
+      Result[i * 8 + j] := (Block shr (56 - j * 8)) and $ff;
+    end;
+  end;
+end;
+
+class function TUDES.Decrypt_PKCS7_ECB(
+  const Cipher: TUInt8Array;
+  const Key: TKey
+): TUInt8Array;
+  var SubKeys: TSubKeys;
+  var DataPadded: TUInt8Array;
+  var Block: T64BitBlock;
+  var i, j: Int32;
+begin
+  Result := nil;
+  if (Length(Cipher) mod 8) <> 0 then Exit;
+  SubKeys := GenerateSubKeys(Key);
+  DataPadded := nil;
+  SetLength(DataPadded, Length(Cipher));
+  for i := 0 to (Length(Cipher) div 8) - 1 do
+  begin
+    Block := 0;
+    for j := 0 to 7 do
+    begin
+      Block := (Block shl 8) or Cipher[i * 8 + j];
+    end;
+    ProcessDESBlock(Block, SubKeys, False);
+    for j := 0 to 7 do
+    begin
+      DataPadded[i * 8 + j] := (Block shr (56 - j * 8)) and $ff;
+    end;
+  end;
+  Result := UnpadData_PKCS7(DataPadded);
+end;
+
+class function TUDES.Encrypt_PKCS7_CBC(
+  const Data: TUInt8Array;
+  const Key: TKey;
+  const IV: TInitVector
+): TUInt8Array;
+  var SubKeys: TSubKeys;
+  var PaddedData: TUInt8Array;
+  var Block, PrevCipherBlock: T64BitBlock;
+  var i, j: Int32;
+begin
+  Result := nil;
+  SubKeys := GenerateSubKeys(Key);
+  PaddedData := PadData_PKCS7(Data, 8);
+  SetLength(Result, Length(PaddedData));
+  PrevCipherBlock := 0;
+  for i := 0 to 7 do PrevCipherBlock := (PrevCipherBlock shl 8) or IV[i];
+  for i := 0 to (Length(PaddedData) div 8) - 1 do
+  begin
+    Block := 0;
+    for j := 0 to 7 do Block := (Block shl 8) or PaddedData[i * 8 + j];
+    Block := Block xor PrevCipherBlock;
+    ProcessDESBlock(Block, SubKeys, True);
+    PrevCipherBlock := Block;
+    for j := 0 to 7 do
+    begin
+      Result[i * 8 + j] := (Block shr (56 - j * 8)) and $ff;
+    end;
+  end;
+end;
+
+class function TUDES.Decrypt_PKCS7_CBC(
+  const Cipher: TUInt8Array;
+  const Key: TKey;
+  const IV: TInitVector
+): TUInt8Array;
+  var SubKeys: TSubKeys;
+  var DataPadded: TUInt8Array;
+  var Block, PrevCipherBlock, PlaintextBlock: T64BitBlock;
+  var i, j: Int32;
+begin
+  Result := nil;
+  if (Length(Cipher) mod 8) <> 0 then Exit;
+  SubKeys := GenerateSubKeys(Key);
+  DataPadded := nil;
+  SetLength(DataPadded, Length(Cipher));
+  PrevCipherBlock := 0;
+  for i := 0 to 7 do PrevCipherBlock := (PrevCipherBlock shl 8) or IV[i];
+  for i := 0 to (Length(Cipher) div 8) - 1 do
+  begin
+    Block := 0;
+    for j := 0 to 7 do Block := (Block shl 8) or Cipher[i * 8 + j];
+    PlaintextBlock := Block;
+    ProcessDESBlock(PlaintextBlock, SubKeys, False);
+    PlaintextBlock := PlaintextBlock xor PrevCipherBlock;
+    PrevCipherBlock := Block;
+    for j := 0 to 7 do
+    begin
+      DataPadded[i * 8 + j] := (PlaintextBlock shr (56 - j * 8)) and $ff;
+    end;
+  end;
+  Result := UnpadData_PKCS7(DataPadded);
+end;
+
+class function TUDES.Process_CTR(
+  const Input: TUInt8Array;
+  const Key: TKey;
+  const Nonce: TInitVector
+): TUInt8Array;
+  var SubKeys: TSubKeys;
+  var CounterBlock, KeystreamBlock: T64BitBlock;
+  var i: Int32;
+begin
+  Result := nil;
+  SubKeys := GenerateSubKeys(Key);
+  SetLength(Result, Length(Input));
+  CounterBlock := 0;
+  for i := 0 to 7 do
+  begin
+    CounterBlock := (CounterBlock shl 8) or Nonce[i];
+  end;
+  for i := 0 to Length(Input) - 1 do
+  begin
+    if (i mod 8) = 0 then
+    begin
+      KeystreamBlock := CounterBlock;
+      ProcessDESBlock(KeystreamBlock, SubKeys, True);
+      Inc(CounterBlock);
+    end;
+    Result[i] := Input[i] xor Byte((KeystreamBlock shr (56 - (i mod 8) * 8)) and $ff);
+  end;
 end;
 
 function UEncrypt_AES_PKCS7_ECB_128(
@@ -2766,7 +3179,7 @@ function UEncrypt_AES_PKCS7_ECB_128(
   const Key: TUAES.TKey128
 ): TUInt8Array;
 begin
-  Result := TUAES.Encrypt_AES_PKCS7_ECB_128(Data, Key);
+  Result := TUAES.Encrypt_PKCS7_ECB_128(Data, Key);
 end;
 
 function UDecrypt_AES_PKCS7_ECB_128(
@@ -2774,7 +3187,7 @@ function UDecrypt_AES_PKCS7_ECB_128(
   const Key: TUAES.TKey128
 ): TUInt8Array;
 begin
-  Result := TUAES.Decrypt_AES_PKCS7_ECB_128(Cipher, Key);
+  Result := TUAES.Decrypt_PKCS7_ECB_128(Cipher, Key);
 end;
 
 function UEncrypt_AES_PKCS7_ECB_192(
@@ -2782,7 +3195,7 @@ function UEncrypt_AES_PKCS7_ECB_192(
   const Key: TUAES.TKey192
 ): TUInt8Array;
 begin
-  Result := TUAES.Encrypt_AES_PKCS7_ECB_192(Data, Key);
+  Result := TUAES.Encrypt_PKCS7_ECB_192(Data, Key);
 end;
 
 function UDecrypt_AES_PKCS7_ECB_192(
@@ -2790,7 +3203,7 @@ function UDecrypt_AES_PKCS7_ECB_192(
   const Key: TUAES.TKey192
 ): TUInt8Array;
 begin
-  Result := TUAES.Decrypt_AES_PKCS7_ECB_192(Cipher, Key);
+  Result := TUAES.Decrypt_PKCS7_ECB_192(Cipher, Key);
 end;
 
 function UEncrypt_AES_PKCS7_ECB_256(
@@ -2798,7 +3211,7 @@ function UEncrypt_AES_PKCS7_ECB_256(
   const Key: TUAES.TKey256
 ): TUInt8Array;
 begin
-  Result := TUAES.Encrypt_AES_PKCS7_ECB_256(Data, Key);
+  Result := TUAES.Encrypt_PKCS7_ECB_256(Data, Key);
 end;
 
 function UDecrypt_AES_PKCS7_ECB_256(
@@ -2806,7 +3219,7 @@ function UDecrypt_AES_PKCS7_ECB_256(
   const Key: TUAES.TKey256
 ): TUInt8Array;
 begin
-  Result := TUAES.Decrypt_AES_PKCS7_ECB_256(Cipher, Key);
+  Result := TUAES.Decrypt_PKCS7_ECB_256(Cipher, Key);
 end;
 
 function UEncrypt_AES_PKCS7_CBC_128(
@@ -2815,7 +3228,7 @@ function UEncrypt_AES_PKCS7_CBC_128(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Encrypt_AES_PKCS7_CBC_128(Data, Key, IV);
+  Result := TUAES.Encrypt_PKCS7_CBC_128(Data, Key, IV);
 end;
 
 function UDecrypt_AES_PKCS7_CBC_128(
@@ -2824,7 +3237,7 @@ function UDecrypt_AES_PKCS7_CBC_128(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Decrypt_AES_PKCS7_CBC_128(Cipher, Key, IV);
+  Result := TUAES.Decrypt_PKCS7_CBC_128(Cipher, Key, IV);
 end;
 
 function UEncrypt_AES_PKCS7_CBC_192(
@@ -2833,7 +3246,7 @@ function UEncrypt_AES_PKCS7_CBC_192(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Encrypt_AES_PKCS7_CBC_192(Data, Key, IV);
+  Result := TUAES.Encrypt_PKCS7_CBC_192(Data, Key, IV);
 end;
 
 function UDecrypt_AES_PKCS7_CBC_192(
@@ -2842,7 +3255,7 @@ function UDecrypt_AES_PKCS7_CBC_192(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Decrypt_AES_PKCS7_CBC_192(Cipher, Key, IV);
+  Result := TUAES.Decrypt_PKCS7_CBC_192(Cipher, Key, IV);
 end;
 
 function UEncrypt_AES_PKCS7_CBC_256(
@@ -2851,7 +3264,7 @@ function UEncrypt_AES_PKCS7_CBC_256(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Encrypt_AES_PKCS7_CBC_256(Data, Key, IV);
+  Result := TUAES.Encrypt_PKCS7_CBC_256(Data, Key, IV);
 end;
 
 function UDecrypt_AES_PKCS7_CBC_256(
@@ -2860,7 +3273,7 @@ function UDecrypt_AES_PKCS7_CBC_256(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Decrypt_AES_PKCS7_CBC_256(Cipher, Key, IV);
+  Result := TUAES.Decrypt_PKCS7_CBC_256(Cipher, Key, IV);
 end;
 
 function UEncrypt_AES_CTR_128(
@@ -2869,7 +3282,7 @@ function UEncrypt_AES_CTR_128(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_CTR_128(Data, Key, IV);
+  Result := TUAES.Process_CTR_128(Data, Key, IV);
 end;
 
 function UDecrypt_AES_CTR_128(
@@ -2878,7 +3291,7 @@ function UDecrypt_AES_CTR_128(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_CTR_128(Cipher, Key, IV);
+  Result := TUAES.Process_CTR_128(Cipher, Key, IV);
 end;
 
 function UEncrypt_AES_CTR_192(
@@ -2887,7 +3300,7 @@ function UEncrypt_AES_CTR_192(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_CTR_192(Data, Key, IV);
+  Result := TUAES.Process_CTR_192(Data, Key, IV);
 end;
 
 function UDecrypt_AES_CTR_192(
@@ -2896,7 +3309,7 @@ function UDecrypt_AES_CTR_192(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_CTR_192(Cipher, Key, IV);
+  Result := TUAES.Process_CTR_192(Cipher, Key, IV);
 end;
 
 function UEncrypt_AES_CTR_256(
@@ -2905,7 +3318,7 @@ function UEncrypt_AES_CTR_256(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_CTR_256(Data, Key, IV);
+  Result := TUAES.Process_CTR_256(Data, Key, IV);
 end;
 
 function UDecrypt_AES_CTR_256(
@@ -2914,7 +3327,7 @@ function UDecrypt_AES_CTR_256(
   const IV: TUAES.TInitVector
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_CTR_256(Cipher, Key, IV);
+  Result := TUAES.Process_CTR_256(Cipher, Key, IV);
 end;
 
 function UEncrypt_AES_GCM_128(
@@ -2925,7 +3338,7 @@ function UEncrypt_AES_GCM_128(
   out AuthTag: TUAES.TTag
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_GCM_128(Data, Key, Nonce, AAD, True, AuthTag);
+  Result := TUAES.Process_GCM_128(Data, Key, Nonce, AAD, True, AuthTag);
 end;
 
 function UDecrypt_AES_GCM_128(
@@ -2936,7 +3349,7 @@ function UDecrypt_AES_GCM_128(
   out AuthTag: TUAES.TTag
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_GCM_128(Cipher, Key, Nonce, AAD, False, AuthTag);
+  Result := TUAES.Process_GCM_128(Cipher, Key, Nonce, AAD, False, AuthTag);
 end;
 
 function UEncrypt_AES_GCM_192(
@@ -2947,7 +3360,7 @@ function UEncrypt_AES_GCM_192(
   out AuthTag: TUAES.TTag
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_GCM_192(Data, Key, Nonce, AAD, True, AuthTag);
+  Result := TUAES.Process_GCM_192(Data, Key, Nonce, AAD, True, AuthTag);
 end;
 
 function UDecrypt_AES_GCM_192(
@@ -2958,7 +3371,7 @@ function UDecrypt_AES_GCM_192(
   out AuthTag: TUAES.TTag
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_GCM_192(Cipher, Key, Nonce, AAD, False, AuthTag);
+  Result := TUAES.Process_GCM_192(Cipher, Key, Nonce, AAD, False, AuthTag);
 end;
 
 function UEncrypt_AES_GCM_256(
@@ -2969,7 +3382,7 @@ function UEncrypt_AES_GCM_256(
   out AuthTag: TUAES.TTag
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_GCM_256(Data, Key, Nonce, AAD, True, AuthTag);
+  Result := TUAES.Process_GCM_256(Data, Key, Nonce, AAD, True, AuthTag);
 end;
 
 function UDecrypt_AES_GCM_256(
@@ -2980,7 +3393,59 @@ function UDecrypt_AES_GCM_256(
   out AuthTag: TUAES.TTag
 ): TUInt8Array;
 begin
-  Result := TUAES.Process_AES_GCM_256(Cipher, Key, Nonce, AAD, False, AuthTag);
+  Result := TUAES.Process_GCM_256(Cipher, Key, Nonce, AAD, False, AuthTag);
+end;
+
+function UEncrypt_DES_PKCS7_ECB(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey
+): TUInt8Array;
+begin
+  Result := TUDES.Encrypt_PKCS7_ECB(Data, Key);
+end;
+
+function UDecrypt_DES_PKCS7_ECB(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey
+): TUInt8Array;
+begin
+  Result := TUDES.Decrypt_PKCS7_ECB(Cipher, Key);
+end;
+
+function UEncrypt_DES_PKCS7_CBC(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey;
+  const IV: TUDES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUDES.Encrypt_PKCS7_CBC(Data, Key, IV);
+end;
+
+function UDecrypt_DES_PKCS7_CBC(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey;
+  const IV: TUDES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUDES.Decrypt_PKCS7_CBC(Cipher, Key, IV);
+end;
+
+function UEncrypt_DES_PKCS7_CTR(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey;
+  const Nonce: TUDES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUDES.Process_CTR(Data, Key, Nonce);
+end;
+
+function UDecrypt_DES_PKCS7_CTR(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey;
+  const Nonce: TUDES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUDES.Process_CTR(Cipher, Key, Nonce);
 end;
 
 end.

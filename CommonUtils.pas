@@ -1893,7 +1893,7 @@ function URandomPi: TUFloat;
 function URandom2Pi: TUFloat;
 function UThreadRandomize: UInt32;
 function UThreadRandom(const Size: UInt32): UInt32;
-function UThreadRandom(var RandomSeed: UInt32; const Size: UInt32): UInt32;
+function URandom(var RandomSeed: UInt32; const Size: UInt32): UInt32;
 function UAddMat(const m0, m1: TUMat): TUMat;
 function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 function USubMat(const m0, m1: TUMat): TUMat;
@@ -11336,10 +11336,10 @@ end;
 
 function UThreadRandom(const Size: UInt32): UInt32;
 begin
-  Result := UThreadRandom(UThreadRandomSeed, Size);
+  Result := URandom(UThreadRandomSeed, Size);
 end;
 
-function UThreadRandom(var RandomSeed: UInt32; const Size: UInt32): UInt32;
+function URandom(var RandomSeed: UInt32; const Size: UInt32): UInt32;
 begin
   RandomSeed := (RandomSeed * 1664525) + 1013904223;
   if Size < 2 then Exit(0);
