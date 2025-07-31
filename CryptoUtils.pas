@@ -480,6 +480,12 @@ function USHA256(const Data: String): TUSHA256Digest;
 
 function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA256Digest;
 
+function UPBKDF2_HMAC_SHA256(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const Iterations: Int32 = 600000
+): TUInt8Array;
+
 function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
 
 function UMakeRSAKey(
@@ -1993,6 +1999,51 @@ begin
   end;
   InnerHashDigest := USHA256(UBytesJoin(i_key_pad, Data));
   Result := USHA256(UBytesJoin(o_key_pad, InnerHashDigest));
+end;
+
+function UPBKDF2_HMAC_SHA256(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const Iterations: Int32 = 600000
+): TUInt8Array;
+  function IntTo4BytesBE(Value: UInt32): TUInt8Array;
+  begin
+    Result := nil;
+    SetLength(Result, 4);
+    Result[0] := Byte((Value shr 24) and $ff);
+    Result[1] := Byte((Value shr 16) and $ff);
+    Result[2] := Byte((Value shr 8) and $ff);
+    Result[3] := Byte(Value and $ff);
+  end;
+  const SHA256_DIGEST_SIZE = SizeOf(TUSHA256Digest);
+  var HashLen, l, i, j, k: Int32;
+  var T, U: TUInt8Array;
+  var BlockIndexBytes: TUInt8Array;
+  var HmacResult: TUSHA256Digest;
+begin
+  Result := nil;
+  HashLen := SHA256_DIGEST_SIZE;
+  l := (KeyLength + HashLen - 1) div HashLen;
+  for i := 1 to l do
+  begin
+    BlockIndexBytes := IntTo4BytesBE(i);
+    HmacResult := UHMAC_SHA256(Password, UBytesJoin(Salt, BlockIndexBytes));
+    SetLength(U, HashLen);
+    Move(HmacResult[0], U[0], HashLen);
+    T := U;
+    for j := 2 to Iterations do
+    begin
+      HmacResult := UHMAC_SHA256(Password, U);
+      SetLength(U, HashLen);
+      Move(HmacResult[0], U[0], HashLen);
+      for k := 0 to HashLen - 1 do
+      begin
+        T[k] := T[k] xor U[k];
+      end;
+    end;
+    Result := UBytesJoin(Result, T);
+  end;
+  SetLength(Result, KeyLength);
 end;
 
 function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
