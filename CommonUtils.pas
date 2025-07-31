@@ -1737,6 +1737,7 @@ function UBytesToBase64(const Bytes: TUInt8Array): String;
 function UBase64ToBytes(const Base64: String): TUInt8Array;
 function UStrToBytes(const Str: String): TUInt8Array;
 function UBytesToString(const Bytes: TUInt8Array): String;
+function UBytesJoin(const a, b: array of UInt8): TUInt8Array; inline;
 function UMatToQuat(const m: TUMat): TUQuat;
 function UQuatToMat(const q: TUQuat): TUMat;
 generic function USignOf<T>(const v: T): T;
@@ -1972,6 +1973,7 @@ generic function UArrPop<T>(var Arr: specialize TUArray<T>): T;
 generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
 generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
 generic function UArrConcat<T>(const Arr: array of T): T;
+generic function UArrJoin<T>(const a, b: array of T): specialize TUArray<T>;
 
 operator + (const a, b: TUVec2): TUVec2;
 operator - (const a, b: TUVec2): TUVec2;
@@ -10220,6 +10222,11 @@ begin
   Move(Bytes[0], Result[1], Length(Bytes));
 end;
 
+function UBytesJoin(const a, b: array of UInt8): TUInt8Array;
+begin
+  Result := specialize UArrJoin<UInt8>(a, b);
+end;
+
 function UMatToQuat(const m: TUMat): TUQuat;
   var mn: TUMat;
   var Trace, SqrtTrace, RcpSqrtTrace, MaxDiag, s: TUFloat;
@@ -13068,6 +13075,17 @@ begin
     Move(Arr[i][0], Result[n], Length(Arr[i]) * SizeOf(Arr[i][0]));
     Inc(n, Length(Arr[i]));
   end;
+end;
+
+generic function UArrJoin<T>(const a, b: array of T): specialize TUArray<T>;
+  var n: Int32;
+begin
+  Result := nil;
+  n := Length(a) + Length(b);
+  if n = 0 then Exit;
+  SetLength(Result, n);
+  if Length(a) > 0 then Move(a[0], Result[0], Length(a) * SizeOf(T));
+  if Length(b) > 0 then Move(b[0], Result[Length(a)], Length(b) * SizeOf(T));
 end;
 // Functions end
 

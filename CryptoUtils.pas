@@ -478,6 +478,8 @@ function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
 function USHA256(const Data: TUInt8Array): TUSHA256Digest;
 function USHA256(const Data: String): TUSHA256Digest;
 
+function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA256Digest;
+
 function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
 
 function UMakeRSAKey(
@@ -1965,6 +1967,32 @@ begin
     Inc(TestCount);
     if TestCount mod 100 = 0 then WriteLn(TestCount);
   until UMillerRabinTest(Result, 100);
+end;
+
+function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA256Digest;
+  const SHA256_DIGEST_SIZE = SizeOf(TUSHA256Digest);
+  const BlockSize = SHA256_DIGEST_SIZE * 2;
+  var PaddedKey, o_key_pad, i_key_pad: array[0..BlockSize - 1] of UInt8;
+  var i: Int32;
+  var HashedKeyDigest, InnerHashDigest: TUSHA256Digest;
+begin
+  UClear(PaddedKey, SizeOf(PaddedKey));
+  if Length(Key) > BlockSize then
+  begin
+    HashedKeyDigest := USHA256(Key);
+    Move(HashedKeyDigest[0], PaddedKey[0], SHA256_DIGEST_SIZE);
+  end
+  else if Length(Key) > 0 then
+  begin
+    Move(Key[0], PaddedKey[0], Length(Key));
+  end;
+  for i := 0 to BlockSize - 1 do
+  begin
+    o_key_pad[i] := PaddedKey[i] xor $5C;
+    i_key_pad[i] := PaddedKey[i] xor $36;
+  end;
+  InnerHashDigest := USHA256(UBytesJoin(i_key_pad, Data));
+  Result := USHA256(UBytesJoin(o_key_pad, InnerHashDigest));
 end;
 
 function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
