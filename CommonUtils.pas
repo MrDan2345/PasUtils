@@ -963,6 +963,7 @@ public
   function ToString: String;
   function ToBase64: String;
   function ToHex: String;
+  function ToInt: Int64;
   function BitsUsed: Int32;
   procedure SetPositive(const Value: Boolean);
   procedure SetNegative(const Value: Boolean);
@@ -1738,6 +1739,9 @@ function UBase64ToBytes(const Base64: String): TUInt8Array;
 function UStrToBytes(const Str: String): TUInt8Array;
 function UBytesToString(const Bytes: TUInt8Array): String;
 function UBytesJoin(const a, b: array of UInt8): TUInt8Array; inline;
+function UBytesConcat(const Bytes: array of TUInt8Array): TUInt8Array; inline;
+function UBytesCompare(const a, b: array of UInt8): Int8; inline;
+function UBytesEqual(const a, b: array of UInt8): Boolean;
 function UMatToQuat(const m: TUMat): TUQuat;
 function UQuatToMat(const q: TUQuat): TUMat;
 generic function USignOf<T>(const v: T): T;
@@ -1895,6 +1899,7 @@ function URandom2Pi: TUFloat;
 function UThreadRandomize: UInt32;
 function UThreadRandom(const Size: UInt32): UInt32;
 function URandom(var RandomSeed: UInt32; const Size: UInt32): UInt32;
+function URandomBytes(const Size: UInt32): TUInt8Array;
 function UAddMat(const m0, m1: TUMat): TUMat;
 function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 function USubMat(const m0, m1: TUMat): TUMat;
@@ -1974,6 +1979,7 @@ generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): I
 generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
 generic function UArrConcat<TArr>(const Arr: array of TArr): TArr;
 generic function UArrJoin<T>(const a, b: array of T): specialize TUArray<T>;
+generic function UArrCompare<T>(const a, b: array of T): Int8;
 
 operator + (const a, b: TUVec2): TUVec2;
 operator - (const a, b: TUVec2): TUVec2;
@@ -5573,6 +5579,14 @@ begin
   end;
   Result := Result.TrimLeft('0');
   if IsNegative then Result := '-' + Result;
+end;
+
+function TUInt4096Impl.ToInt: Int64;
+begin
+  Result := 0;
+  PUInt32Arr(@Result)^[0] := Self[0];
+  PUInt32Arr(@Result)^[1] := Self[1] and $7fffffff;
+  if IsNegative then Result := -Result;
 end;
 
 function TUInt4096Impl.BitsUsed: Int32;
@@ -10227,6 +10241,27 @@ begin
   Result := specialize UArrJoin<UInt8>(a, b);
 end;
 
+function UBytesConcat(const Bytes: array of TUInt8Array): TUInt8Array;
+begin
+  Result := specialize UArrConcat<TUInt8Array>(Bytes);
+end;
+
+function UBytesCompare(const a, b: array of UInt8): Int8;
+begin
+  Result := specialize UArrCompare<UInt8>(a, b);
+end;
+
+function UBytesEqual(const a, b: array of UInt8): Boolean;
+  var i: Int32;
+begin
+  if Length(a) <> Length(b) then Exit(False);
+  for i := 0 to High(a) do
+  begin
+    if a[i] <> b[i] then Exit(False);
+  end;
+  Result := True;
+end;
+
 function UMatToQuat(const m: TUMat): TUQuat;
   var mn: TUMat;
   var Trace, SqrtTrace, RcpSqrtTrace, MaxDiag, s: TUFloat;
@@ -11351,6 +11386,17 @@ begin
   RandomSeed := (RandomSeed * 1664525) + 1013904223;
   if Size < 2 then Exit(0);
   Result := UInt32((UInt64(RandomSeed) * UInt64(Size)) shr 32);
+end;
+
+function URandomBytes(const Size: UInt32): TUInt8Array;
+  var i: UInt32;
+begin
+  Result := nil;
+  SetLength(Result, Size);
+  for i := 0 to High(Result) do
+  begin
+    Result[i] := UThreadRandom(256);
+  end;
 end;
 
 function UAddMat(const m0, m1: TUMat): TUMat;
@@ -13086,6 +13132,19 @@ begin
   SetLength(Result, n);
   if Length(a) > 0 then Move(a[0], Result[0], Length(a) * SizeOf(T));
   if Length(b) > 0 then Move(b[0], Result[Length(a)], Length(b) * SizeOf(T));
+end;
+
+generic function UArrCompare<T>(const a, b: array of T): Int8;
+  var i: Int32;
+begin
+  if Length(a) < Length(b) then Exit(-1)
+  else if Length(a) > Length(b) then Exit(1);
+  for i := 0 to High(a) do
+  begin
+    if a[i] < b[i] then Exit(-1)
+    else if a[i] > b[i] then Exit(0);
+  end;
+  Result := 0;
 end;
 // Functions end
 

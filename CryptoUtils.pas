@@ -40,9 +40,21 @@ public
     class function MakeInvalid: TKey; static;
   end;
 public
-  const RSA_OID: array[0..8] of UInt8 = (
+  const OID_RSA: array[0..8] of UInt8 = (
     $2A, $86, $48, $86, $F7, $0D, $01, $01, $01
-  ); //rsaEncryption (1.2.840.113549.1.1.1)
+  ); // 1.2.840.113549.1.1.1
+  const OID_PBES2: array[0..8] of UInt8 = (
+    $2A, $86, $48, $86, $F7, $0D, $01, $05, $0D
+  ); // 1.2.840.113549.1.5.13
+  const OID_PBKDF2: array[0..8] of UInt8 = (
+    $2A, $86, $48, $86, $F7, $0D, $01, $05, $0C
+  ); // 1.2.840.113549.1.5.12
+  const OID_HMAC_SHA256: array[0..7] of UInt8 = (
+    $2A, $86, $48, $86, $F7, $0D, $02, $09
+  ); // 1.2.840.113549.2.9
+  const OID_AES256_CBC: array[0..8] of UInt8 = (
+    $60, $86, $48, $01, $65, $03, $04, $01, $2A
+  ); // 2.16.840.1.101.3.4.1.42
   type TMakePrimeContext = record
     BitCount: Int32;
     Primes: array of TUInt4096;
@@ -153,11 +165,20 @@ public
   class function ExportKeyPrivate_PKCS1(const Key: TURSA.TKey): String; static;
   class function ExportKeyPublic_PKCS1(const Key: TURSA.TKey): String; static;
   class function ExportKeyPrivate_PKCS8(const Key: TURSA.TKey): String; static;
+  class function ExportKeyPrivateEncrypted_PKCS8(
+    const Key: TURSA.TKey;
+    const Password: TUInt8Array;
+    const IterationCount: Int32 = 600000
+  ): String; static;
   class function ExportKeyPublic_X509(const Key: TURSA.TKey): String; static;
   class function ImportKeyPrivate_PKCS1(const Key: String): TURSA.TKey; static;
   class function ImportKeyPublic_PKCS1(const Key: String): TURSA.TKey; static;
   class function ImportKey_PKCS1(const Key: String): TURSA.TKey; static;
   class function ImportKeyPrivate_PKCS8(const Key: String): TURSA.TKey; static;
+  class function ImportKeyPrivateEncrypted_PKCS8(
+    const Key: String;
+    const Password: TUInt8Array
+  ): TURSA.TKey; static;
   class function ImportKeyPublic_X509(const Key: String): TURSA.TKey; static;
 end;
 
@@ -1503,7 +1524,7 @@ class function TURSA.ExportKeyPrivate_PKCS8(const Key: TURSA.TKey): String;
 begin
   pkcs1_der := ExportKeyPrivate_PKCS1_DER(Key);
   octet_string_sequence := EncodeTLV($04, pkcs1_der);
-  oid_sequence := EncodeTLV($06, RSA_OID);
+  oid_sequence := EncodeTLV($06, OID_RSA);
   null_sequence := EncodeTLV($05, []);
   algid_content := specialize UArrConcat<TUInt8Array>([oid_sequence, null_sequence]);
   algid_sequence := EncodeTLV($30, algid_content);
@@ -1515,6 +1536,54 @@ begin
       octet_string_sequence
     ])
   );
+  Result := ASN1ToBase64(SequenceContent, Header, Footer);
+end;
+
+class function TURSA.ExportKeyPrivateEncrypted_PKCS8(
+  const Key: TURSA.TKey;
+  const Password: TUInt8Array;
+  const IterationCount: Int32
+): String;
+  var Salt, IV, DerivedKey, PlaintextDER, EncryptedData: TUInt8Array;
+  var PBKDF2_Params, KDF_AlgId: TUInt8Array;
+  var EncScheme_AlgId, PBES2_Params, Enc_AlgId: TUInt8Array;
+  var SequenceContent: TUInt8Array;
+  var AESKey: TUAES.TKey256;
+  var AESIV: TUAES.TInitVector;
+  const Header: String = '-----BEGIN ENCRYPTED PRIVATE KEY-----';
+  const Footer: String = '-----END ENCRYPTED PRIVATE KEY-----';
+begin
+  Salt := URandomBytes(16);
+  IV := URandomBytes(16);
+  DerivedKey := UPBKDF2_HMAC_SHA256(Password, Salt, 32, IterationCount);
+  PlaintextDER := ExportKeyPrivate_PKCS1_DER(Key);
+  Move(DerivedKey[0], AESKey[0], 32);
+  Move(IV[0], AESIV[0], 16);
+  EncryptedData := UEncrypt_AES_PKCS7_CBC_256(PlaintextDER, AESKey, AESIV);
+  PBKDF2_Params := UBytesConcat([
+    EncodeTLV($04, Salt),
+    EncodeTLV($02, PackDER(IterationCount))
+  ]);
+  KDF_AlgId := UBytesConcat([
+    EncodeTLV($06, OID_PBKDF2),
+    EncodeTLV($30, PBKDF2_Params)
+  ]);
+  KDF_AlgId := EncodeTLV($30, KDF_AlgId);
+  EncScheme_AlgId := UBytesConcat([
+    EncodeTLV($06, OID_AES256_CBC),
+    EncodeTLV($04, IV)
+  ]);
+  EncScheme_AlgId := EncodeTLV($30, EncScheme_AlgId);
+  PBES2_Params := UBytesConcat([KDF_AlgId, EncScheme_AlgId]);
+  Enc_AlgId := UBytesConcat([
+    EncodeTLV($06, OID_PBES2),
+    EncodeTLV($30, PBES2_Params)
+  ]);
+  SequenceContent := UBytesConcat([
+    EncodeTLV($30, Enc_AlgId),
+    EncodeTLV($04, EncryptedData)
+  ]);
+  SequenceContent := EncodeTLV($30, SequenceContent);
   Result := ASN1ToBase64(SequenceContent, Header, Footer);
 end;
 
@@ -1535,7 +1604,7 @@ begin
     EncodeTLV($30, KeyContent)
   ]);
   AlgIdContent := specialize UArrConcat<TUInt8Array>([
-    EncodeTLV($06, RSA_OID),
+    EncodeTLV($06, OID_RSA),
     EncodeTLV($05, [])
   ]);
   SequenceContent := EncodeTLV(
@@ -1641,10 +1710,72 @@ begin
   if Tag <> $30 then Exit;
   i := 0;
   AlgId := DecodeTLV(AlgIdContent, i, Tag);
-  if (Tag <> $06) or (Length(AlgId) <> Length(RSA_OID)) then Exit;
-  for i := 0 to High(RSA_OID) do if AlgId[i] <> RSA_OID[i] then Exit;
+  if (Tag <> $06) or (Length(AlgId) <> Length(OID_RSA)) then Exit;
+  for i := 0 to High(OID_RSA) do if AlgId[i] <> OID_RSA[i] then Exit;
   PKCS1_Content := DecodeTLV(MainContent, Index, Tag);
   if Tag <> $04 then Exit;
+  Result := ImportKeyPrivate_PKCS1_DER(PKCS1_Content);
+end;
+
+class function TURSA.ImportKeyPrivateEncrypted_PKCS8(
+  const Key: String;
+  const Password: TUInt8Array
+): TURSA.TKey;
+  var Index: Int32;
+  var Tag: UInt8;
+  var OID, DERData, MainContent: TUInt8Array;
+  var Enc_AlgId, EncryptedData, PBES2_Params, PBKDF2_Params: TUInt8Array;
+  var KDF_AlgId, EncScheme_AlgId, PKCS1_Content: TUInt8Array;
+  var IV, Salt, IterationCountDER, DerivedKey: TUInt8Array;
+  var AESKey: TUAES.TKey256;
+  var AESIV: TUAES.TInitVector;
+  var IterationCount: Int32;
+  const Header: String = '-----BEGIN ENCRYPTED PRIVATE KEY-----';
+  const Footer: String = '-----END ENCRYPTED PRIVATE KEY-----';
+begin
+  Result := TKey.MakeInvalid;
+  DERData := Base64ToASN1(Key, Header, Footer);
+  Index := 0;
+  MainContent := DecodeTLV(DERData, Index, Tag);
+  if Tag <> $30 then Exit;
+  Index := 0;
+  Enc_AlgId := DecodeTLV(MainContent, Index, Tag);
+  if Tag <> $30 then Exit;
+  EncryptedData := DecodeTLV(MainContent, Index, Tag);
+  if Tag <> $04 then Exit;
+  Index := 0;
+  OID := DecodeTLV(Enc_AlgId, Index, Tag);
+  if Tag <> $06 then Exit;
+  if not UBytesEqual(OID, OID_PBES2) then Exit;
+  PBES2_Params := DecodeTLV(Enc_AlgId, Index, Tag);
+  if Tag <> $30 then Exit;
+  Index := 0;
+  KDF_AlgId := DecodeTLV(PBES2_Params, Index, Tag);
+  if Tag <> $30 then Exit;
+  EncScheme_AlgId := DecodeTLV(PBES2_Params, Index, Tag);
+  if Tag <> $30 then Exit;
+  Index := 0;
+  OID := DecodeTLV(KDF_AlgId, Index, Tag);
+  if Tag <> $06 then Exit;
+  if not UBytesEqual(OID, OID_PBKDF2) then Exit;
+  PBKDF2_Params := DecodeTLV(KDF_AlgId, Index, Tag);
+  if Tag <> $30 then Exit;
+  Index := 0;
+  Salt := DecodeTLV(PBKDF2_Params, Index, Tag);
+  if Tag <> $04 then Exit;
+  IterationCountDER := DecodeTLV(PBKDF2_Params, Index, Tag);
+  if Tag <> $02 then Exit;
+  IterationCount := UnpackDER(IterationCountDER).ToInt;
+  Index := 0;
+  OID := DecodeTLV(EncScheme_AlgId, Index, Tag);
+  if Tag <> $06 then Exit;
+  if not UBytesEqual(OID, OID_AES256_CBC) then Exit;
+  IV := DecodeTLV(EncScheme_AlgId, Index, Tag);
+  if Tag <> $04 then Exit;
+  DerivedKey := UPBKDF2_HMAC_SHA256(Password, Salt, 32, IterationCount);
+  Move(DerivedKey[0], AESKey, SizeOf(AESKey));
+  Move(IV[0], AESIV, SizeOf(AESIV));
+  PKCS1_Content := UDecrypt_AES_PKCS7_CBC_256(EncryptedData, AESKey, AESIV);
   Result := ImportKeyPrivate_PKCS1_DER(PKCS1_Content);
 end;
 
@@ -1667,8 +1798,8 @@ begin
   if Tag <> $30 then Exit;
   i := 0;
   AlgId := DecodeTLV(AlgIdContent, i, Tag);
-  if (Tag <> $06) or (Length(AlgId) <> Length(RSA_OID)) then Exit;
-  for i := 0 to High(RSA_OID) do if AlgId[i] <> RSA_OID[i] then Exit;
+  if (Tag <> $06) or (Length(AlgId) <> Length(OID_RSA)) then Exit;
+  for i := 0 to High(OID_RSA) do if AlgId[i] <> OID_RSA[i] then Exit;
   BitStringContent := DecodeTLV(MainContent, Index, Tag);
   if Tag <> $03 then Exit;
   if (Length(BitStringContent) = 0) or (BitStringContent[0] <> 0) then Exit;
