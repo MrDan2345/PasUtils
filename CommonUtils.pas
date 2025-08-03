@@ -11372,7 +11372,7 @@ end;
 
 function UThreadRandomize: UInt32;
 begin
-  UThreadRandomSeed := TThread.GetTickCount;
+  UThreadRandomSeed := UInt32(TThread.GetTickCount64);
   Result := UThreadRandomSeed;
 end;
 
