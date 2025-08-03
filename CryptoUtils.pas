@@ -1545,8 +1545,6 @@ class function TURSA.ExportKeyPrivateEncrypted_PKCS8(
   const IterationCount: Int32
 ): String;
   var Salt, IV, DerivedKey, PlaintextDER, EncryptedData: TUInt8Array;
-  var PBKDF2_Params, KDF_AlgId: TUInt8Array;
-  var EncScheme_AlgId, PBES2_Params, Enc_AlgId: TUInt8Array;
   var SequenceContent: TUInt8Array;
   var AESKey: TUAES.TKey256;
   var AESIV: TUAES.TInitVector;
@@ -1560,30 +1558,29 @@ begin
   Move(DerivedKey[0], AESKey[0], 32);
   Move(IV[0], AESIV[0], 16);
   EncryptedData := UEncrypt_AES_PKCS7_CBC_256(PlaintextDER, AESKey, AESIV);
-  PBKDF2_Params := UBytesConcat([
-    EncodeTLV($04, Salt),
-    EncodeTLV($02, PackDER(IterationCount))
-  ]);
-  KDF_AlgId := UBytesConcat([
-    EncodeTLV($06, OID_PBKDF2),
-    EncodeTLV($30, PBKDF2_Params)
-  ]);
-  KDF_AlgId := EncodeTLV($30, KDF_AlgId);
-  EncScheme_AlgId := UBytesConcat([
-    EncodeTLV($06, OID_AES256_CBC),
-    EncodeTLV($04, IV)
-  ]);
-  EncScheme_AlgId := EncodeTLV($30, EncScheme_AlgId);
-  PBES2_Params := UBytesConcat([KDF_AlgId, EncScheme_AlgId]);
-  Enc_AlgId := UBytesConcat([
-    EncodeTLV($06, OID_PBES2),
-    EncodeTLV($30, PBES2_Params)
-  ]);
-  SequenceContent := UBytesConcat([
-    EncodeTLV($30, Enc_AlgId),
+  SequenceContent := EncodeTLV($30, UBytesConcat([
+    EncodeTLV($30, UBytesConcat([
+      EncodeTLV($06, OID_PBES2),
+      EncodeTLV($30, UBytesConcat([
+        EncodeTLV($30, UBytesConcat([
+          EncodeTLV($06, OID_PBKDF2),
+          EncodeTLV($30, UBytesConcat([
+            EncodeTLV($04, Salt),
+            EncodeTLV($02, PackDER(IterationCount)),
+            EncodeTLV($30, UBytesConcat([
+              EncodeTLV($06, OID_HMAC_SHA256),
+              EncodeTLV($05, [])
+            ]))
+          ]))
+        ])),
+        EncodeTLV($30, UBytesConcat([
+          EncodeTLV($06, OID_AES256_CBC),
+          EncodeTLV($04, IV)
+        ]))
+      ]))
+    ])),
     EncodeTLV($04, EncryptedData)
-  ]);
-  SequenceContent := EncodeTLV($30, SequenceContent);
+  ]));
   Result := ASN1ToBase64(SequenceContent, Header, Footer);
 end;
 
@@ -1725,7 +1722,7 @@ class function TURSA.ImportKeyPrivateEncrypted_PKCS8(
   var Tag: UInt8;
   var OID, DERData, MainContent: TUInt8Array;
   var Enc_AlgId, EncryptedData, PBES2_Params, PBKDF2_Params: TUInt8Array;
-  var KDF_AlgId, EncScheme_AlgId, PKCS1_Content: TUInt8Array;
+  var KDF_AlgId, EncScheme_AlgId, PKCS1_Content, PRF_AlgId: TUInt8Array;
   var IV, Salt, IterationCountDER, DerivedKey: TUInt8Array;
   var AESKey: TUAES.TKey256;
   var AESIV: TUAES.TInitVector;
@@ -1766,6 +1763,12 @@ begin
   IterationCountDER := DecodeTLV(PBKDF2_Params, Index, Tag);
   if Tag <> $02 then Exit;
   IterationCount := UnpackDER(IterationCountDER).ToInt;
+  PRF_AlgId := DecodeTLV(PBKDF2_Params, Index, Tag);
+  if (Tag <> $30) then Exit;
+  Index := 0;
+  OID := DecodeTLV(PRF_AlgId, Index, Tag);
+  if Tag <> $06 then Exit;
+  if not UBytesEqual(OID, OID_HMAC_SHA256) then Exit;
   Index := 0;
   OID := DecodeTLV(EncScheme_AlgId, Index, Tag);
   if Tag <> $06 then Exit;
