@@ -429,6 +429,7 @@ end;
 type TUDES = record
 public
   type TKey = array[0..7] of UInt8;
+  type TKey3 = array[0..23] of UInt8;
   type TInitVector = array[0..7] of UInt8;
 private
   type T64BitBlock = UInt64;
@@ -524,7 +525,12 @@ private
   class function Decrypt_PKCS7_ECB(const Cipher: TUInt8Array; const Key: TKey): TUInt8Array; static;
   class function Encrypt_PKCS7_CBC(const Data: TUInt8Array; const Key: TKey; const IV: TInitVector): TUInt8Array; static;
   class function Decrypt_PKCS7_CBC(const Cipher: TUInt8Array; const Key: TKey; const IV: TInitVector): TUInt8Array; static;
+  class function Encrypt_PKCS7_Triple_ECB(const Data: TUInt8Array; const Key: TKey3): TUInt8Array; static;
+  class function Decrypt_PKCS7_Triple_ECB(const Cipher: TUInt8Array; const Key: TKey3): TUInt8Array; static;
+  class function Encrypt_PKCS7_Triple_CBC(const Data: TUInt8Array; const Key: TKey3; const IV: TInitVector): TUInt8Array; static;
+  class function Decrypt_PKCS7_Triple_CBC(const Cipher: TUInt8Array; const Key: TKey3; const IV: TInitVector): TUInt8Array; static;
   class function Process_CTR(const Input: TUInt8Array; const Key: TKey; const Nonce: TInitVector): TUInt8Array; static;
+  class function Process_Triple_CTR(const Input: TUInt8Array; const Key: TKey3; const Nonce: TInitVector): TUInt8Array; static;
 end;
 
 function USHA1(const Data: Pointer; const DataSize: UInt32): TUSHA1Digest;
@@ -539,7 +545,9 @@ function USHA512(const Data: Pointer; const DataSize: UInt32): TUSHA512Digest;
 function USHA512(const Data: TUInt8Array): TUSHA512Digest;
 function USHA512(const Data: String): TUSHA512Digest;
 
+function UHMAC_SHA1(const Key, Data: TUInt8Array): TUSHA1Digest;
 function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA256Digest;
+function UHMAC_SHA512(const Key, Data: TUInt8Array): TUSHA512Digest;
 
 function UPBKDF2_HMAC_SHA256(
   const Password, Salt: TUInt8Array;
@@ -749,6 +757,35 @@ function UEncrypt_DES_PKCS7_CTR(
 function UDecrypt_DES_PKCS7_CTR(
   const Cipher: TUInt8Array;
   const Key: TUDES.TKey;
+  const Nonce: TUDES.TInitVector
+): TUInt8Array;
+
+function UEncrypt_DES_Triple_PKCS7_ECB(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey3
+): TUInt8Array;
+function UDecrypt_DES_Triple_PKCS7_ECB(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey3
+): TUInt8Array;
+function UEncrypt_DES_Triple_PKCS7_CBC(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey3;
+  const IV: TUDES.TInitVector
+): TUInt8Array;
+function UDecrypt_DES_Triple_PKCS7_CBC(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey3;
+  const IV: TUDES.TInitVector
+): TUInt8Array;
+function UEncrypt_DES_Triple_PKCS7_CTR(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey3;
+  const Nonce: TUDES.TInitVector
+): TUInt8Array;
+function UDecrypt_DES_Triple_PKCS7_CTR(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey3;
   const Nonce: TUDES.TInitVector
 ): TUInt8Array;
 
@@ -2382,9 +2419,35 @@ begin
   Result := USHA512(@Data[1], Length(Data));
 end;
 
+function UHMAC_SHA1(const Key, Data: TUInt8Array): TUSHA1Digest;
+  const DigestSize = SizeOf(TUSHA1Digest);
+  const BlockSize = DigestSize * 2;
+  var PaddedKey, o_key_pad, i_key_pad: array[0..BlockSize - 1] of UInt8;
+  var i: Int32;
+  var HashedKeyDigest, InnerHashDigest: TUSHA1Digest;
+begin
+  UClear(PaddedKey, SizeOf(PaddedKey));
+  if Length(Key) > BlockSize then
+  begin
+    HashedKeyDigest := USHA1(Key);
+    Move(HashedKeyDigest[0], PaddedKey[0], DigestSize);
+  end
+  else if Length(Key) > 0 then
+  begin
+    Move(Key[0], PaddedKey[0], Length(Key));
+  end;
+  for i := 0 to BlockSize - 1 do
+  begin
+    o_key_pad[i] := PaddedKey[i] xor $5C;
+    i_key_pad[i] := PaddedKey[i] xor $36;
+  end;
+  InnerHashDigest := USHA1(UBytesJoin(i_key_pad, Data));
+  Result := USHA1(UBytesJoin(o_key_pad, InnerHashDigest));
+end;
+
 function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA256Digest;
-  const SHA256_DIGEST_SIZE = SizeOf(TUSHA256Digest);
-  const BlockSize = SHA256_DIGEST_SIZE * 2;
+  const DigestSize = SizeOf(TUSHA256Digest);
+  const BlockSize = DigestSize * 2;
   var PaddedKey, o_key_pad, i_key_pad: array[0..BlockSize - 1] of UInt8;
   var i: Int32;
   var HashedKeyDigest, InnerHashDigest: TUSHA256Digest;
@@ -2393,7 +2456,7 @@ begin
   if Length(Key) > BlockSize then
   begin
     HashedKeyDigest := USHA256(Key);
-    Move(HashedKeyDigest[0], PaddedKey[0], SHA256_DIGEST_SIZE);
+    Move(HashedKeyDigest[0], PaddedKey[0], DigestSize);
   end
   else if Length(Key) > 0 then
   begin
@@ -2406,6 +2469,32 @@ begin
   end;
   InnerHashDigest := USHA256(UBytesJoin(i_key_pad, Data));
   Result := USHA256(UBytesJoin(o_key_pad, InnerHashDigest));
+end;
+
+function UHMAC_SHA512(const Key, Data: TUInt8Array): TUSHA512Digest;
+  const DigestSize = SizeOf(TUSHA512Digest);
+  const BlockSize = DigestSize * 2;
+  var PaddedKey, o_key_pad, i_key_pad: array[0..BlockSize - 1] of UInt8;
+  var i: Int32;
+  var HashedKeyDigest, InnerHashDigest: TUSHA512Digest;
+begin
+  UClear(PaddedKey, SizeOf(PaddedKey));
+  if Length(Key) > BlockSize then
+  begin
+    HashedKeyDigest := USHA512(Key);
+    Move(HashedKeyDigest[0], PaddedKey[0], DigestSize);
+  end
+  else if Length(Key) > 0 then
+  begin
+    Move(Key[0], PaddedKey[0], Length(Key));
+  end;
+  for i := 0 to BlockSize - 1 do
+  begin
+    o_key_pad[i] := PaddedKey[i] xor $5C;
+    i_key_pad[i] := PaddedKey[i] xor $36;
+  end;
+  InnerHashDigest := USHA512(UBytesJoin(i_key_pad, Data));
+  Result := USHA512(UBytesJoin(o_key_pad, InnerHashDigest));
 end;
 
 function UPBKDF2_HMAC_SHA256(
@@ -3377,11 +3466,8 @@ begin
   );
 end;
 
-class function TUDES.Permute(
-  const Input: T64BitBlock;
-  const Table: array of UInt8;
-  const InSize, OutSize: Int32
-): T64BitBlock;
+class function TUDES.Permute(const Input: T64BitBlock;
+  const Table: array of Byte; const InSize, OutSize: Int32): T64BitBlock;
   var i: Int32;
 begin
   Result := 0;
@@ -3631,6 +3717,137 @@ begin
   Result := UnpadData_PKCS7(DataPadded);
 end;
 
+class function TUDES.Encrypt_PKCS7_Triple_ECB(
+  const Data: TUInt8Array;
+  const Key: TKey3
+): TUInt8Array;
+  var SubKeys1, SubKeys2, SubKeys3: TSubKeys;
+  var Key1: TKey absolute Key[0];
+  var Key2: TKey absolute Key[8];
+  var Key3: TKey absolute Key[16];
+  var PaddedData: TUInt8Array;
+  var Block: T64BitBlock;
+  var i, j: Int32;
+begin
+  SubKeys1 := GenerateSubKeys(Key1);
+  SubKeys2 := GenerateSubKeys(Key2);
+  SubKeys3 := GenerateSubKeys(Key3);
+  PaddedData := PadData_PKCS7(Data, 8);
+  Result := nil;
+  SetLength(Result, Length(PaddedData));
+  for i := 0 to (Length(PaddedData) div 8) - 1 do
+  begin
+    Block := 0;
+    for j := 0 to 7 do Block := (Block shl 8) or PaddedData[i * 8 + j];
+    ProcessDESBlock(Block, SubKeys1, True);
+    ProcessDESBlock(Block, SubKeys2, False);
+    ProcessDESBlock(Block, SubKeys3, True);
+    for j := 0 to 7 do Result[i * 8 + j] := (Block shr (56 - j * 8)) and $ff;
+  end;
+end;
+
+class function TUDES.Decrypt_PKCS7_Triple_ECB(
+  const Cipher: TUInt8Array;
+  const Key: TKey3
+): TUInt8Array;
+  var SubKeys1, SubKeys2, SubKeys3: TSubKeys;
+  var Key1: TKey absolute Key[0];
+  var Key2: TKey absolute Key[8];
+  var Key3: TKey absolute Key[16];
+  var PaddedData: TUInt8Array;
+  var Block: T64BitBlock;
+  var i, j: Int32;
+begin
+  Result := nil;
+  if (Length(Cipher) mod 8) <> 0 then Exit;
+  SubKeys1 := GenerateSubKeys(Key1);
+  SubKeys2 := GenerateSubKeys(Key2);
+  SubKeys3 := GenerateSubKeys(Key3);
+  PaddedData := nil;
+  SetLength(PaddedData, Length(Cipher));
+  for i := 0 to (Length(Cipher) div 8) - 1 do
+  begin
+    Block := 0;
+    for j := 0 to 7 do Block := (Block shl 8) or Cipher[i * 8 + j];
+    ProcessDESBlock(Block, SubKeys3, False);
+    ProcessDESBlock(Block, SubKeys2, True);
+    ProcessDESBlock(Block, SubKeys1, False);
+    for j := 0 to 7 do PaddedData[i * 8 + j] := (Block shr (56 - j * 8)) and $ff;
+  end;
+  Result := UnpadData_PKCS7(PaddedData);
+end;
+
+class function TUDES.Encrypt_PKCS7_Triple_CBC(
+  const Data: TUInt8Array;
+  const Key: TKey3;
+  const IV: TInitVector
+): TUInt8Array;
+  var SubKeys1, SubKeys2, SubKeys3: TSubKeys;
+  var Key1: TKey absolute Key[0];
+  var Key2: TKey absolute Key[8];
+  var Key3: TKey absolute Key[16];
+  var PaddedData: TUInt8Array;
+  var Block, PrevCipherBlock: T64BitBlock;
+  var i, j: Int32;
+begin
+  SubKeys1 := GenerateSubKeys(Key1);
+  SubKeys2 := GenerateSubKeys(Key2);
+  SubKeys3 := GenerateSubKeys(Key3);
+  PaddedData := PadData_PKCS7(Data, 8);
+  Result := nil;
+  SetLength(Result, Length(PaddedData));
+  PrevCipherBlock := 0;
+  for i := 0 to 7 do PrevCipherBlock := (PrevCipherBlock shl 8) or IV[i];
+  for i := 0 to (Length(PaddedData) div 8) - 1 do
+  begin
+    Block := 0;
+    for j := 0 to 7 do Block := (Block shl 8) or PaddedData[i * 8 + j];
+    Block := Block xor PrevCipherBlock;
+    ProcessDESBlock(Block, SubKeys1, True);
+    ProcessDESBlock(Block, SubKeys2, False);
+    ProcessDESBlock(Block, SubKeys3, True);
+    PrevCipherBlock := Block;
+    for j := 0 to 7 do Result[i * 8 + j] := (Block shr (56 - j * 8)) and $ff;
+  end;
+end;
+
+class function TUDES.Decrypt_PKCS7_Triple_CBC(
+  const Cipher: TUInt8Array;
+  const Key: TKey3;
+  const IV: TInitVector
+): TUInt8Array;
+  var SubKeys1, SubKeys2, SubKeys3: TSubKeys;
+  var Key1: TKey absolute Key[0];
+  var Key2: TKey absolute Key[8];
+  var Key3: TKey absolute Key[16];
+  var DecryptedPadded: TUInt8Array;
+  var Block, PrevCipherBlock, PlaintextBlock: T64BitBlock;
+  var i, j: Int32;
+begin
+  Result := nil;
+  if (Length(Cipher) mod 8) <> 0 then Exit;
+  SubKeys1 := GenerateSubKeys(Key1);
+  SubKeys2 := GenerateSubKeys(Key2);
+  SubKeys3 := GenerateSubKeys(Key3);
+  DecryptedPadded := nil;
+  SetLength(DecryptedPadded, Length(Cipher));
+  PrevCipherBlock := 0;
+  for i := 0 to 7 do PrevCipherBlock := (PrevCipherBlock shl 8) or IV[i];
+  for i := 0 to (Length(Cipher) div 8) - 1 do
+  begin
+    Block := 0;
+    for j := 0 to 7 do Block := (Block shl 8) or Cipher[i * 8 + j];
+    PlaintextBlock := Block;
+    ProcessDESBlock(PlaintextBlock, SubKeys3, False);
+    ProcessDESBlock(PlaintextBlock, SubKeys2, True);
+    ProcessDESBlock(PlaintextBlock, SubKeys1, False);
+    PlaintextBlock := PlaintextBlock xor PrevCipherBlock;
+    PrevCipherBlock := Block;
+    for j := 0 to 7 do DecryptedPadded[i * 8 + j] := (PlaintextBlock shr (56 - j * 8)) and $ff;
+  end;
+  Result := UnpadData_PKCS7(DecryptedPadded);
+end;
+
 class function TUDES.Process_CTR(
   const Input: TUInt8Array;
   const Key: TKey;
@@ -3654,6 +3871,39 @@ begin
     begin
       KeystreamBlock := CounterBlock;
       ProcessDESBlock(KeystreamBlock, SubKeys, True);
+      Inc(CounterBlock);
+    end;
+    Result[i] := Input[i] xor Byte((KeystreamBlock shr (56 - (i mod 8) * 8)) and $ff);
+  end;
+end;
+
+class function TUDES.Process_Triple_CTR(
+  const Input: TUInt8Array;
+  const Key: TKey3;
+  const Nonce: TInitVector
+): TUInt8Array;
+  var SubKeys1, SubKeys2, SubKeys3: TSubKeys;
+  var Key1: TKey absolute Key[0];
+  var Key2: TKey absolute Key[8];
+  var Key3: TKey absolute Key[16];
+  var CounterBlock, KeystreamBlock: T64BitBlock;
+  var i, j: Int32;
+begin
+  SubKeys1 := GenerateSubKeys(Key1);
+  SubKeys2 := GenerateSubKeys(Key2);
+  SubKeys3 := GenerateSubKeys(Key3);
+  Result := nil;
+  SetLength(Result, Length(Input));
+  CounterBlock := 0;
+  for i := 0 to 7 do CounterBlock := (CounterBlock shl 8) or Nonce[i];
+  for i := 0 to Length(Input) - 1 do
+  begin
+    if (i mod 8) = 0 then
+    begin
+      KeystreamBlock := CounterBlock;
+      ProcessDESBlock(KeystreamBlock, SubKeys1, True);
+      ProcessDESBlock(KeystreamBlock, SubKeys2, False);
+      ProcessDESBlock(KeystreamBlock, SubKeys3, True);
       Inc(CounterBlock);
     end;
     Result[i] := Input[i] xor Byte((KeystreamBlock shr (56 - (i mod 8) * 8)) and $ff);
@@ -3932,6 +4182,58 @@ function UDecrypt_DES_PKCS7_CTR(
 ): TUInt8Array;
 begin
   Result := TUDES.Process_CTR(Cipher, Key, Nonce);
+end;
+
+function UEncrypt_DES_Triple_PKCS7_ECB(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey3
+): TUInt8Array;
+begin
+  Result := TUDES.Encrypt_PKCS7_Triple_ECB(Data, Key);
+end;
+
+function UDecrypt_DES_Triple_PKCS7_ECB(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey3
+): TUInt8Array;
+begin
+  Result := TUDES.Decrypt_PKCS7_Triple_ECB(Cipher, Key);
+end;
+
+function UEncrypt_DES_Triple_PKCS7_CBC(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey3;
+  const IV: TUDES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUDES.Encrypt_PKCS7_Triple_CBC(Data, Key, IV);
+end;
+
+function UDecrypt_DES_Triple_PKCS7_CBC(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey3;
+  const IV: TUDES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUDES.Decrypt_PKCS7_Triple_CBC(Cipher, Key, IV);
+end;
+
+function UEncrypt_DES_Triple_PKCS7_CTR(
+  const Data: TUInt8Array;
+  const Key: TUDES.TKey3;
+  const Nonce: TUDES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUDES.Process_Triple_CTR(Data, Key, Nonce);
+end;
+
+function UDecrypt_DES_Triple_PKCS7_CTR(
+  const Cipher: TUInt8Array;
+  const Key: TUDES.TKey3;
+  const Nonce: TUDES.TInitVector
+): TUInt8Array;
+begin
+  Result := TUDES.Process_Triple_CTR(Cipher, Key, Nonce);
 end;
 
 end.
