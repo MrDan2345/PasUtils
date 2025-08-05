@@ -58,6 +58,9 @@ public
   const OID_SHA_512: array[0..8] of UInt8 = (
     $60, $86, $48, $01, $65, $03, $04, $02, $03
   ); // 2.16.840.1.101.3.4.2.3
+  const OID_HMAC_SHA1: array[0..7] of UInt8 = (
+    $2a, $86, $48, $86, $f7, $0d, $02, $07
+  ); // 1.2.840.113549.2.7
   const OID_HMAC_SHA256: array[0..7] of UInt8 = (
     $2a, $86, $48, $86, $f7, $0d, $02, $09
   ); // 1.2.840.113549.2.9
@@ -202,6 +205,38 @@ public
   class function ExportKeyPublic_PKCS1(const Key: TURSA.TKey): String; static;
   class function ExportKeyPrivate_PKCS8(const Key: TURSA.TKey): String; static;
   class function ExportKeyPrivateEncrypted_PKCS8(
+    const EncryptedKey: TUint8Array;
+    const HMAC_OID: TUInt8Array;
+    const ALG_OID: TUInt8Array;
+    const Salt, IV: TUInt8Array;
+    const IterationCount: Int32
+  ): String; static;
+  class function ExportKeyPrivateEncrypted_PKCS8_SHA256_AES128_CBC(
+    const Key: TURSA.TKey;
+    const Password: TUInt8Array;
+    const IterationCount: Int32 = 600000
+  ): String; static;
+  class function ExportKeyPrivateEncrypted_PKCS8_SHA256_AES192_CBC(
+    const Key: TURSA.TKey;
+    const Password: TUInt8Array;
+    const IterationCount: Int32 = 600000
+  ): String; static;
+  class function ExportKeyPrivateEncrypted_PKCS8_SHA256_AES256_CBC(
+    const Key: TURSA.TKey;
+    const Password: TUInt8Array;
+    const IterationCount: Int32 = 600000
+  ): String; static;
+  class function ExportKeyPrivateEncrypted_PKCS8_SHA512_AES128_CBC(
+    const Key: TURSA.TKey;
+    const Password: TUInt8Array;
+    const IterationCount: Int32 = 600000
+  ): String; static;
+  class function ExportKeyPrivateEncrypted_PKCS8_SHA512_AES192_CBC(
+    const Key: TURSA.TKey;
+    const Password: TUInt8Array;
+    const IterationCount: Int32 = 600000
+  ): String; static;
+  class function ExportKeyPrivateEncrypted_PKCS8_SHA512_AES256_CBC(
     const Key: TURSA.TKey;
     const Password: TUInt8Array;
     const IterationCount: Int32 = 600000
@@ -238,6 +273,11 @@ public
   type TKey256 = array[0..31] of UInt8;
   type TInitVector = array[0..15] of UInt8;
   type TTag = array[0..15] of UInt8;
+  class function MakeIV(const Bytes: TUInt8Array): TInitVector; static;
+  class function MakeIV: TInitVector; static;
+  class function MakeKey128(const Bytes: TUInt8Array): TKey128; static;
+  class function MakeKey192(const Bytes: TUInt8Array): TKey192; static;
+  class function MakeKey256(const Bytes: TUInt8Array): TKey256; static;
 private
   type TBlock = array[0..3, 0..3] of UInt8;
   type TExpandedKey = array[0..14] of TBlock;
@@ -436,6 +476,10 @@ public
   type TKey = array[0..7] of UInt8;
   type TKey3 = array[0..23] of UInt8;
   type TInitVector = array[0..7] of UInt8;
+  class function MakeIV(const Bytes: TUInt8Array): TInitVector; static;
+  class function MakeIV: TInitVector; static;
+  class function MakeKey(const Bytes: TUInt8Array): TKey; static;
+  class function MakeKey3(const Bytes: TUInt8Array): TKey3; static;
 private
   type T64BitBlock = UInt64;
   type T48BitKey = array[0..5] of UInt8;
@@ -554,7 +598,17 @@ function UHMAC_SHA1(const Key, Data: TUInt8Array): TUSHA1Digest;
 function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA256Digest;
 function UHMAC_SHA512(const Key, Data: TUInt8Array): TUSHA512Digest;
 
+function UPBKDF2_HMAC_SHA1(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const Iterations: Int32 = 600000
+): TUInt8Array;
 function UPBKDF2_HMAC_SHA256(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const Iterations: Int32 = 600000
+): TUInt8Array;
+function UPBKDF2_HMAC_SHA512(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const Iterations: Int32 = 600000
@@ -1687,24 +1741,16 @@ begin
 end;
 
 class function TURSA.ExportKeyPrivateEncrypted_PKCS8(
-  const Key: TURSA.TKey;
-  const Password: TUInt8Array;
+  const EncryptedKey: TUint8Array;
+  const HMAC_OID: TUInt8Array;
+  const ALG_OID: TUInt8Array;
+  const Salt, IV: TUInt8Array;
   const IterationCount: Int32
 ): String;
-  var Salt, IV, DerivedKey, KeyPKCS8, EncryptedData: TUInt8Array;
   var SequenceContent: TUInt8Array;
-  var AESKey: TUAES.TKey256;
-  var AESIV: TUAES.TInitVector;
   const Header: String = '-----BEGIN ENCRYPTED PRIVATE KEY-----';
   const Footer: String = '-----END ENCRYPTED PRIVATE KEY-----';
 begin
-  Salt := URandomBytes(16);
-  IV := URandomBytes(16);
-  DerivedKey := UPBKDF2_HMAC_SHA256(Password, Salt, 32, IterationCount);
-  KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
-  Move(DerivedKey[0], AESKey[0], 32);
-  Move(IV[0], AESIV[0], 16);
-  EncryptedData := UEncrypt_AES_PKCS7_CBC_256(KeyPKCS8, AESKey, AESIV);
   SequenceContent := EncodeTLV($30, UBytesConcat([
     EncodeTLV($30, UBytesConcat([
       EncodeTLV($06, OID_PBES2),
@@ -1715,20 +1761,170 @@ begin
             EncodeTLV($04, Salt),
             EncodeTLV($02, PackDER(IterationCount)),
             EncodeTLV($30, UBytesConcat([
-              EncodeTLV($06, OID_HMAC_SHA256),
+              EncodeTLV($06, HMAC_OID),
               EncodeTLV($05, [])
             ]))
           ]))
         ])),
         EncodeTLV($30, UBytesConcat([
-          EncodeTLV($06, OID_AES256_CBC),
+          EncodeTLV($06, ALG_OID),
           EncodeTLV($04, IV)
         ]))
       ]))
     ])),
-    EncodeTLV($04, EncryptedData)
+    EncodeTLV($04, EncryptedKey)
   ]));
   Result := ASN1ToBase64(SequenceContent, Header, Footer);
+end;
+
+class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA256_AES128_CBC(
+  const Key: TURSA.TKey;
+  const Password: TUInt8Array;
+  const IterationCount: Int32
+): String;
+  var KeyPKCS8, Salt, DerivedKey, EncryptedKey: TUInt8Array;
+  var AESIV: TUAES.TInitVector;
+  var AESKey: TUAES.TKey128;
+  const SaltSize = 16;
+begin
+  KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
+  Salt := URandomBytes(SaltSize);
+  DerivedKey := UPBKDF2_HMAC_SHA256(
+    Password, Salt,
+    SizeOf(AESKey), IterationCount
+  );
+  AESKey := TUAES.MakeKey128(DerivedKey);
+  AESIV := TUAES.MakeIV;
+  EncryptedKey := UEncrypt_AES_PKCS7_CBC_128(KeyPKCS8, AESKey, AESIV);
+  Result := ExportKeyPrivateEncrypted_PKCS8(
+    EncryptedKey, TURSA.OID_HMAC_SHA256, TURSA.OID_AES128_CBC,
+    Salt, AESIV, IterationCount
+  );
+end;
+
+class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA256_AES192_CBC(
+  const Key: TURSA.TKey;
+  const Password: TUInt8Array;
+  const IterationCount: Int32
+): String;
+  var KeyPKCS8, Salt, DerivedKey, EncryptedKey: TUInt8Array;
+  var AESIV: TUAES.TInitVector;
+  var AESKey: TUAES.TKey192;
+  const SaltSize = 16;
+begin
+  KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
+  Salt := URandomBytes(SaltSize);
+  DerivedKey := UPBKDF2_HMAC_SHA256(
+    Password, Salt,
+    SizeOf(AESKey), IterationCount
+  );
+  AESKey := TUAES.MakeKey192(DerivedKey);
+  AESIV := TUAES.MakeIV;
+  EncryptedKey := UEncrypt_AES_PKCS7_CBC_192(KeyPKCS8, AESKey, AESIV);
+  Result := ExportKeyPrivateEncrypted_PKCS8(
+    EncryptedKey, TURSA.OID_HMAC_SHA256, TURSA.OID_AES192_CBC,
+    Salt, AESIV, IterationCount
+  );
+end;
+
+class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA256_AES256_CBC(
+  const Key: TURSA.TKey;
+  const Password: TUInt8Array;
+  const IterationCount: Int32
+): String;
+  var KeyPKCS8, Salt, DerivedKey, EncryptedKey: TUInt8Array;
+  var AESIV: TUAES.TInitVector;
+  var AESKey: TUAES.TKey256;
+  const SaltSize = 16;
+begin
+  KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
+  Salt := URandomBytes(SaltSize);
+  DerivedKey := UPBKDF2_HMAC_SHA256(
+    Password, Salt,
+    SizeOf(AESKey), IterationCount
+  );
+  AESKey := TUAES.MakeKey256(DerivedKey);
+  AESIV := TUAES.MakeIV;
+  EncryptedKey := UEncrypt_AES_PKCS7_CBC_256(KeyPKCS8, AESKey, AESIV);
+  Result := ExportKeyPrivateEncrypted_PKCS8(
+    EncryptedKey, TURSA.OID_HMAC_SHA256, TURSA.OID_AES256_CBC,
+    Salt, AESIV, IterationCount
+  );
+end;
+
+class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA512_AES128_CBC(
+  const Key: TURSA.TKey;
+  const Password: TUInt8Array;
+  const IterationCount: Int32
+): String;
+  var KeyPKCS8, Salt, DerivedKey, EncryptedKey: TUInt8Array;
+  var AESIV: TUAES.TInitVector;
+  var AESKey: TUAES.TKey128;
+  const SaltSize = 16;
+begin
+  KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
+  Salt := URandomBytes(SaltSize);
+  DerivedKey := UPBKDF2_HMAC_SHA512(
+    Password, Salt,
+    SizeOf(AESKey), IterationCount
+  );
+  AESKey := TUAES.MakeKey128(DerivedKey);
+  AESIV := TUAES.MakeIV;
+  EncryptedKey := UEncrypt_AES_PKCS7_CBC_128(KeyPKCS8, AESKey, AESIV);
+  Result := ExportKeyPrivateEncrypted_PKCS8(
+    EncryptedKey, TURSA.OID_HMAC_SHA512, TURSA.OID_AES128_CBC,
+    Salt, AESIV, IterationCount
+  );
+end;
+
+class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA512_AES192_CBC(
+  const Key: TURSA.TKey;
+  const Password: TUInt8Array;
+  const IterationCount: Int32
+): String;
+  var KeyPKCS8, Salt, DerivedKey, EncryptedKey: TUInt8Array;
+  var AESIV: TUAES.TInitVector;
+  var AESKey: TUAES.TKey192;
+  const SaltSize = 16;
+begin
+  KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
+  Salt := URandomBytes(SaltSize);
+  DerivedKey := UPBKDF2_HMAC_SHA512(
+    Password, Salt,
+    SizeOf(AESKey), IterationCount
+  );
+  AESKey := TUAES.MakeKey192(DerivedKey);
+  AESIV := TUAES.MakeIV;
+  EncryptedKey := UEncrypt_AES_PKCS7_CBC_192(KeyPKCS8, AESKey, AESIV);
+  Result := ExportKeyPrivateEncrypted_PKCS8(
+    EncryptedKey, TURSA.OID_HMAC_SHA512, TURSA.OID_AES192_CBC,
+    Salt, AESIV, IterationCount
+  );
+end;
+
+class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA512_AES256_CBC(
+  const Key: TURSA.TKey;
+  const Password: TUInt8Array;
+  const IterationCount: Int32
+): String;
+  var KeyPKCS8, Salt, DerivedKey, EncryptedKey: TUInt8Array;
+  var AESIV: TUAES.TInitVector;
+  var AESKey: TUAES.TKey256;
+  const SaltSize = 16;
+begin
+  KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
+  Salt := URandomBytes(SaltSize);
+  DerivedKey := UPBKDF2_HMAC_SHA512(
+    Password, Salt,
+    SizeOf(AESKey), IterationCount
+  );
+  AESKey := TUAES.MakeKey256(DerivedKey);
+  AESIV := TUAES.MakeIV;
+  EncryptedKey := UEncrypt_AES_PKCS7_CBC_256(KeyPKCS8, AESKey, AESIV);
+  Result := ExportKeyPrivateEncrypted_PKCS8(
+    EncryptedKey, TURSA.OID_HMAC_SHA512, TURSA.OID_AES256_CBC,
+    Salt, AESIV, IterationCount
+);
 end;
 
 class function TURSA.ExportKeyPublic_X509(const Key: TURSA.TKey): String;
@@ -1847,15 +2043,47 @@ class function TURSA.ImportKeyPrivateEncrypted_PKCS8(
   const Key: String;
   const Password: TUInt8Array
 ): TURSA.TKey;
+  function GetKeySize(const ALG_OID: TUInt8Array): Int32;
+  begin
+    if UBytesEqual(ALG_OID, OID_AES128_ECB)
+    or UBytesEqual(ALG_OID, OID_AES128_CBC) then
+    begin
+      Exit(SizeOf(TUAES.TKey128));
+    end
+    else if UBytesEqual(ALG_OID, OID_AES192_ECB)
+    or UBytesEqual(ALG_OID, OID_AES192_CBC) then
+    begin
+      Exit(SizeOf(TUAES.TKey192));
+    end
+    else if UBytesEqual(ALG_OID, OID_AES256_ECB)
+    or UBytesEqual(ALG_OID, OID_AES256_CBC) then
+    begin
+      Exit(SizeOf(TUAES.TKey256));
+    end
+    else if UBytesEqual(ALG_OID, OID_DES_EDE3_CBC) then
+    begin
+      Exit(SizeOf(TUDES.TKey3));
+    end
+    else
+    begin
+      Exit(SizeOf(TUDES.TKey));
+    end;
+  end;
   var Index: Int32;
   var Tag: UInt8;
   var OID, DERData, MainContent: TUInt8Array;
   var Enc_AlgId, EncryptedData, PBES2_Params, PBKDF2_Params: TUInt8Array;
-  var KDF_AlgId, EncScheme_AlgId, PKCS1_Content, PRF_AlgId: TUInt8Array;
+  var KDF_AlgId, EncScheme_AlgId, KeyPKCS8, PRF_AlgId: TUInt8Array;
   var IV, Salt, IterationCountDER, DerivedKey: TUInt8Array;
-  var AESKey: TUAES.TKey256;
+  var AESKey128: TUAES.TKey128;
+  var AESKey192: TUAES.TKey192;
+  var AESKey256: TUAES.TKey256;
   var AESIV: TUAES.TInitVector;
-  var IterationCount: Int32;
+  var DESKey3: TUDES.TKey3;
+  var DESKey: TUDES.TKey;
+  var DESIV: TUDES.TInitVector;
+  var IterationCount, KeySize: Int32;
+  var HMAC_OID, ALG_OID: TUInt8Array;
   const Header: String = '-----BEGIN ENCRYPTED PRIVATE KEY-----';
   const Footer: String = '-----END ENCRYPTED PRIVATE KEY-----';
 begin
@@ -1893,22 +2121,80 @@ begin
   if Tag <> $02 then Exit;
   IterationCount := UnpackDER(IterationCountDER).ToInt;
   PRF_AlgId := DecodeTLV(PBKDF2_Params, Index, Tag);
-  if (Tag <> $30) then Exit;
+  if Length(PRF_AlgId) = 0 then
+  begin
+    HMAC_OID := nil;
+  end
+  else
+  begin
+    if (Tag <> $30) then Exit;
+    Index := 0;
+    HMAC_OID := DecodeTLV(PRF_AlgId, Index, Tag);
+    if Tag <> $06 then Exit;
+  end;
   Index := 0;
-  OID := DecodeTLV(PRF_AlgId, Index, Tag);
+  ALG_OID := DecodeTLV(EncScheme_AlgId, Index, Tag);
   if Tag <> $06 then Exit;
-  if not UBytesEqual(OID, OID_HMAC_SHA256) then Exit;
-  Index := 0;
-  OID := DecodeTLV(EncScheme_AlgId, Index, Tag);
-  if Tag <> $06 then Exit;
-  if not UBytesEqual(OID, OID_AES256_CBC) then Exit;
   IV := DecodeTLV(EncScheme_AlgId, Index, Tag);
   if Tag <> $04 then Exit;
-  DerivedKey := UPBKDF2_HMAC_SHA256(Password, Salt, 32, IterationCount);
-  Move(DerivedKey[0], AESKey, SizeOf(AESKey));
-  Move(IV[0], AESIV, SizeOf(AESIV));
-  PKCS1_Content := UDecrypt_AES_PKCS7_CBC_256(EncryptedData, AESKey, AESIV);
-  Result := ImportKeyPrivate_PKCS8_DER(PKCS1_Content);
+  if UBytesEqual(HMAC_OID, OID_HMAC_SHA256) then
+  begin
+    DerivedKey := UPBKDF2_HMAC_SHA256(Password, Salt, GetKeySize(ALG_OID), IterationCount);
+  end
+  else if UBytesEqual(HMAC_OID, OID_HMAC_SHA512) then
+  begin
+    DerivedKey := UPBKDF2_HMAC_SHA512(Password, Salt, GetKeySize(ALG_OID), IterationCount);
+  end
+  else
+  begin
+    DerivedKey := UPBKDF2_HMAC_SHA1(Password, Salt, GetKeySize(ALG_OID), IterationCount);
+  end;
+  if UBytesEqual(ALG_OID, OID_AES128_ECB) then
+  begin
+    AESKey128 := TUAES.MakeKey128(DerivedKey);
+    KeyPKCS8 := UDecrypt_AES_PKCS7_ECB_128(EncryptedData, AESKey128);
+  end
+  else if UBytesEqual(ALG_OID, OID_AES128_CBC) then
+  begin
+    AESKey128 := TUAES.MakeKey128(DerivedKey);
+    AESIV := TUAES.MakeIV(IV);
+    KeyPKCS8 := UDecrypt_AES_PKCS7_CBC_128(EncryptedData, AESKey128, AESIV);
+  end
+  else if UBytesEqual(ALG_OID, OID_AES192_ECB) then
+  begin
+    AESKey192 := TUAES.MakeKey192(DerivedKey);
+    KeyPKCS8 := UDecrypt_AES_PKCS7_CBC_192(EncryptedData, AESKey192, AESIV);
+  end
+  else if UBytesEqual(ALG_OID, OID_AES192_CBC) then
+  begin
+    AESKey192 := TUAES.MakeKey192(DerivedKey);
+    AESIV := TUAES.MakeIV(IV);
+    KeyPKCS8 := UDecrypt_AES_PKCS7_CBC_192(EncryptedData, AESKey192, AESIV);
+  end
+  else if UBytesEqual(ALG_OID, OID_AES256_ECB) then
+  begin
+    AESKey256 := TUAES.MakeKey256(DerivedKey);
+    KeyPKCS8 := UDecrypt_AES_PKCS7_CBC_256(EncryptedData, AESKey256, AESIV);
+  end
+  else if UBytesEqual(ALG_OID, OID_AES256_CBC) then
+  begin
+    AESKey256 := TUAES.MakeKey256(DerivedKey);
+    AESIV := TUAES.MakeIV(IV);
+    KeyPKCS8 := UDecrypt_AES_PKCS7_CBC_256(EncryptedData, AESKey256, AESIV);
+  end
+  else if UBytesEqual(ALG_OID, OID_DES_EDE3_CBC) then
+  begin
+    DESKey3 := TUDES.MakeKey3(DerivedKey);
+    DESIV := TUDES.MakeIV(IV);
+    KeyPKCS8 := UDecrypt_DES_Triple_PKCS7_CBC(EncryptedData, DESKey3, DESIV);
+  end
+  else
+  begin
+    DESKey := TUDES.MakeKey(DerivedKey);
+    DESIV := TUDES.MakeIV(IV);
+    KeyPKCS8 := UDecrypt_DES_PKCS7_CBC(EncryptedData, DESKey, DESIV);
+  end;
+  Result := ImportKeyPrivate_PKCS8_DER(KeyPKCS8);
 end;
 
 class function TURSA.ImportKeyPublic_X509(const Key: String): TURSA.TKey;
@@ -2610,6 +2896,51 @@ begin
   Result := USHA512(UBytesJoin(o_key_pad, InnerHashDigest));
 end;
 
+function UPBKDF2_HMAC_SHA1(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const Iterations: Int32
+): TUInt8Array;
+  function IntTo4BytesBE(Value: UInt32): TUInt8Array;
+  begin
+    Result := nil;
+    SetLength(Result, 4);
+    Result[0] := Byte((Value shr 24) and $ff);
+    Result[1] := Byte((Value shr 16) and $ff);
+    Result[2] := Byte((Value shr 8) and $ff);
+    Result[3] := Byte(Value and $ff);
+  end;
+  const DigestSize = SizeOf(TUSHA1Digest);
+  var HashLen, l, i, j, k: Int32;
+  var T, U: TUInt8Array;
+  var BlockIndexBytes: TUInt8Array;
+  var HmacResult: TUSHA1Digest;
+begin
+  Result := nil;
+  HashLen := DigestSize;
+  l := (KeyLength + HashLen - 1) div HashLen;
+  for i := 1 to l do
+  begin
+    BlockIndexBytes := IntTo4BytesBE(i);
+    HmacResult := UHMAC_SHA1(Password, UBytesJoin(Salt, BlockIndexBytes));
+    SetLength(U, HashLen);
+    Move(HmacResult[0], U[0], HashLen);
+    T := U;
+    for j := 2 to Iterations do
+    begin
+      HmacResult := UHMAC_SHA1(Password, U);
+      SetLength(U, HashLen);
+      Move(HmacResult[0], U[0], HashLen);
+      for k := 0 to HashLen - 1 do
+      begin
+        T[k] := T[k] xor U[k];
+      end;
+    end;
+    Result := UBytesJoin(Result, T);
+  end;
+  SetLength(Result, KeyLength);
+end;
+
 function UPBKDF2_HMAC_SHA256(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
@@ -2624,14 +2955,14 @@ function UPBKDF2_HMAC_SHA256(
     Result[2] := Byte((Value shr 8) and $ff);
     Result[3] := Byte(Value and $ff);
   end;
-  const SHA256_DIGEST_SIZE = SizeOf(TUSHA256Digest);
+  const DigestSize = SizeOf(TUSHA256Digest);
   var HashLen, l, i, j, k: Int32;
   var T, U: TUInt8Array;
   var BlockIndexBytes: TUInt8Array;
   var HmacResult: TUSHA256Digest;
 begin
   Result := nil;
-  HashLen := SHA256_DIGEST_SIZE;
+  HashLen := DigestSize;
   l := (KeyLength + HashLen - 1) div HashLen;
   for i := 1 to l do
   begin
@@ -2643,6 +2974,51 @@ begin
     for j := 2 to Iterations do
     begin
       HmacResult := UHMAC_SHA256(Password, U);
+      SetLength(U, HashLen);
+      Move(HmacResult[0], U[0], HashLen);
+      for k := 0 to HashLen - 1 do
+      begin
+        T[k] := T[k] xor U[k];
+      end;
+    end;
+    Result := UBytesJoin(Result, T);
+  end;
+  SetLength(Result, KeyLength);
+end;
+
+function UPBKDF2_HMAC_SHA512(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const Iterations: Int32
+): TUInt8Array;
+  function IntTo4BytesBE(Value: UInt32): TUInt8Array;
+  begin
+    Result := nil;
+    SetLength(Result, 4);
+    Result[0] := Byte((Value shr 24) and $ff);
+    Result[1] := Byte((Value shr 16) and $ff);
+    Result[2] := Byte((Value shr 8) and $ff);
+    Result[3] := Byte(Value and $ff);
+  end;
+  const DigestSize = SizeOf(TUSHA512Digest);
+  var HashLen, l, i, j, k: Int32;
+  var T, U: TUInt8Array;
+  var BlockIndexBytes: TUInt8Array;
+  var HmacResult: TUSHA512Digest;
+begin
+  Result := nil;
+  HashLen := DigestSize;
+  l := (KeyLength + HashLen - 1) div HashLen;
+  for i := 1 to l do
+  begin
+    BlockIndexBytes := IntTo4BytesBE(i);
+    HmacResult := UHMAC_SHA512(Password, UBytesJoin(Salt, BlockIndexBytes));
+    SetLength(U, HashLen);
+    Move(HmacResult[0], U[0], HashLen);
+    T := U;
+    for j := 2 to Iterations do
+    begin
+      HmacResult := UHMAC_SHA512(Password, U);
       SetLength(U, HashLen);
       Move(HmacResult[0], U[0], HashLen);
       for k := 0 to HashLen - 1 do
@@ -2769,6 +3145,44 @@ function UDecrypt_RSA_OAEP(
 ): TUInt8Array;
 begin
   Result := TURSA.Decrypt_OAEP(Cipher, Key);
+end;
+
+class function TUAES.MakeIV(const Bytes: TUInt8Array): TInitVector;
+  var i, n: Int32;
+begin
+  n := UMin(Length(Result), Length(Bytes));
+  for i := 0 to n - 1 do Result[i] := Bytes[i];
+  for i := n to High(Result) do Result[i] := 0;
+end;
+
+class function TUAES.MakeIV: TInitVector;
+  var i: Int32;
+begin
+  for i := 0 to High(Result) do Result[i] := UThreadRandom(256);
+end;
+
+class function TUAES.MakeKey128(const Bytes: TUInt8Array): TKey128;
+  var i, n: Int32;
+begin
+  n := UMin(Length(Result), Length(Bytes));
+  for i := 0 to n - 1 do Result[i] := Bytes[i];
+  for i := n to High(Result) do Result[i] := 0;
+end;
+
+class function TUAES.MakeKey192(const Bytes: TUInt8Array): TKey192;
+  var i, n: Int32;
+begin
+  n := UMin(Length(Result), Length(Bytes));
+  for i := 0 to n - 1 do Result[i] := Bytes[i];
+  for i := n to High(Result) do Result[i] := 0;
+end;
+
+class function TUAES.MakeKey256(const Bytes: TUInt8Array): TKey256;
+  var i, n: Int32;
+begin
+  n := UMin(Length(Result), Length(Bytes));
+  for i := 0 to n - 1 do Result[i] := Bytes[i];
+  for i := n to High(Result) do Result[i] := 0;
 end;
 
 class procedure TUAES.GF128_Mul(var X: TInitVector; const Y: TInitVector);
@@ -3577,6 +3991,36 @@ begin
   Result := Process_GCM(
     Input, ExpandedKey, Nonce, AAD, IsEncrypting, 14, AuthTag
   );
+end;
+
+class function TUDES.MakeIV(const Bytes: TUInt8Array): TInitVector;
+  var i, n: Int32;
+begin
+  n := UMin(Length(Result), Length(Bytes));
+  for i := 0 to n - 1 do Result[i] := Bytes[i];
+  for i := n to High(Result) do Result[i] := 0;
+end;
+
+class function TUDES.MakeIV: TInitVector;
+  var i: Int32;
+begin
+  for i := 0 to High(Result) do Result[i] := UThreadRandom(256);
+end;
+
+class function TUDES.MakeKey(const Bytes: TUInt8Array): TKey;
+  var i, n: Int32;
+begin
+  n := UMin(Length(Result), Length(Bytes));
+  for i := 0 to n - 1 do Result[i] := Bytes[i];
+  for i := n to High(Result) do Result[i] := 0;
+end;
+
+class function TUDES.MakeKey3(const Bytes: TUInt8Array): TKey3;
+  var i, n: Int32;
+begin
+  n := UMin(Length(Result), Length(Bytes));
+  for i := 0 to n - 1 do Result[i] := Bytes[i];
+  for i := n to High(Result) do Result[i] := 0;
 end;
 
 class function TUDES.Permute(const Input: T64BitBlock;
