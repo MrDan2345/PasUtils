@@ -52,6 +52,9 @@ public
   const OID_PBKDF2: array[0..8] of UInt8 = (
     $2a, $86, $48, $86, $f7, $0d, $01, $05, $0c
   ); // 1.2.840.113549.1.5.12
+  const OID_SHA1: array[0..4] of UInt8 = (
+    $2B, $0E, $03, $02, $1A
+  ); // 1.3.14.3.2.26
   const OID_SHA_256: array[0..8] of UInt8 = (
     $60, $86, $48, $01, $65, $03, $04, $02, $01
   ); // 2.16.840.1.101.3.4.2.1
@@ -161,6 +164,15 @@ public
     const Block: TUInt4096;
     const BlockSize: UInt32 = 2048
   ): String; static;
+  class function PackData_Singature(
+    const Data: Pointer;
+    const DataSize: UInt32;
+    const BlockSize: UInt32 = 2048
+  ): TUInt4096; static;
+  class function UnpackData_Singature(
+    const Block: TUInt4096;
+    const BlockSize: UInt32 = 2048
+  ): TUInt8Array; static;
   class function Encrypt_PKCS1(
     const Data: Pointer;
     const DataSize: UInt32;
@@ -195,6 +207,18 @@ public
     const Cipher: TUInt4096;
     const Key: TURSA.TKey
   ): TUInt4096; static;
+  class function Sign_SHA256(
+    const Data: TUInt8Array;
+    const Key: TKey
+  ): TUInt8Array; static;
+  class function Sign_SHA512(
+    const Data: TUInt8Array;
+    const Key: TKey
+  ): TUInt8Array; static;
+  class function Verify(
+    const Data, Signature: TUInt8Array;
+    const Key: TKey
+  ): Boolean; static;
   class function ExportKeyPrivate_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array; static;
   class function ImportKeyPrivate_PKCS1_DER(const Key: TUInt8Array): TURSA.TKey; static;
   class function ExportKeyPublic_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array; static;
@@ -244,7 +268,6 @@ public
   class function ExportKeyPublic_X509(const Key: TURSA.TKey): String; static;
   class function ImportKeyPrivate_PKCS1(const Key: String): TURSA.TKey; static;
   class function ImportKeyPublic_PKCS1(const Key: String): TURSA.TKey; static;
-  class function ImportKey_PKCS1(const Key: String): TURSA.TKey; static;
   class function ImportKeyPrivate_PKCS8(const Key: String): TURSA.TKey; static;
   class function ImportKeyPrivateEncrypted_PKCS8(
     const Key: String;
@@ -585,18 +608,25 @@ end;
 function USHA1(const Data: Pointer; const DataSize: UInt32): TUSHA1Digest;
 function USHA1(const Data: TUInt8Array): TUSHA1Digest;
 function USHA1(const Data: String): TUSHA1Digest;
+function USHA1_Generic(const Data: TUInt8Array): TUInt8Array;
 
 function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
 function USHA256(const Data: TUInt8Array): TUSHA256Digest;
 function USHA256(const Data: String): TUSHA256Digest;
+function USHA256_Generic(const Data: TUInt8Array): TUInt8Array;
 
 function USHA512(const Data: Pointer; const DataSize: UInt32): TUSHA512Digest;
 function USHA512(const Data: TUInt8Array): TUSHA512Digest;
 function USHA512(const Data: String): TUSHA512Digest;
+function USHA512_Generic(const Data: TUInt8Array): TUInt8Array;
 
 function UHMAC_SHA1(const Key, Data: TUInt8Array): TUSHA1Digest;
 function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA256Digest;
 function UHMAC_SHA512(const Key, Data: TUInt8Array): TUSHA512Digest;
+
+function USign_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
+function USign_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
+function UVerify(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
 
 function UPBKDF2_HMAC_SHA1(
   const Password, Salt: TUInt8Array;
@@ -620,6 +650,11 @@ function UMakeRSAKey(
   const BitCount: UInt32;
   const Threads: Int32
 ): TURSA.TKey;
+function UExportRSAKey_PKCS1(const Key: TURSA.TKey): String;
+function UExportRSAKey_PKCS8(const Key: TURSA.TKey): String;
+function UExportRSAKey_PKCS8(const Key: TURSA.TKey; const Password: String = ''): String;
+function UExportRSAKey_X509(const Key: TURSA.TKey): String;
+function UImportRSAKey(const KeyASN1: String; const Password: String = ''): TURSA.TKey;
 function UEncrypt_RSA_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
@@ -662,6 +697,10 @@ function UDecrypt_RSA_OAEP(
   const Cipher: TUInt4096;
   const Key: TURSA.TKey
 ): TUInt8Array;
+function UCertSign_SHA256(
+  const Data: TUInt8Array;
+  const Key: TURSA.TKey
+): TUSHA256Digest;
 
 function UEncrypt_AES_PKCS7_ECB_128(
   const Data: TUInt8Array;
@@ -1277,14 +1316,7 @@ class function TURSA.MakeKey(
   var Primes: TUInt4096Array;
 begin
   One := TUInt4096.One;
-  Result.n := TUInt4096.Invalid;
-  Result.e := TUInt4096.Invalid;
-  Result.d := TUInt4096.Invalid;
-  Result.q := TUInt4096.Invalid;
-  Result.p := TUInt4096.Invalid;
-  Result.exp1 := TUInt4096.Invalid;
-  Result.exp2 := TUInt4096.Invalid;
-  Result.c := TUInt4096.Invalid;
+  Result := TKey.MakeInvalid;
   PrimeSizeInBits := BitCount shr 1;
   e := 65537;
   repeat
@@ -1329,7 +1361,7 @@ begin
   PaddedDataBE[1] := $02;
   for i := 2 to PaddingSize - 2 do
   repeat
-    PaddedDataBE[i] := UInt8(Random(256));
+    PaddedDataBE[i] := UInt8(UThreadRandom(256));
   until PaddedDataBE[i] > 0;
   PaddedDataBE[PaddingSize - 1] := 0;
   Move(Data^, PaddedDataBE[PaddingSize], DataSize);
@@ -1506,6 +1538,67 @@ begin
   Move(Data[0], Result[1], Length(Data));
 end;
 
+class function TURSA.PackData_Singature(
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const BlockSize: UInt32
+): TUInt4096;
+  const MinPadding = 11;
+  const ByteCount = (TUInt4096Impl.MaxItem + 1) * 4;
+  var PaddingSize, BlockSizeInBytes: Int32;
+  var PaddedDataBE: array[0..ByteCount - 1] of UInt8;
+  var PaddedData: array[0..ByteCount - 1] of UInt8 absolute Result;
+  var i: Int32;
+begin
+  BlockSizeInBytes := BlockSize shr 3;
+  if DataSize > BlockSizeInBytes - MinPadding then Exit(TUInt4096.Invalid);
+  Result := TUInt4096.Zero;
+  PaddingSize := BlockSizeInBytes - DataSize;
+  PaddedDataBE[0] := $00;
+  PaddedDataBE[1] := $01;
+  for i := 2 to PaddingSize - 2 do PaddedDataBE[i] := $ff;
+  PaddedDataBE[PaddingSize - 1] := 0;
+  Move(Data^, PaddedDataBE[PaddingSize], DataSize);
+  for i := 0 to BlockSizeInBytes - 1 do
+  begin
+    PaddedData[i] := PaddedDataBE[BlockSizeInBytes - i - 1];
+  end;
+end;
+
+class function TURSA.UnpackData_Singature(
+  const Block: TUInt4096;
+  const BlockSize: UInt32
+): TUInt8Array;
+  const MinPadding = 11;
+  const ByteCount = (TUInt4096Impl.MaxItem + 1) * 4;
+  var PaddingSize, BlockSizeInBytes: Int32;
+  var PaddedDataBE: array[0..ByteCount - 1] of UInt8;
+  var PaddedData: array[0..ByteCount - 1] of UInt8 absolute Block;
+  var i: Int32;
+begin
+  Result := nil;
+  BlockSizeInBytes := BlockSize shr 3;
+  for i := 0 to BlockSizeInBytes - 1 do
+  begin
+    PaddedDataBE[i] := PaddedData[BlockSizeInBytes - i - 1];
+  end;
+  if (PaddedDataBE[0] <> $00) or (PaddedDataBE[1] <> $01) then Exit;
+  PaddingSize := 0;
+  for i := 2 to High(PaddedDataBE) do
+  begin
+    if PaddedDataBE[i] <> 0 then
+    begin
+      if PaddedDataBE[i] <> $ff then Exit;
+      Continue;
+    end;
+    PaddingSize := i + 1;
+    Break;
+  end;
+  if PaddingSize < MinPadding then Exit;
+  SetLength(Result, BlockSizeInBytes - PaddingSize);
+  Move(PaddedDataBE[PaddingSize], Result[0], Length(Result));
+end;
+
 class function TURSA.Encrypt_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
@@ -1601,6 +1694,86 @@ class function TURSA.Decrypt(
 begin
   if Key.IsCRT then Exit(Decrypt_CRT(Cipher, Key));
   Result := PowMod(Cipher, Key.d, Key.n);
+end;
+
+class function TURSA.Sign_SHA256(const Data: TUInt8Array; const Key: TKey): TUInt8Array;
+  var Hash: TUSHA256Digest;
+  var HashDER: TUInt8Array;
+  var PackedHash, Signature: TUInt4096;
+begin
+  Hash := USHA256(Data);
+  HashDER := EncodeTLV($30, UBytesConcat([
+    EncodeTLV($30, UBytesConcat([
+      EncodeTLV($06, OID_SHA_256),
+      EncodeTLV($05, [])
+    ])),
+    EncodeTLV($04, Hash)
+  ]));
+  PackedHash := PackData_Singature(@HashDER[0], Length(HashDER), Key.Size);
+  Signature := PowMod(PackedHash, Key.d, Key.n);
+  Result := Signature.ToBytes;
+end;
+
+class function TURSA.Sign_SHA512(const Data: TUInt8Array; const Key: TKey): TUInt8Array;
+  var Hash: TUSHA512Digest;
+  var HashDER: TUInt8Array;
+  var PackedHash, Signature: TUInt4096;
+begin
+  Hash := USHA512(Data);
+  HashDER := EncodeTLV($30, UBytesConcat([
+    EncodeTLV($30, UBytesConcat([
+      EncodeTLV($06, OID_SHA_512),
+      EncodeTLV($05, [])
+    ])),
+    EncodeTLV($04, Hash)
+  ]));
+  PackedHash := PackData_Singature(@HashDER[0], Length(HashDER), Key.Size);
+  Signature := PowMod(PackedHash, Key.d, Key.n);
+  Result := Signature.ToBytes;
+end;
+
+class function TURSA.Verify(
+  const Data, Signature: TUInt8Array;
+  const Key: TKey
+): Boolean;
+  var Hash: TUInt8Array;
+  var PackedHash: TUInt4096;
+  var UnpackedDER, SignedHashDER, SignedHash, Alg, OID: TUInt8Array;
+  var Index: Int32;
+  var Tag: UInt8;
+begin
+  PackedHash := PowMod(TUInt4096(Signature), Key.e, Key.n);
+  Index := 0;
+  UnpackedDER := UnpackData_Singature(PackedHash, Key.Size);
+  SignedHashDER := DecodeTLV(UnpackedDER, Index, Tag);
+  if Tag <> $30 then Exit(False);
+  Index := 0;
+  Alg := DecodeTLV(SignedHashDER, Index, Tag);
+  if Tag <> $30 then Exit(False);
+  SignedHash := DecodeTLV(SignedHashDER, Index, Tag);
+  if Tag <> $04 then Exit(False);
+  Index := 0;
+  OID := DecodeTLV(Alg, Index, Tag);
+  if Tag <> $06 then Exit(False);
+  DecodeTLV(Alg, Index, Tag);
+  if Tag <> $05 then Exit(False);
+  if UBytesEqual(OID, OID_SHA_256) then
+  begin
+    Hash := USHA256_Generic(Data);
+  end
+  else if UBytesEqual(OID, OID_SHA_512) then
+  begin
+    Hash := USHA512_Generic(Data);
+  end
+  else if UBytesEqual(OID, OID_SHA1) then
+  begin
+    Hash := USHA1_Generic(Data);
+  end
+  else
+  begin
+    Exit(False);
+  end;
+  Result := UBytesEqual(Hash, SignedHash);
 end;
 
 class function TURSA.ExportKeyPrivate_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array;
@@ -1977,57 +2150,6 @@ begin
   DERData := Base64ToASN1(Key, Header, Footer);
   if Length(DERData) = 0 then Exit;
   Result := ImportKeyPublic_PKCS1_DER(DERData);
-end;
-
-class function TURSA.ImportKey_PKCS1(const Key: String): TURSA.TKey;
-  type TKeyType = record
-    Header: String;
-    Footer: String;
-    Components: array of Int32;
-  end;
-  const KeyTypes: array of TKeyType = (
-    (
-      Header: '-----BEGIN RSA PRIVATE KEY-----';
-      Footer: '-----END RSA PRIVATE KEY-----';
-      Components: (-1, 0, 1, 2, 3, 4, 5, 6, 7)
-    ),
-    (
-      Header: '-----BEGIN RSA PUBLIC KEY-----';
-      Footer: '-----END RSA PUBLIC KEY-----';
-      Components: (0, 1)
-    )
-  );
-  var Index, i, k: Integer;
-  var Tag: Byte;
-  var SequenceContent, IntegerValue: TUInt8Array;
-  var Components: array [0..7] of TUInt4096 absolute Result;
-  var DataDER: TUInt8Array;
-begin
-  Result := TKey.MakeInvalid;
-  k := -1;
-  for i := 0 to High(KeyTypes) do
-  begin
-    DataDER := Base64ToASN1(Key, KeyTypes[i].Header, KeyTypes[i].Footer);
-    if Length(DataDER) = 0 then Continue;
-    k := i;
-    Break;
-  end;
-  if k = -1 then Exit;
-  Index := 0;
-  SequenceContent := DecodeTLV(DataDER, Index, Tag);
-  if Tag <> $30 then Exit;
-  Index := 0;
-  i := 0;
-  while (Index < Length(SequenceContent))
-  and (i < Length(KeyTypes[k].Components)) do
-  try
-    IntegerValue := DecodeTLV(SequenceContent, Index, Tag);
-    if Tag <> $02 then Exit;
-    if KeyTypes[k].Components[i] = -1 then Continue;
-    Components[KeyTypes[k].Components[i]] := UnpackDER(IntegerValue);
-  finally
-    Inc(i);
-  end;
 end;
 
 class function TURSA.ImportKeyPrivate_PKCS8(const Key: String): TURSA.TKey;
@@ -2473,6 +2595,15 @@ begin
   Result := USHA1(@Data[1], Length(Data));
 end;
 
+function USHA1_Generic(const Data: TUInt8Array): TUInt8Array;
+  var Hash: TUSHA1Digest;
+begin
+  Result := nil;
+  SetLength(Result, Length(TUSHA1Digest));
+  Hash := USHA1(Data);
+  Move(Hash, Result[0], Length(Result));
+end;
+
 function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
   function RightRotate(const Value: UInt32; const Amount: Int32): UInt32;
   begin
@@ -2590,6 +2721,15 @@ end;
 function USHA256(const Data: String): TUSHA256Digest;
 begin
   Result := USHA256(@Data[1], Length(Data));
+end;
+
+function USHA256_Generic(const Data: TUInt8Array): TUInt8Array;
+  var Hash: TUSHA256Digest;
+begin
+  Result := nil;
+  SetLength(Result, Length(TUSHA256Digest));
+  Hash := USHA256(Data);
+  Move(Hash, Result[0], Length(Result));
 end;
 
 function UModInverse(const e, phi: TUInt4096): TUInt4096;
@@ -2818,6 +2958,15 @@ begin
   Result := USHA512(@Data[1], Length(Data));
 end;
 
+function USHA512_Generic(const Data: TUInt8Array): TUInt8Array;
+  var Hash: TUSHA512Digest;
+begin
+  Result := nil;
+  SetLength(Result, Length(TUSHA512Digest));
+  Hash := USHA512(Data);
+  Move(Hash, Result[0], Length(Result));
+end;
+
 function UHMAC_SHA1(const Key, Data: TUInt8Array): TUSHA1Digest;
   const DigestSize = SizeOf(TUSHA1Digest);
   const BlockSize = DigestSize * 2;
@@ -2894,6 +3043,21 @@ begin
   end;
   InnerHashDigest := USHA512(UBytesJoin(i_key_pad, Data));
   Result := USHA512(UBytesJoin(o_key_pad, InnerHashDigest));
+end;
+
+function USign_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
+begin
+  Result := TURSA.Sign_SHA256(Data, Key);
+end;
+
+function USign_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
+begin
+  Result := TURSA.Sign_SHA512(Data, Key);
+end;
+
+function UVerify(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
+begin
+  Result := TURSA.Verify(Data, Signature, Key);
 end;
 
 function UPBKDF2_HMAC_SHA1(
@@ -3065,6 +3229,31 @@ begin
   Result := TURSA.MakeKey(BitCount, Threads);
 end;
 
+function UExportRSAKey_PKCS1(const Key: TURSA.TKey): String;
+begin
+  Result := TURSA.ExportKeyPrivate_PKCS1(Key);
+end;
+
+function UExportRSAKey_PKCS8(const Key: TURSA.TKey): String;
+begin
+  Result := TURSA.ExportKeyPrivate_PKCS8(Key);
+end;
+
+function UExportRSAKey_PKCS8(const Key: TURSA.TKey; const Password: String): String;
+begin
+  Result := TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA256_AES256_CBC(Key, UStrToBytes(Password));
+end;
+
+function UExportRSAKey_X509(const Key: TURSA.TKey): String;
+begin
+  Result := TURSA.ExportKeyPublic_X509(Key);
+end;
+
+function UImportRSAKey(const KeyASN1: String; const Password: String): TURSA.TKey;
+begin
+  Result := TURSA.ImportKey(KeyASN1, Password);
+end;
+
 function UEncrypt_RSA_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
@@ -3145,6 +3334,16 @@ function UDecrypt_RSA_OAEP(
 ): TUInt8Array;
 begin
   Result := TURSA.Decrypt_OAEP(Cipher, Key);
+end;
+
+function UCertSign_SHA256(
+  const Data: TUInt8Array;
+  const Key: TURSA.TKey
+): TUSHA256Digest;
+  var Hash: TUSHA256Digest;
+begin
+  Hash := USHA256(Data);
+  //Result := TURSA.PowMod(Hash, Key.d, Key.n);
 end;
 
 class function TUAES.MakeIV(const Bytes: TUInt8Array): TInitVector;

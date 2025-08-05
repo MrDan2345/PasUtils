@@ -964,11 +964,13 @@ public
   function ToBase64: String;
   function ToHex: String;
   function ToInt: Int64;
+  function ToBytes: TUInt8Array;
   function BitsUsed: Int32;
   procedure SetPositive(const Value: Boolean);
   procedure SetNegative(const Value: Boolean);
   class function Make(const Number: Int64): TUInt4096; static;
   class function Make(const Number: String): TUInt4096; static;
+  class function Make(const Bytes: TUInt8Array): TUInt4096; static;
   class function FromBase64(const Base64: String): TUInt4096; static;
   class function MakeRandom(const BitCount: Int32 = 2048): TUInt4096; static;
   class function MakeRandomRange(const Min, Max: TUInt4096): TUInt4096; static;
@@ -2012,6 +2014,7 @@ operator mod (const a, b: TUInt4096): TUInt4096;
 operator := (const v: TUVec2): TUVec2i;
 operator := (const v: UInt64): TUInt4096;
 operator := (const v: String): TUInt4096;
+operator := (const v: TUint8Array): TUInt4096;
 operator := (const v: TUVec2i): TUVec2;
 operator := (const i: Int32): TUVec2i;
 operator := (const f: TUFloat): TUVec2;
@@ -5590,6 +5593,23 @@ begin
   if IsNegative then Result := -Result;
 end;
 
+function TUInt4096Impl.ToBytes: TUInt8Array;
+  const ByteCount = (MaxItem + 1) * 4;
+  var AsBytes: array[0..ByteCount - 1] of UInt8 absolute Self;
+  var i, n: Int32;
+begin
+  Result := nil;
+  n := 1;
+  for i := ByteCount - 1 downto 0 do
+  if AsBytes[i] <> 0 then
+  begin
+    n := i + 1;
+    Break;
+  end;
+  SetLength(Result, n);
+  Move(Self, Result[0], n);
+end;
+
 function TUInt4096Impl.BitsUsed: Int32;
 begin
   Result := TopBit + 1;
@@ -5704,6 +5724,13 @@ class function TUInt4096Impl.Make(const Number: String): TUInt4096;
 begin
   Result := TUInt4096.Zero;
   if Number.StartsWith('$') then FromHex else FromDec;
+end;
+
+class function TUInt4096Impl.Make(const Bytes: TUInt8Array): TUInt4096;
+  const ByteCount = (MaxItem + 1) * 4;
+begin
+  Result := Zero;
+  Move(Bytes[0], Result, UMin(ByteCount, Length(Bytes)));
 end;
 
 class function TUInt4096Impl.FromBase64(const Base64: String): TUInt4096;
@@ -12091,6 +12118,11 @@ begin
 end;
 
 operator := (const v: Int64): TUInt4096;
+begin
+  Result := TUInt4096.Make(v);
+end;
+
+operator := (const v: TUint8Array): TUInt4096;
 begin
   Result := TUInt4096.Make(v);
 end;
