@@ -39,6 +39,7 @@ public
     function IsPublic: Boolean;
     function IsPrivate: Boolean;
     function IsCRT: Boolean;
+    function IsValid: Boolean;
     class function MakeInvalid: TKey; static;
   end;
 public
@@ -108,6 +109,7 @@ public
   class function XORBytes(const a, b: TUInt8Array): TUInt8Array; static;
   class function PackDER(const Number: TUInt4096): TUInt8Array; static;
   class function UnpackDER(const Bytes: TUInt8Array): TUInt4096; static;
+  class procedure DebugASN1(const Bytes: TUInt8Array; const Offset: String = ''); static;
   class function EncodeTLV(const Tag: UInt8; const Value: TUInt8Array): TUInt8Array; static;
   class function DecodeTLV(const Data: TUInt8Array; var Index: Int32; out Tag: UInt8): TUInt8Array; static;
   class function ASN1ToBase64(const DataASN: TUInt8Array; const Header, Footer: String): String; static;
@@ -191,9 +193,11 @@ public
     const Key: TURSA.TKey
   ): TUInt4096; static;
   class function ExportKeyPrivate_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array; static;
-  class function ExportKeyPublic_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array; static;
   class function ImportKeyPrivate_PKCS1_DER(const Key: TUInt8Array): TURSA.TKey; static;
+  class function ExportKeyPublic_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array; static;
   class function ImportKeyPublic_PKCS1_DER(const Key: TUInt8Array): TURSA.TKey; static;
+  class function ExportKeyPrivate_PKCS8_DER(const Key: TURSA.TKey): TUInt8Array; static;
+  class function ImportKeyPrivate_PKCS8_DER(const Key: TUInt8Array): TURSA.TKey; static;
   class function ExportKeyPrivate_PKCS1(const Key: TURSA.TKey): String; static;
   class function ExportKeyPublic_PKCS1(const Key: TURSA.TKey): String; static;
   class function ExportKeyPrivate_PKCS8(const Key: TURSA.TKey): String; static;
@@ -212,6 +216,7 @@ public
     const Password: TUInt8Array
   ): TURSA.TKey; static;
   class function ImportKeyPublic_X509(const Key: String): TURSA.TKey; static;
+  class function ImportKey(const Key: String; const Password: String = ''): TURSA.TKey; static;
 end;
 
 type TUMontgomeryReduction = record
@@ -811,6 +816,11 @@ begin
   Result := p.IsValid and q.IsValid and exp1.IsValid and exp2.IsValid and c.IsValid;
 end;
 
+function TURSA.TKey.IsValid: Boolean;
+begin
+  Result := IsPublic or IsPrivate;
+end;
+
 class function TURSA.TKey.MakeInvalid: TKey;
 begin
   Result.n := TUInt4096.Invalid;
@@ -1001,6 +1011,37 @@ begin
   end;
 end;
 
+class procedure TURSA.DebugASN1(const Bytes: TUInt8Array; const Offset: String);
+  var i: Int32;
+  var Tag: UInt8;
+  var Content: TUInt8Array;
+begin
+  i := 0;
+  while i < Length(Bytes) do
+  begin
+    Content := DecodeTLV(Bytes, i, Tag);
+    case Tag of
+      $30:
+      begin
+        WriteLn(Offset, 'SEQUENCE');
+        DebugASN1(Content, Offset + '  ');
+      end;
+      $02:
+      begin
+        WriteLn(Offset, 'NUMBER: ', UnpackDER(Content).ToString);
+      end;
+      $06:
+      begin
+        WriteLn(Offset, 'OID: ', UBytesToHex(Content));
+      end;
+      else
+      begin
+        WriteLn(Offset, 'Unknown Tag: ', IntToHex(Tag));
+      end;
+    end;
+  end;
+end;
+
 class function TURSA.EncodeTLV(
   const Tag: UInt8;
   const Value: TUInt8Array
@@ -1118,6 +1159,7 @@ begin
   if KeyStart > KeyEnd then Exit(nil);
   Str := Base64.Substring(KeyStart, KeyEnd - KeyStart);
   Str := Str.Replace(#$d#$a, '', [rfReplaceAll]);
+  Str := Str.Replace(#$a, '', [rfReplaceAll]);
   Result := UBase64ToBytes(Str);
 end;
 
@@ -1510,8 +1552,8 @@ end;
 class function TURSA.ExportKeyPrivate_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array;
 begin
   Result := EncodeTLV($30,
-    specialize UArrConcat<TUInt8Array>([
-      EncodeTLV($02, PackDER(TUInt4096.Zero)),//version
+    UBytesConcat([
+      EncodeTLV($02, [0]),
       EncodeTLV($02, PackDER(Key.n)),
       EncodeTLV($02, PackDER(Key.e)),
       EncodeTLV($02, PackDER(Key.d)),
@@ -1524,37 +1566,39 @@ begin
   );
 end;
 
-class function TURSA.ExportKeyPublic_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array;
-begin
-  Result := EncodeTLV($30,
-    specialize UArrConcat<TUInt8Array>([
-      EncodeTLV($02, PackDER(Key.n)),
-      EncodeTLV($02, PackDER(Key.e))
-    ])
-  );
-end;
-
 class function TURSA.ImportKeyPrivate_PKCS1_DER(const Key: TUInt8Array): TURSA.TKey;
   var Index, i: Int32;
   var Tag: UInt8;
   var SequenceContent, IntValue: TUInt8Array;
   var Components: array [0..7] of TUInt4096 absolute Result;
 begin
+  Result := TKey.MakeInvalid;
   Index := 0;
   SequenceContent := DecodeTLV(Key, Index, Tag);
   if Tag <> $30 then Exit;
   Index := 0;
+  IntValue := DecodeTLV(SequenceContent, Index, Tag);
+  if (Tag <> $02) or (UnpackDER(IntValue).ToInt <> 0) then Exit;
   i := 0;
   while (Index < Length(SequenceContent))
   and (i <= Length(Components)) do
   try
     IntValue := DecodeTLV(SequenceContent, Index, Tag);
     if Tag <> $02 then Exit;
-    if i = 0 then Continue;
-    Components[i - 1] := UnpackDER(IntValue);
+    Components[i] := UnpackDER(IntValue);
   finally
     Inc(i);
   end;
+end;
+
+class function TURSA.ExportKeyPublic_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array;
+begin
+  Result := EncodeTLV($30,
+    UBytesConcat([
+      EncodeTLV($02, PackDER(Key.n)),
+      EncodeTLV($02, PackDER(Key.e))
+    ])
+  );
 end;
 
 class function TURSA.ImportKeyPublic_PKCS1_DER(const Key: TUInt8Array): TURSA.TKey;
@@ -1579,6 +1623,46 @@ begin
   end;
 end;
 
+class function TURSA.ExportKeyPrivate_PKCS8_DER(const Key: TURSA.TKey): TUInt8Array;
+  var KeyPKCS1: TUInt8Array;
+begin
+  KeyPKCS1 := ExportKeyPrivate_PKCS1_DER(Key);
+  Result := EncodeTLV($30,
+    UBytesConcat([
+      EncodeTLV($02, [0]),
+      EncodeTLV($30, UBytesConcat([
+        EncodeTLV($06, OID_RSA),
+        EncodeTLV($05, [])
+      ])),
+      EncodeTLV($04, KeyPKCS1)
+    ])
+  );
+end;
+
+class function TURSA.ImportKeyPrivate_PKCS8_DER(const Key: TUInt8Array): TURSA.TKey;
+  var Index, i: Int32;
+  var Tag: UInt8;
+  var MainContent, VersionContent, AlgIdContent, AlgId, PKCS1_Content: TUInt8Array;
+begin
+  Result := TKey.MakeInvalid;
+  Index := 0;
+  MainContent := DecodeTLV(Key, Index, Tag);
+  if Tag <> $30 then Exit;
+  Index := 0;
+  VersionContent := DecodeTLV(MainContent, Index, Tag);
+  if Tag <> $02 then Exit;
+  if not UnpackDER(VersionContent).IsZero then Exit;
+  AlgIdContent := DecodeTLV(MainContent, Index, Tag);
+  if Tag <> $30 then Exit;
+  i := 0;
+  AlgId := DecodeTLV(AlgIdContent, i, Tag);
+  if (Tag <> $06) or (Length(AlgId) <> Length(OID_RSA)) then Exit;
+  for i := 0 to High(OID_RSA) do if AlgId[i] <> OID_RSA[i] then Exit;
+  PKCS1_Content := DecodeTLV(MainContent, Index, Tag);
+  if Tag <> $04 then Exit;
+  Result := ImportKeyPrivate_PKCS1_DER(PKCS1_Content);
+end;
+
 class function TURSA.ExportKeyPrivate_PKCS1(const Key: TURSA.TKey): String;
   const Header: String = '-----BEGIN RSA PRIVATE KEY-----';
   const Footer: String = '-----END RSA PRIVATE KEY-----';
@@ -1594,26 +1678,12 @@ begin
 end;
 
 class function TURSA.ExportKeyPrivate_PKCS8(const Key: TURSA.TKey): String;
-  var version_bytes, pkcs1_der, octet_string_sequence: TUInt8Array;
-  var oid_sequence, null_sequence, algid_content, algid_sequence, SequenceContent: TUInt8Array;
+  var KeyDER: TUInt8Array;
   const Header: String = '-----BEGIN PRIVATE KEY-----';
   const Footer: String = '-----END PRIVATE KEY-----';
 begin
-  pkcs1_der := ExportKeyPrivate_PKCS1_DER(Key);
-  octet_string_sequence := EncodeTLV($04, pkcs1_der);
-  oid_sequence := EncodeTLV($06, OID_RSA);
-  null_sequence := EncodeTLV($05, []);
-  algid_content := specialize UArrConcat<TUInt8Array>([oid_sequence, null_sequence]);
-  algid_sequence := EncodeTLV($30, algid_content);
-  version_bytes := EncodeTLV($02, [0]);
-  SequenceContent := EncodeTLV($30,
-    specialize UArrConcat<TUInt8Array>([
-      version_bytes,
-      algid_sequence,
-      octet_string_sequence
-    ])
-  );
-  Result := ASN1ToBase64(SequenceContent, Header, Footer);
+  KeyDER := ExportKeyPrivate_PKCS8_DER(Key);
+  Result := ASN1ToBase64(KeyDER, Header, Footer);
 end;
 
 class function TURSA.ExportKeyPrivateEncrypted_PKCS8(
@@ -1621,7 +1691,7 @@ class function TURSA.ExportKeyPrivateEncrypted_PKCS8(
   const Password: TUInt8Array;
   const IterationCount: Int32
 ): String;
-  var Salt, IV, DerivedKey, PlaintextDER, EncryptedData: TUInt8Array;
+  var Salt, IV, DerivedKey, KeyPKCS8, EncryptedData: TUInt8Array;
   var SequenceContent: TUInt8Array;
   var AESKey: TUAES.TKey256;
   var AESIV: TUAES.TInitVector;
@@ -1631,10 +1701,10 @@ begin
   Salt := URandomBytes(16);
   IV := URandomBytes(16);
   DerivedKey := UPBKDF2_HMAC_SHA256(Password, Salt, 32, IterationCount);
-  PlaintextDER := ExportKeyPrivate_PKCS1_DER(Key);
+  KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
   Move(DerivedKey[0], AESKey[0], 32);
   Move(IV[0], AESIV[0], 16);
-  EncryptedData := UEncrypt_AES_PKCS7_CBC_256(PlaintextDER, AESKey, AESIV);
+  EncryptedData := UEncrypt_AES_PKCS7_CBC_256(KeyPKCS8, AESKey, AESIV);
   SequenceContent := EncodeTLV($30, UBytesConcat([
     EncodeTLV($30, UBytesConcat([
       EncodeTLV($06, OID_PBES2),
@@ -1765,30 +1835,12 @@ begin
 end;
 
 class function TURSA.ImportKeyPrivate_PKCS8(const Key: String): TURSA.TKey;
-  var Index, i: Int32;
-  var Tag: UInt8;
-  var DERData, MainContent, VersionContent, AlgIdContent, AlgId, PKCS1_Content: TUInt8Array;
+  var DataDER: TUInt8Array;
   const Header = '-----BEGIN PRIVATE KEY-----';
   const Footer = '-----END PRIVATE KEY-----';
 begin
-  Result := TKey.MakeInvalid;
-  DERData := Base64ToASN1(Key, Header, Footer);
-  Index := 0;
-  MainContent := DecodeTLV(DERData, Index, Tag);
-  if Tag <> $30 then Exit;
-  Index := 0;
-  VersionContent := DecodeTLV(MainContent, Index, Tag);
-  if Tag <> $02 then Exit;
-  if not UnpackDER(VersionContent).IsZero then Exit;
-  AlgIdContent := DecodeTLV(MainContent, Index, Tag);
-  if Tag <> $30 then Exit;
-  i := 0;
-  AlgId := DecodeTLV(AlgIdContent, i, Tag);
-  if (Tag <> $06) or (Length(AlgId) <> Length(OID_RSA)) then Exit;
-  for i := 0 to High(OID_RSA) do if AlgId[i] <> OID_RSA[i] then Exit;
-  PKCS1_Content := DecodeTLV(MainContent, Index, Tag);
-  if Tag <> $04 then Exit;
-  Result := ImportKeyPrivate_PKCS1_DER(PKCS1_Content);
+  DataDER := Base64ToASN1(Key, Header, Footer);
+  Result := ImportKeyPrivate_PKCS8_DER(DataDER);
 end;
 
 class function TURSA.ImportKeyPrivateEncrypted_PKCS8(
@@ -1856,7 +1908,7 @@ begin
   Move(DerivedKey[0], AESKey, SizeOf(AESKey));
   Move(IV[0], AESIV, SizeOf(AESIV));
   PKCS1_Content := UDecrypt_AES_PKCS7_CBC_256(EncryptedData, AESKey, AESIV);
-  Result := ImportKeyPrivate_PKCS1_DER(PKCS1_Content);
+  Result := ImportKeyPrivate_PKCS8_DER(PKCS1_Content);
 end;
 
 class function TURSA.ImportKeyPublic_X509(const Key: String): TURSA.TKey;
@@ -1893,6 +1945,67 @@ begin
   if Tag <> $02 then Exit;
   Result.n := UnpackDER(n_bytes);
   Result.e := UnpackDER(e_bytes);
+end;
+
+class function TURSA.ImportKey(const Key: String; const Password: String
+  ): TURSA.TKey;
+  type TKeyType = record
+    Header: String;
+    Footer: String;
+  end;
+  function CheckKeyType(const KeyType: TKeyType): Boolean;
+    var KeyStart, KeyEnd: Int32;
+  begin
+    KeyStart := Key.IndexOf(KeyType.Header);
+    if KeyStart = -1 then Exit(False);
+    KeyStart += Length(KeyType.Header);
+    KeyEnd := Key.IndexOf(KeyType.Footer);
+    if KeyEnd < -1 then Exit(False);
+    if KeyStart > KeyEnd then Exit(False);
+    Result := True;
+  end;
+  const KeyPrivatePKCS1: TKeyType = (
+    Header: '-----BEGIN RSA PRIVATE KEY-----';
+    Footer: '-----END RSA PRIVATE KEY-----';
+  );
+  const KeyPublicPKCS1: TKeyType = (
+    Header: '-----BEGIN RSA PUBLIC KEY-----';
+    Footer: '-----END RSA PUBLIC KEY-----';
+  );
+  const KeyPublicX509: TKeyType = (
+    Header: '-----BEGIN PUBLIC KEY-----';
+    Footer: '-----END PUBLIC KEY-----';
+  );
+  const KeyPrivatePKCS8: TKeyType = (
+    Header: '-----BEGIN PRIVATE KEY-----';
+    Footer: '-----END PRIVATE KEY-----';
+  );
+  const KeyPrivateEncryptedPKCS8: TKeyType = (
+    Header: '-----BEGIN ENCRYPTED PRIVATE KEY-----';
+    Footer: '-----END ENCRYPTED PRIVATE KEY-----';
+  );
+begin
+  if CheckKeyType(KeyPrivatePKCS1) then
+  begin
+    Exit(TURSA.ImportKeyPrivate_PKCS1(Key));
+  end
+  else if CheckKeyType(KeyPublicPKCS1) then
+  begin
+    Exit(TURSA.ImportKeyPublic_PKCS1(Key));
+  end
+  else if CheckKeyType(KeyPublicX509) then
+  begin
+    Exit(TURSA.ImportKeyPublic_X509(Key));
+  end
+  else if CheckKeyType(KeyPrivatePKCS8) then
+  begin
+    Exit(TURSA.ImportKeyPrivate_PKCS8(Key));
+  end
+  else if CheckKeyType(KeyPrivateEncryptedPKCS8) then
+  begin
+    Exit(TURSA.ImportKeyPrivateEncrypted_PKCS8(Key, UStrToBytes(Password)))
+  end;
+  Result := TURSA.TKey.MakeInvalid;
 end;
 
 procedure TUMontgomeryReduction.Init(const Modulus: TUInt4096);

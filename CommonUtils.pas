@@ -1954,6 +1954,7 @@ procedure UCopyFilePrepare(const BufferSize: UInt32 = 1024 * 1024 * 1024);
 procedure UCopyFileCleanup;
 procedure UCopyFile(const SrcFile, DstFile: String);
 procedure UCopyDir(const SrcDir, DstDir: String; const LogProc: TUProcedureString = nil);
+function UAppPath: String;
 procedure ULog(const Text: String; const Offset: Int32 = 0);
 procedure ULogOffset(const Offset: Int32);
 function UExec(
@@ -10167,7 +10168,7 @@ begin
   for i := 1 to Length(Base64) do
   if not (Base64[i] in ['A'..'Z', 'a'..'z', '0'..'9', '+', '/', '=']) then
   begin
-    WriteLn('Invalid Character: ', Base64[i]);
+    //WriteLn('Invalid Character: ', Base64[i]);
     Exit;
   end;
   Len := Length(Base64);
@@ -12832,6 +12833,11 @@ begin
     ExpandFileName(DstDir.TrimRight(['/', '\']))
   );
   UCopyFileCleanup;
+end;
+
+function UAppPath: String;
+begin
+  Result := ExtractFileDir(ParamStr(0));
 end;
 
 var LogOffset: Int32 = 0;
