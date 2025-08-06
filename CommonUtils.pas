@@ -195,7 +195,7 @@ public
   function ToString: String; inline;
 end;
 
-type TUDpubleImpl = type helper for TUDouble
+type TUDoubleImpl = type helper for TUDouble
 public
   function ToString: String; inline;
 end;
@@ -2159,7 +2159,7 @@ end;
 // TUFloatImpl end
 
 // TUFloatImpl begin
-function TUDpubleImpl.ToString: String;
+function TUDoubleImpl.ToString: String;
 begin
   System.Str(Self, Result);
 end;

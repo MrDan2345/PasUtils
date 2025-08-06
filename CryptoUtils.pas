@@ -20,6 +20,7 @@ uses
   Classes,
   CommonUtils;
 
+type TUMD5Digest = array[0..15] of UInt8;
 type TUSHA1Digest = array[0..19] of UInt8;
 type TUSHA256Digest = array[0..31] of UInt8;
 type TUSHA512Digest = array[0..63] of UInt8;
@@ -604,6 +605,10 @@ private
   class function Process_CTR(const Input: TUInt8Array; const Key: TKey; const Nonce: TInitVector): TUInt8Array; static;
   class function Process_Triple_CTR(const Input: TUInt8Array; const Key: TKey3; const Nonce: TInitVector): TUInt8Array; static;
 end;
+
+function UMD5(const Data: Pointer; const DataSize: UInt32): TUMD5Digest;
+function UMD5(const Data: TUInt8Array): TUMD5Digest;
+function UMD5(const Data: String): TUMD5Digest;
 
 function USHA1(const Data: Pointer; const DataSize: UInt32): TUSHA1Digest;
 function USHA1(const Data: TUInt8Array): TUSHA1Digest;
@@ -2481,6 +2486,186 @@ begin
   begin
     Result := Result - N;
   end;
+end;
+
+function UMD5(const Data: Pointer; const DataSize: UInt32): TUMD5Digest;
+function RotateLeft(const Value: UInt32; const Amount: Int32): UInt32; inline;
+  begin
+    Result := (Value shl Amount) or (Value shr (32 - Amount));
+  end;
+  procedure FF(var a: UInt32; b, c, d, x: UInt32; s: Integer; ac: UInt32); inline;
+    function F(const x, y, z: UInt32): UInt32; inline;
+    begin
+      Result := (x and y) or ((not x) and z);
+    end;
+  begin
+    a := a + F(b, c, d) + x + ac;
+    a := RotateLeft(a, s);
+    a := a + b;
+  end;
+  procedure GG(var a: UInt32; b, c, d, x: UInt32; s: Integer; ac: UInt32); inline;
+    function G(const x, y, z: UInt32): UInt32; inline;
+    begin
+      Result := (x and z) or (y and (not z));
+    end;
+  begin
+    a := a + G(b, c, d) + x + ac;
+    a := RotateLeft(a, s);
+    a := a + b;
+  end;
+  procedure HH(var a: UInt32; b, c, d, x: UInt32; s: Integer; ac: UInt32); inline;
+    function H(const x, y, z: UInt32): UInt32; inline;
+    begin
+      Result := x xor y xor z;
+    end;
+  begin
+    a := a + H(b, c, d) + x + ac;
+    a := RotateLeft(a, s);
+    a := a + b;
+  end;
+  procedure II(var a: UInt32; b, c, d, x: UInt32; s: Integer; ac: UInt32); inline;
+    function I(const x, y, z: UInt32): UInt32; inline;
+    begin
+      Result := y xor (x or (not z));
+    end;
+  begin
+    a := a + I(b, c, d) + x + ac;
+    a := RotateLeft(a, s);
+    a := a + b;
+  end;
+  var h0, h1, h2, h3: UInt32;
+  var a, b, c, d: UInt32;
+  var PaddedData: TUInt8Array;
+  var OriginalLength: UInt64;
+  var PaddedLength: Int32;
+  var i, j: Int32;
+  var w: array[0..15] of UInt32;
+begin
+  h0 := $67452301;
+  h1 := $efcdab89;
+  h2 := $98badcfe;
+  h3 := $10325476;
+  OriginalLength := UInt64(DataSize) * 8;
+  PaddedLength := DataSize;
+  Inc(PaddedLength);
+  while (PaddedLength mod 64) <> 56 do Inc(PaddedLength);
+  Inc(PaddedLength, 8);
+  PaddedData := nil;
+  SetLength(PaddedData, PaddedLength);
+  if DataSize > 0 then
+  begin
+    Move(Data^, PaddedData[0], DataSize);
+  end;
+  PaddedData[DataSize] := $80;
+  for i := DataSize + 1 to PaddedLength - 9 do
+  begin
+    PaddedData[i] := 0;
+  end;
+  Move(OriginalLength, PaddedData[PaddedLength - 8], 8);
+  i := 0;
+  while i < PaddedLength do
+  begin
+    for j := 0 to 15 do
+    begin
+      w[j] := (
+        PaddedData[i + j * 4] or
+        (PaddedData[i + j * 4 + 1] shl 8) or
+        (PaddedData[i + j * 4 + 2] shl 16) or
+        (PaddedData[i + j * 4 + 3] shl 24)
+      );
+    end;
+    a := h0;
+    b := h1;
+    c := h2;
+    d := h3;
+    // Round 1
+    FF(a, b, c, d, w[0],  7,  $d76aa478);
+    FF(d, a, b, c, w[1],  12, $e8c7b756);
+    FF(c, d, a, b, w[2],  17, $242070db);
+    FF(b, c, d, a, w[3],  22, $c1bdceee);
+    FF(a, b, c, d, w[4],  7,  $f57c0faf);
+    FF(d, a, b, c, w[5],  12, $4787c62a);
+    FF(c, d, a, b, w[6],  17, $a8304613);
+    FF(b, c, d, a, w[7],  22, $fd469501);
+    FF(a, b, c, d, w[8],  7,  $698098d8);
+    FF(d, a, b, c, w[9],  12, $8b44f7af);
+    FF(c, d, a, b, w[10], 17, $ffff5bb1);
+    FF(b, c, d, a, w[11], 22, $895cd7be);
+    FF(a, b, c, d, w[12], 7,  $6b901122);
+    FF(d, a, b, c, w[13], 12, $fd987193);
+    FF(c, d, a, b, w[14], 17, $a679438e);
+    FF(b, c, d, a, w[15], 22, $49b40821);
+    // Round 2
+    GG(a, b, c, d, w[1],  5,  $f61e2562);
+    GG(d, a, b, c, w[6],  9,  $c040b340);
+    GG(c, d, a, b, w[11], 14, $265e5a51);
+    GG(b, c, d, a, w[0],  20, $e9b6c7aa);
+    GG(a, b, c, d, w[5],  5,  $d62f105d);
+    GG(d, a, b, c, w[10], 9,  $02441453);
+    GG(c, d, a, b, w[15], 14, $d8a1e681);
+    GG(b, c, d, a, w[4],  20, $e7d3fbc8);
+    GG(a, b, c, d, w[9],  5,  $21e1cde6);
+    GG(d, a, b, c, w[14], 9,  $c33707d6);
+    GG(c, d, a, b, w[3],  14, $f4d50d87);
+    GG(b, c, d, a, w[8],  20, $455a14ed);
+    GG(a, b, c, d, w[13], 5,  $a9e3e905);
+    GG(d, a, b, c, w[2],  9,  $fcefa3f8);
+    GG(c, d, a, b, w[7],  14, $676f02d9);
+    GG(b, c, d, a, w[12], 20, $8d2a4c8a);
+    // Round 3
+    HH(a, b, c, d, w[5],  4,  $fffa3942);
+    HH(d, a, b, c, w[8],  11, $8771f681);
+    HH(c, d, a, b, w[11], 16, $6d9d6122);
+    HH(b, c, d, a, w[14], 23, $fde5380c);
+    HH(a, b, c, d, w[1],  4,  $a4beea44);
+    HH(d, a, b, c, w[4],  11, $4bdecfa9);
+    HH(c, d, a, b, w[7],  16, $f6bb4b60);
+    HH(b, c, d, a, w[10], 23, $bebfbc70);
+    HH(a, b, c, d, w[13], 4,  $289b7ec6);
+    HH(d, a, b, c, w[0],  11, $eaa127fa);
+    HH(c, d, a, b, w[3],  16, $d4ef3085);
+    HH(b, c, d, a, w[6],  23, $04881d05);
+    HH(a, b, c, d, w[9],  4,  $d9d4d039);
+    HH(d, a, b, c, w[12], 11, $e6db99e5);
+    HH(c, d, a, b, w[15], 16, $1fa27cf8);
+    HH(b, c, d, a, w[2],  23, $c4ac5665);
+    // Round 4
+    II(a, b, c, d, w[0],  6,  $f4292244);
+    II(d, a, b, c, w[7],  10, $432aff97);
+    II(c, d, a, b, w[14], 15, $ab9423a7);
+    II(b, c, d, a, w[5],  21, $fc93a039);
+    II(a, b, c, d, w[12], 6,  $655b59c3);
+    II(d, a, b, c, w[3],  10, $8f0ccc92);
+    II(c, d, a, b, w[10], 15, $ffeff47d);
+    II(b, c, d, a, w[1],  21, $85845dd1);
+    II(a, b, c, d, w[8],  6,  $6fa87e4f);
+    II(d, a, b, c, w[15], 10, $fe2ce6e0);
+    II(c, d, a, b, w[6],  15, $a3014314);
+    II(b, c, d, a, w[13], 21, $4e0811a1);
+    II(a, b, c, d, w[4],  6,  $f7537e82);
+    II(d, a, b, c, w[11], 10, $bd3af235);
+    II(c, d, a, b, w[2],  15, $2ad7d2bb);
+    II(b, c, d, a, w[9],  21, $eb86d391);
+    h0 := h0 + a;
+    h1 := h1 + b;
+    h2 := h2 + c;
+    h3 := h3 + d;
+    Inc(i, 64);
+  end;
+  Move(h0, Result[0], 4);
+  Move(h1, Result[4], 4);
+  Move(h2, Result[8], 4);
+  Move(h3, Result[12], 4);
+end;
+
+function UMD5(const Data: TUInt8Array): TUMD5Digest;
+begin
+  Result := UMD5(@Data[0], Length(Data));
+end;
+
+function UMD5(const Data: String): TUMD5Digest;
+begin
+  Result := UMD5(@Data[1], Length(Data));
 end;
 
 function USHA1(const Data: Pointer; const DataSize: UInt32): TUSHA1Digest;
