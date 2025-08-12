@@ -2250,7 +2250,6 @@ class function TURSA.ImportKeyPrivateEncrypted_PKCS5(
   var AESIV: TUAES.TInitVector;
   var KeyEncrypted, KeyDER, EncKey, EncIV: TUInt8Array;
 begin
-  Result := '';
   KeyStart := Key.IndexOf(Header);
   if KeyStart = -1 then Exit;
   KeyStart += Length(Header);
@@ -2310,8 +2309,9 @@ begin
     AESKey256 := TUAES.MakeKey256(EncKey);
     AESIV := TUAES.MakeIV(EncIV);
     KeyDER := UDecrypt_AES_PKCS7_CBC_256(KeyEncrypted, AESKey256, AESIV);
+    //DebugASN1(KeyDER);
   end;
-  DebugASN1(KeyDER);
+  Result := ImportKeyPrivate_PKCS1_DER(KeyDER);
 end;
 
 class function TURSA.ImportKeyPrivateEncrypted_PKCS8(
