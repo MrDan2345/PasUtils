@@ -270,11 +270,16 @@ public
   class function ImportKeyPrivate_PKCS1(const Key: String): TURSA.TKey; static;
   class function ImportKeyPublic_PKCS1(const Key: String): TURSA.TKey; static;
   class function ImportKeyPrivate_PKCS8(const Key: String): TURSA.TKey; static;
+  class function ImportKeyPrivateEncrypted_PKCS5(
+    const Key: String;
+    const Password: TUInt8Array
+  ): TURSA.TKey; static;
   class function ImportKeyPrivateEncrypted_PKCS8(
     const Key: String;
     const Password: TUInt8Array
   ): TURSA.TKey; static;
   class function ImportKeyPublic_X509(const Key: String): TURSA.TKey; static;
+  class function ImportKey(const Key: String; const Password: TUInt8Array): TURSA.TKey; static;
   class function ImportKey(const Key: String; const Password: String = ''): TURSA.TKey; static;
 end;
 
@@ -613,17 +618,14 @@ function UMD5(const Data: String): TUMD5Digest;
 function USHA1(const Data: Pointer; const DataSize: UInt32): TUSHA1Digest;
 function USHA1(const Data: TUInt8Array): TUSHA1Digest;
 function USHA1(const Data: String): TUSHA1Digest;
-function USHA1_Generic(const Data: TUInt8Array): TUInt8Array;
 
 function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
 function USHA256(const Data: TUInt8Array): TUSHA256Digest;
 function USHA256(const Data: String): TUSHA256Digest;
-function USHA256_Generic(const Data: TUInt8Array): TUInt8Array;
 
 function USHA512(const Data: Pointer; const DataSize: UInt32): TUSHA512Digest;
 function USHA512(const Data: TUInt8Array): TUSHA512Digest;
 function USHA512(const Data: String): TUSHA512Digest;
-function USHA512_Generic(const Data: TUInt8Array): TUInt8Array;
 
 function UHMAC_SHA1(const Key, Data: TUInt8Array): TUSHA1Digest;
 function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA256Digest;
@@ -647,6 +649,13 @@ function UPBKDF2_HMAC_SHA512(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const Iterations: Int32 = 600000
+): TUInt8Array;
+
+function UEvpKDF(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const IVLength: Int32;
+  out IV: TUInt8Array
 ): TUInt8Array;
 
 function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
@@ -1764,15 +1773,15 @@ begin
   if Tag <> $05 then Exit(False);
   if UBytesEqual(OID, OID_SHA_256) then
   begin
-    Hash := USHA256_Generic(Data);
+    Hash := USHA256(Data);
   end
   else if UBytesEqual(OID, OID_SHA_512) then
   begin
-    Hash := USHA512_Generic(Data);
+    Hash := USHA512(Data);
   end
   else if UBytesEqual(OID, OID_SHA1) then
   begin
-    Hash := USHA1_Generic(Data);
+    Hash := USHA1(Data);
   end
   else
   begin
@@ -2166,6 +2175,145 @@ begin
   Result := ImportKeyPrivate_PKCS8_DER(DataDER);
 end;
 
+class function TURSA.ImportKeyPrivateEncrypted_PKCS5(
+  const Key: String;
+  const Password: TUInt8Array
+): TURSA.TKey;
+  function SkipChars(var Pos: Int32; const Chars: array of AnsiChar): Boolean;
+    var i: Int32;
+  begin
+    while Pos < Length(Key) do
+    begin
+      Result := True;
+      for i := 0 to High(Chars) do
+      if Key[Pos] = Chars[i] then
+      begin
+        Result := False;
+        Break;
+      end;
+      if Result then Exit;
+      Inc(Pos);
+    end;
+    Result := False;
+  end;
+  function ParseLine(const Pos: Int32): String;
+    var i: Int32;
+  begin
+    Result := '';
+    i := Pos;
+    while (i <= Length(Key))
+    and (Key[i] <> #$d)
+    and (Key[i] <> #$a) do
+    begin
+      Inc(i);
+    end;
+    i := i - Pos;
+    if i = 0 then Exit;
+    SetLength(Result, i);
+    Move(Key[Pos], Result[1], i);
+  end;
+  function FindPattern(const Pos: Int32; const Pattern: String; const AtStart: Boolean): Int32;
+    var i, j: Int32;
+    var Match: Boolean;
+  begin
+    for i := Pos to Length(Key) do
+    begin
+      Match := True;
+      for j := 0 to Length(Pattern) - 1 do
+      if Key[i + j] <> Pattern[j + 1] then
+      begin
+        Match := False;
+        Break;
+      end;
+      if Match then
+      begin
+        if AtStart then Exit(i) else Exit(i + Length(Pattern));
+      end;
+    end;
+    Result := -1;
+  end;
+  const Header: String = '-----BEGIN RSA PRIVATE KEY-----';
+  const Footer: String = '-----END RSA PRIVATE KEY-----';
+  const ProcTypeMark: String = 'Proc-Type';
+  const DEKInfoMark: String = 'DEK-Info';
+  var KeyStart, KeyEnd: Int32;
+  var ProcTypePos, DEKInfoPos: Int32;
+  var ProcTypeStr, DEKInfoStr: String;
+  var ProcType, DEKInfo: TUStrArray;
+  var Alg: String;
+  var Salt: TUInt8Array;
+  var i: Int32;
+  var KeyASN1: String;
+  var AESKey128: TUAES.TKey128;
+  var AESKey192: TUAES.TKey192;
+  var AESKey256: TUAES.TKey256;
+  var AESIV: TUAES.TInitVector;
+  var KeyEncrypted, KeyDER, EncKey, EncIV: TUInt8Array;
+begin
+  Result := '';
+  KeyStart := Key.IndexOf(Header);
+  if KeyStart = -1 then Exit;
+  KeyStart += Length(Header);
+  KeyEnd := Key.IndexOf(Footer);
+  if KeyEnd = -1 then Exit;
+  if KeyStart > KeyEnd then Exit;
+  ProcTypePos := Key.IndexOf(ProcTypeMark);
+  if ProcTypePos = -1 then Exit;
+  if (ProcTypePos < KeyStart) or (ProcTypePos > KeyEnd) then Exit;
+  DEKInfoPos := Key.IndexOf(DEKInfoMark);
+  if DEKInfoPos = -1 then Exit;
+  if (DEKInfoPos < KeyStart) or (DEKInfoPos > KeyEnd) then Exit;
+  i := ProcTypePos + Length(ProcTypeMark) + 1;
+  if not SkipChars(i, [':', ' ']) then Exit;
+  ProcTypeStr := ParseLine(i);
+  if Length(ProcTypeStr) = 0 then Exit;
+  i := DEKInfoPos + Length(DEKInfoMark) + 1;
+  if not SkipChars(i, [':', ' ']) then Exit;
+  DEKInfoStr := ParseLine(i);
+  ProcType := UStrExplode(ProcTypeStr, ',', False);
+  if Length(ProcType) < 2 then Exit;
+  DEKInfo := UStrExplode(DEKInfoStr, ',', False);
+  if Length(DEKInfo) < 2 then Exit;
+  if ProcType[0].Trim <> '4' then Exit;
+  if ProcType[1].Trim <> 'ENCRYPTED' then Exit;
+  Alg := DEKInfo[0].Trim;
+  Salt := UHexToBytes(DEKInfo[1]);
+  i := FindPattern(DEKInfoPos, #$d#$a#$d#$a, False);
+  if i = -1 then
+  begin
+    i := FindPattern(DEKInfoPos, #$a#$a, False);
+    if i = -1 then Exit;
+  end;
+  KeyStart := i;
+  i := FindPattern(KeyStart, #$d#$a#$d#$a, True);
+  if i = -1 then
+  begin
+    i := FindPattern(KeyStart, #$a#$a, False);
+    if i = -1 then Exit;
+  end;
+  KeyEnd := i;
+  WriteLn(Key[KeyStart]);
+  WriteLn(Key[KeyEnd]);
+  KeyASN1 := Key.Substring(KeyStart - 1, KeyEnd - KeyStart);
+  KeyASN1 := StringReplace(KeyASN1, #$d#$a, '', [rfReplaceAll]);
+  KeyASN1 := StringReplace(KeyASN1, #$a, '', [rfReplaceAll]);
+  KeyEncrypted := UBase64ToBytes(KeyASN1);
+  DebugASN1(KeyEncrypted);
+  if Alg = 'AES-256-CBC' then
+  begin
+    EncKey := UEvpKDF(
+      Password, Salt,
+      SizeOf(TUAES.TKey256),
+      SizeOf(TUAES.TInitVector),
+      EncIV
+    );
+    AESKey256 := TUAES.MakeKey256(EncKey);
+    AESIV := TUAES.MakeIV(EncIV);
+    KeyDER := UDecrypt_AES_PKCS7_CBC_256(KeyEncrypted, AESKey256, AESIV);
+  end;
+  DebugASN1(KeyDER);
+end;
+
 class function TURSA.ImportKeyPrivateEncrypted_PKCS8(
   const Key: String;
   const Password: TUInt8Array
@@ -2209,7 +2357,7 @@ class function TURSA.ImportKeyPrivateEncrypted_PKCS8(
   var DESKey3: TUDES.TKey3;
   var DESKey: TUDES.TKey;
   var DESIV: TUDES.TInitVector;
-  var IterationCount, KeySize: Int32;
+  var IterationCount: Int32;
   var HMAC_OID, ALG_OID: TUInt8Array;
   const Header: String = '-----BEGIN ENCRYPTED PRIVATE KEY-----';
   const Footer: String = '-----END ENCRYPTED PRIVATE KEY-----';
@@ -2360,8 +2508,10 @@ begin
   Result.e := UnpackDER(e_bytes);
 end;
 
-class function TURSA.ImportKey(const Key: String; const Password: String
-  ): TURSA.TKey;
+class function TURSA.ImportKey(
+  const Key: String;
+  const Password: TUInt8Array
+): TURSA.TKey;
   type TKeyType = record
     Header: String;
     Footer: String;
@@ -2416,9 +2566,14 @@ begin
   end
   else if CheckKeyType(KeyPrivateEncryptedPKCS8) then
   begin
-    Exit(TURSA.ImportKeyPrivateEncrypted_PKCS8(Key, UStrToBytes(Password)))
+    Exit(TURSA.ImportKeyPrivateEncrypted_PKCS8(Key, Password))
   end;
   Result := TURSA.TKey.MakeInvalid;
+end;
+
+class function TURSA.ImportKey(const Key: String; const Password: String): TURSA.TKey;
+begin
+  Result := ImportKey(Key, UStrToBytes(Password));
 end;
 
 procedure TUMontgomeryReduction.Init(const Modulus: TUInt4096);
@@ -2780,15 +2935,6 @@ begin
   Result := USHA1(@Data[1], Length(Data));
 end;
 
-function USHA1_Generic(const Data: TUInt8Array): TUInt8Array;
-  var Hash: TUSHA1Digest;
-begin
-  Result := nil;
-  SetLength(Result, Length(TUSHA1Digest));
-  Hash := USHA1(Data);
-  Move(Hash, Result[0], Length(Result));
-end;
-
 function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
   function RightRotate(const Value: UInt32; const Amount: Int32): UInt32;
   begin
@@ -2906,15 +3052,6 @@ end;
 function USHA256(const Data: String): TUSHA256Digest;
 begin
   Result := USHA256(@Data[1], Length(Data));
-end;
-
-function USHA256_Generic(const Data: TUInt8Array): TUInt8Array;
-  var Hash: TUSHA256Digest;
-begin
-  Result := nil;
-  SetLength(Result, Length(TUSHA256Digest));
-  Hash := USHA256(Data);
-  Move(Hash, Result[0], Length(Result));
 end;
 
 function UModInverse(const e, phi: TUInt4096): TUInt4096;
@@ -3143,15 +3280,6 @@ begin
   Result := USHA512(@Data[1], Length(Data));
 end;
 
-function USHA512_Generic(const Data: TUInt8Array): TUInt8Array;
-  var Hash: TUSHA512Digest;
-begin
-  Result := nil;
-  SetLength(Result, Length(TUSHA512Digest));
-  Hash := USHA512(Data);
-  Move(Hash, Result[0], Length(Result));
-end;
-
 function UHMAC_SHA1(const Key, Data: TUInt8Array): TUSHA1Digest;
   const DigestSize = SizeOf(TUSHA1Digest);
   const BlockSize = DigestSize * 2;
@@ -3378,6 +3506,33 @@ begin
     Result := UBytesJoin(Result, T);
   end;
   SetLength(Result, KeyLength);
+end;
+
+function UEvpKDF(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const IVLength: Int32;
+  out IV: TUInt8Array
+): TUInt8Array;
+  var DerivedBytes: TUInt8Array;
+  var RequiredLength: Int32;
+  var Digest, PrevDigest: TUInt8Array;
+begin
+  Result := nil;
+  IV := nil;
+  DerivedBytes := nil;
+  PrevDigest := nil;
+  RequiredLength := KeyLength + IVLength;
+  while Length(DerivedBytes) < RequiredLength do
+  begin
+    Digest := UMD5(UBytesConcat([PrevDigest, Password, Salt]));
+    DerivedBytes := UBytesConcat([DerivedBytes, Digest]);
+    PrevDigest := Digest;
+  end;
+  SetLength(Result, KeyLength);
+  Move(DerivedBytes[0], Result[0], KeyLength);
+  SetLength(IV, IVLength);
+  Move(DerivedBytes[KeyLength], IV[0], IVLength);
 end;
 
 function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
