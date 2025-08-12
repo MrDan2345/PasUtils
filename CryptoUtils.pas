@@ -2276,6 +2276,7 @@ class function TURSA.ImportKeyPrivateEncrypted_PKCS5(
   var DESIV: TUDES.TInitVector;
   var KeyEncrypted, KeyDER, EncKey, EncIV: TUInt8Array;
 begin
+  Result := TURSA.TKey.MakeInvalid;
   KeyStart := Key.IndexOf(Header);
   if KeyStart = -1 then Exit;
   KeyStart += Length(Header);
@@ -2323,7 +2324,6 @@ begin
   KeyASN1 := StringReplace(KeyASN1, #$d#$a, '', [rfReplaceAll]);
   KeyASN1 := StringReplace(KeyASN1, #$a, '', [rfReplaceAll]);
   KeyEncrypted := UBase64ToBytes(KeyASN1);
-  DebugASN1(KeyEncrypted);
   if Alg = 'des-cbc' then
   begin
     EncKey := UEvpKDF_MD5(
@@ -2384,6 +2384,7 @@ begin
     AESIV := TUAES.MakeIV(EncIV);
     KeyDER := UDecrypt_AES_PKCS7_CBC_256(KeyEncrypted, AESKey256, AESIV);
   end;
+  if Length(KeyDER) = 0 then Exit;
   Result := ImportKeyPrivate_PKCS1_DER(KeyDER);
 end;
 
