@@ -24,6 +24,7 @@ type TUMD5Digest = array[0..15] of UInt8;
 type TUSHA1Digest = array[0..19] of UInt8;
 type TUSHA256Digest = array[0..31] of UInt8;
 type TUSHA512Digest = array[0..63] of UInt8;
+type TUDigestFunc = function (const Data: TUInt8Array): TUInt8Array;
 
 type TURSA = record
 public
@@ -627,6 +628,11 @@ function USHA512(const Data: Pointer; const DataSize: UInt32): TUSHA512Digest;
 function USHA512(const Data: TUInt8Array): TUSHA512Digest;
 function USHA512(const Data: String): TUSHA512Digest;
 
+function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
+function UDigestSHA1(const Data: TUInt8Array): TUInt8Array;
+function UDigestSHA256(const Data: TUInt8Array): TUInt8Array;
+function UDigestSHA512(const Data: TUInt8Array): TUInt8Array;
+
 function UHMAC_SHA1(const Key, Data: TUInt8Array): TUSHA1Digest;
 function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA256Digest;
 function UHMAC_SHA512(const Key, Data: TUInt8Array): TUSHA512Digest;
@@ -652,9 +658,26 @@ function UPBKDF2_HMAC_SHA512(
 ): TUInt8Array;
 
 function UEvpKDF(
+  const DigestFunc: TUDigestFunc;
+  const BlockSize: Int32;
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const IVLength: Int32;
+  const Iterations: Int32;
+  out IV: TUInt8Array
+): TUInt8Array;
+function UEvpKDF_MD5(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const IVLength: Int32;
+  const Iterations: Int32;
+  out IV: TUInt8Array
+): TUInt8Array;
+function UEvpKDF_SHA256(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const IVLength: Int32;
+  const Iterations: Int32;
   out IV: TUInt8Array
 ): TUInt8Array;
 
@@ -2247,7 +2270,10 @@ class function TURSA.ImportKeyPrivateEncrypted_PKCS5(
   var AESKey128: TUAES.TKey128;
   var AESKey192: TUAES.TKey192;
   var AESKey256: TUAES.TKey256;
+  var DESKey3: TUDES.TKey3;
+  var DESKey: TUDES.TKey;
   var AESIV: TUAES.TInitVector;
+  var DESIV: TUDES.TInitVector;
   var KeyEncrypted, KeyDER, EncKey, EncIV: TUInt8Array;
 begin
   KeyStart := Key.IndexOf(Header);
@@ -2275,7 +2301,7 @@ begin
   if Length(DEKInfo) < 2 then Exit;
   if ProcType[0].Trim <> '4' then Exit;
   if ProcType[1].Trim <> 'ENCRYPTED' then Exit;
-  Alg := DEKInfo[0].Trim;
+  Alg := LowerCase(DEKInfo[0].Trim);
   Salt := UHexToBytes(DEKInfo[1]);
   i := FindPattern(DEKInfoPos, #$d#$a#$d#$a, False);
   if i = -1 then
@@ -2298,18 +2324,65 @@ begin
   KeyASN1 := StringReplace(KeyASN1, #$a, '', [rfReplaceAll]);
   KeyEncrypted := UBase64ToBytes(KeyASN1);
   DebugASN1(KeyEncrypted);
-  if Alg = 'AES-256-CBC' then
+  if Alg = 'des-cbc' then
   begin
-    EncKey := UEvpKDF(
+    EncKey := UEvpKDF_MD5(
+      Password, Salt,
+      SizeOf(TUDES.TKey),
+      SizeOf(TUAES.TInitVector),
+      1, EncIV
+    );
+    DESKey := TUDES.MakeKey(EncKey);
+    DESIV := TUDES.MakeIV(EncIV);
+    KeyDER := UDecrypt_DES_PKCS7_CBC(KeyEncrypted, DESKey, DESIV);
+  end
+  else if Alg = 'des-ede3-cbc' then
+  begin
+    EncKey := UEvpKDF_MD5(
+      Password, Salt,
+      SizeOf(TUDES.TKey3),
+      SizeOf(TUAES.TInitVector),
+      1, EncIV
+    );
+    DESKey3 := TUDES.MakeKey3(EncKey);
+    DESIV := TUDES.MakeIV(EncIV);
+    KeyDER := UDecrypt_DES_Triple_PKCS7_CBC(KeyEncrypted, DESKey3, DESIV);
+  end
+  else if Alg = 'aes-128-cbc' then
+  begin
+    EncKey := UEvpKDF_SHA256(
+      Password, Salt,
+      SizeOf(TUAES.TKey128),
+      SizeOf(TUAES.TInitVector),
+      1, EncIV
+    );
+    AESKey128 := TUAES.MakeKey128(EncKey);
+    AESIV := TUAES.MakeIV(EncIV);
+    KeyDER := UDecrypt_AES_PKCS7_CBC_128(KeyEncrypted, AESKey128, AESIV);
+  end
+  else if Alg = 'aes-192-cbc' then
+  begin
+    EncKey := UEvpKDF_SHA256(
+      Password, Salt,
+      SizeOf(TUAES.TKey192),
+      SizeOf(TUAES.TInitVector),
+      1, EncIV
+    );
+    AESKey192 := TUAES.MakeKey192(EncKey);
+    AESIV := TUAES.MakeIV(EncIV);
+    KeyDER := UDecrypt_AES_PKCS7_CBC_192(KeyEncrypted, AESKey192, AESIV);
+  end
+  else if Alg = 'aes-256-cbc' then
+  begin
+    EncKey := UEvpKDF_SHA256(
       Password, Salt,
       SizeOf(TUAES.TKey256),
       SizeOf(TUAES.TInitVector),
-      EncIV
+      1, EncIV
     );
     AESKey256 := TUAES.MakeKey256(EncKey);
     AESIV := TUAES.MakeIV(EncIV);
     KeyDER := UDecrypt_AES_PKCS7_CBC_256(KeyEncrypted, AESKey256, AESIV);
-    //DebugASN1(KeyDER);
   end;
   Result := ImportKeyPrivate_PKCS1_DER(KeyDER);
 end;
@@ -3280,6 +3353,26 @@ begin
   Result := USHA512(@Data[1], Length(Data));
 end;
 
+function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
+begin
+  Result := UMD5(Data);
+end;
+
+function UDigestSHA1(const Data: TUInt8Array): TUInt8Array;
+begin
+  Result := USHA1(Data);
+end;
+
+function UDigestSHA256(const Data: TUInt8Array): TUInt8Array;
+begin
+  Result := USHA256(Data);
+end;
+
+function UDigestSHA512(const Data: TUInt8Array): TUInt8Array;
+begin
+  Result := USHA512(Data);
+end;
+
 function UHMAC_SHA1(const Key, Data: TUInt8Array): TUSHA1Digest;
   const DigestSize = SizeOf(TUSHA1Digest);
   const BlockSize = DigestSize * 2;
@@ -3509,30 +3602,68 @@ begin
 end;
 
 function UEvpKDF(
+  const DigestFunc: TUDigestFunc;
+  const BlockSize: Int32;
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const IVLength: Int32;
+  const Iterations: Int32;
   out IV: TUInt8Array
 ): TUInt8Array;
-  var DerivedBytes: TUInt8Array;
-  var RequiredLength: Int32;
-  var Digest, PrevDigest: TUInt8Array;
+  var TotalLength: Int32;
+  var HashInput: TUInt8Array;
+  var CurrentHash: TUInt8Array;
+  var i: Int32;
 begin
   Result := nil;
   IV := nil;
-  DerivedBytes := nil;
-  PrevDigest := nil;
-  RequiredLength := KeyLength + IVLength;
-  while Length(DerivedBytes) < RequiredLength do
+  if Iterations < 1 then Exit;
+  TotalLength := KeyLength + IVLength;
+  HashInput := nil;
+  while Length(Result) < TotalLength do
   begin
-    Digest := UMD5(UBytesConcat([PrevDigest, Password, Salt]));
-    DerivedBytes := UBytesConcat([DerivedBytes, Digest]);
-    PrevDigest := Digest;
+    HashInput := UBytesConcat([HashInput, Password, Salt]);
+    CurrentHash := DigestFunc(HashInput);
+    for i := 2 to Iterations do CurrentHash := DigestFunc(CurrentHash);
+    Result := UBytesJoin(Result, CurrentHash);
+    HashInput := CurrentHash;
+  end;
+  if IVLength > 0 then
+  begin
+    SetLength(IV, IVLength);
+    Move(Result[KeyLength], IV[0], IVLength);
   end;
   SetLength(Result, KeyLength);
-  Move(DerivedBytes[0], Result[0], KeyLength);
-  SetLength(IV, IVLength);
-  Move(DerivedBytes[KeyLength], IV[0], IVLength);
+end;
+
+function UEvpKDF_MD5(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const IVLength: Int32;
+  const Iterations: Int32;
+  out IV: TUInt8Array
+): TUInt8Array;
+  const BlockSize = SizeOf(TUMD5Digest);
+begin
+  Result := UEvpKDF(
+    @UDigestMD5, BlockSize,
+    Password, Salt, KeyLength, IVLength, Iterations, IV
+  );
+end;
+
+function UEvpKDF_SHA256(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const IVLength: Int32;
+  const Iterations: Int32;
+  out IV: TUInt8Array
+): TUInt8Array;
+  const BlockSize = SizeOf(TUSHA256Digest);
+begin
+  Result := UEvpKDF(
+    @UDigestSHA256, BlockSize,
+    Password, Salt, KeyLength, IVLength, Iterations, IV
+  );
 end;
 
 function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
