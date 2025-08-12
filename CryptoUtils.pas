@@ -44,7 +44,7 @@ public
     function IsValid: Boolean;
     class function MakeInvalid: TKey; static;
   end;
-public
+private
   const OID_RSA: array[0..8] of UInt8 = (
     $2a, $86, $48, $86, $f7, $0d, $01, $01, $01
   ); // 1.2.840.113549.1.1.1
@@ -281,7 +281,6 @@ public
   ): TURSA.TKey; static;
   class function ImportKeyPublic_X509(const Key: String): TURSA.TKey; static;
   class function ImportKey(const Key: String; const Password: TUInt8Array): TURSA.TKey; static;
-  class function ImportKey(const Key: String; const Password: String = ''): TURSA.TKey; static;
 end;
 
 type TUMontgomeryReduction = record
@@ -928,7 +927,7 @@ implementation
 
 function TURSA.TKey.Size: Uint32;
 begin
-  Result := (n.Top + 1) * 32;
+  Result := n.BytesUsed * 8;
 end;
 
 function TURSA.TKey.IsPublic: Boolean;
@@ -2645,11 +2644,6 @@ begin
   Result := TURSA.TKey.MakeInvalid;
 end;
 
-class function TURSA.ImportKey(const Key: String; const Password: String): TURSA.TKey;
-begin
-  Result := ImportKey(Key, UStrToBytes(Password));
-end;
-
 procedure TUMontgomeryReduction.Init(const Modulus: TUInt4096);
   var inv: UInt32;
   var i: Int32;
@@ -3723,7 +3717,7 @@ end;
 
 function UImportRSAKey(const KeyASN1: String; const Password: String): TURSA.TKey;
 begin
-  Result := TURSA.ImportKey(KeyASN1, Password);
+  Result := TURSA.ImportKey(KeyASN1, UStrToBytes(Password));
 end;
 
 function UEncrypt_RSA_PKCS1(
