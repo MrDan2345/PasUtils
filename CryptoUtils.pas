@@ -26,7 +26,7 @@ type TUSHA256Digest = array[0..31] of UInt8;
 type TUSHA512Digest = array[0..63] of UInt8;
 type TUDigestFunc = function (const Data: TUInt8Array): TUInt8Array;
 
-type TUCryptoInt = TUInt4096;
+type TUCryptoInt = TUInt8192;
 type TUCryptoIntArray = array of TUCryptoInt;
 
 type TURSA = record
@@ -691,7 +691,7 @@ function UMakeRSAKey(
 ): TURSA.TKey;
 function UExportRSAKey_PKCS1(const Key: TURSA.TKey): String;
 function UExportRSAKey_PKCS8(const Key: TURSA.TKey): String;
-function UExportRSAKey_PKCS8(const Key: TURSA.TKey; const Password: String = ''): String;
+function UExportRSAKey_PKCS8(const Key: TURSA.TKey; const Password: String): String;
 function UExportRSAKey_X509(const Key: TURSA.TKey): String;
 function UImportRSAKey(const KeyASN1: String; const Password: String = ''): TURSA.TKey;
 function UEncrypt_RSA_PKCS1(
@@ -990,34 +990,33 @@ begin
 end;
 
 class function TURSA.ModInverse(const e, phi: TUCryptoInt): TUCryptoInt;
-  function GCDR(const a, b: TUCryptoInt; var x: TUCryptoInt; var y: TUCryptoInt): TUCryptoInt;
-  var x1, y1, gcd_val: TUCryptoInt;
-  begin
-    if a = TUCryptoInt.Zero then
-    begin
-      x := TUCryptoInt.Zero;
-      y := TUCryptoInt.One;
-      Exit(b);
-    end;
-    x1 := TUCryptoInt.Zero;
-    y1 := TUCryptoInt.Zero;
-    gcd_val := GCDR(b mod a, a, x1, y1);
-    x := y1 - (b div a) * x1;
-    y := x1;
-    Result := gcd_val;
-  end;
-  var x, y, gcd_val: TUCryptoInt;
+  var Zero: TUCryptoInt;
+  var One: TUCryptoInt;
+  var x0, x1, a, m, q, temp: TUCryptoInt;
 begin
-  x := TUCryptoInt.Zero;
-  y := TUCryptoInt.Zero;
-  gcd_val := GCDR(e, phi, x, y);
-  if gcd_val <> TUCryptoInt.One then Exit(TUCryptoInt.Invalid);
-  if x < TUCryptoInt.Zero then x := x + phi;
-  Result := x;
+  Zero := TUCryptoInt.Zero;
+  One := TUCryptoInt.One;
+  if phi = One then Exit(Zero);
+  x0 := Zero;
+  x1 := One;
+  a := ((e mod phi) + phi) mod phi;
+  m := phi;
+  while a > One do
+  begin
+    q := TUCryptoInt.Division(a, m, temp);
+    a := m;
+    m := temp;
+    temp := x0;
+    x0 := x1 - (q * x0);
+    x1 := temp;
+  end;
+  if a <> One then Exit(TUCryptoInt.Invalid);
+  if (x1 < 0) then x1 := x1 + phi;
+  Result := x1;
 end;
 
 class function TURSA.GCD(const a, b: TUCryptoInt): TUCryptoInt;
-  var Temp, Remainder: TUCryptoInt;
+  var Remainder: TUCryptoInt;
   var LocalA, LocalB: TUCryptoInt;
 begin
   LocalA := a;
