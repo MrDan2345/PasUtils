@@ -908,6 +908,7 @@ public
   class function BitOr(const a, b: TSelf): TSelf; static;
   class function BitXor(const a, b: TSelf): TSelf; static;
   class function BitNot(const Number: TSelf): TSelf; static;
+  class operator Initialize(var v: TSelf);
   class operator := (const v: Int64): TSelf;
   class operator := (const v: String): TSelf;
   class operator := (const v: TUInt8Array): TSelf;
@@ -933,9 +934,9 @@ type TUSize128 = record const Value = 128; end;
 //type TUInt4096 = specialize TUBigInt<TUSize128>;
 //type TUInt4096Array = array of TUInt4096;
 
-//type TUSize256 = record const Value = 256; end;
-//type TUInt8192 = specialize TUBigInt<TUSize256>;
-//type TUInt8192Array = array of TUInt8192;
+type TUSize256 = record const Value = 256; end;
+type TUInt8192 = specialize TUBigInt<TUSize256>;
+type TUInt8192Array = array of TUInt8192;
 
 type TUInt4096Impl = type helper for TUInt4096
 public
@@ -4809,7 +4810,9 @@ begin
     Carry := Product shr 32;
   end;
   if NumWords < ItemCount then
-  Result[NumWords] := Carry;
+  begin
+    Result[NumWords] := Carry;
+  end;
 end;
 
 function TUBigInt.GetData(const Index: Int32): UInt32;
@@ -4825,6 +4828,7 @@ end;
 class function TUBigInt.Zero: TSelf;
 begin
   UClear(Result._Data, SizeOf(Result._Data));
+  Result._Flags := [];
 end;
 
 class function TUBigInt.One: TSelf;
@@ -5343,6 +5347,12 @@ begin
   for i := 0 to MaxItem do Result[i] := not Number[i];
 end;
 
+class operator TUBigInt.Initialize(var v: TSelf);
+begin
+  UClear(v._Data, SizeOf(v._Data));
+  v._Flags := [];
+end;
+
 class operator TUBigInt.:=(const v: Int64): TSelf;
 begin
   Result := Make(v);
@@ -5638,7 +5648,9 @@ class function TUInt4096Impl.MagDiv(const a, b: TUInt4096; out r: TUInt4096): TU
       Carry := Product shr 32;
     end;
     if NumWords < NumItems then
-    Result[NumWords] := Carry;
+    begin
+      Result[NumWords] := Carry;
+    end;
   end;
   var NormDividend, NormDivisor: TUInt4096;
   var m, n, s, j, i: Int32;
