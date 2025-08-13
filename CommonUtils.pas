@@ -153,8 +153,8 @@ type TUBounds2i = array[0..1] of TUVec2i; // TUBounds2iImpl
 type PUBounds2i = ^TUBounds2i;
 type TUBounds3i = array[0..1] of TUVec3i; // TUBounds3iImpl
 type PUBounds3i = ^TUBounds3i;
-//type TUInt4096 = array[0..128] of UInt32; // TUInt4096Impl
-//type TUInt4096Array = array of TUInt4096;
+type TUInt4096 = array[0..128] of UInt32; // TUInt4096Impl
+type TUInt4096Array = array of TUInt4096;
 
 type TUSwizzle = record
 private
@@ -929,13 +929,17 @@ public
   class operator not (const a: TSelf): TSelf;
 end;
 
-type TUSize256 = record const Value = 256; end;
+type TUSize128 = record const Value = 128; end;
+//type TUInt4096 = specialize TUBigInt<TUSize128>;
+//type TUInt4096Array = array of TUInt4096;
 
-type TUInt8192 = specialize TUBigInt<TUSize256>;
-type TUInt8192Array = array of TUInt8192;
-{
+//type TUSize256 = record const Value = 256; end;
+//type TUInt8192 = specialize TUBigInt<TUSize256>;
+//type TUInt8192Array = array of TUInt8192;
+
 type TUInt4096Impl = type helper for TUInt4096
 public
+  type Size32 = TUSize128;
   const MaxItem = 127;
   const ItemCount = MaxItem + 1;
   const FlagsItem = 128;
@@ -1023,7 +1027,7 @@ public
   class function BitXor(const a, b: TUInt4096): TUInt4096; static;
   class function BitNot(const Number: TUInt4096): TUInt4096; static;
   class function PowMod(const Base, Exp, Modulus: TUInt4096): TUInt4096; static;
-end;}
+end;
 
 type TUTransform = record
 strict private
@@ -2019,7 +2023,7 @@ generic function UArrCompare<T>(const a, b: array of T): Int8;
 operator + (const a, b: TUVec2): TUVec2;
 operator - (const a, b: TUVec2): TUVec2;
 operator * (const a, b: TUVec2): TUVec2;
-//operator / (const a, b: TUInt4096): TUInt4096;
+operator / (const a, b: TUInt4096): TUInt4096;
 operator / (const a, b: TUVec2): TUVec2;
 operator / (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2; const f: TUFloat): TUVec2;
@@ -2031,7 +2035,7 @@ operator * (const a, b: TUVec2i): TUVec2i;
 operator * (const a: TUVec2i; const b: TUVec2): TUVec2;
 operator / (const a, b: TUVec2i): TUVec2;
 operator div (const a, b: TUVec2i): TUVec2i;
-//operator div (const a, b: TUInt4096): TUInt4096;
+operator div (const a, b: TUInt4096): TUInt4096;
 operator + (const v: TUVec2i; const i: Int32): TUVec2i;
 operator - (const v: TUVec2i; const i: Int32): TUVec2i;
 operator * (const v: TUVec2i; const i: Int32): TUVec2i;
@@ -2042,11 +2046,11 @@ operator - (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator / (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator mod (const v: TUVec2i; const i: Int32): TUVec2i;
-//operator mod (const a, b: TUInt4096): TUInt4096;
+operator mod (const a, b: TUInt4096): TUInt4096;
 operator := (const v: TUVec2): TUVec2i;
-//operator := (const v: UInt64): TUInt4096;
-//operator := (const v: String): TUInt4096;
-//operator := (const v: TUint8Array): TUInt4096;
+operator := (const v: UInt64): TUInt4096;
+operator := (const v: String): TUInt4096;
+operator := (const v: TUint8Array): TUInt4096;
 operator := (const v: TUVec2i): TUVec2;
 operator := (const i: Int32): TUVec2i;
 operator := (const f: TUFloat): TUVec2;
@@ -2078,11 +2082,11 @@ operator * (const f: TUFloat; const v: TUVec4): TUVec4;
 operator - (const v: TUVec4): TUVec4;
 operator := (const v: TUVec4): TUBounds2f;
 operator := (const v: TUBounds2f): TUVec4;
-//operator + (const a, b: TUInt4096): TUInt4096;
+operator + (const a, b: TUInt4096): TUInt4096;
 operator + (const a, b: TUMat): TUMat;
 operator - (const a, b: TUMat): TUMat;
-//operator - (const a, b: TUInt4096): TUInt4096;
-//operator * (const a, b: TUInt4096): TUInt4096;
+operator - (const a, b: TUInt4096): TUInt4096;
+operator * (const a, b: TUInt4096): TUInt4096;
 operator * (const a, b: TUMat): TUMat;
 operator * (const m: TUMat; const f: TUFloat): TUMat;
 operator := (const q: TUQuat): TUMat;
@@ -2093,16 +2097,16 @@ operator * (const a, b: TUQuat): TUQuat;
 operator mod (const a, b: TUDouble): TUDouble;
 operator mod (const a, b: TUFloat): TUFloat;
 operator < (const a, b: TUInt32Array): Boolean;
-//operator < (const a, b: TUInt4096): Boolean;
-//operator <= (const a, b: TUInt4096): Boolean;
-//operator > (const a, b: TUInt4096): Boolean;
-//operator >= (const a, b: TUInt4096): Boolean;
-//operator = (const a, b: TUInt4096): Boolean;
-//operator shl (const a: TUInt4096; const b: UInt32): TUInt4096;
-//operator shr (const a: TUInt4096; const b: UInt32): TUInt4096;
-//operator or (const a, b: TUInt4096): TUInt4096;
-//operator and (const a, b: TUInt4096): TUInt4096;
-//operator xor (const a, b: TUInt4096): TUInt4096;
+operator < (const a, b: TUInt4096): Boolean;
+operator <= (const a, b: TUInt4096): Boolean;
+operator > (const a, b: TUInt4096): Boolean;
+operator >= (const a, b: TUInt4096): Boolean;
+operator = (const a, b: TUInt4096): Boolean;
+operator shl (const a: TUInt4096; const b: UInt32): TUInt4096;
+operator shr (const a: TUInt4096; const b: UInt32): TUInt4096;
+operator or (const a, b: TUInt4096): TUInt4096;
+operator and (const a, b: TUInt4096): TUInt4096;
+operator xor (const a, b: TUInt4096): TUInt4096;
 
 const tt_any = [tt_error, tt_eof, tt_symbol, tt_word, tt_keyword, tt_string, tt_number];
 const UPi = 3.14159265359;
@@ -5436,7 +5440,6 @@ end;
 // TUBigInt end
 
 // TUInt4096 begin
-{
 function TUInt4096Impl.Top: Int32;
   var i: Int32;
 begin
@@ -5993,15 +5996,11 @@ begin
 end;
 
 class function TUInt4096Impl.MakePrime(const BitCount: Int32): TUInt4096;
-  //var TestCount: Int32;
 begin
-  //TestCount := 0;
   repeat
     Result := MakeRandom(BitCount);
     Result := Result or (One shl (BitCount - 1));
     Result[0] := Result[0] or 1;
-    //Inc(TestCount);
-    //if TestCount mod 100 = 0 then WriteLn(TestCount);
   until MillerRabinTest(Result, 100);
 end;
 
@@ -6298,7 +6297,7 @@ begin
   begin
     Result := Result - Context.N;
   end;
-end;           }
+end;
 // TUInt4096 end
 
 // TUTransform begin
@@ -12169,11 +12168,11 @@ begin
   Result[0] := a[0] * b[0];
   Result[1] := a[1] * b[1];
 end;
-{
+
 operator / (const a, b: TUInt4096): TUInt4096;
 begin
   Result := TUInt4096.Division(a, b);
-end;}
+end;
 
 operator / (const a, b: TUVec2): TUVec2;
 begin
@@ -12242,12 +12241,12 @@ begin
   Result[0] := a[0] div b[0];
   Result[1] := a[1] div b[1];
 end;
-{
+
 operator div (const a, b: TUInt4096): TUInt4096;
 begin
   Result := TUInt4096.Division(a, b);
 end;
-}
+
 operator + (const v: TUVec2i; const i: Int32): TUVec2i;
 begin
   Result[0] := v[0] + i;
@@ -12309,12 +12308,11 @@ begin
   Result[0] := v[0] mod i;
   Result[1] := v[1] mod i;
 end;
-{
+
 operator mod (const a, b: TUInt4096): TUInt4096;
 begin
   Result := TUInt4096.Modulo(a, b);
 end;
-}
 
 operator := (const v: TUVec2): TUVec2i;
 begin
@@ -12322,7 +12320,6 @@ begin
   Result[1] := Trunc(v[1]);
 end;
 
-{
 operator := (const v: UInt64): TUInt4096;
 begin
   Result := TUInt4096.Make(v);
@@ -12347,7 +12344,7 @@ operator := (const v: TUint8Array): TUInt4096;
 begin
   Result := TUInt4096.Make(v);
 end;
-}
+
 operator := (const v: TUVec2i): TUVec2;
 begin
   Result[0] := v[0];
@@ -12567,33 +12564,32 @@ operator := (const v: TUBounds2f): TUVec4;
 begin
   Result := PUVec4(@v)^;
 end;
-{
+
 operator + (const a, b: TUInt4096): TUInt4096;
 begin
   Result := TUInt4096.Addition(a, b);
 end;
-}
+
 operator + (const a, b: TUMat): TUMat;
 begin
   Result := UAddMat(a, b);
 end;
 
-{
 operator - (const a, b: TUInt4096): TUInt4096;
 begin
   Result := TUInt4096.Subtraction(a, b);
 end;
-}
+
 operator - (const a, b: TUMat): TUMat;
 begin
   Result := USubMat(a, b);
 end;
-{
+
 operator * (const a, b: TUInt4096): TUInt4096;
 begin
   Result := TUInt4096.Multiplication(a, b);
 end;
-}
+
 operator * (const a, b: TUMat): TUMat;
 begin
   Result := UMulMat(a, b);
@@ -12649,7 +12645,7 @@ begin
   end;
   Result := True;
 end;
-{
+
 operator < (const a, b: TUInt4096): Boolean;
 begin
   Result := TUInt4096.Compare(a, b) < 0;
@@ -12699,7 +12695,7 @@ operator xor (const a, b: TUInt4096): TUInt4096;
 begin
   Result := TUInt4096.BitXor(a, b);
 end;
-}
+
 function UStrExprMatch(const Str, Expr: String): TUExprMatch;
   function CompareSeq(const StrPos: Int32; const Seq: String): Boolean;
     var i: Int32;

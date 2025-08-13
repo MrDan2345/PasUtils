@@ -26,7 +26,7 @@ type TUSHA256Digest = array[0..31] of UInt8;
 type TUSHA512Digest = array[0..63] of UInt8;
 type TUDigestFunc = function (const Data: TUInt8Array): TUInt8Array;
 
-type TUCryptoInt = TUInt8192;
+type TUCryptoInt = TUInt4096;
 type TUCryptoIntArray = array of TUCryptoInt;
 
 type TURSA = record
