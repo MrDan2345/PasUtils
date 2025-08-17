@@ -1,11 +1,6 @@
 unit NetUtils;
 
-{$mode objfpc}{$H+}
-{$modeswitch advancedrecords}
-{$modeswitch nestedprocvars}
-{$modeswitch typehelpers}
-{$optimization autoinline}
-{$macro on}
+{$include PasUtilsMode.inc}
 
 interface
 
