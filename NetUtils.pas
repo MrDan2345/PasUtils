@@ -511,6 +511,7 @@ public
       TimeStamp: UInt64;
       Name: String;
       Message: String;
+      class operator = (const a, b: TPeer): Boolean;
     end;
     type TPeerArray = array of TPeer;
   private
@@ -1140,6 +1141,11 @@ class function TUSocketImpl.CreateUDP(
 begin
   Result := TUSocket.Invalid;
   Result.MakeUDP(SockDomain, SockProtocol);
+end;
+
+class operator TUNet.TBeacon.TPeer.=(const a, b: TPeer): Boolean;
+begin
+  Result := a.Addr.Addr32 = b.Addr.Addr32;
 end;
 
 procedure TUNet.TBeacon.SetEnabled(const Value: Boolean);
