@@ -246,6 +246,7 @@ TUInAddr = packed record
   1: (Addr32: UInt32);
 end;
 type TUInAddrArray = array of TUInAddr;
+operator = (const a, b: TUInAddr): Boolean;
 
 type TUSockAddr = packed record
   sin_family: UInt16;
@@ -1612,6 +1613,11 @@ destructor TUNet.TBroker.TDomain.Destroy;
 begin
   specialize UArrClear<TClient>(Clients);
   inherited Destroy;
+end;
+
+operator = (const a, b: TUInAddr): Boolean;
+begin
+  Result := a.Addr32 = b.Addr32;
 end;
 
 function USelect(
