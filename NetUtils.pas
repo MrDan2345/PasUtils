@@ -649,6 +649,7 @@ public
     constructor Create;
     destructor Destroy; override;
   end;
+  type TBrokerRef = specialize TUSharedRef<TBroker>;
 end;
 
 {$if defined(windows)}
