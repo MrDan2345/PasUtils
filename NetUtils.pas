@@ -1,11 +1,6 @@
 unit NetUtils;
 
-{$mode objfpc}{$H+}
-{$modeswitch advancedrecords}
-{$modeswitch nestedprocvars}
-{$modeswitch typehelpers}
-{$optimization autoinline}
-{$macro on}
+{$include PasUtilsMode.inc}
 
 interface
 
@@ -251,6 +246,7 @@ TUInAddr = packed record
   1: (Addr32: UInt32);
 end;
 type TUInAddrArray = array of TUInAddr;
+operator = (const a, b: TUInAddr): Boolean;
 
 type TUSockAddr = packed record
   sin_family: UInt16;
@@ -511,6 +507,7 @@ public
       TimeStamp: UInt64;
       Name: String;
       Message: String;
+      class operator = (const a, b: TPeer): Boolean;
     end;
     type TPeerArray = array of TPeer;
   private
@@ -1142,6 +1139,11 @@ begin
   Result.MakeUDP(SockDomain, SockProtocol);
 end;
 
+class operator TUNet.TBeacon.TPeer.=(const a, b: TPeer): Boolean;
+begin
+  Result := a.Addr.Addr32 = b.Addr.Addr32;
+end;
+
 procedure TUNet.TBeacon.SetEnabled(const Value: Boolean);
 begin
   if _Enabled = Value then Exit;
@@ -1611,6 +1613,11 @@ destructor TUNet.TBroker.TDomain.Destroy;
 begin
   specialize UArrClear<TClient>(Clients);
   inherited Destroy;
+end;
+
+operator = (const a, b: TUInAddr): Boolean;
+begin
+  Result := a.Addr32 = b.Addr32;
 end;
 
 function USelect(
