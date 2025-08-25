@@ -1936,6 +1936,7 @@ function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start
 function UStrUTF8ToUTF32(const StrUTF8: String): TUInt32Array;
 function UStrUTF32ToUTF8(const Code: UInt32): String;
 function UFileToStr(const FileName: String): String;
+function UDirSearch(const Path: String): TUStrArray;
 function UFileSearch(const Path: String): TUStrArray;
 procedure UCopyFilePrepare(const BufferSize: UInt32 = 1024 * 1024 * 1024);
 procedure UCopyFileCleanup;
@@ -12518,6 +12519,18 @@ begin
 end;
 
 threadvar CopyFileBuffer: array of UInt8;
+
+function UDirSearch(const Path: String): TUStrArray;
+  var sr: TSearchRec;
+begin
+  Result := nil;
+  if FindFirst(Path, faDirectory, sr) <> 0 then Exit(nil);
+  repeat
+    if (sr.Name = '.') or (sr.Name = '..') then Continue;
+    specialize UArrAppend<String>(Result, sr.Name);
+  until FindNext(sr) <> 0;
+  FindClose(sr);
+end;
 
 function UFileSearch(const Path: String): TUStrArray;
   var sr: TSearchRec;
