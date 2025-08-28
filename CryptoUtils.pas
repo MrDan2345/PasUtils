@@ -11,8 +11,12 @@ uses
 
 type TUMD5Digest = array[0..15] of UInt8;
 type TUSHA1Digest = array[0..19] of UInt8;
-type TUSHA256Digest = array[0..31] of UInt8;
-type TUSHA512Digest = array[0..63] of UInt8;
+type TUSHA2_256Digest = array[0..31] of UInt8;
+type TUSHA2_512Digest = array[0..63] of UInt8;
+type TUSHA3_224Digest = array[0..27] of UInt8;
+type TUSHA3_256Digest = array[0..31] of UInt8;
+type TUSHA3_384Digest = array[0..47] of UInt8;
+type TUSHA3_512Digest = array[0..63] of UInt8;
 type TUDigestFunc = function (const Data: TUInt8Array): TUInt8Array;
 
 type TUCryptoInt = TUInt8192;
@@ -611,13 +615,29 @@ function USHA1(const Data: Pointer; const DataSize: UInt32): TUSHA1Digest;
 function USHA1(const Data: TUInt8Array): TUSHA1Digest;
 function USHA1(const Data: String): TUSHA1Digest;
 
-function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
-function USHA256(const Data: TUInt8Array): TUSHA256Digest;
-function USHA256(const Data: String): TUSHA256Digest;
+function USHA2_256(const Data: Pointer; const DataSize: UInt32): TUSHA2_256Digest;
+function USHA2_256(const Data: TUInt8Array): TUSHA2_256Digest;
+function USHA2_256(const Data: String): TUSHA2_256Digest;
 
-function USHA512(const Data: Pointer; const DataSize: UInt32): TUSHA512Digest;
-function USHA512(const Data: TUInt8Array): TUSHA512Digest;
-function USHA512(const Data: String): TUSHA512Digest;
+function USHA2_512(const Data: Pointer; const DataSize: UInt32): TUSHA2_512Digest;
+function USHA2_512(const Data: TUInt8Array): TUSHA2_512Digest;
+function USHA2_512(const Data: String): TUSHA2_512Digest;
+
+function USHA3_224(const Data: Pointer; const DataSize: UInt32): TUSHA3_224Digest;
+function USHA3_224(const Data: TUInt8Array): TUSHA3_224Digest;
+function USHA3_224(const Data: String): TUSHA3_224Digest;
+
+function USHA3_256(const Data: Pointer; const DataSize: UInt32): TUSHA3_256Digest;
+function USHA3_256(const Data: TUInt8Array): TUSHA3_256Digest;
+function USHA3_256(const Data: String): TUSHA3_256Digest;
+
+function USHA3_384(const Data: Pointer; const DataSize: UInt32): TUSHA3_384Digest;
+function USHA3_384(const Data: TUInt8Array): TUSHA3_384Digest;
+function USHA3_384(const Data: String): TUSHA3_384Digest;
+
+function USHA3_512(const Data: Pointer; const DataSize: UInt32): TUSHA3_512Digest;
+function USHA3_512(const Data: TUInt8Array): TUSHA3_512Digest;
+function USHA3_512(const Data: String): TUSHA3_512Digest;
 
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
 function UDigestSHA1(const Data: TUInt8Array): TUInt8Array;
@@ -625,8 +645,8 @@ function UDigestSHA256(const Data: TUInt8Array): TUInt8Array;
 function UDigestSHA512(const Data: TUInt8Array): TUInt8Array;
 
 function UHMAC_SHA1(const Key, Data: TUInt8Array): TUSHA1Digest;
-function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA256Digest;
-function UHMAC_SHA512(const Key, Data: TUInt8Array): TUSHA512Digest;
+function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA2_256Digest;
+function UHMAC_SHA512(const Key, Data: TUInt8Array): TUSHA2_512Digest;
 
 function USign_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
 function USign_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
@@ -680,7 +700,7 @@ function UMakeRSAKey(
 ): TURSA.TKey;
 function UExportRSAKey_PKCS1(const Key: TURSA.TKey): String;
 function UExportRSAKey_PKCS8(const Key: TURSA.TKey): String;
-function UExportRSAKey_PKCS8(const Key: TURSA.TKey; const Password: String): String;
+function UExportRSAKey_PKCS8(const Key: TURSA.TKey; const Password: String; const Iterations: UInt32 = 600000): String;
 function UExportRSAKey_X509(const Key: TURSA.TKey): String;
 function UImportRSAKey(const KeyASN1: String; const Password: String = ''): TURSA.TKey;
 function UEncrypt_RSA_PKCS1(
@@ -1442,7 +1462,7 @@ class function TURSA.PackData_OAEP(
   const DataSize: UInt32;
   const BlockSize: UInt32
 ): TUCryptoInt;
-  const HashLen = SizeOf(TUSHA256Digest);
+  const HashLen = SizeOf(TUSHA2_256Digest);
   const ByteCount = (TUCryptoInt.Size32.Value) * 4;
   var BlockSizeInBytes: UInt32;
   var PaddedDataBE: array[0..ByteCount - 1] of UInt8;
@@ -1450,11 +1470,11 @@ class function TURSA.PackData_OAEP(
   var PadStrLen: Int32;
   var DB, Seed, DBMask, MaskedDB, SeedMask, MaskedSeed: TUInt8Array;
   var i, j: Int32;
-  var LabelHash: TUSHA256Digest;
+  var LabelHash: TUSHA2_256Digest;
 begin
   BlockSizeInBytes := BlockSize shr 3;
   if DataSize > BlockSizeInBytes - 2 * HashLen - 2 then Exit(TUCryptoInt.Invalid);
-  LabelHash := USHA256(nil, 0);
+  LabelHash := USHA2_256(nil, 0);
   PadStrLen := BlockSizeInBytes - DataSize - 2 * HashLen - 2;
   DB := nil;
   SetLength(DB, HashLen + PadStrLen + 1 + DataSize);
@@ -1500,7 +1520,7 @@ class function TURSA.UnpackData_OAEP(
   const Block: TUCryptoInt;
   const BlockSize: UInt32
 ): TUInt8Array;
-  const HashLen = SizeOf(TUSHA256Digest);
+  const HashLen = SizeOf(TUSHA2_256Digest);
   const ByteCount = (TUCryptoInt.Size32.Value) * 4;
   var BlockSizeInBytes: UInt32;
   var PaddedDataBE: array[0..ByteCount - 1] of UInt8;
@@ -1508,7 +1528,7 @@ class function TURSA.UnpackData_OAEP(
   var i, SepIndex: Int32;
   var MaskedSeed, MaskedDB, SeedMask, Seed, DBMask, DB: TUint8Array;
   var Y: UInt8;
-  var LabelHash: TUSHA256Digest;
+  var LabelHash: TUSHA2_256Digest;
 begin
   Result := nil;
   BlockSizeInBytes := BlockSize shr 3;
@@ -1527,7 +1547,7 @@ begin
   Seed := XORBytes(MaskedSeed, SeedMask);
   DBMask := UMGF1_SHA256(Seed, BlockSizeInBytes - HashLen - 1);
   DB := XORBytes(MaskedDB, DBMask);
-  LabelHash := USHA256(nil, 0);
+  LabelHash := USHA2_256(nil, 0);
   if Y <> $00 then Exit;
   for i := 0 to HashLen - 1 do
   begin
@@ -1720,11 +1740,11 @@ begin
 end;
 
 class function TURSA.Sign_SHA256(const Data: TUInt8Array; const Key: TKey): TUInt8Array;
-  var Hash: TUSHA256Digest;
+  var Hash: TUSHA2_256Digest;
   var HashDER: TUInt8Array;
   var PackedHash, Signature: TUCryptoInt;
 begin
-  Hash := USHA256(Data);
+  Hash := USHA2_256(Data);
   HashDER := EncodeTLV($30, UBytesConcat([
     EncodeTLV($30, UBytesConcat([
       EncodeTLV($06, OID_SHA_256),
@@ -1738,11 +1758,11 @@ begin
 end;
 
 class function TURSA.Sign_SHA512(const Data: TUInt8Array; const Key: TKey): TUInt8Array;
-  var Hash: TUSHA512Digest;
+  var Hash: TUSHA2_512Digest;
   var HashDER: TUInt8Array;
   var PackedHash, Signature: TUCryptoInt;
 begin
-  Hash := USHA512(Data);
+  Hash := USHA2_512(Data);
   HashDER := EncodeTLV($30, UBytesConcat([
     EncodeTLV($30, UBytesConcat([
       EncodeTLV($06, OID_SHA_512),
@@ -1782,11 +1802,11 @@ begin
   if Tag <> $05 then Exit(False);
   if UBytesEqual(OID, OID_SHA_256) then
   begin
-    Hash := USHA256(Data);
+    Hash := USHA2_256(Data);
   end
   else if UBytesEqual(OID, OID_SHA_512) then
   begin
-    Hash := USHA512(Data);
+    Hash := USHA2_512(Data);
   end
   else if UBytesEqual(OID, OID_SHA1) then
   begin
@@ -2990,7 +3010,7 @@ begin
   Result := USHA1(@Data[1], Length(Data));
 end;
 
-function USHA256(const Data: Pointer; const DataSize: UInt32): TUSHA256Digest;
+function USHA2_256(const Data: Pointer; const DataSize: UInt32): TUSHA2_256Digest;
   function RightRotate(const Value: UInt32; const Amount: Int32): UInt32;
   begin
     Result := (Value shr Amount) or (Value shl (32 - Amount));
@@ -3099,14 +3119,14 @@ begin
   end;
 end;
 
-function USHA256(const Data: TUInt8Array): TUSHA256Digest;
+function USHA2_256(const Data: TUInt8Array): TUSHA2_256Digest;
 begin
-  Result := USHA256(@Data[0], Length(Data));
+  Result := USHA2_256(@Data[0], Length(Data));
 end;
 
-function USHA256(const Data: String): TUSHA256Digest;
+function USHA2_256(const Data: String): TUSHA2_256Digest;
 begin
-  Result := USHA256(@Data[1], Length(Data));
+  Result := USHA2_256(@Data[1], Length(Data));
 end;
 
 function UModInverse(const e, phi: TUCryptoInt): TUCryptoInt;
@@ -3210,7 +3230,7 @@ begin
   until UMillerRabinTest(Result, 100);
 end;
 
-function USHA512(const Data: Pointer; const DataSize: UInt32): TUSHA512Digest;
+function USHA2_512(const Data: Pointer; const DataSize: UInt32): TUSHA2_512Digest;
   const K: array[0..79] of UInt64 = (
     UInt64($428a2f98d728ae22), UInt64($7137449123ef65cd), UInt64($b5c0fbcfec4d3b2f), UInt64($e9b5dba58189dbbc),
     UInt64($3956c25bf348b538), UInt64($59f111f1b605d019), UInt64($923f82a4af194f9b), UInt64($ab1c5ed5da6d8118),
@@ -3325,14 +3345,198 @@ begin
   end;
 end;
 
-function USHA512(const Data: TUInt8Array): TUSHA512Digest;
+function USHA2_512(const Data: TUInt8Array): TUSHA2_512Digest;
 begin
-  Result := USHA512(@Data[0], Length(Data));
+  Result := USHA2_512(@Data[0], Length(Data));
 end;
 
-function USHA512(const Data: String): TUSHA512Digest;
+function USHA2_512(const Data: String): TUSHA2_512Digest;
 begin
-  Result := USHA512(@Data[1], Length(Data));
+  Result := USHA2_512(@Data[1], Length(Data));
+end;
+
+function SHA3(const Data: Pointer; const DataSize: UInt32; const DigestSize: UInt32): TUInt8Array;
+  type TKeccakState = array[0..4, 0..4] of UInt64;
+  procedure KeccakF1600(var State: TKeccakState);
+    function ROTL64(const x: UInt64; const n: UInt8): UInt64;
+    begin
+      Result := (x shl n) or (x shr (64 - n));
+    end;
+    const RoundConstants: array[0..23] of UInt64 = (
+      $0000000000000001, $0000000000008082, $800000000000808A, $8000000080008000,
+      $000000000000808B, $0000000080000001, $8000000080008081, $8000000000008009,
+      $000000000000008A, $0000000000000088, $0000000080008009, $000000008000000A,
+      $000000008000808B, $800000000000008B, $8000000000008089, $8000000000008003,
+      $8000000000008002, $8000000000000080, $000000000000800A, $800000008000000A,
+      $8000000080008081, $8000000000008080, $0000000080000001, $8000000080008008
+    );
+    RotationOffsets: array[0..4, 0..4] of UInt8 = (
+      (0, 36, 3, 41, 18),
+      (1, 44, 10, 45, 2),
+      (62, 6, 43, 15, 61),
+      (28, 55, 25, 21, 56),
+      (27, 20, 39, 8, 14)
+    );
+    var r: Int32;
+    var x, y: Int32;
+    var C, D: array[0..4] of UInt64;
+    var B: TKeccakState;
+  begin
+    for r := 0 to 23 do
+    begin
+      for x := 0 to 4 do
+      begin
+        C[x] := State[x, 0] xor State[x, 1] xor State[x, 2] xor State[x, 3] xor State[x, 4];
+      end;
+      for x := 0 to 4 do
+      begin
+        D[x] := C[(x + 4) mod 5] xor ROTL64(C[(x + 1) mod 5], 1);
+      end;
+      for x := 0 to 4 do
+      for y := 0 to 4 do
+      begin
+        State[x, y] := State[x, y] xor D[x];
+      end;
+      for x := 0 to 4 do
+      for y := 0 to 4 do
+      begin
+        B[y, (2 * x + 3 * y) mod 5] := ROTL64(State[x, y], RotationOffsets[x, y]);
+      end;
+      for x := 0 to 4 do
+      for y := 0 to 4 do
+      begin
+        State[x, y] := B[x, y] xor ((not B[(x + 1) mod 5, y]) and B[(x + 2) mod 5, y]);
+      end;
+      State[0, 0] := State[0, 0] xor RoundConstants[r];
+    end;
+  end;
+  var Rate: UInt32;
+  var State: TKeccakState;
+  var PaddedData: TUInt8Array;
+  var Digest: array[0..200 - 1] of UInt8;
+  var PadLen, x, y, i, j, n, BlockPos: Int32;
+  var w: UInt64;
+begin
+  Result := nil;
+  SetLength(Result, DigestSize);
+  Rate := 200 - (2 * DigestSize);
+  UClear(State, SizeOf(State));
+  PadLen := Rate - (DataSize mod Rate);
+  if PadLen = 0 then PadLen := Rate;
+  PaddedData := nil;
+  SetLength(PaddedData, DataSize + PadLen);
+  if DataSize > 0 then
+  begin
+    Move(Data^, PaddedData[0], DataSize);
+  end;
+  PaddedData[DataSize] := $06;
+  for i := DataSize + 1 to DataSize + PadLen - 2 do
+  begin
+    PaddedData[i] := $00;
+  end;
+  i := High(PaddedData);
+  PaddedData[i] := PaddedData[i] or $80;
+  for i := 0 to (Length(PaddedData) div Rate) - 1 do
+  begin
+    BlockPos := i * Rate;
+    for y := 0 to 4 do
+    for x := 0 to 4 do
+    begin
+      if (x + 5 * y) * 8 < Rate then
+      begin
+        w := 0;
+        for j := 0 to 7 do
+        begin
+          w := w or (UInt64(PaddedData[BlockPos + (x + 5 * y) * 8 + j]) shl (j * 8));
+        end;
+        State[x, y] := State[x, y] xor w;
+      end;
+    end;
+    KeccakF1600(State);
+  end;
+  n := 0;
+  while n < DigestSize do
+  begin
+    for y := 0 to 4 do
+    for x := 0 to 4 do
+    begin
+      if (x + 5 * y) * 8 < Rate then
+      for j := 0 to 7 do
+      begin
+        Digest[n] := Byte((State[x, y] shr (j * 8)) and $ff);
+        Inc(n);
+      end;
+    end;
+  end;
+  Move(Digest, Result[0], DigestSize);
+end;
+
+function USHA3_224(const Data: Pointer; const DataSize: UInt32): TUSHA3_224Digest;
+  var Digest: TUInt8Array;
+begin
+  Digest := SHA3(Data, DataSize, SizeOf(Result));
+  Move(Digest[0], Result, SizeOf(Result));
+end;
+
+function USHA3_224(const Data: TUInt8Array): TUSHA3_224Digest;
+begin
+  Result := USHA3_224(@Data[0], Length(Data));
+end;
+
+function USHA3_224(const Data: String): TUSHA3_224Digest;
+begin
+  Result := USHA3_224(@Data[1], Length(Data));
+end;
+
+function USHA3_256(const Data: Pointer; const DataSize: UInt32): TUSHA3_256Digest;
+  var Digest: TUInt8Array;
+begin
+  Digest := SHA3(Data, DataSize, SizeOf(Result));
+  Move(Digest[0], Result, SizeOf(Result));
+end;
+
+function USHA3_256(const Data: TUInt8Array): TUSHA3_256Digest;
+begin
+  Result := USHA3_256(@Data[0], Length(Data));
+end;
+
+function USHA3_256(const Data: String): TUSHA3_256Digest;
+begin
+  Result := USHA3_256(@Data[1], Length(Data));
+end;
+
+function USHA3_384(const Data: Pointer; const DataSize: UInt32): TUSHA3_384Digest;
+  var Digest: TUInt8Array;
+begin
+  Digest := SHA3(Data, DataSize, SizeOf(Result));
+  Move(Digest[0], Result, SizeOf(Result));
+end;
+
+function USHA3_384(const Data: TUInt8Array): TUSHA3_384Digest;
+begin
+  Result := USHA3_384(@Data[0], Length(Data));
+end;
+
+function USHA3_384(const Data: String): TUSHA3_384Digest;
+begin
+  Result := USHA3_384(@Data[1], Length(Data));
+end;
+
+function USHA3_512(const Data: Pointer; const DataSize: UInt32): TUSHA3_512Digest;
+  var Digest: TUInt8Array;
+begin
+  Digest := SHA3(Data, DataSize, SizeOf(Result));
+  Move(Digest[0], Result, SizeOf(Result));
+end;
+
+function USHA3_512(const Data: TUInt8Array): TUSHA3_512Digest;
+begin
+  Result := USHA3_512(@Data[0], Length(Data));
+end;
+
+function USHA3_512(const Data: String): TUSHA3_512Digest;
+begin
+  Result := USHA3_512(@Data[1], Length(Data));
 end;
 
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
@@ -3347,12 +3551,12 @@ end;
 
 function UDigestSHA256(const Data: TUInt8Array): TUInt8Array;
 begin
-  Result := USHA256(Data);
+  Result := USHA2_256(Data);
 end;
 
 function UDigestSHA512(const Data: TUInt8Array): TUInt8Array;
 begin
-  Result := USHA512(Data);
+  Result := USHA2_512(Data);
 end;
 
 function UHMAC_SHA1(const Key, Data: TUInt8Array): TUSHA1Digest;
@@ -3381,17 +3585,17 @@ begin
   Result := USHA1(UBytesJoin(o_key_pad, InnerHashDigest));
 end;
 
-function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA256Digest;
-  const DigestSize = SizeOf(TUSHA256Digest);
+function UHMAC_SHA256(const Key, Data: TUInt8Array): TUSHA2_256Digest;
+  const DigestSize = SizeOf(TUSHA2_256Digest);
   const BlockSize = DigestSize * 2;
   var PaddedKey, o_key_pad, i_key_pad: array[0..BlockSize - 1] of UInt8;
   var i: Int32;
-  var HashedKeyDigest, InnerHashDigest: TUSHA256Digest;
+  var HashedKeyDigest, InnerHashDigest: TUSHA2_256Digest;
 begin
   UClear(PaddedKey, SizeOf(PaddedKey));
   if Length(Key) > BlockSize then
   begin
-    HashedKeyDigest := USHA256(Key);
+    HashedKeyDigest := USHA2_256(Key);
     Move(HashedKeyDigest[0], PaddedKey[0], DigestSize);
   end
   else if Length(Key) > 0 then
@@ -3403,21 +3607,21 @@ begin
     o_key_pad[i] := PaddedKey[i] xor $5C;
     i_key_pad[i] := PaddedKey[i] xor $36;
   end;
-  InnerHashDigest := USHA256(UBytesJoin(i_key_pad, Data));
-  Result := USHA256(UBytesJoin(o_key_pad, InnerHashDigest));
+  InnerHashDigest := USHA2_256(UBytesJoin(i_key_pad, Data));
+  Result := USHA2_256(UBytesJoin(o_key_pad, InnerHashDigest));
 end;
 
-function UHMAC_SHA512(const Key, Data: TUInt8Array): TUSHA512Digest;
-  const DigestSize = SizeOf(TUSHA512Digest);
+function UHMAC_SHA512(const Key, Data: TUInt8Array): TUSHA2_512Digest;
+  const DigestSize = SizeOf(TUSHA2_512Digest);
   const BlockSize = DigestSize * 2;
   var PaddedKey, o_key_pad, i_key_pad: array[0..BlockSize - 1] of UInt8;
   var i: Int32;
-  var HashedKeyDigest, InnerHashDigest: TUSHA512Digest;
+  var HashedKeyDigest, InnerHashDigest: TUSHA2_512Digest;
 begin
   UClear(PaddedKey, SizeOf(PaddedKey));
   if Length(Key) > BlockSize then
   begin
-    HashedKeyDigest := USHA512(Key);
+    HashedKeyDigest := USHA2_512(Key);
     Move(HashedKeyDigest[0], PaddedKey[0], DigestSize);
   end
   else if Length(Key) > 0 then
@@ -3429,8 +3633,8 @@ begin
     o_key_pad[i] := PaddedKey[i] xor $5C;
     i_key_pad[i] := PaddedKey[i] xor $36;
   end;
-  InnerHashDigest := USHA512(UBytesJoin(i_key_pad, Data));
-  Result := USHA512(UBytesJoin(o_key_pad, InnerHashDigest));
+  InnerHashDigest := USHA2_512(UBytesJoin(i_key_pad, Data));
+  Result := USHA2_512(UBytesJoin(o_key_pad, InnerHashDigest));
 end;
 
 function USign_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
@@ -3453,40 +3657,30 @@ function UPBKDF2_HMAC_SHA1(
   const KeyLength: Int32;
   const Iterations: Int32
 ): TUInt8Array;
-  function IntTo4BytesBE(Value: UInt32): TUInt8Array;
-  begin
-    Result := nil;
-    SetLength(Result, 4);
-    Result[0] := Byte((Value shr 24) and $ff);
-    Result[1] := Byte((Value shr 16) and $ff);
-    Result[2] := Byte((Value shr 8) and $ff);
-    Result[3] := Byte(Value and $ff);
-  end;
   const DigestSize = SizeOf(TUSHA1Digest);
-  var HashLen, l, i, j, k: Int32;
-  var T, U: TUInt8Array;
-  var BlockIndexBytes: TUInt8Array;
+  var l, i, j, k: UInt32;
+  var T, U: array [0..DigestSize - 1] of UInt8;
+  var BlockIndexBytes: array[0..3] of UInt8;
   var HmacResult: TUSHA1Digest;
 begin
   Result := nil;
-  HashLen := DigestSize;
-  l := (KeyLength + HashLen - 1) div HashLen;
+  UClear(U, SizeOf(U));
+  UClear(T, SizeOf(T));
+  l := (KeyLength + DigestSize - 1) div DigestSize;
   for i := 1 to l do
   begin
-    BlockIndexBytes := IntTo4BytesBE(i);
+    BlockIndexBytes[0] := Byte((i shr 24) and $ff);
+    BlockIndexBytes[1] := Byte((i shr 16) and $ff);
+    BlockIndexBytes[2] := Byte((i shr 8) and $ff);
+    BlockIndexBytes[3] := Byte(i and $ff);
     HmacResult := UHMAC_SHA1(Password, UBytesJoin(Salt, BlockIndexBytes));
-    SetLength(U, HashLen);
-    Move(HmacResult[0], U[0], HashLen);
+    Move(HmacResult[0], U[0], DigestSize);
     T := U;
     for j := 2 to Iterations do
     begin
       HmacResult := UHMAC_SHA1(Password, U);
-      SetLength(U, HashLen);
-      Move(HmacResult[0], U[0], HashLen);
-      for k := 0 to HashLen - 1 do
-      begin
-        T[k] := T[k] xor U[k];
-      end;
+      Move(HmacResult[0], U[0], DigestSize);
+      for k := 0 to DigestSize - 1 do T[k] := T[k] xor U[k];
     end;
     Result := UBytesJoin(Result, T);
   end;
@@ -3498,40 +3692,30 @@ function UPBKDF2_HMAC_SHA256(
   const KeyLength: Int32;
   const Iterations: Int32 = 600000
 ): TUInt8Array;
-  function IntTo4BytesBE(Value: UInt32): TUInt8Array;
-  begin
-    Result := nil;
-    SetLength(Result, 4);
-    Result[0] := Byte((Value shr 24) and $ff);
-    Result[1] := Byte((Value shr 16) and $ff);
-    Result[2] := Byte((Value shr 8) and $ff);
-    Result[3] := Byte(Value and $ff);
-  end;
-  const DigestSize = SizeOf(TUSHA256Digest);
-  var HashLen, l, i, j, k: Int32;
-  var T, U: TUInt8Array;
-  var BlockIndexBytes: TUInt8Array;
-  var HmacResult: TUSHA256Digest;
+  const DigestSize = SizeOf(TUSHA2_256Digest);
+  var l, i, j, k: UInt32;
+  var T, U: array [0..DigestSize - 1] of UInt8;
+  var BlockIndexBytes: array[0..3] of UInt8;
+  var HmacResult: TUSHA2_256Digest;
 begin
   Result := nil;
-  HashLen := DigestSize;
-  l := (KeyLength + HashLen - 1) div HashLen;
+  UClear(U, SizeOf(U));
+  UClear(T, SizeOf(T));
+  l := (KeyLength + DigestSize - 1) div DigestSize;
   for i := 1 to l do
   begin
-    BlockIndexBytes := IntTo4BytesBE(i);
+    BlockIndexBytes[0] := Byte((i shr 24) and $ff);
+    BlockIndexBytes[1] := Byte((i shr 16) and $ff);
+    BlockIndexBytes[2] := Byte((i shr 8) and $ff);
+    BlockIndexBytes[3] := Byte(i and $ff);
     HmacResult := UHMAC_SHA256(Password, UBytesJoin(Salt, BlockIndexBytes));
-    SetLength(U, HashLen);
-    Move(HmacResult[0], U[0], HashLen);
+    Move(HmacResult[0], U[0], DigestSize);
     T := U;
     for j := 2 to Iterations do
     begin
       HmacResult := UHMAC_SHA256(Password, U);
-      SetLength(U, HashLen);
-      Move(HmacResult[0], U[0], HashLen);
-      for k := 0 to HashLen - 1 do
-      begin
-        T[k] := T[k] xor U[k];
-      end;
+      Move(HmacResult[0], U[0], DigestSize);
+      for k := 0 to DigestSize - 1 do T[k] := T[k] xor U[k];
     end;
     Result := UBytesJoin(Result, T);
   end;
@@ -3543,40 +3727,30 @@ function UPBKDF2_HMAC_SHA512(
   const KeyLength: Int32;
   const Iterations: Int32
 ): TUInt8Array;
-  function IntTo4BytesBE(Value: UInt32): TUInt8Array;
-  begin
-    Result := nil;
-    SetLength(Result, 4);
-    Result[0] := Byte((Value shr 24) and $ff);
-    Result[1] := Byte((Value shr 16) and $ff);
-    Result[2] := Byte((Value shr 8) and $ff);
-    Result[3] := Byte(Value and $ff);
-  end;
-  const DigestSize = SizeOf(TUSHA512Digest);
-  var HashLen, l, i, j, k: Int32;
-  var T, U: TUInt8Array;
-  var BlockIndexBytes: TUInt8Array;
-  var HmacResult: TUSHA512Digest;
+  const DigestSize = SizeOf(TUSHA2_512Digest);
+  var l, i, j, k: UInt32;
+  var T, U: array [0..DigestSize - 1] of UInt8;
+  var BlockIndexBytes: array[0..3] of UInt8;
+  var HmacResult: TUSHA2_512Digest;
 begin
   Result := nil;
-  HashLen := DigestSize;
-  l := (KeyLength + HashLen - 1) div HashLen;
+  UClear(U, SizeOf(U));
+  UClear(T, SizeOf(T));
+  l := (KeyLength + DigestSize - 1) div DigestSize;
   for i := 1 to l do
   begin
-    BlockIndexBytes := IntTo4BytesBE(i);
+    BlockIndexBytes[0] := Byte((i shr 24) and $ff);
+    BlockIndexBytes[1] := Byte((i shr 16) and $ff);
+    BlockIndexBytes[2] := Byte((i shr 8) and $ff);
+    BlockIndexBytes[3] := Byte(i and $ff);
     HmacResult := UHMAC_SHA512(Password, UBytesJoin(Salt, BlockIndexBytes));
-    SetLength(U, HashLen);
-    Move(HmacResult[0], U[0], HashLen);
+    Move(HmacResult[0], U[0], DigestSize);
     T := U;
     for j := 2 to Iterations do
     begin
       HmacResult := UHMAC_SHA512(Password, U);
-      SetLength(U, HashLen);
-      Move(HmacResult[0], U[0], HashLen);
-      for k := 0 to HashLen - 1 do
-      begin
-        T[k] := T[k] xor U[k];
-      end;
+      Move(HmacResult[0], U[0], DigestSize);
+      for k := 0 to DigestSize - 1 do T[k] := T[k] xor U[k];
     end;
     Result := UBytesJoin(Result, T);
   end;
@@ -3640,7 +3814,7 @@ function UEvpKDF_SHA256(
   const Iterations: Int32;
   out IV: TUInt8Array
 ): TUInt8Array;
-  const BlockSize = SizeOf(TUSHA256Digest);
+  const BlockSize = SizeOf(TUSHA2_256Digest);
 begin
   Result := UEvpKDF(
     @UDigestSHA256, BlockSize,
@@ -3649,10 +3823,10 @@ begin
 end;
 
 function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
-  const HashLen = SizeOf(TUSHA256Digest);
+  const HashLen = SizeOf(TUSHA2_256Digest);
   var Counter, i: UInt32;
   var C, T: TUInt8Array;
-  var Digest: TUSHA256Digest;
+  var Digest: TUSHA2_256Digest;
 begin
   Counter := 0;
   C := nil;
@@ -3667,7 +3841,7 @@ begin
     C[Length(Seed) + 1] := UInt8((Counter shr 16) and $ff);
     C[Length(Seed) + 2] := UInt8((Counter shr 8) and $ff);
     C[Length(Seed) + 3] := UInt8(Counter and $ff);
-    Digest := USHA256(C);
+    Digest := USHA2_256(C);
     Move(Digest, T[i], HashLen);
     Inc(i, HashLen);
     Inc(Counter);
@@ -3692,9 +3866,9 @@ begin
   Result := TURSA.ExportKeyPrivate_PKCS8(Key);
 end;
 
-function UExportRSAKey_PKCS8(const Key: TURSA.TKey; const Password: String): String;
+function UExportRSAKey_PKCS8(const Key: TURSA.TKey; const Password: String; const Iterations: UInt32): String;
 begin
-  Result := TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA256_AES256_CBC(Key, UStrToBytes(Password));
+  Result := TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA256_AES256_CBC(Key, UStrToBytes(Password), Iterations);
 end;
 
 function UExportRSAKey_X509(const Key: TURSA.TKey): String;
