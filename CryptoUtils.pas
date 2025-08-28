@@ -18,7 +18,7 @@ type TUDigestSHA3_256 = array[0..31] of UInt8;
 type TUDigestSHA3_384 = array[0..47] of UInt8;
 type TUDigestSHA3_512 = array[0..63] of UInt8;
 type TUFuncDigest = function (const Data: TUInt8Array): TUInt8Array;
-type TUFuncMAC = function (const Key, Data: TUInt8Array): TUInt8Array;
+type TUFuncAuth = function (const Key, Data: TUInt8Array): TUInt8Array;
 
 type TUCryptoInt = TUInt8192;
 type TUCryptoIntArray = array of TUCryptoInt;
@@ -724,10 +724,25 @@ function UHMAC_SHA3_256(const Key, Data: TUInt8Array): TUDigestSHA3_256;
 function UHMAC_SHA3_384(const Key, Data: TUInt8Array): TUDigestSHA3_384;
 function UHMAC_SHA3_512(const Key, Data: TUInt8Array): TUDigestSHA3_512;
 
+function UAuthHMAC_SHA1(const Key, Data: TUInt8Array): TUInt8Array;
+function UAuthHMAC_SHA2_256(const Key, Data: TUInt8Array): TUInt8Array;
+function UAuthHMAC_SHA2_512(const Key, Data: TUInt8Array): TUInt8Array;
+function UAuthHMAC_SHA3_224(const Key, Data: TUInt8Array): TUInt8Array;
+function UAuthHMAC_SHA3_256(const Key, Data: TUInt8Array): TUInt8Array;
+function UAuthHMAC_SHA3_384(const Key, Data: TUInt8Array): TUInt8Array;
+function UAuthHMAC_SHA3_512(const Key, Data: TUInt8Array): TUInt8Array;
+
 function USign_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
 function USign_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
 function UVerify(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
 
+function UPBKDF2(
+  const FuncAuth: TUFuncAuth;
+  const DigestSize: UInt32;
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const Iterations: Int32 = 600000
+): TUInt8Array;
 function UPBKDF2_HMAC_SHA1(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
@@ -744,9 +759,7 @@ function UPBKDF2_HMAC_SHA512(
   const Iterations: Int32 = 600000
 ): TUInt8Array;
 
-function UEvpKDF(
-  const DigestFunc: TUFuncDigest;
-  const BlockSize: Int32;
+generic function UEvpKDF<TDigest>(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const IVLength: Int32;
@@ -3799,6 +3812,41 @@ begin
   Result := specialize UHMAC<TUDigestSHA3_512>(Key, Data);
 end;
 
+function UAuthHMAC_SHA1(const Key, Data: TUInt8Array): TUInt8Array;
+begin
+  Result := UHMAC_SHA1(Key, Data);
+end;
+
+function UAuthHMAC_SHA2_256(const Key, Data: TUInt8Array): TUInt8Array;
+begin
+  Result := UHMAC_SHA256(Key, Data);
+end;
+
+function UAuthHMAC_SHA2_512(const Key, Data: TUInt8Array): TUInt8Array;
+begin
+  Result := UHMAC_SHA512(Key, Data);
+end;
+
+function UAuthHMAC_SHA3_224(const Key, Data: TUInt8Array): TUInt8Array;
+begin
+  Result := UHMAC_SHA3_224(Key, Data);
+end;
+
+function UAuthHMAC_SHA3_256(const Key, Data: TUInt8Array): TUInt8Array;
+begin
+  Result := UHMAC_SHA3_256(Key, Data);
+end;
+
+function UAuthHMAC_SHA3_384(const Key, Data: TUInt8Array): TUInt8Array;
+begin
+  Result := UHMAC_SHA3_384(Key, Data);
+end;
+
+function UAuthHMAC_SHA3_512(const Key, Data: TUInt8Array): TUInt8Array;
+begin
+  Result := UHMAC_SHA3_512(Key, Data);
+end;
+
 function USign_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
 begin
   Result := TURSA.Sign_SHA256(Data, Key);
@@ -3814,20 +3862,20 @@ begin
   Result := TURSA.Verify(Data, Signature, Key);
 end;
 
-function UPBKDF2_HMAC_SHA1(
+function UPBKDF2(
+  const FuncAuth: TUFuncAuth;
+  const DigestSize: UInt32;
   const Password, Salt: TUInt8Array;
-  const KeyLength: Int32;
-  const Iterations: Int32
+  const KeyLength: Int32; const Iterations: Int32
 ): TUInt8Array;
-  const DigestSize = SizeOf(TUDigestSHA1);
   var l, i, j, k: UInt32;
-  var T, U: array [0..DigestSize - 1] of UInt8;
+  var T, U: TUInt8Array;
   var BlockIndexBytes: array[0..3] of UInt8;
-  var HmacResult: TUDigestSHA1;
+  var HmacResult: TUInt8Array;
 begin
   Result := nil;
-  UClear(U, SizeOf(U));
-  UClear(T, SizeOf(T));
+  U := TUInt8Array.Make(DigestSize);
+  T := TUInt8Array.Make(DigestSize);
   l := (KeyLength + DigestSize - 1) div DigestSize;
   for i := 1 to l do
   begin
@@ -3835,18 +3883,30 @@ begin
     BlockIndexBytes[1] := Byte((i shr 16) and $ff);
     BlockIndexBytes[2] := Byte((i shr 8) and $ff);
     BlockIndexBytes[3] := Byte(i and $ff);
-    HmacResult := UHMAC_SHA1(Password, UBytesJoin(Salt, BlockIndexBytes));
+    HmacResult := FuncAuth(Password, UBytesJoin(Salt, BlockIndexBytes));
     Move(HmacResult[0], U[0], DigestSize);
-    T := U;
+    Move(U[0], T[0], DigestSize);
     for j := 2 to Iterations do
     begin
-      HmacResult := UHMAC_SHA1(Password, U);
+      HmacResult := FuncAuth(Password, U);
       Move(HmacResult[0], U[0], DigestSize);
       for k := 0 to DigestSize - 1 do T[k] := T[k] xor U[k];
     end;
     Result := UBytesJoin(Result, T);
   end;
   SetLength(Result, KeyLength);
+end;
+
+function UPBKDF2_HMAC_SHA1(
+  const Password, Salt: TUInt8Array;
+  const KeyLength: Int32;
+  const Iterations: Int32
+): TUInt8Array;
+begin
+  Result := UPBKDF2(
+    @UAuthHMAC_SHA1, SizeOf(TUDigestSHA1),
+    Password, Salt, KeyLength, Iterations
+  );
 end;
 
 function UPBKDF2_HMAC_SHA256(
@@ -3854,34 +3914,11 @@ function UPBKDF2_HMAC_SHA256(
   const KeyLength: Int32;
   const Iterations: Int32 = 600000
 ): TUInt8Array;
-  const DigestSize = SizeOf(TUDigestSHA2_256);
-  var l, i, j, k: UInt32;
-  var T, U: array [0..DigestSize - 1] of UInt8;
-  var BlockIndexBytes: array[0..3] of UInt8;
-  var HmacResult: TUDigestSHA2_256;
 begin
-  Result := nil;
-  UClear(U, SizeOf(U));
-  UClear(T, SizeOf(T));
-  l := (KeyLength + DigestSize - 1) div DigestSize;
-  for i := 1 to l do
-  begin
-    BlockIndexBytes[0] := Byte((i shr 24) and $ff);
-    BlockIndexBytes[1] := Byte((i shr 16) and $ff);
-    BlockIndexBytes[2] := Byte((i shr 8) and $ff);
-    BlockIndexBytes[3] := Byte(i and $ff);
-    HmacResult := UHMAC_SHA256(Password, UBytesJoin(Salt, BlockIndexBytes));
-    Move(HmacResult[0], U[0], DigestSize);
-    T := U;
-    for j := 2 to Iterations do
-    begin
-      HmacResult := UHMAC_SHA256(Password, U);
-      Move(HmacResult[0], U[0], DigestSize);
-      for k := 0 to DigestSize - 1 do T[k] := T[k] xor U[k];
-    end;
-    Result := UBytesJoin(Result, T);
-  end;
-  SetLength(Result, KeyLength);
+  Result := UPBKDF2(
+    @UAuthHMAC_SHA2_256, SizeOf(TUDigestSHA2_256),
+    Password, Salt, KeyLength, Iterations
+  );
 end;
 
 function UPBKDF2_HMAC_SHA512(
@@ -3889,39 +3926,14 @@ function UPBKDF2_HMAC_SHA512(
   const KeyLength: Int32;
   const Iterations: Int32
 ): TUInt8Array;
-  const DigestSize = SizeOf(TUDigestSHA2_512);
-  var l, i, j, k: UInt32;
-  var T, U: array [0..DigestSize - 1] of UInt8;
-  var BlockIndexBytes: array[0..3] of UInt8;
-  var HmacResult: TUDigestSHA2_512;
 begin
-  Result := nil;
-  UClear(U, SizeOf(U));
-  UClear(T, SizeOf(T));
-  l := (KeyLength + DigestSize - 1) div DigestSize;
-  for i := 1 to l do
-  begin
-    BlockIndexBytes[0] := Byte((i shr 24) and $ff);
-    BlockIndexBytes[1] := Byte((i shr 16) and $ff);
-    BlockIndexBytes[2] := Byte((i shr 8) and $ff);
-    BlockIndexBytes[3] := Byte(i and $ff);
-    HmacResult := UHMAC_SHA512(Password, UBytesJoin(Salt, BlockIndexBytes));
-    Move(HmacResult[0], U[0], DigestSize);
-    T := U;
-    for j := 2 to Iterations do
-    begin
-      HmacResult := UHMAC_SHA512(Password, U);
-      Move(HmacResult[0], U[0], DigestSize);
-      for k := 0 to DigestSize - 1 do T[k] := T[k] xor U[k];
-    end;
-    Result := UBytesJoin(Result, T);
-  end;
-  SetLength(Result, KeyLength);
+  Result := UPBKDF2(
+    @UAuthHMAC_SHA2_512, SizeOf(TUDigestSHA2_512),
+    Password, Salt, KeyLength, Iterations
+  );
 end;
 
-function UEvpKDF(
-  const DigestFunc: TUFuncDigest;
-  const BlockSize: Int32;
+generic function UEvpKDF<TDigest>(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const IVLength: Int32;
@@ -3941,8 +3953,8 @@ begin
   while Length(Result) < TotalLength do
   begin
     HashInput := UBytesConcat([HashInput, Password, Salt]);
-    CurrentHash := DigestFunc(HashInput);
-    for i := 2 to Iterations do CurrentHash := DigestFunc(CurrentHash);
+    CurrentHash := TDigest.Func(HashInput);
+    for i := 2 to Iterations do CurrentHash := TDigest.Func(CurrentHash);
     Result := UBytesJoin(Result, CurrentHash);
     HashInput := CurrentHash;
   end;
@@ -3961,10 +3973,8 @@ function UEvpKDF_MD5(
   const Iterations: Int32;
   out IV: TUInt8Array
 ): TUInt8Array;
-  const BlockSize = SizeOf(TUDigestMD5);
 begin
-  Result := UEvpKDF(
-    @UDigestMD5, BlockSize,
+  Result := specialize UEvpKDF<TUDigestMD5>(
     Password, Salt, KeyLength, IVLength, Iterations, IV
   );
 end;
@@ -3976,10 +3986,8 @@ function UEvpKDF_SHA256(
   const Iterations: Int32;
   out IV: TUInt8Array
 ): TUInt8Array;
-  const BlockSize = SizeOf(TUDigestSHA2_256);
 begin
-  Result := UEvpKDF(
-    @UDigestSHA2_256, BlockSize,
+  Result := specialize UEvpKDF<TUDigestSHA2_256>(
     Password, Salt, KeyLength, IVLength, Iterations, IV
   );
 end;
