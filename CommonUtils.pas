@@ -189,6 +189,11 @@ public
   function ToBool: Boolean; inline;
 end;
 
+type TUInt8ArrayImpl = type helper for TUInt8Array
+public
+  class function Make(const Size: UInt32): TUInt8Array; static;
+end;
+
 type TUInt16Impl = type helper for TUInt16
 private
   function GetBit(const Index: TUInt8): TUInt8;
@@ -2213,6 +2218,14 @@ begin
   Result := Self <> 0;
 end;
 // TUInt8Impl end
+
+// TUInt8ArrayImpl begin
+class function TUInt8ArrayImpl.Make(const Size: UInt32): TUInt8Array;
+begin
+  Result := nil;
+  SetLength(Result, Size);
+end;
+// TUInt8ArrayImpl end
 
 // TUInt16Impl begin
 function TUInt16Impl.GetBit(const Index: TUInt8): TUInt8;
