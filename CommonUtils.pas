@@ -1593,6 +1593,34 @@ end;
 generic TUPredicate<T> = function (const a, b: T): Boolean;
 generic TUPredicateObj<T> = function (const a, b: T): Boolean of object;
 
+generic TULinkedList<T> = record
+public
+  type TSelf = specialize TULinkedList<T>;
+  type TItem = class
+    var Data: T;
+    var Prev: TItem;
+    var Next: TItem;
+  end;
+strict private
+  var _Cache: TItem;
+  var _List: TItem;
+  var _Cached: Boolean;
+  procedure SetCached(const Value: Boolean);
+  procedure ItemAdd(var LinkedList: TItem; var Item: TItem);
+  procedure ItemRemove(var LinkedList: TItem; var Item: TItem);
+  procedure FreeList(var LinkedList: TItem);
+  procedure Initialize;
+  procedure Finalize;
+public
+  property Cached: Boolean read _Cached write SetCached;
+  property List: TItem read _List;
+  function NewItem: TItem;
+  procedure FreeItem(var Item: TItem);
+  procedure Clear;
+  class operator Initialize(var v: TSelf);
+  class operator Finalize(var v: TSelf);
+end;
+
 type TUXML = class (TURefClass)
 public
   type TAttribute = class
@@ -9321,6 +9349,104 @@ begin
   Arr := nil;
 end;
 //TUArrayObjUtils end
+
+//TULinkedList begin
+procedure TULinkedList.SetCached(const Value: Boolean);
+begin
+  if Value = _Cached then Exit;
+  _Cached := Value;
+  if not _Cached then FreeList(_Cache);
+end;
+
+procedure TULinkedList.ItemAdd(var LinkedList: TItem; var Item: TItem);
+begin
+  Item.Prev := nil;
+  Item.Next := LinkedList;
+  LinkedList := Item;
+end;
+
+procedure TULinkedList.ItemRemove(var LinkedList: TItem; var Item: TItem);
+begin
+  if Assigned(Item.Prev) then Item.Prev.Next := Item.Next;
+  if Assigned(Item.Next) then Item.Next.Prev := Item.Prev;
+  if LinkedList = Item then LinkedList := Item.Next;
+end;
+
+procedure TULinkedList.FreeList(var LinkedList: TItem);
+  var Item: TItem;
+begin
+  while Assigned(LinkedList) do
+  begin
+    Item := LinkedList;
+    LinkedList := LinkedList.Next;
+    Item.Free;
+  end;
+end;
+
+procedure TULinkedList.Initialize;
+begin
+  _List := nil;
+  _Cache := nil;
+  _Cached := False;
+end;
+
+procedure TULinkedList.Finalize;
+begin
+  FreeList(_Cache);
+  FreeList(_List);
+end;
+
+function TULinkedList.NewItem: TItem;
+begin
+  if Assigned(_Cache) then
+  begin
+    Result := _Cache;
+    ItemRemove(_Cache, Result);
+  end
+  else
+  begin
+    Result := TItem.Create;
+  end;
+  ItemAdd(_List, Result);
+end;
+
+procedure TULinkedList.FreeItem(var Item: TItem);
+begin
+  ItemRemove(_List, Item);
+  if _Cached then
+  begin
+    ItemAdd(_Cache, Item);
+  end
+  else
+  begin
+    Item.Free;
+  end;
+end;
+
+procedure TULinkedList.Clear;
+begin
+  if _Cached and Assigned(_List) then
+  begin
+    _List.Next := _Cache;
+    _Cache := _List;
+    _List := nil;
+  end
+  else
+  begin
+    FreeList(_List);
+  end;
+end;
+
+class operator TULinkedList.Initialize(var v: TSelf);
+begin
+  v.Initialize;
+end;
+
+class operator TULinkedList.Finalize(var v: TSelf);
+begin
+  v.Finalize;
+end;
+// TULinkedList end
 
 // TUXML begin
 function TUXML.TEnumerator.GetCurrent: TUXML;
