@@ -1001,7 +1001,9 @@ begin
   begin
     Exit(UNetSend(Self, @Msg[1], Length(Msg) + 1, 0));
   end;
+  {$push}{$warn 5057 off}
   Move(Msg[1], ShortMsg[0], 2047);
+  {$pop}
   ShortMsg[2047] := #0;
   Result := UNetSend(Self, @ShortMsg, SizeOf(ShortMsg), 0);
 end;
@@ -1730,9 +1732,9 @@ function UNetLocalMacAddr: TUMacAddr;
     var Adapters, Adapter: PIP_ADAPTER_INFO;
     var Buffer: array[0..1024 * 16 - 1] of UInt8;
     var BufSize: UInt32;
-    var i: Int32;
     var Addr: TUMacAddr;
   begin
+    Addr := Default(TUMacAddr);
     Result := nil;
     BufSize := SizeOf(Buffer);
     Adapters := PIP_ADAPTER_INFO(@Buffer);
@@ -2107,27 +2109,27 @@ end;
 
 function UNetHostAddrToStr6(const Addr: TUInAddr6): AnsiString;
 begin
-
+  Result := '';
 end;
 
 function UNetStrToHostAddr6(const AddrStr: AnsiString): TUInAddr6;
 begin
-
+  Result := TUInAddr6.Zero;
 end;
 
 function UNetNetAddrToStr6(const Addr: TUInAddr6): AnsiString;
 begin
-
+  Result := '';
 end;
 
 function UNetStrToNetAddr6(const AddrStr: AnsiString): TUInAddr6;
 begin
-
+  Result := TUInAddr6.Zero;
 end;
 
 function UNetTryStrToNetAddr6(const AddrStr: AnsiString; out OutAddr: TUInAddr6): Boolean;
 begin
-
+  Result := False;
 end;
 
 procedure UNetFDZero(out FDSet: TUFDSet);
@@ -2201,6 +2203,7 @@ procedure UNetInitialize;
 {$if defined(windows)}
   var WSAData: TUNetWSAData;
 begin
+  UClear(WSAData, SizeOf(WSAData));
   UNetWSAStartup(2 or (2 shl 8), WSAData);
 end;
 {$else}

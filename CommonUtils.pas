@@ -2172,8 +2172,7 @@ class function TUSwizzle.Make(
   const ord2: UInt8; const ord3: UInt8
 ): TUSwizzle;
 begin
-  {$push}
-  {$warnings off}
+  {$push}{$warnings off}
   Result.SetValue(ord0, ord1, ord2, ord3);
   {$pop}
 end;
@@ -6863,16 +6862,14 @@ end;
 
 class operator TUSharedRef.:=(const Value: TPtr): TSelf;
 begin
-  {$push}
-  {$warnings off}
+  {$push}{$warnings off}
   Result.Ptr := Value;
   {$pop}
 end;
 
 class operator TUSharedRef.:=(const Value: Pointer): TSelf;
 begin
-  {$push}
-  {$warnings off}
+  {$push}{$warnings off}
   Result.Ptr := TPtr(Value);
   {$pop}
 end;
@@ -7054,8 +7051,7 @@ begin
   Result := _Stream.Read(Buffer^, Count);
 end;
 
-{$push}
-{$hints off}
+{$push}{$hints off}
 function TUStreamHelper.ReadBool: Boolean;
 begin
   _Stream.Read(Result, SizeOf(Result));
@@ -7233,8 +7229,7 @@ end;
 
 function TUStreamHelper.ToString: String;
 begin
-  {$push}
-  {$hints off}
+  {$push}{$hints off}
   SetLength(Result, Remaining);
   {$pop}
   ReadBuffer(@Result[1], Remaining);
@@ -10318,15 +10313,17 @@ end;
 // Functions begin
 procedure UClear(out x; const Size: UInt32);
 begin
-{$push}{$hints off}FillChar(x, Size, 0);{$pop}
+  {$push}{$hints off}
+  FillChar(x, Size, 0);
+  {$pop}
 end;
 
-{$push}{$hints off}
 procedure UMove(out Dest; const Src; const Size: UInt32);
 begin
+  {$push}{$hints off}
   Move(Src, Dest, Size);
+  {$pop}
 end;
-{$pop}
 
 function UIntToPtr(const i: PtrUInt): Pointer;
 begin
@@ -11646,7 +11643,7 @@ end;
 
 function UFileCRC32(const FileName: String; const CRC: UInt32): UInt32;
   var fs: TFileStream;
-  var Buffer: array[0..2048] of UInt8;
+  var Buffer: array[0..2048 - 1] of UInt8;
   var RemSize, Size: Int64;
 begin
   Result := CRC;
@@ -11654,7 +11651,9 @@ begin
   try
     RemSize := fs.Size;
     repeat
+      {$push}{$warn 5057 off}
       Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
+      {$pop}
       Result := UCRC32(Result, @Buffer, Size);
       Dec(RemSize, Size);
     until RemSize = 0;
@@ -11673,7 +11672,9 @@ begin
   try
     RemSize := fs.Size;
     repeat
+      {$push}{$warn 5057 off}
       Size := fs.Read(Buffer, UMin(SizeOf(Buffer), RemSize));
+      {$pop}
       Result := UCRC64(Result, @Buffer, Size);
       Dec(RemSize, Size);
     until RemSize = 0;
