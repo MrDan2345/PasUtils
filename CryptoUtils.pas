@@ -20,8 +20,8 @@ type TUDigestSHA3_512 = array[0..63] of UInt8;
 type TUFuncDigest = function (const Data: TUInt8Array): TUInt8Array;
 type TUFuncAuth = function (const Key, Data: TUInt8Array): TUInt8Array;
 
-type TUCryptoInt = TUInt8192;
-type TUCryptoIntArray = array of TUCryptoInt;
+type TUCrInt = TUInt8192;
+type TUCrIntArray = array of TUCrInt;
 
 type TUDigestMD5_Impl = type helper for TUDigestMD5
 private
@@ -90,14 +90,14 @@ end;
 type TURSA = record
 public
   type TKey = record
-    n: TUCryptoInt; // modulus
-    e: TUCryptoInt; // public exponent
-    d: TUCryptoInt; // private exponent
-    p: TUCryptoInt; // first prime
-    q: TUCryptoInt; // second prime
-    exp1: TUCryptoInt; // d mod (p - 1)
-    exp2: TUCryptoInt; // d mod (q - 1)
-    c: TUCryptoInt; // q^-1 mod p
+    n: TUCrInt; // modulus
+    e: TUCrInt; // public exponent
+    d: TUCrInt; // private exponent
+    p: TUCrInt; // first prime
+    q: TUCrInt; // second prime
+    exp1: TUCrInt; // d mod (p - 1)
+    exp2: TUCrInt; // d mod (q - 1)
+    c: TUCrInt; // q^-1 mod p
     function Size: Uint32; // bit size
     function IsPublic: Boolean;
     function IsPrivate: Boolean;
@@ -105,6 +105,7 @@ public
     function IsValid: Boolean;
     class function MakeInvalid: TKey; static;
   end;
+//public
 private
   const OID_RSA: array[0..8] of UInt8 = (
     $2a, $86, $48, $86, $f7, $0d, $01, $01, $01
@@ -159,7 +160,7 @@ private
   ); // 2.16.840.1.101.3.4.1.42
   type TMakePrimeContext = record
     BitCount: Int32;
-    Primes: array of TUCryptoInt;
+    Primes: array of TUCrInt;
     CurItem: Int32;
     Lock: TUCriticalSection;
     Done: Boolean;
@@ -171,24 +172,25 @@ private
     var RandSeed: UInt32;
     procedure Execute; override;
   end;
-  class function ModInverse(const e, phi: TUCryptoInt): TUCryptoInt; static;
-  class function GCD(const a, b: TUCryptoInt): TUCryptoInt; static;
-  class function PowMod(const Base, Exp, Modulus: TUCryptoInt): TUCryptoInt; static;
-  class function MillerRabinTest(const Number: TUCryptoInt; const Iterations: Int32 = 50): Boolean; static;
+  class function ModInverse(const e, phi: TUCrInt): TUCrInt; static;
+  class function GCD(const a, b: TUCrInt): TUCrInt; static;
+  class function PowMod(const Base, Exp, Modulus: TUCrInt): TUCrInt; static;
+  class function SimplePrimeTest(const Number: TUCrInt; const MaxValue: UInt32 = 1000): Boolean; static;
+  class function MillerRabinTest(const Number: TUCrInt; const Iterations: Int32 = 50): Boolean; static;
   class function XORBytes(const a, b: TUInt8Array): TUInt8Array; static;
-  class function PackDER(const Number: TUCryptoInt): TUInt8Array; static;
-  class function UnpackDER(const Bytes: TUInt8Array): TUCryptoInt; static;
+  class function PackDER(const Number: TUCrInt): TUInt8Array; static;
+  class function UnpackDER(const Bytes: TUInt8Array): TUCrInt; static;
   class procedure DebugASN1(const Bytes: TUInt8Array; const Offset: String = ''); static;
   class function EncodeTLV(const Tag: UInt8; const Value: TUInt8Array): TUInt8Array; static;
   class function DecodeTLV(const Data: TUInt8Array; var Index: Int32; out Tag: UInt8): TUInt8Array; static;
   class function ASN1ToBase64(const DataASN: TUInt8Array; const Header, Footer: String): String; static;
   class function Base64ToASN1(const Base64: String; const Header, Footer: String): TUInt8Array; static;
-  class function MakePrime(const BitCount: Int32 = 1024): TUCryptoInt; static;
+  class function MakePrime(const BitCount: Int32 = 1024): TUCrInt; static;
   class function MakePrimes(
     const PrimeCount: Int32;
     const BitCount: Int32 = 1024;
     const ThreadCount: Int32 = 8
-  ): TUCryptoIntArray; static;
+  ): TUCrIntArray; static;
   class function MakeKey(
     const BitCount: UInt32 = 2048;
     const Threads: Int32 = 16
@@ -197,79 +199,79 @@ private
     const Data: Pointer;
     const DataSize: UInt32;
     const BlockSize: UInt32 = 2048
-  ): TUCryptoInt; static;
+  ): TUCrInt; static;
   class function PackData_PKCS1(
     const Data: TUInt8Array;
     const BlockSize: UInt32 = 2048
-  ): TUCryptoInt; static;
+  ): TUCrInt; static;
   class function UnpackData_PKCS1(
-    const Block: TUCryptoInt;
+    const Block: TUCrInt;
     const BlockSize: UInt32 = 2048
   ): TUInt8Array; static;
   class function UnpackStr_PKCS1(
-    const Block: TUCryptoInt;
+    const Block: TUCrInt;
     const BlockSize: UInt32 = 2048
   ): String; static;
   class function PackData_OAEP(
     const Data: Pointer;
     const DataSize: UInt32;
     const BlockSize: UInt32 = 2048
-  ): TUCryptoInt; static;
+  ): TUCrInt; static;
   class function PackData_OAEP(
     const Data: TUInt8Array;
     const BlockSize: UInt32 = 2048
-  ): TUCryptoInt; static;
+  ): TUCrInt; static;
   class function UnpackData_OAEP(
-    const Block: TUCryptoInt;
+    const Block: TUCrInt;
     const BlockSize: UInt32 = 2048
   ): TUInt8Array; static;
   class function UnpackStr_OAEP(
-    const Block: TUCryptoInt;
+    const Block: TUCrInt;
     const BlockSize: UInt32 = 2048
   ): String; static;
   class function PackData_Singature(
     const Data: Pointer;
     const DataSize: UInt32;
     const BlockSize: UInt32 = 2048
-  ): TUCryptoInt; static;
+  ): TUCrInt; static;
   class function UnpackData_Singature(
-    const Block: TUCryptoInt;
+    const Block: TUCrInt;
     const BlockSize: UInt32 = 2048
   ): TUInt8Array; static;
   class function Encrypt_PKCS1(
     const Data: Pointer;
     const DataSize: UInt32;
     const Key: TURSA.TKey
-  ): TUCryptoInt; static;
+  ): TUCrInt; static;
   class function Decrypt_PKCS1_Str(
-    const Cipher: TUCryptoInt;
+    const Cipher: TUCrInt;
     const Key: TURSA.TKey
   ): String; static;
   class function Decrypt_PKCS1(
-    const Cipher: TUCryptoInt;
+    const Cipher: TUCrInt;
     const Key: TURSA.TKey
   ): TUInt8Array; static;
   class function Encrypt_OAEP(
     const Data: Pointer;
     const DataSize: UInt32;
     const Key: TURSA.TKey
-  ): TUCryptoInt; static;
+  ): TUCrInt; static;
   class function Decrypt_OAEP_Str(
-    const Cipher: TUCryptoInt;
+    const Cipher: TUCrInt;
     const Key: TURSA.TKey
   ): String; static;
   class function Decrypt_OAEP(
-    const Cipher: TUCryptoInt;
+    const Cipher: TUCrInt;
     const Key: TURSA.TKey
   ): TUInt8Array; static;
   class function Decrypt_CRT(
-    const Cipher: TUCryptoInt;
+    const Cipher: TUCrInt;
     const Key: TURSA.TKey
-  ): TUCryptoInt; static;
+  ): TUCrInt; static;
   class function Decrypt(
-    const Cipher: TUCryptoInt;
+    const Cipher: TUCrInt;
     const Key: TURSA.TKey
-  ): TUCryptoInt; static;
+  ): TUCrInt; static;
   class function Sign_SHA256(
     const Data: TUInt8Array;
     const Key: TKey
@@ -346,14 +348,14 @@ end;
 
 type TUMontgomeryReduction = record
 private
-  N: TUCryptoInt;
+  N: TUCrInt;
   N_prime: UInt32;
-  R2_mod_N: TUCryptoInt;
+  R2_mod_N: TUCrInt;
   NumItems: Int32;
 public
-  procedure Init(const Modulus: TUCryptoInt);
-  function Conv(const Number: TUCryptoInt): TUCryptoInt;
-  function Mul(const a, b: TUCryptoInt): TUCryptoInt;
+  procedure Init(const Modulus: TUCrInt);
+  function Conv(const Number: TUCrInt): TUCrInt;
+  function Mul(const a, b: TUCrInt): TUCrInt;
 end;
 
 type TUAES = record
@@ -796,42 +798,42 @@ function UEncrypt_RSA_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 function UEncrypt_RSA_PKCS1(
   const Data: TUInt8Array;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 function UEncrypt_RSA_PKCS1_Str(
   const Str: String;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 function UDecrypt_RSA_PKCS1_Str(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): String;
 function UDecrypt_RSA_PKCS1(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): TUInt8Array;
 function UEncrypt_RSA_OAEP(
   const Data: Pointer;
   const DataSize: UInt32;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 function UEncrypt_RSA_OAEP(
   const Data: TUInt8Array;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 function UEncrypt_RSA_OAEP_Str(
   const Str: String;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 function UDecrypt_RSA_OAEP_Str(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): String;
 function UDecrypt_RSA_OAEP(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): TUInt8Array;
 
@@ -1049,26 +1051,27 @@ end;
 
 class function TURSA.TKey.MakeInvalid: TKey;
 begin
-  Result.n := TUCryptoInt.Invalid;
-  Result.e := TUCryptoInt.Invalid;
-  Result.d := TUCryptoInt.Invalid;
-  Result.p := TUCryptoInt.Invalid;
-  Result.q := TUCryptoInt.Invalid;
-  Result.exp1 := TUCryptoInt.Invalid;
-  Result.exp2 := TUCryptoInt.Invalid;
-  Result.c := TUCryptoInt.Invalid;
+  Result.n := TUCrInt.Invalid;
+  Result.e := TUCrInt.Invalid;
+  Result.d := TUCrInt.Invalid;
+  Result.p := TUCrInt.Invalid;
+  Result.q := TUCrInt.Invalid;
+  Result.exp1 := TUCrInt.Invalid;
+  Result.exp2 := TUCrInt.Invalid;
+  Result.c := TUCrInt.Invalid;
 end;
 
 procedure TURSA.TMakePrimeThread.Execute;
-  var Number: TUCryptoInt;
+  var Number: TUCrInt;
   var i: Int32;
 begin
   UThreadRandomSeed := RandSeed;
   with Context^ do
   repeat
-    Number := TUCryptoInt.MakeRandom(BitCount);
-    Number := Number or (TUCryptoInt.One shl (BitCount - 1));
+    Number := TUCrInt.MakeRandom(BitCount);
+    Number := Number or (TUCrInt.One shl (BitCount - 1));
     Number[0] := Number[0] or 1;
+    if not TURSA.SimplePrimeTest(Number, 2000) then Continue;
     if not TURSA.MillerRabinTest(Number, 50) then Continue;
     Lock.Enter;
     try
@@ -1167,13 +1170,13 @@ begin
   Result := Func(Data);
 end;
 
-class function TURSA.ModInverse(const e, phi: TUCryptoInt): TUCryptoInt;
-  var Zero: TUCryptoInt;
-  var One: TUCryptoInt;
-  var x0, x1, a, m, q, temp: TUCryptoInt;
+class function TURSA.ModInverse(const e, phi: TUCrInt): TUCrInt;
+  var Zero: TUCrInt;
+  var One: TUCrInt;
+  var x0, x1, a, m, q, temp: TUCrInt;
 begin
-  Zero := TUCryptoInt.Zero;
-  One := TUCryptoInt.One;
+  Zero := TUCrInt.Zero;
+  One := TUCrInt.One;
   if phi = One then Exit(Zero);
   x0 := Zero;
   x1 := One;
@@ -1181,21 +1184,21 @@ begin
   m := phi;
   while a > One do
   begin
-    q := TUCryptoInt.Division(a, m, temp);
+    q := TUCrInt.Division(a, m, temp);
     a := m;
     m := temp;
     temp := x0;
     x0 := x1 - (q * x0);
     x1 := temp;
   end;
-  if a <> One then Exit(TUCryptoInt.Invalid);
+  if a <> One then Exit(TUCrInt.Invalid);
   if (x1 < 0) then x1 := x1 + phi;
   Result := x1;
 end;
 
-class function TURSA.GCD(const a, b: TUCryptoInt): TUCryptoInt;
-  var Remainder: TUCryptoInt;
-  var LocalA, LocalB: TUCryptoInt;
+class function TURSA.GCD(const a, b: TUCrInt): TUCrInt;
+  var Remainder: TUCrInt;
+  var LocalA, LocalB: TUCrInt;
 begin
   LocalA := a;
   LocalB := b;
@@ -1208,15 +1211,15 @@ begin
   Result := LocalA;
 end;
 
-class function TURSA.PowMod(const Base, Exp, Modulus: TUCryptoInt): TUCryptoInt;
+class function TURSA.PowMod(const Base, Exp, Modulus: TUCrInt): TUCrInt;
   var Context: TUMontgomeryReduction;
-  var BaseMont: TUCryptoInt;
-  var ResultMont: TUCryptoInt;
-  var CurrentExponent: TUCryptoInt;
+  var BaseMont: TUCrInt;
+  var ResultMont: TUCrInt;
+  var CurrentExponent: TUCrInt;
 begin
   Context.Init(Modulus);
   BaseMont := Context.Conv(Base);
-  ResultMont := Context.Conv(TUCryptoInt.One);
+  ResultMont := Context.Conv(TUCrInt.One);
   CurrentExponent := Exp;
   while not CurrentExponent.IsZero do
   begin
@@ -1225,42 +1228,137 @@ begin
       ResultMont := Context.Mul(ResultMont, BaseMont);
     end;
     BaseMont := Context.Mul(BaseMont, BaseMont);
-    CurrentExponent := TUCryptoInt.ShrOne(CurrentExponent);
+    CurrentExponent := TUCrInt.ShrOne(CurrentExponent);
   end;
-  Result := Context.Mul(ResultMont, TUCryptoInt.One);
+  Result := Context.Mul(ResultMont, TUCrInt.One);
 end;
 
-class function TURSA.MillerRabinTest(const Number: TUCryptoInt; const Iterations: Int32): Boolean;
-  var Two: TUCryptoInt;
+class function TURSA.SimplePrimeTest(
+  const Number: TUCrInt;
+  const MaxValue: UInt32
+): Boolean;
+  const PrimeTable: array[0..1228] of UInt32 = (
+    2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53,
+    59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131,
+    137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223,
+    227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311,
+    313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409,
+    419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499, 503,
+    509, 521, 523, 541, 547, 557, 563, 569, 571, 577, 587, 593, 599, 601, 607, 613,
+    617, 619, 631, 641, 643, 647, 653, 659, 661, 673, 677, 683, 691, 701, 709, 719,
+    727, 733, 739, 743, 751, 757, 761, 769, 773, 787, 797, 809, 811, 821, 823, 827,
+    829, 839, 853, 857, 859, 863, 877, 881, 883, 887, 907, 911, 919, 929, 937, 941,
+    947, 953, 967, 971, 977, 983, 991, 997, 1009, 1013, 1019, 1021, 1031, 1033, 1039, 1049,
+    1051, 1061, 1063, 1069, 1087, 1091, 1093, 1097, 1103, 1109, 1117, 1123, 1129, 1151, 1153, 1163,
+    1171, 1181, 1187, 1193, 1201, 1213, 1217, 1223, 1229, 1231, 1237, 1249, 1259, 1277, 1279, 1283,
+    1289, 1291, 1297, 1301, 1303, 1307, 1319, 1321, 1327, 1361, 1367, 1373, 1381, 1399, 1409, 1423,
+    1427, 1429, 1433, 1439, 1447, 1451, 1453, 1459, 1471, 1481, 1483, 1487, 1489, 1493, 1499, 1511,
+    1523, 1531, 1543, 1549, 1553, 1559, 1567, 1571, 1579, 1583, 1597, 1601, 1607, 1609, 1613, 1619,
+    1621, 1627, 1637, 1657, 1663, 1667, 1669, 1693, 1697, 1699, 1709, 1721, 1723, 1733, 1741, 1747,
+    1753, 1759, 1777, 1783, 1787, 1789, 1801, 1811, 1823, 1831, 1847, 1861, 1867, 1871, 1873, 1877,
+    1879, 1889, 1901, 1907, 1913, 1931, 1933, 1949, 1951, 1973, 1979, 1987, 1993, 1997, 1999, 2003,
+    2011, 2017, 2027, 2029, 2039, 2053, 2063, 2069, 2081, 2083, 2087, 2089, 2099, 2111, 2113, 2129,
+    2131, 2137, 2141, 2143, 2153, 2161, 2179, 2203, 2207, 2213, 2221, 2237, 2239, 2243, 2251, 2267,
+    2269, 2273, 2281, 2287, 2293, 2297, 2309, 2311, 2333, 2339, 2341, 2347, 2351, 2357, 2371, 2377,
+    2381, 2383, 2389, 2393, 2399, 2411, 2417, 2423, 2437, 2441, 2447, 2459, 2467, 2473, 2477, 2503,
+    2521, 2531, 2539, 2543, 2549, 2551, 2557, 2579, 2591, 2593, 2609, 2617, 2621, 2633, 2647, 2657,
+    2659, 2663, 2671, 2677, 2683, 2687, 2689, 2693, 2699, 2707, 2711, 2713, 2719, 2729, 2731, 2741,
+    2749, 2753, 2767, 2777, 2789, 2791, 2797, 2801, 2803, 2819, 2833, 2837, 2843, 2851, 2857, 2861,
+    2879, 2887, 2897, 2903, 2909, 2917, 2927, 2939, 2953, 2957, 2963, 2969, 2971, 2999, 3001, 3011,
+    3019, 3023, 3037, 3041, 3049, 3061, 3067, 3079, 3083, 3089, 3109, 3119, 3121, 3137, 3163, 3167,
+    3169, 3181, 3187, 3191, 3203, 3209, 3217, 3221, 3229, 3251, 3253, 3257, 3259, 3271, 3299, 3301,
+    3307, 3313, 3319, 3323, 3329, 3331, 3343, 3347, 3359, 3361, 3371, 3373, 3389, 3391, 3407, 3413,
+    3433, 3449, 3457, 3461, 3463, 3467, 3469, 3491, 3499, 3511, 3517, 3527, 3529, 3533, 3539, 3541,
+    3547, 3557, 3559, 3571, 3581, 3583, 3593, 3607, 3613, 3617, 3623, 3631, 3637, 3643, 3659, 3671,
+    3673, 3677, 3691, 3697, 3701, 3709, 3719, 3727, 3733, 3739, 3761, 3767, 3769, 3779, 3793, 3797,
+    3803, 3821, 3823, 3833, 3847, 3851, 3853, 3863, 3877, 3881, 3889, 3907, 3911, 3917, 3919, 3923,
+    3929, 3931, 3943, 3947, 3967, 3989, 4001, 4003, 4007, 4013, 4019, 4021, 4027, 4049, 4051, 4057,
+    4073, 4079, 4091, 4093, 4099, 4111, 4127, 4129, 4133, 4139, 4153, 4157, 4159, 4177, 4201, 4211,
+    4217, 4219, 4229, 4231, 4241, 4243, 4253, 4259, 4261, 4271, 4273, 4283, 4289, 4297, 4327, 4337,
+    4339, 4349, 4357, 4363, 4373, 4391, 4397, 4409, 4421, 4423, 4441, 4447, 4451, 4457, 4463, 4481,
+    4483, 4493, 4507, 4513, 4517, 4519, 4523, 4547, 4549, 4561, 4567, 4583, 4591, 4597, 4603, 4621,
+    4637, 4639, 4643, 4649, 4651, 4657, 4663, 4673, 4679, 4691, 4703, 4721, 4723, 4729, 4733, 4751,
+    4759, 4783, 4787, 4789, 4793, 4799, 4801, 4813, 4817, 4831, 4861, 4871, 4877, 4889, 4903, 4909,
+    4919, 4931, 4933, 4937, 4943, 4951, 4957, 4967, 4969, 4973, 4987, 4993, 4999, 5003, 5009, 5011,
+    5021, 5023, 5039, 5051, 5059, 5077, 5081, 5087, 5099, 5101, 5107, 5113, 5119, 5147, 5153, 5167,
+    5171, 5179, 5189, 5197, 5209, 5227, 5231, 5233, 5237, 5261, 5273, 5279, 5281, 5297, 5303, 5309,
+    5323, 5333, 5347, 5351, 5381, 5387, 5393, 5399, 5407, 5413, 5417, 5419, 5431, 5437, 5441, 5443,
+    5449, 5471, 5477, 5479, 5483, 5501, 5503, 5507, 5519, 5521, 5527, 5531, 5557, 5563, 5569, 5573,
+    5581, 5591, 5623, 5639, 5641, 5647, 5651, 5653, 5657, 5659, 5669, 5683, 5689, 5693, 5701, 5711,
+    5717, 5737, 5741, 5743, 5749, 5779, 5783, 5791, 5801, 5807, 5813, 5821, 5827, 5839, 5843, 5849,
+    5851, 5857, 5861, 5867, 5869, 5879, 5881, 5897, 5903, 5923, 5927, 5939, 5953, 5981, 5987, 6007,
+    6011, 6029, 6037, 6043, 6047, 6053, 6067, 6073, 6079, 6089, 6091, 6101, 6113, 6121, 6131, 6133,
+    6143, 6151, 6163, 6173, 6197, 6199, 6203, 6211, 6217, 6221, 6229, 6247, 6257, 6263, 6269, 6271,
+    6277, 6287, 6299, 6301, 6311, 6317, 6323, 6329, 6337, 6343, 6353, 6359, 6361, 6367, 6373, 6379,
+    6389, 6397, 6421, 6427, 6449, 6451, 6469, 6473, 6481, 6491, 6521, 6529, 6547, 6551, 6553, 6563,
+    6569, 6571, 6577, 6581, 6599, 6607, 6619, 6637, 6653, 6659, 6661, 6673, 6679, 6689, 6691, 6701,
+    6703, 6709, 6719, 6733, 6737, 6761, 6763, 6779, 6781, 6791, 6793, 6803, 6823, 6827, 6829, 6833,
+    6841, 6857, 6863, 6869, 6871, 6883, 6899, 6907, 6911, 6917, 6947, 6949, 6959, 6961, 6967, 6971,
+    6977, 6983, 6991, 6997, 7001, 7013, 7019, 7027, 7039, 7043, 7057, 7069, 7079, 7103, 7109, 7121,
+    7127, 7129, 7151, 7159, 7177, 7187, 7193, 7207, 7211, 7213, 7219, 7229, 7237, 7243, 7247, 7253,
+    7283, 7297, 7307, 7309, 7321, 7331, 7333, 7349, 7351, 7369, 7393, 7411, 7417, 7433, 7451, 7457,
+    7459, 7477, 7481, 7487, 7489, 7499, 7507, 7517, 7523, 7529, 7537, 7541, 7547, 7549, 7559, 7561,
+    7573, 7577, 7583, 7589, 7591, 7603, 7607, 7621, 7639, 7643, 7649, 7669, 7673, 7681, 7687, 7691,
+    7699, 7703, 7717, 7723, 7727, 7741, 7753, 7757, 7759, 7789, 7793, 7817, 7823, 7829, 7841, 7853,
+    7867, 7873, 7877, 7879, 7883, 7901, 7907, 7919, 7927, 7933, 7937, 7949, 7951, 7963, 7993, 8009,
+    8011, 8017, 8039, 8053, 8059, 8069, 8081, 8087, 8089, 8093, 8101, 8111, 8117, 8123, 8147, 8161,
+    8167, 8171, 8179, 8191, 8209, 8219, 8221, 8231, 8233, 8237, 8243, 8263, 8269, 8273, 8287, 8291,
+    8293, 8297, 8311, 8317, 8329, 8353, 8363, 8369, 8377, 8387, 8389, 8419, 8423, 8429, 8431, 8443,
+    8447, 8461, 8467, 8501, 8513, 8521, 8527, 8537, 8539, 8543, 8563, 8573, 8581, 8597, 8599, 8609,
+    8623, 8627, 8629, 8641, 8647, 8663, 8669, 8677, 8681, 8689, 8693, 8699, 8707, 8713, 8719, 8731,
+    8737, 8741, 8747, 8753, 8761, 8779, 8783, 8803, 8807, 8819, 8821, 8831, 8837, 8839, 8849, 8861,
+    8863, 8867, 8887, 8893, 8923, 8929, 8933, 8941, 8951, 8963, 8969, 8971, 8999, 9001, 9007, 9011,
+    9013, 9029, 9041, 9043, 9049, 9059, 9067, 9091, 9103, 9109, 9127, 9133, 9137, 9151, 9157, 9161,
+    9173, 9181, 9187, 9199, 9203, 9209, 9221, 9227, 9239, 9241, 9257, 9277, 9281, 9283, 9293, 9311,
+    9319, 9323, 9337, 9341, 9343, 9349, 9371, 9377, 9391, 9397, 9403, 9413, 9419, 9421, 9431, 9433,
+    9437, 9439, 9461, 9463, 9467, 9473, 9479, 9491, 9497, 9511, 9521, 9533, 9539, 9547, 9551, 9587,
+    9601, 9613, 9619, 9623, 9629, 9631, 9643, 9649, 9661, 9677, 9679, 9689, 9697, 9719, 9721, 9733,
+    9739, 9743, 9749, 9767, 9769, 9781, 9787, 9791, 9803, 9811, 9817, 9829, 9833, 9839, 9851, 9857,
+    9859, 9871, 9883, 9887, 9901, 9907, 9923, 9929, 9931, 9941, 9949, 9967, 9973
+  );
+  var i: Int32;
+  var Zero: TUCrInt;
+begin
+  Zero := TUCrInt.Zero;
+  Result := True;
+  for i := 0 to High(PrimeTable) do
+  begin
+    if PrimeTable[i] > MaxValue then Exit;
+    if Number mod PrimeTable[i] = Zero then Exit(False);
+  end;
+end;
+
+class function TURSA.MillerRabinTest(const Number: TUCrInt; const Iterations: Int32): Boolean;
+  var Two: TUCrInt;
   var Cmp: Int8;
   var i: Int32;
   var m, m_temp: UInt32;
-  var d, a, x, n_minus_1, n_minus_2: TUCryptoInt;
+  var d, a, x, n_minus_1, n_minus_2: TUCrInt;
 begin
   Two := 2;
-  Cmp := TUCryptoInt.Compare(Number, Two);
+  Cmp := TUCrInt.Compare(Number, Two);
   if Cmp < 0 then Exit(False);
   if Cmp = 0 then Exit(True);
   if not Number.IsOdd then Exit(False);
-  n_minus_1 := Number - TUCryptoInt.One;
+  n_minus_1 := Number - TUCrInt.One;
   d := n_minus_1;
   m := 0;
-  while not d.IsOdd and (d > TUCryptoInt.Zero) do
+  while not d.IsOdd and (d > TUCrInt.Zero) do
   begin
-    d := TUCryptoInt.ShrOne(d);
+    d := TUCrInt.ShrOne(d);
     Inc(m);
   end;
   n_minus_2 := Number - Two;
   for i := 1 to Iterations do
   begin
-    a := TUCryptoInt.MakeRandomRange(Two, n_minus_2);
+    a := TUCrInt.MakeRandomRange(Two, n_minus_2);
     x := PowMod(a, d, Number);
-    if (x = TUCryptoInt.One) or (x = n_minus_1) then Continue;
+    if (x = TUCrInt.One) or (x = n_minus_1) then Continue;
     m_temp := m;
     while m_temp > 1 do
     begin
       x := PowMod(x, Two, Number);
-      if x = TUCryptoInt.One then Exit(False);
+      if x = TUCrInt.One then Exit(False);
       if x = n_minus_1 then Break;
       Dec(m_temp);
     end;
@@ -1279,8 +1377,8 @@ begin
   Result[i] := a[i] xor b[i];
 end;
 
-class function TURSA.PackDER(const Number: TUCryptoInt): TUInt8Array;
-  const ByteCount = (TUCryptoInt.Size32.Value) * 4;
+class function TURSA.PackDER(const Number: TUCrInt): TUInt8Array;
+  const ByteCount = (TUCrInt.Size32.Value) * 4;
   var AsBytes: array[0..ByteCount - 1] of UInt8 absolute Number;
   var i, j, TopByte: Int32;
 begin
@@ -1301,12 +1399,12 @@ begin
   end;
 end;
 
-class function TURSA.UnpackDER(const Bytes: TUInt8Array): TUCryptoInt;
-  const ByteCount = (TUCryptoInt.Size32.Value) * 4;
+class function TURSA.UnpackDER(const Bytes: TUInt8Array): TUCrInt;
+  const ByteCount = (TUCrInt.Size32.Value) * 4;
   var AsBytes: array[0..ByteCount - 1] of UInt8 absolute Result;
   var i, StartIndex, CopyCount: Int32;
 begin
-  Result := TUCryptoInt.Zero;
+  Result := TUCrInt.Zero;
   if Length(Bytes) = 0 then Exit;
   StartIndex := Int32(Bytes[0] = 0);
   CopyCount := UMin(Length(Bytes) - StartIndex, ByteCount);
@@ -1468,20 +1566,20 @@ begin
   Result := UBase64ToBytes(Str);
 end;
 
-class function TURSA.MakePrime(const BitCount: Int32): TUCryptoInt;
+class function TURSA.MakePrime(const BitCount: Int32): TUCrInt;
 begin
   repeat
-    Result := TUCryptoInt.MakeRandom(BitCount);
-    Result := Result or (TUCryptoInt.One shl (BitCount - 1));
+    Result := TUCrInt.MakeRandom(BitCount);
+    Result := Result or (TUCrInt.One shl (BitCount - 1));
     Result[0] := Result[0] or 1;
-  until MillerRabinTest(Result, 100);
+  until TURSA.SimplePrimeTest(Result, 2000) and MillerRabinTest(Result, 50);
 end;
 
 class function TURSA.MakePrimes(
   const PrimeCount: Int32;
   const BitCount: Int32;
   const ThreadCount: Int32
-): TUCryptoIntArray;
+): TUCrIntArray;
   var Threads: array of TMakePrimeThread;
   var Context: TMakePrimeContext;
   var i: Int32;
@@ -1514,7 +1612,7 @@ begin
     if Length(Context.Primes) > 0 then
     begin
       SetLength(Result, Length(Context.Primes));
-      Move(Context.Primes[0], Result[0], Length(Result) * SizeOf(TUCryptoInt));
+      Move(Context.Primes[0], Result[0], Length(Result) * SizeOf(TUCrInt));
     end;
   end;
 end;
@@ -1523,11 +1621,11 @@ class function TURSA.MakeKey(
   const BitCount: UInt32;
   const Threads: Int32
 ): TURSA.TKey;
-  var p, q, n, phi, e, d, One, p_minus_1, q_minus_1: TUCryptoInt;
+  var p, q, n, phi, e, d, One, p_minus_1, q_minus_1: TUCrInt;
   var PrimeSizeInBits: Int32;
-  var Primes: TUCryptoIntArray;
+  var Primes: TUCrIntArray;
 begin
-  One := TUCryptoInt.One;
+  One := TUCrInt.One;
   Result := TKey.MakeInvalid;
   PrimeSizeInBits := BitCount shr 1;
   e := 65537;
@@ -1557,17 +1655,17 @@ class function TURSA.PackData_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
   const BlockSize: UInt32
-): TUCryptoInt;
+): TUCrInt;
   const MinPadding = 11;
-  const ByteCount = (TUCryptoInt.Size32.Value) * 4;
+  const ByteCount = (TUCrInt.Size32.Value) * 4;
   var PaddingSize, BlockSizeInBytes: Int32;
   var PaddedDataBE: array[0..ByteCount - 1] of UInt8;
   var PaddedData: array[0..ByteCount - 1] of UInt8 absolute Result;
   var i: Int32;
 begin
   BlockSizeInBytes := BlockSize shr 3;
-  if DataSize > BlockSizeInBytes - MinPadding then Exit(TUCryptoInt.Invalid);
-  Result := TUCryptoInt.Zero;
+  if DataSize > BlockSizeInBytes - MinPadding then Exit(TUCrInt.Invalid);
+  Result := TUCrInt.Zero;
   PaddingSize := BlockSizeInBytes - DataSize;
   PaddedDataBE[0] := $00;
   PaddedDataBE[1] := $02;
@@ -1586,13 +1684,13 @@ end;
 class function TURSA.PackData_PKCS1(
   const Data: TUInt8Array;
   const BlockSize: UInt32
-): TUCryptoInt;
+): TUCrInt;
 begin
   Result := PackData_PKCS1(@Data[0], Length(Data), BlockSize);
 end;
 
-class function TURSA.UnpackData_PKCS1(const Block: TUCryptoInt; const BlockSize: UInt32): TUInt8Array;
-  const ByteCount = (TUCryptoInt.Size32.Value) * 4;
+class function TURSA.UnpackData_PKCS1(const Block: TUCrInt; const BlockSize: UInt32): TUInt8Array;
+  const ByteCount = (TUCrInt.Size32.Value) * 4;
   var PaddingSize, BlockSizeInBytes: Int32;
   var PaddedDataBE: array[0..ByteCount - 1] of UInt8;
   var PaddedData: array[0..ByteCount - 1] of UInt8 absolute Block;
@@ -1617,7 +1715,7 @@ begin
   Move(PaddedDataBE[PaddingSize], Result[0], Length(Result));
 end;
 
-class function TURSA.UnpackStr_PKCS1(const Block: TUCryptoInt; const BlockSize: UInt32): String;
+class function TURSA.UnpackStr_PKCS1(const Block: TUCrInt; const BlockSize: UInt32): String;
   var Data: TUInt8Array;
 begin
   Data := UnpackData_PKCS1(Block, BlockSize);
@@ -1630,9 +1728,9 @@ class function TURSA.PackData_OAEP(
   const Data: Pointer;
   const DataSize: UInt32;
   const BlockSize: UInt32
-): TUCryptoInt;
+): TUCrInt;
   const HashLen = SizeOf(TUDigestSHA2_256);
-  const ByteCount = (TUCryptoInt.Size32.Value) * 4;
+  const ByteCount = (TUCrInt.Size32.Value) * 4;
   var BlockSizeInBytes: UInt32;
   var PaddedDataBE: array[0..ByteCount - 1] of UInt8;
   var PaddedData: array[0..ByteCount - 1] of UInt8 absolute Result;
@@ -1642,7 +1740,7 @@ class function TURSA.PackData_OAEP(
   var LabelHash: TUDigestSHA2_256;
 begin
   BlockSizeInBytes := BlockSize shr 3;
-  if DataSize > BlockSizeInBytes - 2 * HashLen - 2 then Exit(TUCryptoInt.Invalid);
+  if DataSize > BlockSizeInBytes - 2 * HashLen - 2 then Exit(TUCrInt.Invalid);
   LabelHash := USHA2_256(nil, 0);
   PadStrLen := BlockSizeInBytes - DataSize - 2 * HashLen - 2;
   DB := nil;
@@ -1667,7 +1765,7 @@ begin
   MaskedDB := XORBytes(DB, DBMask);
   SeedMask := UMGF1_SHA256(MaskedDB, HashLen);
   MaskedSeed := XORBytes(Seed, SeedMask);
-  Result := TUCryptoInt.Zero;
+  Result := TUCrInt.Zero;
   PaddedDataBE[0] := $00;
   Move(MaskedSeed[0], PaddedDataBE[1], HashLen);
   Move(MaskedDB[0], PaddedDataBE[1 + HashLen], BlockSizeInBytes - HashLen - 1);
@@ -1680,17 +1778,17 @@ end;
 class function TURSA.PackData_OAEP(
   const Data: TUInt8Array;
   const BlockSize: UInt32
-): TUCryptoInt;
+): TUCrInt;
 begin
   Result := PackData_OAEP(@Data[0], Length(Data));
 end;
 
 class function TURSA.UnpackData_OAEP(
-  const Block: TUCryptoInt;
+  const Block: TUCrInt;
   const BlockSize: UInt32
 ): TUInt8Array;
   const HashLen = SizeOf(TUDigestSHA2_256);
-  const ByteCount = (TUCryptoInt.Size32.Value) * 4;
+  const ByteCount = (TUCrInt.Size32.Value) * 4;
   var BlockSizeInBytes: UInt32;
   var PaddedDataBE: array[0..ByteCount - 1] of UInt8;
   var PaddedData: array[0..ByteCount - 1] of UInt8 absolute Block;
@@ -1739,7 +1837,7 @@ begin
 end;
 
 class function TURSA.UnpackStr_OAEP(
-  const Block: TUCryptoInt;
+  const Block: TUCrInt;
   const BlockSize: UInt32
 ): String;
   var Data: TUInt8Array;
@@ -1754,17 +1852,17 @@ class function TURSA.PackData_Singature(
   const Data: Pointer;
   const DataSize: UInt32;
   const BlockSize: UInt32
-): TUCryptoInt;
+): TUCrInt;
   const MinPadding = 11;
-  const ByteCount = (TUCryptoInt.Size32.Value) * 4;
+  const ByteCount = (TUCrInt.Size32.Value) * 4;
   var PaddingSize, BlockSizeInBytes: Int32;
   var PaddedDataBE: array[0..ByteCount - 1] of UInt8;
   var PaddedData: array[0..ByteCount - 1] of UInt8 absolute Result;
   var i: Int32;
 begin
   BlockSizeInBytes := BlockSize shr 3;
-  if DataSize > BlockSizeInBytes - MinPadding then Exit(TUCryptoInt.Invalid);
-  Result := TUCryptoInt.Zero;
+  if DataSize > BlockSizeInBytes - MinPadding then Exit(TUCrInt.Invalid);
+  Result := TUCrInt.Zero;
   PaddingSize := BlockSizeInBytes - DataSize;
   PaddedDataBE[0] := $00;
   PaddedDataBE[1] := $01;
@@ -1778,11 +1876,11 @@ begin
 end;
 
 class function TURSA.UnpackData_Singature(
-  const Block: TUCryptoInt;
+  const Block: TUCrInt;
   const BlockSize: UInt32
 ): TUInt8Array;
   const MinPadding = 11;
-  const ByteCount = (TUCryptoInt.Size32.Value) * 4;
+  const ByteCount = (TUCrInt.Size32.Value) * 4;
   var PaddingSize, BlockSizeInBytes: Int32;
   var PaddedDataBE: array[0..ByteCount - 1] of UInt8;
   var PaddedData: array[0..ByteCount - 1] of UInt8 absolute Block;
@@ -1815,29 +1913,29 @@ class function TURSA.Encrypt_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
   const Key: TURSA.TKey
-): TUCryptoInt;
-  var Block: TUCryptoInt;
+): TUCrInt;
+  var Block: TUCrInt;
 begin
   Block := PackData_PKCS1(Data, DataSize, Key.Size);
-  if not Block.IsValid then Exit(TUCryptoInt.Invalid);
+  if not Block.IsValid then Exit(TUCrInt.Invalid);
   Result := PowMod(Block, Key.e, Key.n);
 end;
 
 class function TURSA.Decrypt_PKCS1_Str(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): String;
-  var Block: TUCryptoInt;
+  var Block: TUCrInt;
 begin
   Block := Decrypt(Cipher, Key);
   Result := UnpackStr_PKCS1(Block, Key.Size);
 end;
 
 class function TURSA.Decrypt_PKCS1(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): TUInt8Array;
-  var Block: TUCryptoInt;
+  var Block: TUCrInt;
 begin
   Block := Decrypt(Cipher, Key);
   Result := UnpackData_PKCS1(Block, Key.Size);
@@ -1847,39 +1945,39 @@ class function TURSA.Encrypt_OAEP(
   const Data: Pointer;
   const DataSize: UInt32;
   const Key: TURSA.TKey
-): TUCryptoInt;
-  var Block: TUCryptoInt;
+): TUCrInt;
+  var Block: TUCrInt;
 begin
   Block := PackData_OAEP(Data, DataSize, Key.Size);
-  if not Block.IsValid then Exit(TUCryptoInt.Invalid);
+  if not Block.IsValid then Exit(TUCrInt.Invalid);
   Result := PowMod(Block, Key.e, Key.n);
 end;
 
 class function TURSA.Decrypt_OAEP_Str(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): String;
-  var Block: TUCryptoInt;
+  var Block: TUCrInt;
 begin
   Block := Decrypt(Cipher, Key);
   Result := UnpackStr_OAEP(Block, Key.Size);
 end;
 
 class function TURSA.Decrypt_OAEP(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): TUInt8Array;
-  var Block: TUCryptoInt;
+  var Block: TUCrInt;
 begin
   Block := Decrypt(Cipher, Key);
   Result := UnpackData_OAEP(Block, Key.Size);
 end;
 
 class function TURSA.Decrypt_CRT(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
-): TUCryptoInt;
-  var m1, m2, h, c_mod_p, c_mod_q: TUCryptoInt;
+): TUCrInt;
+  var m1, m2, h, c_mod_p, c_mod_q: TUCrInt;
 begin
   c_mod_p := Cipher mod Key.p;
   c_mod_q := Cipher mod Key.q;
@@ -1900,9 +1998,9 @@ begin
 end;
 
 class function TURSA.Decrypt(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 begin
   if Key.IsCRT then Exit(Decrypt_CRT(Cipher, Key));
   Result := PowMod(Cipher, Key.d, Key.n);
@@ -1911,7 +2009,7 @@ end;
 class function TURSA.Sign_SHA256(const Data: TUInt8Array; const Key: TKey): TUInt8Array;
   var Hash: TUDigestSHA2_256;
   var HashDER: TUInt8Array;
-  var PackedHash, Signature: TUCryptoInt;
+  var PackedHash, Signature: TUCrInt;
 begin
   Hash := USHA2_256(Data);
   HashDER := EncodeTLV($30, UBytesConcat([
@@ -1929,7 +2027,7 @@ end;
 class function TURSA.Sign_SHA512(const Data: TUInt8Array; const Key: TKey): TUInt8Array;
   var Hash: TUDigestSHA2_512;
   var HashDER: TUInt8Array;
-  var PackedHash, Signature: TUCryptoInt;
+  var PackedHash, Signature: TUCrInt;
 begin
   Hash := USHA2_512(Data);
   HashDER := EncodeTLV($30, UBytesConcat([
@@ -1949,12 +2047,12 @@ class function TURSA.Verify(
   const Key: TKey
 ): Boolean;
   var Hash: TUInt8Array;
-  var PackedHash: TUCryptoInt;
+  var PackedHash: TUCrInt;
   var UnpackedDER, SignedHashDER, SignedHash, Alg, OID: TUInt8Array;
   var Index: Int32;
   var Tag: UInt8;
 begin
-  PackedHash := PowMod(TUCryptoInt(Signature), Key.e, Key.n);
+  PackedHash := PowMod(TUCrInt(Signature), Key.e, Key.n);
   Index := 0;
   UnpackedDER := UnpackData_Singature(PackedHash, Key.Size);
   SignedHashDER := DecodeTLV(UnpackedDER, Index, Tag);
@@ -2009,7 +2107,7 @@ class function TURSA.ImportKeyPrivate_PKCS1_DER(const Key: TUInt8Array): TURSA.T
   var Index, i: Int32;
   var Tag: UInt8;
   var SequenceContent, IntValue: TUInt8Array;
-  var Components: array [0..7] of TUCryptoInt absolute Result;
+  var Components: array [0..7] of TUCrInt absolute Result;
 begin
   Result := TKey.MakeInvalid;
   Index := 0;
@@ -2044,7 +2142,7 @@ class function TURSA.ImportKeyPublic_PKCS1_DER(const Key: TUInt8Array): TURSA.TK
   var Index, i: Int32;
   var Tag: UInt8;
   var SequenceContent, IntValue: TUInt8Array;
-  var Components: array [0..1] of TUCryptoInt absolute Result;
+  var Components: array [0..1] of TUCrInt absolute Result;
 begin
   Index := 0;
   SequenceContent := DecodeTLV(Key, Index, Tag);
@@ -2820,10 +2918,10 @@ begin
   Result := TURSA.TKey.MakeInvalid;
 end;
 
-procedure TUMontgomeryReduction.Init(const Modulus: TUCryptoInt);
+procedure TUMontgomeryReduction.Init(const Modulus: TUCrInt);
   var inv: UInt32;
   var i: Int32;
-  var R_val, R2_val, R_mod_N: TUCryptoInt;
+  var R_val, R2_val, R_mod_N: TUCrInt;
 begin
   N := Modulus;
   NumItems := N.Top + 1;
@@ -2833,8 +2931,8 @@ begin
     inv := inv * (2 - N[0] * inv);
   end;
   N_prime := -inv;
-  R_val := TUCryptoInt.Zero;
-  if NumItems <= TUCryptoInt.MaxItem then
+  R_val := TUCrInt.Zero;
+  if NumItems <= TUCrInt.MaxItem then
   begin
     R_val[NumItems] := 1;
   end;
@@ -2843,19 +2941,19 @@ begin
   R2_mod_N := R2_val mod N;
 end;
 
-function TUMontgomeryReduction.Conv(const Number: TUCryptoInt): TUCryptoInt;
+function TUMontgomeryReduction.Conv(const Number: TUCrInt): TUCrInt;
 begin
   Result := Mul(Number, R2_mod_N);
 end;
 
-function TUMontgomeryReduction.Mul(const a, b: TUCryptoInt): TUCryptoInt;
-  var T: TUCryptoInt;
+function TUMontgomeryReduction.Mul(const a, b: TUCrInt): TUCrInt;
+  var T: TUCrInt;
   var m: UInt32;
   var i, j, k: Int32;
   var Carry: UInt64;
   var Product, Sum: UInt64;
 begin
-  Result := TUCryptoInt.Zero;
+  Result := TUCrInt.Zero;
   T := a * b;
   for i := 0 to NumItems - 1 do
   begin
@@ -2869,7 +2967,7 @@ begin
       Carry := (Product shr 32) + (Sum shr 32);
     end;
     k := i + NumItems;
-    while (Carry > 0) and (k <= TUCryptoInt.MaxItem) do
+    while (Carry > 0) and (k <= TUCrInt.MaxItem) do
     begin
       Sum := UInt64(T[k]) + Carry;
       T[k] := Sum and $ffffffff;
@@ -3298,42 +3396,42 @@ begin
   Result := USHA2_256(@Data[1], Length(Data));
 end;
 
-function UModInverse(const e, phi: TUCryptoInt): TUCryptoInt;
-  function GCD(const a, b: TUCryptoInt; var x: TUCryptoInt; var y: TUCryptoInt): TUCryptoInt;
-    var x1, y1, gcd_val: TUCryptoInt;
+function UModInverse(const e, phi: TUCrInt): TUCrInt;
+  function GCD(const a, b: TUCrInt; var x: TUCrInt; var y: TUCrInt): TUCrInt;
+    var x1, y1, gcd_val: TUCrInt;
   begin
-    if a = TUCryptoInt.Zero then
+    if a = TUCrInt.Zero then
     begin
-      x := TUCryptoInt.Zero;
-      y := TUCryptoInt.One;
+      x := TUCrInt.Zero;
+      y := TUCrInt.One;
       Exit(b);
     end;
-    x1 := TUCryptoInt.Zero;
-    y1 := TUCryptoInt.Zero;
+    x1 := TUCrInt.Zero;
+    y1 := TUCrInt.Zero;
     gcd_val := GCD(b mod a, a, x1, y1);
     x := y1 - (b div a) * x1;
     y := x1;
     Result := gcd_val;
   end;
-  var x, y, gcd_val: TUCryptoInt;
+  var x, y, gcd_val: TUCrInt;
 begin
-  x := TUCryptoInt.Zero;
-  y := TUCryptoInt.Zero;
+  x := TUCrInt.Zero;
+  y := TUCrInt.Zero;
   gcd_val := GCD(e, phi, x, y);
-  if gcd_val <> TUCryptoInt.One then Exit(TUCryptoInt.Invalid);
-  if x < TUCryptoInt.Zero then x := x + phi;
+  if gcd_val <> TUCrInt.One then Exit(TUCrInt.Invalid);
+  if x < TUCrInt.Zero then x := x + phi;
   Result := x;
 end;
 
-function UPowMod(const Base, Exp, Modulus: TUCryptoInt): TUCryptoInt;
+function UPowMod(const Base, Exp, Modulus: TUCrInt): TUCrInt;
   var Context: TUMontgomeryReduction;
-  var BaseMont: TUCryptoInt;
-  var ResultMont: TUCryptoInt;
-  var CurrentExponent: TUCryptoInt;
+  var BaseMont: TUCrInt;
+  var ResultMont: TUCrInt;
+  var CurrentExponent: TUCrInt;
 begin
   Context.Init(Modulus);
   BaseMont := Context.Conv(Base);
-  ResultMont := Context.Conv(TUCryptoInt.One);
+  ResultMont := Context.Conv(TUCrInt.One);
   CurrentExponent := Exp;
   while not CurrentExponent.IsZero do
   begin
@@ -3342,42 +3440,42 @@ begin
       ResultMont := Context.Mul(ResultMont, BaseMont);
     end;
     BaseMont := Context.Mul(BaseMont, BaseMont);
-    CurrentExponent := TUCryptoInt.ShrOne(CurrentExponent);
+    CurrentExponent := TUCrInt.ShrOne(CurrentExponent);
   end;
-  Result := Context.Mul(ResultMont, TUCryptoInt.One);
+  Result := Context.Mul(ResultMont, TUCrInt.One);
 end;
 
-function UMillerRabinTest(const Number: TUCryptoInt; const Iterations: Int32): Boolean;
-  var Two: TUCryptoInt;
+function UMillerRabinTest(const Number: TUCrInt; const Iterations: Int32): Boolean;
+  var Two: TUCrInt;
   var Cmp: Int8;
   var i: Int32;
   var m, m_temp: UInt32;
-  var d, a, x, n_minus_1, n_minus_2: TUCryptoInt;
+  var d, a, x, n_minus_1, n_minus_2: TUCrInt;
 begin
   Two := 2;
-  Cmp := TUCryptoInt.Compare(Number, Two);
+  Cmp := TUCrInt.Compare(Number, Two);
   if Cmp < 0 then Exit(False);
   if Cmp = 0 then Exit(True);
   if not Number.IsOdd then Exit(False);
-  n_minus_1 := Number - TUCryptoInt.One;
+  n_minus_1 := Number - TUCrInt.One;
   d := n_minus_1;
   m := 0;
-  while not d.IsOdd and (d > TUCryptoInt.Zero) do
+  while not d.IsOdd and (d > TUCrInt.Zero) do
   begin
-    d := TUCryptoInt.ShrOne(d);
+    d := TUCrInt.ShrOne(d);
     Inc(m);
   end;
   n_minus_2 := Number - Two;
   for i := 1 to Iterations do
   begin
-    a := TUCryptoInt.MakeRandomRange(Two, n_minus_2);
+    a := TUCrInt.MakeRandomRange(Two, n_minus_2);
     x := UPowMod(a, d, Number);
-    if (x = TUCryptoInt.One) or (x = n_minus_1) then Continue;
+    if (x = TUCrInt.One) or (x = n_minus_1) then Continue;
     m_temp := m;
     while m_temp > 1 do
     begin
       x := UPowMod(x, Two, Number);
-      if x = TUCryptoInt.One then Exit(False);
+      if x = TUCrInt.One then Exit(False);
       if x = n_minus_1 then Break;
       Dec(m_temp);
     end;
@@ -3386,13 +3484,13 @@ begin
   Result := True;
 end;
 
-function UMakePrime(const BitCount: Int32): TUCryptoInt;
+function UMakePrime(const BitCount: Int32): TUCrInt;
   var TestCount: Int32;
 begin
   TestCount := 0;
   repeat
-    Result := TUCryptoInt.MakeRandom(BitCount);
-    Result := Result or (TUCryptoInt.One shl (BitCount - 1));
+    Result := TUCrInt.MakeRandom(BitCount);
+    Result := Result or (TUCrInt.One shl (BitCount - 1));
     Result[0] := Result[0] or 1;
     Inc(TestCount);
     if TestCount mod 100 = 0 then WriteLn(TestCount);
@@ -4055,7 +4153,7 @@ function UEncrypt_RSA_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 begin
   Result := TURSA.Encrypt_PKCS1(Data, DataSize, Key);
 end;
@@ -4063,7 +4161,7 @@ end;
 function UEncrypt_RSA_PKCS1(
   const Data: TUInt8Array;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 begin
   Result := TURSA.Encrypt_PKCS1(@Data[0], Length(Data), Key);
 end;
@@ -4071,13 +4169,13 @@ end;
 function UEncrypt_RSA_PKCS1_Str(
   const Str: String;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 begin
   Result := UEncrypt_RSA_PKCS1(@Str[1], Length(Str), Key);
 end;
 
 function UDecrypt_RSA_PKCS1_Str(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): String;
 begin
@@ -4085,7 +4183,7 @@ begin
 end;
 
 function UDecrypt_RSA_PKCS1(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): TUInt8Array;
 begin
@@ -4096,7 +4194,7 @@ function UEncrypt_RSA_OAEP(
   const Data: Pointer;
   const DataSize: UInt32;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 begin
   Result := TURSA.Encrypt_OAEP(Data, DataSize, Key);
 end;
@@ -4104,7 +4202,7 @@ end;
 function UEncrypt_RSA_OAEP(
   const Data: TUInt8Array;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 begin
   Result := TURSA.Encrypt_OAEP(@Data[0], Length(Data), Key);
 end;
@@ -4112,13 +4210,13 @@ end;
 function UEncrypt_RSA_OAEP_Str(
   const Str: String;
   const Key: TURSA.TKey
-): TUCryptoInt;
+): TUCrInt;
 begin
   Result := TURSA.Encrypt_OAEP(@Str[1], Length(Str), Key);
 end;
 
 function UDecrypt_RSA_OAEP_Str(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): String;
 begin
@@ -4126,7 +4224,7 @@ begin
 end;
 
 function UDecrypt_RSA_OAEP(
-  const Cipher: TUCryptoInt;
+  const Cipher: TUCrInt;
   const Key: TURSA.TKey
 ): TUInt8Array;
 begin
