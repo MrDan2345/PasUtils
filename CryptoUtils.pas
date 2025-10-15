@@ -706,6 +706,14 @@ function USHA3_512(const Data: Pointer; const DataSize: UInt32): TUDigestSHA3_51
 function USHA3_512(const Data: TUInt8Array): TUDigestSHA3_512;
 function USHA3_512(const Data: String): TUDigestSHA3_512;
 
+function USHAKE_128(const Data: Pointer; const DataSize: UInt32; const OutputSize: Int32): TUInt8Array;
+function USHAKE_128(const Data: TUInt8Array; const OutputSize: Int32): TUInt8Array;
+function USHAKE_128(const Data: String; const OutputSize: Int32): TUInt8Array;
+
+function USHAKE_256(const Data: Pointer; const DataSize: UInt32; const OutputSize: Int32): TUInt8Array;
+function USHAKE_256(const Data: TUInt8Array; const OutputSize: Int32): TUInt8Array;
+function USHAKE_256(const Data: String; const OutputSize: Int32): TUInt8Array;
+
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
 function UDigestSHA1(const Data: TUInt8Array): TUInt8Array;
 function UDigestSHA2_256(const Data: TUInt8Array): TUInt8Array;
@@ -719,8 +727,8 @@ generic function UHMAC<TDigest>(
   const Key, Data: TUInt8Array
 ): TDigest;
 function UHMAC_SHA1(const Key, Data: TUInt8Array): TUDigestSHA1;
-function UHMAC_SHA256(const Key, Data: TUInt8Array): TUDigestSHA2_256;
-function UHMAC_SHA512(const Key, Data: TUInt8Array): TUDigestSHA2_512;
+function UHMAC_SHA2_256(const Key, Data: TUInt8Array): TUDigestSHA2_256;
+function UHMAC_SHA2_512(const Key, Data: TUInt8Array): TUDigestSHA2_512;
 function UHMAC_SHA3_224(const Key, Data: TUInt8Array): TUDigestSHA3_224;
 function UHMAC_SHA3_256(const Key, Data: TUInt8Array): TUDigestSHA3_256;
 function UHMAC_SHA3_384(const Key, Data: TUInt8Array): TUDigestSHA3_384;
@@ -750,12 +758,12 @@ function UPBKDF2_HMAC_SHA1(
   const KeyLength: Int32;
   const Iterations: Int32 = 600000
 ): TUInt8Array;
-function UPBKDF2_HMAC_SHA256(
+function UPBKDF2_HMAC_SHA2_256(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const Iterations: Int32 = 600000
 ): TUInt8Array;
-function UPBKDF2_HMAC_SHA512(
+function UPBKDF2_HMAC_SHA2_512(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const Iterations: Int32 = 600000
@@ -775,7 +783,7 @@ function UEvpKDF_MD5(
   const Iterations: Int32;
   out IV: TUInt8Array
 ): TUInt8Array;
-function UEvpKDF_SHA256(
+function UEvpKDF_SHA2_256(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const IVLength: Int32;
@@ -783,7 +791,7 @@ function UEvpKDF_SHA256(
   out IV: TUInt8Array
 ): TUInt8Array;
 
-function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
+function UMGF1_SHA2_256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
 
 function UMakeRSAKey(
   const BitCount: UInt32;
@@ -1761,9 +1769,9 @@ begin
   begin
     Seed[i] := UInt8(Random(256));
   end;
-  DBMask := UMGF1_SHA256(Seed, BlockSizeInBytes - HashLen - 1);
+  DBMask := UMGF1_SHA2_256(Seed, BlockSizeInBytes - HashLen - 1);
   MaskedDB := XORBytes(DB, DBMask);
-  SeedMask := UMGF1_SHA256(MaskedDB, HashLen);
+  SeedMask := UMGF1_SHA2_256(MaskedDB, HashLen);
   MaskedSeed := XORBytes(Seed, SeedMask);
   Result := TUCrInt.Zero;
   PaddedDataBE[0] := $00;
@@ -1810,9 +1818,9 @@ begin
   SetLength(MaskedDB, BlockSizeInBytes - HashLen - 1);
   Move(PaddedDataBE[1], MaskedSeed[0], HashLen);
   Move(PaddedDataBE[1 + HashLen], MaskedDB[0], BlockSizeInBytes - HashLen - 1);
-  SeedMask := UMGF1_SHA256(MaskedDB, HashLen);
+  SeedMask := UMGF1_SHA2_256(MaskedDB, HashLen);
   Seed := XORBytes(MaskedSeed, SeedMask);
-  DBMask := UMGF1_SHA256(Seed, BlockSizeInBytes - HashLen - 1);
+  DBMask := UMGF1_SHA2_256(Seed, BlockSizeInBytes - HashLen - 1);
   DB := XORBytes(MaskedDB, DBMask);
   LabelHash := USHA2_256(nil, 0);
   if Y <> $00 then Exit;
@@ -2272,7 +2280,7 @@ class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA256_AES128_CBC(
 begin
   KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
   Salt := URandomBytes(SaltSize);
-  DerivedKey := UPBKDF2_HMAC_SHA256(
+  DerivedKey := UPBKDF2_HMAC_SHA2_256(
     Password, Salt,
     SizeOf(AESKey), IterationCount
   );
@@ -2297,7 +2305,7 @@ class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA256_AES192_CBC(
 begin
   KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
   Salt := URandomBytes(SaltSize);
-  DerivedKey := UPBKDF2_HMAC_SHA256(
+  DerivedKey := UPBKDF2_HMAC_SHA2_256(
     Password, Salt,
     SizeOf(AESKey), IterationCount
   );
@@ -2322,7 +2330,7 @@ class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA256_AES256_CBC(
 begin
   KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
   Salt := URandomBytes(SaltSize);
-  DerivedKey := UPBKDF2_HMAC_SHA256(
+  DerivedKey := UPBKDF2_HMAC_SHA2_256(
     Password, Salt,
     SizeOf(AESKey), IterationCount
   );
@@ -2347,7 +2355,7 @@ class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA512_AES128_CBC(
 begin
   KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
   Salt := URandomBytes(SaltSize);
-  DerivedKey := UPBKDF2_HMAC_SHA512(
+  DerivedKey := UPBKDF2_HMAC_SHA2_512(
     Password, Salt,
     SizeOf(AESKey), IterationCount
   );
@@ -2372,7 +2380,7 @@ class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA512_AES192_CBC(
 begin
   KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
   Salt := URandomBytes(SaltSize);
-  DerivedKey := UPBKDF2_HMAC_SHA512(
+  DerivedKey := UPBKDF2_HMAC_SHA2_512(
     Password, Salt,
     SizeOf(AESKey), IterationCount
   );
@@ -2397,7 +2405,7 @@ class function TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA512_AES256_CBC(
 begin
   KeyPKCS8 := ExportKeyPrivate_PKCS8_DER(Key);
   Salt := URandomBytes(SaltSize);
-  DerivedKey := UPBKDF2_HMAC_SHA512(
+  DerivedKey := UPBKDF2_HMAC_SHA2_512(
     Password, Salt,
     SizeOf(AESKey), IterationCount
   );
@@ -2623,7 +2631,7 @@ begin
   end
   else if Alg = 'aes-128-cbc' then
   begin
-    EncKey := UEvpKDF_SHA256(
+    EncKey := UEvpKDF_SHA2_256(
       Password, Salt,
       SizeOf(TUAES.TKey128),
       SizeOf(TUAES.TInitVector),
@@ -2635,7 +2643,7 @@ begin
   end
   else if Alg = 'aes-192-cbc' then
   begin
-    EncKey := UEvpKDF_SHA256(
+    EncKey := UEvpKDF_SHA2_256(
       Password, Salt,
       SizeOf(TUAES.TKey192),
       SizeOf(TUAES.TInitVector),
@@ -2647,7 +2655,7 @@ begin
   end
   else if Alg = 'aes-256-cbc' then
   begin
-    EncKey := UEvpKDF_SHA256(
+    EncKey := UEvpKDF_SHA2_256(
       Password, Salt,
       SizeOf(TUAES.TKey256),
       SizeOf(TUAES.TInitVector),
@@ -2761,11 +2769,11 @@ begin
   if Tag <> $04 then Exit;
   if UBytesEqual(HMAC_OID, OID_HMAC_SHA256) then
   begin
-    DerivedKey := UPBKDF2_HMAC_SHA256(Password, Salt, GetKeySize(ALG_OID), IterationCount);
+    DerivedKey := UPBKDF2_HMAC_SHA2_256(Password, Salt, GetKeySize(ALG_OID), IterationCount);
   end
   else if UBytesEqual(HMAC_OID, OID_HMAC_SHA512) then
   begin
-    DerivedKey := UPBKDF2_HMAC_SHA512(Password, Salt, GetKeySize(ALG_OID), IterationCount);
+    DerivedKey := UPBKDF2_HMAC_SHA2_512(Password, Salt, GetKeySize(ALG_OID), IterationCount);
   end
   else
   begin
@@ -3622,61 +3630,62 @@ begin
   Result := USHA2_512(@Data[1], Length(Data));
 end;
 
-function SHA3(const Data: Pointer; const DataSize: UInt32; const DigestSize: UInt32): TUInt8Array;
-  type TKeccakState = array[0..4, 0..4] of UInt64;
-  procedure KeccakF1600(var State: TKeccakState);
-    function ROTL64(const x: UInt64; const n: UInt8): UInt64;
-    begin
-      Result := (x shl n) or (x shr (64 - n));
-    end;
-    const RoundConstants: array[0..23] of UInt64 = (
-      $0000000000000001, $0000000000008082, $800000000000808A, $8000000080008000,
-      $000000000000808B, $0000000080000001, $8000000080008081, $8000000000008009,
-      $000000000000008A, $0000000000000088, $0000000080008009, $000000008000000A,
-      $000000008000808B, $800000000000008B, $8000000000008089, $8000000000008003,
-      $8000000000008002, $8000000000000080, $000000000000800A, $800000008000000A,
-      $8000000080008081, $8000000000008080, $0000000080000001, $8000000080008008
-    );
-    RotationOffsets: array[0..4, 0..4] of UInt8 = (
-      (0, 36, 3, 41, 18),
-      (1, 44, 10, 45, 2),
-      (62, 6, 43, 15, 61),
-      (28, 55, 25, 21, 56),
-      (27, 20, 39, 8, 14)
-    );
-    var r: Int32;
-    var x, y: Int32;
-    var C, D: array[0..4] of UInt64;
-    var B: TKeccakState;
+type TKeccakState = array[0..4, 0..4] of UInt64;
+procedure KeccakF1600(var State: TKeccakState);
+  function ROTL64(const x: UInt64; const n: UInt8): UInt64;
   begin
-    for r := 0 to 23 do
-    begin
-      for x := 0 to 4 do
-      begin
-        C[x] := State[x, 0] xor State[x, 1] xor State[x, 2] xor State[x, 3] xor State[x, 4];
-      end;
-      for x := 0 to 4 do
-      begin
-        D[x] := C[(x + 4) mod 5] xor ROTL64(C[(x + 1) mod 5], 1);
-      end;
-      for x := 0 to 4 do
-      for y := 0 to 4 do
-      begin
-        State[x, y] := State[x, y] xor D[x];
-      end;
-      for x := 0 to 4 do
-      for y := 0 to 4 do
-      begin
-        B[y, (2 * x + 3 * y) mod 5] := ROTL64(State[x, y], RotationOffsets[x, y]);
-      end;
-      for x := 0 to 4 do
-      for y := 0 to 4 do
-      begin
-        State[x, y] := B[x, y] xor ((not B[(x + 1) mod 5, y]) and B[(x + 2) mod 5, y]);
-      end;
-      State[0, 0] := State[0, 0] xor RoundConstants[r];
-    end;
+    Result := (x shl n) or (x shr (64 - n));
   end;
+  const RoundConstants: array[0..23] of UInt64 = (
+    UInt64($0000000000000001), UInt64($0000000000008082), UInt64($800000000000808A), UInt64($8000000080008000),
+    UInt64($000000000000808B), UInt64($0000000080000001), UInt64($8000000080008081), UInt64($8000000000008009),
+    UInt64($000000000000008A), UInt64($0000000000000088), UInt64($0000000080008009), UInt64($000000008000000A),
+    UInt64($000000008000808B), UInt64($800000000000008B), UInt64($8000000000008089), UInt64($8000000000008003),
+    UInt64($8000000000008002), UInt64($8000000000000080), UInt64($000000000000800A), UInt64($800000008000000A),
+    UInt64($8000000080008081), UInt64($8000000000008080), UInt64($0000000080000001), UInt64($8000000080008008)
+  );
+  RotationOffsets: array[0..4, 0..4] of UInt8 = (
+    (0, 36, 3, 41, 18),
+    (1, 44, 10, 45, 2),
+    (62, 6, 43, 15, 61),
+    (28, 55, 25, 21, 56),
+    (27, 20, 39, 8, 14)
+  );
+  var r: Int32;
+  var x, y: Int32;
+  var C, D: array[0..4] of UInt64;
+  var B: TKeccakState;
+begin
+  for r := 0 to 23 do
+  begin
+    for x := 0 to 4 do
+    begin
+      C[x] := State[x, 0] xor State[x, 1] xor State[x, 2] xor State[x, 3] xor State[x, 4];
+    end;
+    for x := 0 to 4 do
+    begin
+      D[x] := C[(x + 4) mod 5] xor ROTL64(C[(x + 1) mod 5], 1);
+    end;
+    for x := 0 to 4 do
+    for y := 0 to 4 do
+    begin
+      State[x, y] := State[x, y] xor D[x];
+    end;
+    for x := 0 to 4 do
+    for y := 0 to 4 do
+    begin
+      B[y, (2 * x + 3 * y) mod 5] := ROTL64(State[x, y], RotationOffsets[x, y]);
+    end;
+    for x := 0 to 4 do
+    for y := 0 to 4 do
+    begin
+      State[x, y] := B[x, y] xor ((not B[(x + 1) mod 5, y]) and B[(x + 2) mod 5, y]);
+    end;
+    State[0, 0] := State[0, 0] xor RoundConstants[r];
+  end;
+end;
+
+function SHA3(const Data: Pointer; const DataSize: UInt32; const DigestSize: UInt32): TUInt8Array;
   var Rate: UInt32;
   var State: TKeccakState;
   var PaddedData: TUInt8Array;
@@ -3742,7 +3751,7 @@ function USHA3_224(const Data: Pointer; const DataSize: UInt32): TUDigestSHA3_22
   var Digest: TUInt8Array;
 begin
   Digest := SHA3(Data, DataSize, SizeOf(Result));
-  Move(Digest[0], Result, SizeOf(Result));
+  UMove(Result, Digest[0], SizeOf(Result));
 end;
 
 function USHA3_224(const Data: TUInt8Array): TUDigestSHA3_224;
@@ -3759,7 +3768,7 @@ function USHA3_256(const Data: Pointer; const DataSize: UInt32): TUDigestSHA3_25
   var Digest: TUInt8Array;
 begin
   Digest := SHA3(Data, DataSize, SizeOf(Result));
-  Move(Digest[0], Result, SizeOf(Result));
+  UMove(Result, Digest[0], SizeOf(Result));
 end;
 
 function USHA3_256(const Data: TUInt8Array): TUDigestSHA3_256;
@@ -3776,7 +3785,7 @@ function USHA3_384(const Data: Pointer; const DataSize: UInt32): TUDigestSHA3_38
   var Digest: TUInt8Array;
 begin
   Digest := SHA3(Data, DataSize, SizeOf(Result));
-  Move(Digest[0], Result, SizeOf(Result));
+  UMove(Result, Digest[0], SizeOf(Result));
 end;
 
 function USHA3_384(const Data: TUInt8Array): TUDigestSHA3_384;
@@ -3793,7 +3802,7 @@ function USHA3_512(const Data: Pointer; const DataSize: UInt32): TUDigestSHA3_51
   var Digest: TUInt8Array;
 begin
   Digest := SHA3(Data, DataSize, SizeOf(Result));
-  Move(Digest[0], Result, SizeOf(Result));
+  UMove(Result, Digest[0], SizeOf(Result));
 end;
 
 function USHA3_512(const Data: TUInt8Array): TUDigestSHA3_512;
@@ -3804,6 +3813,92 @@ end;
 function USHA3_512(const Data: String): TUDigestSHA3_512;
 begin
   Result := USHA3_512(@Data[1], Length(Data));
+end;
+
+function SHAKE(const Data: Pointer; const DataSize: UInt32; const OutputSize: Int32; const SecLevel: UInt32): TUInt8Array;
+  var Rate: UInt32;
+  var State: TKeccakState;
+  var PaddedData: TUInt8Array;
+  var i, j, BlockPos, SqueezedBytes: Int32;
+  var BlockCount, LastBlockLen, x, y: Int32;
+  var w: UInt64;
+begin
+  UClear(State, SizeOf(State));
+  Rate := 200 - (2 * SecLevel);
+  BlockCount := (DataSize * 8 + 2 + (Rate * 8 - 1)) div (Rate * 8);
+  LastBlockLen := (DataSize * 8 + 2) mod (Rate * 8);
+  if LastBlockLen = 0 then LastBlockLen := Rate * 8;
+  PaddedData := nil;
+  SetLength(PaddedData, BlockCount * Rate);
+  if DataSize > 0 then Move(Data^, PaddedData[0], DataSize);
+  PaddedData[DataSize] := $1f;
+  for i := DataSize + 1 to High(PaddedData) do PaddedData[i] := $00;
+  PaddedData[High(PaddedData)] := PaddedData[High(PaddedData)] or $80;
+  for i := 0 to (Length(PaddedData) div Rate) - 1 do
+  begin
+    BlockPos := i * Rate;
+    for y := 0 to 4 do
+    for x := 0 to 4 do
+    if (x + 5 * y) * 8 < Rate then
+    begin
+      w := 0;
+      for j := 0 to 7 do
+      begin
+        w := w or (UInt64(PaddedData[BlockPos + (x + 5 * y) * 8 + j]) shl (j * 8));
+      end;
+      State[x, y] := State[x, y] xor w;
+    end;
+    KeccakF1600(State);
+  end;
+  Result := nil;
+  SetLength(Result, OutputSize);
+  SqueezedBytes := 0;
+  while SqueezedBytes < OutputSize do
+  begin
+    BlockPos := 0;
+    for y := 0 to 4 do
+    for x := 0 to 4 do
+    begin
+      if (x + 5 * y) * 8 < Rate then
+      for j := 0 to 7 do
+      begin
+        Result[SqueezedBytes] := UInt8((State[x, y] shr (j * 8)) and $ff);
+        Inc(SqueezedBytes);
+        if SqueezedBytes >= OutputSize then Exit;
+      end;
+    end;
+    KeccakF1600(State);
+  end;
+end;
+
+function USHAKE_128(const Data: Pointer; const DataSize: UInt32; const OutputSize: Int32): TUInt8Array;
+begin
+  Result := SHAKE(Data, DataSize, OutputSize, 16);
+end;
+
+function USHAKE_128(const Data: TUInt8Array; const OutputSize: Int32): TUInt8Array;
+begin
+  Result := SHAKE(@Data[0], Length(Data), OutputSize, 16);
+end;
+
+function USHAKE_128(const Data: String; const OutputSize: Int32): TUInt8Array;
+begin
+  Result := SHAKE(@Data[1], Length(Data), OutputSize, 16);
+end;
+
+function USHAKE_256(const Data: Pointer; const DataSize: UInt32; const OutputSize: Int32): TUInt8Array;
+begin
+  Result := SHAKE(Data, DataSize, OutputSize, 32);
+end;
+
+function USHAKE_256(const Data: TUInt8Array; const OutputSize: Int32): TUInt8Array;
+begin
+  Result := SHAKE(@Data[0], Length(Data), OutputSize, 32);
+end;
+
+function USHAKE_256(const Data: String; const OutputSize: Int32): TUInt8Array;
+begin
+  Result := SHAKE(@Data[1], Length(Data), OutputSize, 32);
 end;
 
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
@@ -3880,12 +3975,12 @@ begin
   Result := specialize UHMAC<TUDigestSHA1>(Key, Data);
 end;
 
-function UHMAC_SHA256(const Key, Data: TUInt8Array): TUDigestSHA2_256;
+function UHMAC_SHA2_256(const Key, Data: TUInt8Array): TUDigestSHA2_256;
 begin
   Result := specialize UHMAC<TUDigestSHA2_256>(Key, Data);
 end;
 
-function UHMAC_SHA512(const Key, Data: TUInt8Array): TUDigestSHA2_512;
+function UHMAC_SHA2_512(const Key, Data: TUInt8Array): TUDigestSHA2_512;
 begin
   Result := specialize UHMAC<TUDigestSHA2_512>(Key, Data);
 end;
@@ -3917,12 +4012,12 @@ end;
 
 function UAuthHMAC_SHA2_256(const Key, Data: TUInt8Array): TUInt8Array;
 begin
-  Result := UHMAC_SHA256(Key, Data);
+  Result := UHMAC_SHA2_256(Key, Data);
 end;
 
 function UAuthHMAC_SHA2_512(const Key, Data: TUInt8Array): TUInt8Array;
 begin
-  Result := UHMAC_SHA512(Key, Data);
+  Result := UHMAC_SHA2_512(Key, Data);
 end;
 
 function UAuthHMAC_SHA3_224(const Key, Data: TUInt8Array): TUInt8Array;
@@ -4007,7 +4102,7 @@ begin
   );
 end;
 
-function UPBKDF2_HMAC_SHA256(
+function UPBKDF2_HMAC_SHA2_256(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const Iterations: Int32 = 600000
@@ -4019,7 +4114,7 @@ begin
   );
 end;
 
-function UPBKDF2_HMAC_SHA512(
+function UPBKDF2_HMAC_SHA2_512(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const Iterations: Int32
@@ -4077,7 +4172,7 @@ begin
   );
 end;
 
-function UEvpKDF_SHA256(
+function UEvpKDF_SHA2_256(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const IVLength: Int32;
@@ -4090,7 +4185,7 @@ begin
   );
 end;
 
-function UMGF1_SHA256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
+function UMGF1_SHA2_256(const Seed: TUInt8Array; const MaskLen: Int32): TUInt8Array;
   const HashLen = SizeOf(TUDigestSHA2_256);
   var Counter, i: UInt32;
   var C, T: TUInt8Array;
