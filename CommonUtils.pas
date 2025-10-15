@@ -1161,6 +1161,7 @@ public
   function TimeRunning: QWord;
   function IsComplete: Boolean;
   function IsStarted: Boolean;
+  function IsRunning: Boolean;
   function TaskResult: TRes;
   procedure Reset;
   procedure WaitFor;
@@ -6765,6 +6766,11 @@ end;
 function TUTask.IsStarted: Boolean;
 begin
   Result := Assigned(_Thread);
+end;
+
+function TUTask.IsRunning: Boolean;
+begin
+  Result := IsStarted and not IsComplete;
 end;
 
 function TUTask.TaskResult: TRes;
@@ -13304,6 +13310,7 @@ begin
       Exec.Parameters.Add(s);
     end;
     Exec.Options := Exec.Options + [poUsePipes, poStderrToOutPut];
+    if not WriteConsole then Exec.Options := Exec.Options + [poNoConsole];
     Exec.Execute;
     repeat
       if Exec.Output.NumBytesAvailable = 0 then
