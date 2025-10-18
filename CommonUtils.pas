@@ -1798,6 +1798,7 @@ function UBytesToBase64(const Bytes: TUInt8Array): String;
 function UBase64ToBytes(const Base64: String): TUInt8Array;
 function UStrToBytes(const Str: String): TUInt8Array;
 function UBytesToString(const Bytes: TUInt8Array): String;
+function UBytesMake(const Data: Pointer; const DataSize: UInt32): TUInt8Array;
 function UBytesJoin(const a, b: array of UInt8): TUInt8Array; inline;
 function UBytesConcat(const Bytes: array of TUInt8Array): TUInt8Array; inline;
 function UBytesCompare(const a, b: array of UInt8): Int8; inline;
@@ -10622,6 +10623,13 @@ begin
   Result := '';
   SetLength(Result, Length(Bytes));
   Move(Bytes[0], Result[1], Length(Bytes));
+end;
+
+function UBytesMake(const Data: Pointer; const DataSize: UInt32): TUInt8Array;
+begin
+  Result := nil;
+  SetLength(Result, DataSize);
+  Move(Data^, Result[0], DataSize);
 end;
 
 function UBytesJoin(const a, b: array of UInt8): TUInt8Array;

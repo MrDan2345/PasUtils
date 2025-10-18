@@ -714,6 +714,14 @@ function USHAKE_256(const Data: Pointer; const DataSize: UInt32; const OutputSiz
 function USHAKE_256(const Data: TUInt8Array; const OutputSize: Int32): TUInt8Array;
 function USHAKE_256(const Data: String; const OutputSize: Int32): TUInt8Array;
 
+function UcSHAKE_128(const Data: Pointer; const DataSize, OutputSize: UInt32; const FunctionName, Customization: TUInt8Array): TUInt8Array;
+function UcSHAKE_128(const Data: TUInt8Array; const OutputSize: UInt32; const FunctionName, Customization: TUInt8Array): TUInt8Array;
+function UcSHAKE_128(const Data: String; const OutputSize: UInt32; const FunctionName, Customization: String): TUInt8Array;
+
+function UcSHAKE_256(const Data: Pointer; const DataSize, OutputSize: UInt32; const FunctionName, Customization: TUInt8Array): TUInt8Array;
+function UcSHAKE_256(const Data: TUInt8Array; const OutputSize: UInt32; const FunctionName, Customization: TUInt8Array): TUInt8Array;
+function UcSHAKE_256(const Data: String; const OutputSize: UInt32; const FunctionName, Customization: String): TUInt8Array;
+
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
 function UDigestSHA1(const Data: TUInt8Array): TUInt8Array;
 function UDigestSHA2_256(const Data: TUInt8Array): TUInt8Array;
@@ -723,9 +731,7 @@ function UDigestSHA3_256(const Data: TUInt8Array): TUInt8Array;
 function UDigestSHA3_384(const Data: TUInt8Array): TUInt8Array;
 function UDigestSHA3_512(const Data: TUInt8Array): TUInt8Array;
 
-generic function UHMAC<TDigest>(
-  const Key, Data: TUInt8Array
-): TDigest;
+generic function UHMAC<TDigest>(const Key, Data: TUInt8Array): TDigest;
 function UHMAC_SHA1(const Key, Data: TUInt8Array): TUDigestSHA1;
 function UHMAC_SHA2_256(const Key, Data: TUInt8Array): TUDigestSHA2_256;
 function UHMAC_SHA2_512(const Key, Data: TUInt8Array): TUDigestSHA2_512;
@@ -741,6 +747,47 @@ function UAuthHMAC_SHA3_224(const Key, Data: TUInt8Array): TUInt8Array;
 function UAuthHMAC_SHA3_256(const Key, Data: TUInt8Array): TUInt8Array;
 function UAuthHMAC_SHA3_384(const Key, Data: TUInt8Array): TUInt8Array;
 function UAuthHMAC_SHA3_512(const Key, Data: TUInt8Array): TUInt8Array;
+
+function UKMAC_128(
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+function UKMAC_128(
+  const Data: TUInt8Array;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+function UKMAC_128(
+  const Data: String;
+  const DataSize: UInt32;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+function UKMAC_256(
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+function UKMAC_256(
+  const Data: TUInt8Array;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+function UKMAC_256(
+  const Data: String;
+  const DataSize: UInt32;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
 
 function USign_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
 function USign_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
@@ -1461,6 +1508,7 @@ class function TURSA.EncodeTLV(
   var LenBytes: TUInt8Array;
 begin
   Len := Length(Value);
+  LenBytes := nil;
   if Len < 128 then
   begin
     SetLength(LenBytes, 1);
@@ -3157,10 +3205,10 @@ begin
     h3 := h3 + d;
     Inc(i, 64);
   end;
-  Move(h0, Result[0], 4);
-  Move(h1, Result[4], 4);
-  Move(h2, Result[8], 4);
-  Move(h3, Result[12], 4);
+  UMove(Result[0], h0, 4);
+  UMove(Result[4], h1, 4);
+  UMove(Result[8], h2, 4);
+  UMove(Result[12], h3, 4);
 end;
 
 function UMD5(const Data: TUInt8Array): TUDigestMD5;
@@ -3815,7 +3863,13 @@ begin
   Result := USHA3_512(@Data[1], Length(Data));
 end;
 
-function SHAKE(const Data: Pointer; const DataSize: UInt32; const OutputSize: Int32; const SecLevel: UInt32): TUInt8Array;
+function KeccakSponge(
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutputSize: Int32;
+  const SecLevel: UInt32;
+  const PaddingByte: UInt8 = $1f
+): TUInt8Array;
   var Rate: UInt32;
   var State: TKeccakState;
   var PaddedData: TUInt8Array;
@@ -3831,7 +3885,7 @@ begin
   PaddedData := nil;
   SetLength(PaddedData, BlockCount * Rate);
   if DataSize > 0 then Move(Data^, PaddedData[0], DataSize);
-  PaddedData[DataSize] := $1f;
+  PaddedData[DataSize] := PaddingByte;
   for i := DataSize + 1 to High(PaddedData) do PaddedData[i] := $00;
   PaddedData[High(PaddedData)] := PaddedData[High(PaddedData)] or $80;
   for i := 0 to (Length(PaddedData) div Rate) - 1 do
@@ -3855,7 +3909,6 @@ begin
   SqueezedBytes := 0;
   while SqueezedBytes < OutputSize do
   begin
-    BlockPos := 0;
     for y := 0 to 4 do
     for x := 0 to 4 do
     begin
@@ -3869,6 +3922,16 @@ begin
     end;
     KeccakF1600(State);
   end;
+end;
+
+function SHAKE(
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutputSize: Int32;
+  const SecLevel: UInt32
+): TUInt8Array;
+begin
+  Result := KeccakSponge(Data, DataSize, OutputSize, SecLevel, $1f);
 end;
 
 function USHAKE_128(const Data: Pointer; const DataSize: UInt32; const OutputSize: Int32): TUInt8Array;
@@ -3899,6 +3962,171 @@ end;
 function USHAKE_256(const Data: String; const OutputSize: Int32): TUInt8Array;
 begin
   Result := SHAKE(@Data[1], Length(Data), OutputSize, 32);
+end;
+
+function RightEncode(const x: UInt64): TUInt8Array;
+  var i, n: Int32;
+  var temp: UInt64;
+begin
+  if x = 0 then
+  begin
+    n := 1;
+  end
+  else
+  begin
+    n := 0;
+    temp := x;
+    while temp > 0 do
+    begin
+      temp := temp shr 8;
+      Inc(n);
+    end;
+  end;
+  Result := nil;
+  SetLength(Result, n + 1);
+  temp := x;
+  for i := n - 1 downto 0 do
+  begin
+    Result[i] := UInt8(temp and $ff);
+    temp := temp shr 8;
+  end;
+  Result[n] := UInt8(n);
+end;
+
+function LeftEncode(const x: UInt64): TUInt8Array;
+  var i, n: Int32;
+  var temp: UInt64;
+begin
+  if x = 0 then
+  begin
+    n := 1;
+  end
+  else
+  begin
+    n := 0;
+    temp := x;
+    while temp > 0 do
+    begin
+      temp := temp shr 8;
+      Inc(n);
+    end;
+  end;
+  Result := nil;
+  SetLength(Result, n + 1);
+  Result[0] := UInt8(n);
+  temp := x;
+  for i := n downto 1 do
+  begin
+    Result[i] := UInt8(temp and $ff);
+    temp := temp shr 8;
+  end;
+end;
+
+function EncodeString(const Str: TUInt8Array): TUInt8Array;
+begin
+  Result := UBytesJoin(LeftEncode(UInt64(Length(Str)) * 8), Str);
+end;
+
+function BytePad(const X: TUInt8Array; const W: UInt32): TUInt8Array;
+  var LeftEnc: TUInt8Array;
+  var Pad: UInt32;
+  var i: Int32;
+begin
+  LeftEnc := LeftEncode(W);
+  Result := UBytesJoin(LeftEnc, X);
+  Pad := W - (UInt32(Length(Result)) mod W);
+  if Pad = W then Pad := 0;
+  if Pad = 0 then Exit;
+  SetLength(Result, Length(Result) + Pad);
+  for i := Length(Result) - Pad to High(Result) do
+  begin
+    Result[i] := 0;
+  end;
+end;
+
+function cSHAKE(
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutputSize: UInt32;
+  const SecLevel: UInt32;
+  const FunctionName: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+  var Rate: UInt32;
+  var EncName, EncCustom, Prefix, Input: TUInt8Array;
+begin
+  if (Length(FunctionName) = 0)
+  and (Length(Customization) = 0) then
+  begin
+    Exit(SHAKE(Data, DataSize, OutputSize, SecLevel));
+  end;
+  Rate := 200 - (2 * SecLevel);
+  EncName := EncodeString(FunctionName);
+  EncCustom := EncodeString(Customization);
+  Prefix := UBytesJoin(EncName, EncCustom);
+  Prefix := BytePad(Prefix, Rate);
+  Input := nil;
+  SetLength(Input, Length(Prefix) + DataSize);
+  Move(Prefix[0], Input[0], Length(Prefix));
+  if DataSize > 0 then
+  begin
+    Move(Data^, Input[Length(Prefix)], DataSize);
+  end;
+  Result := KeccakSponge(@Input[0], Length(Input), OutputSize, SecLevel, $04);
+end;
+
+function UcSHAKE_128(
+  const Data: Pointer;
+  const DataSize, OutputSize: UInt32;
+  const FunctionName, Customization: TUInt8Array
+): TUInt8Array;
+begin
+  Result := cSHAKE(Data, DataSize, OutputSize, 16, FunctionName, Customization);
+end;
+
+function UcSHAKE_128(
+  const Data: TUInt8Array;
+  const OutputSize: UInt32;
+  const FunctionName, Customization: TUInt8Array
+): TUInt8Array;
+begin
+  Result := cSHAKE(@Data[0], Length(Data), OutputSize, 16, FunctionName, Customization);
+end;
+
+function UcSHAKE_128(
+  const Data: String;
+  const OutputSize: UInt32;
+  const FunctionName, Customization: String
+): TUInt8Array;
+begin
+  Result := cSHAKE(@Data[1], Length(Data), OutputSize, 16, UStrToBytes(FunctionName), UStrToBytes(Customization));
+end;
+
+function UcSHAKE_256(
+  const Data: Pointer;
+  const DataSize, OutputSize: UInt32;
+  const FunctionName, Customization: TUInt8Array
+): TUInt8Array;
+begin
+  Result := cSHAKE(Data, DataSize, OutputSize, 32, FunctionName, Customization);
+end;
+
+function UcSHAKE_256(
+  const Data: TUInt8Array;
+  const OutputSize: UInt32;
+  const FunctionName, Customization: TUInt8Array
+): TUInt8Array;
+begin
+  Result := cSHAKE(@Data[0], Length(Data), OutputSize, 32, FunctionName, Customization);
+end;
+
+function UcSHAKE_256(
+  const Data: String;
+  const OutputSize: UInt32;
+  const FunctionName, Customization: String
+): TUInt8Array;
+begin
+  Result := cSHAKE(@Data[1], Length(Data), OutputSize, 32, UStrToBytes(FunctionName), UStrToBytes(Customization));
 end;
 
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
@@ -3967,7 +4195,7 @@ begin
   end;
   InnerHashDigest := TDigest.Func(UBytesJoin(i_key_pad, Data));
   Digest := TDigest.Func(UBytesJoin(o_key_pad, InnerHashDigest));
-  Move(Digest[0], Result, DigestSize);
+  UMove(Result, Digest[0], DigestSize);
 end;
 
 function UHMAC_SHA1(const Key, Data: TUInt8Array): TUDigestSHA1;
@@ -4038,6 +4266,96 @@ end;
 function UAuthHMAC_SHA3_512(const Key, Data: TUInt8Array): TUInt8Array;
 begin
   Result := UHMAC_SHA3_512(Key, Data);
+end;
+
+function KMAC(
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array;
+  const SecLevel: UInt32
+): TUInt8Array;
+  var Rate: UInt32;
+  var Input, PaddedKey, EncOutputSize: TUInt8Array;
+begin
+  Rate := 200 - (2 * SecLevel);
+  PaddedKey := BytePad(EncodeString(Key), Rate);
+  EncOutputSize := RightEncode(UInt64(OutputSize) * 8);
+  Input := UBytesConcat([
+    PaddedKey,
+    UBytesMake(Data, DataSize),
+    EncOutputSize
+  ]);
+  Result := cSHAKE(
+    @Input[0], Length(Input),
+    OutputSize, SecLevel,
+    UStrToBytes('KMAC'), Customization
+  );
+end;
+
+function UKMAC_128(
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+begin
+  Result := KMAC(Data, DataSize, OutputSize, Key, Customization, 16);
+end;
+
+function UKMAC_128(
+  const Data: TUInt8Array;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+begin
+  Result := KMAC(@Data[0], Length(Data), OutputSize, Key, Customization, 16);
+end;
+
+function UKMAC_128(
+  const Data: String;
+  const DataSize: UInt32;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+begin
+  Result := KMAC(@Data[1], Length(Data), OutputSize, Key, Customization, 16);
+end;
+
+function UKMAC_256(
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+begin
+  Result := KMAC(Data, DataSize, OutputSize, Key, Customization, 32);
+end;
+
+function UKMAC_256(
+  const Data: TUInt8Array;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+begin
+  Result := KMAC(@Data[0], Length(Data), OutputSize, Key, Customization, 32);
+end;
+
+function UKMAC_256(
+  const Data: String;
+  const DataSize: UInt32;
+  const OutputSize: UInt32;
+  const Key: TUInt8Array;
+  const Customization: TUInt8Array
+): TUInt8Array;
+begin
+  Result := KMAC(@Data[1], Length(Data), OutputSize, Key, Customization, 32);
 end;
 
 function USign_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
@@ -5623,7 +5941,7 @@ class function TUDES.Process_Triple_CTR(
   var Key2: TKey absolute Key[8];
   var Key3: TKey absolute Key[16];
   var CounterBlock, KeystreamBlock: T64BitBlock;
-  var i, j: Int32;
+  var i: Int32;
 begin
   SubKeys1 := GenerateSubKeys(Key1);
   SubKeys2 := GenerateSubKeys(Key2);
