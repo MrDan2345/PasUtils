@@ -675,6 +675,9 @@ private
 end;
 
 type TUBLAKE3 = record
+public
+  type TKey = array[0..31] of UInt8;
+  class function KeyFromHex(const Hex: String): TKey; static;
 private
   const OUT_LEN = 32;
   const KEY_LEN = 32;
@@ -734,7 +737,8 @@ private
     var CVStack: array of TUInt32Arr8;
     var CVStackLen: Int32;
     var Flags: UInt32;
-    procedure Init;
+    procedure Init(const AFlags: UInt32 = 0);
+    procedure Init(const AKey: TUBLAKE3.TKey; const AFlags: UInt32 = KEYED_HASH);
     procedure Update(const Input: TUInt8Array);
     function Finalize(const OutLen: UInt32): TUInt8Array;
     procedure PushStack(const CV: TUInt32Arr8);
@@ -762,7 +766,19 @@ private
     const Flags: UInt32
   ): TOutput; static;
 public
-  class function Hash(const Data: TUInt8Array; const OutputLengthInBytes: UInt32): TUInt8Array; static;
+  class function Hash(
+    const Data: TUInt8Array;
+    const OutputSize: UInt32
+  ): TUInt8Array; static;
+  class function Hash(
+    const Data: TUInt8Array;
+    const Key: TKey;
+    const OutputSize: UInt32
+  ): TUInt8Array; static;
+  class function KDF(
+    const Context, Password: TUInt8Array;
+    const OutputSize: Uint32
+  ): TUInt8Array; static;
 end;
 
 function UMD5(const Data: Pointer; const DataSize: UInt32): TUDigestMD5;
@@ -814,6 +830,8 @@ function UcSHAKE_256(const Data: TUInt8Array; const OutputSize: UInt32; const Fu
 function UcSHAKE_256(const Data: String; const OutputSize: UInt32; const FunctionName, Customization: String): TUInt8Array;
 
 function UBLAKE3_Hash(const Data: TUInt8Array; const OutputSize: UInt32): TUInt8Array;
+function UBLAKE3_Hash(const Data: TUInt8Array; const Key: TUBLAKE3.TKey; const OutputSize: UInt32): TUInt8Array;
+function UBLAKE3_KDF(const Context, Password: TUInt8Array; const OutputSize: UInt32): TUInt8Array;
 
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
 function UDigestSHA1(const Data: TUInt8Array): TUInt8Array;
@@ -4227,6 +4245,19 @@ begin
   Result := TUBLAKE3.Hash(Data, OutputSize);
 end;
 
+function UBLAKE3_Hash(const Data: TUInt8Array; const Key: TUBLAKE3.TKey; const OutputSize: UInt32): TUInt8Array;
+begin
+  Result := TUBLAKE3.Hash(Data, Key, OutputSize);
+end;
+
+function UBLAKE3_KDF(
+  const Context, Password: TUInt8Array;
+  const OutputSize: UInt32
+): TUInt8Array;
+begin
+  Result := TUBLAKE3.KDF(Context, Password, OutputSize);
+end;
+
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
 begin
   Result := UMD5(Data);
@@ -6062,6 +6093,25 @@ begin
   end;
 end;
 
+class function TUBLAKE3.KeyFromHex(const Hex: String): TKey;
+  var ByteCount: Int32;
+  var i, j: Int32;
+begin
+  UClear(Result, SizeOf(Result));
+  for i := 1 to Length(Hex) do
+  if not (Hex[i] in ['0'..'9', 'A'..'Z', 'a'..'z']) then
+  begin
+    Exit;
+  end;
+  if Length(Hex) mod 2 <> 0 then Exit;
+  ByteCount := UMin(Length(Hex) div 2, Length(TKey));
+  for i := 0 to ByteCount - 1 do
+  begin
+    j := i * 2 + 1;
+    Result[i] := UInt8(StrToInt('$' + Hex[j] + Hex[j + 1]));
+  end;
+end;
+
 class function TUBLAKE3.ROTR32(const x: UInt32; const n: UInt8): UInt32;
 begin
   Result := (x shr n) or (x shl (32 - n));
@@ -6168,12 +6218,45 @@ begin
   Result.Flags := PARENT or Flags;
 end;
 
-class function TUBLAKE3.Hash(const Data: TUInt8Array; const OutputLengthInBytes: UInt32): TUInt8Array;
+class function TUBLAKE3.Hash(
+  const Data: TUInt8Array;
+  const OutputSize: UInt32
+): TUInt8Array;
   var Hasher: THasher;
 begin
   Hasher.Init;
   Hasher.Update(Data);
-  Result := Hasher.Finalize(OutputLengthInBytes);
+  Result := Hasher.Finalize(OutputSize);
+end;
+
+class function TUBLAKE3.Hash(
+  const Data: TUInt8Array;
+  const Key: TKey;
+  const OutputSize: UInt32
+): TUInt8Array;
+  var Hasher: THasher;
+begin
+  Hasher.Init(Key);
+  Hasher.Update(Data);
+  Result := Hasher.Finalize(OutputSize);
+end;
+
+class function TUBLAKE3.KDF(
+  const Context: TUInt8Array;
+  const Password: TUInt8Array;
+  const OutputSize: Uint32
+): TUInt8Array;
+  var Hasher: THasher;
+  var ContextKey: TUInt8Array;
+  var Key: TKey;
+begin
+  Hasher.Init(DERIVE_KEY_CONTEXT);
+  Hasher.Update(Context);
+  ContextKey := Hasher.Finalize(32);
+  Move(ContextKey[0], Key, SizeOf(Key));
+  Hasher.Init(Key, DERIVE_KEY_MATERIAL);
+  Hasher.Update(Password);
+  Result := Hasher.Finalize(OutputSize);
 end;
 
 function TUBLAKE3.TOutput.ChainingValue: TUInt32Arr8;
@@ -6288,17 +6371,22 @@ begin
   end;
 end;
 
-procedure TUBLAKE3.THasher.Init;
-  var i: Int32;
+procedure TUBLAKE3.THasher.Init(const AFlags: UInt32);
 begin
-  for i := 0 to High(Key) do
-  begin
-    Key[i] := IV[i];
-  end;
-  ChunkState.Init(Key, 0, 0);
+  Move(IV, Key, SizeOf(Key));
+  ChunkState.Init(Key, 0, AFlags);
   SetLength(CVStack, 54);
   CVStackLen := 0;
-  Flags := 0;
+  Flags := AFlags;
+end;
+
+procedure TUBLAKE3.THasher.Init(const AKey: TUBLAKE3.TKey; const AFlags: UInt32);
+begin
+  Move(AKey, Key, SizeOf(Key));
+  ChunkState.Init(Key, 0, AFlags);
+  SetLength(CVStack, 54);
+  CVStackLen := 0;
+  Flags := AFlags;
 end;
 
 procedure TUBLAKE3.THasher.Update(const Input: TUInt8Array);
