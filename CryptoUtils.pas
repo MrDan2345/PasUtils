@@ -674,6 +674,97 @@ private
   class function Process_Triple_CTR(const Input: TUInt8Array; const Key: TKey3; const Nonce: TInitVector): TUInt8Array; static;
 end;
 
+type TUBLAKE3 = record
+private
+  const OUT_LEN = 32;
+  const KEY_LEN = 32;
+  const BLOCK_LEN = 64;
+  const CHUNK_LEN = 1024;
+  const CHUNK_START = 1 shl 0;
+  const CHUNK_END = 1 shl 1;
+  const PARENT = 1 shl 2;
+  const ROOT = 1 shl 3;
+  const KEYED_HASH = 1 shl 4;
+  const DERIVE_KEY_CONTEXT = 1 shl 5;
+  const DERIVE_KEY_MATERIAL = 1 shl 6;
+  const IV: array[0..7] of UInt32 = (
+    $6a09e667, $bb67ae85, $3c6ef372, $a54ff53a,
+    $510e527f, $9b05688c, $1f83d9ab, $5be0cd19
+  );
+  const MSG_PERMUTATION: array[0..15] of UInt8 = (
+    2, 6, 3, 10, 7, 0, 4, 13, 1, 11, 12, 5, 9, 14, 15, 8
+  );
+  type TUInt32Arr8 = array[0..7] of UInt32;
+  type TUInt32Arr16 = array[0..15] of UInt32;
+  type TState = TUInt32Arr16;
+  type TBlock = TUInt32Arr16;
+  type TOutput = record
+    var InputChainingValue: TUInt32Arr8;
+    var BlockWords: TBlock;
+    var Counter: UInt64;
+    var BlockLen: UInt32;
+    var Flags: UInt32;
+    function ChainingValue: TUInt32Arr8;
+    function RootBytes(const OutLen: UInt32): TUInt8Array;
+  end;
+  type TChunkState = record
+    var ChainingValue: TUInt32Arr8;
+    var ChunkCounter: UInt64;
+    var Block: array[0..BLOCK_LEN - 1] of UInt8;
+    var BlockLen: UInt8;
+    var BlocksCompressed: UInt8;
+    var Flags: UInt32;
+    function Len: UInt32;
+    function StartFlag: UInt32;
+    function Output: TOutput;
+    procedure Init(
+      const AKey: TUInt32Arr8;
+      const AChunkCounter: UInt64;
+      const AFlags: UInt32
+    );
+    procedure Update(
+      const Input: TUInt8Array;
+      var InputOffset: Int32;
+      const InputLen: Int32
+    );
+  end;
+  type THasher = record
+    var ChunkState: TChunkState;
+    var Key: TUInt32Arr8;
+    var CVStack: array of TUInt32Arr8;
+    var CVStackLen: Int32;
+    var Flags: UInt32;
+    procedure Init;
+    procedure Update(const Input: TUInt8Array);
+    function Finalize(const OutLen: UInt32): TUInt8Array;
+    procedure PushStack(const CV: TUInt32Arr8);
+    function PopStack: TUInt32Arr8;
+    procedure AddChunkChainingValue(
+      var NewCV: TUInt32Arr8;
+      const TotalChunks: UInt64
+    );
+  end;
+  class function ROTR32(const x: UInt32; const n: UInt8): UInt32; static;
+  class procedure G(var State: TState; const a, b, c, d, mx, my: UInt32); static;
+  class function BytesToWords(const BlockBytes: TUInt8Array): TUInt32Arr16; static;
+  class procedure Round(var State: TState; const Msg: TBlock); static;
+  class procedure Permute(var Msg: TBlock); static;
+  class function Compress(
+    const ChainingValue: TUInt32Arr8;
+    const BlockWords: TBlock;
+    const Counter: UInt64;
+    const BlockLen: UInt32;
+    const Flags: UInt32
+  ): TBlock; static;
+  class function ParentOutput(
+    const LeftChildCV, RightChildCV: TUInt32Arr8;
+    const Key: TUInt32Arr8;
+    const Flags: UInt32
+  ): TOutput; static;
+public
+  class function Hash(const Data: TUInt8Array; const OutputLengthInBytes: UInt32): TUInt8Array; static;
+end;
+
 function UMD5(const Data: Pointer; const DataSize: UInt32): TUDigestMD5;
 function UMD5(const Data: TUInt8Array): TUDigestMD5;
 function UMD5(const Data: String): TUDigestMD5;
@@ -721,6 +812,8 @@ function UcSHAKE_128(const Data: String; const OutputSize: UInt32; const Functio
 function UcSHAKE_256(const Data: Pointer; const DataSize, OutputSize: UInt32; const FunctionName, Customization: TUInt8Array): TUInt8Array;
 function UcSHAKE_256(const Data: TUInt8Array; const OutputSize: UInt32; const FunctionName, Customization: TUInt8Array): TUInt8Array;
 function UcSHAKE_256(const Data: String; const OutputSize: UInt32; const FunctionName, Customization: String): TUInt8Array;
+
+function UBLAKE3_Hash(const Data: TUInt8Array; const OutputSize: UInt32): TUInt8Array;
 
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
 function UDigestSHA1(const Data: TUInt8Array): TUInt8Array;
@@ -4129,6 +4222,11 @@ begin
   Result := cSHAKE(@Data[1], Length(Data), OutputSize, 32, UStrToBytes(FunctionName), UStrToBytes(Customization));
 end;
 
+function UBLAKE3_Hash(const Data: TUInt8Array; const OutputSize: UInt32): TUInt8Array;
+begin
+  Result := TUBLAKE3.Hash(Data, OutputSize);
+end;
+
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
 begin
   Result := UMD5(Data);
@@ -5962,6 +6060,313 @@ begin
     end;
     Result[i] := Input[i] xor Byte((KeystreamBlock shr (56 - (i mod 8) * 8)) and $ff);
   end;
+end;
+
+class function TUBLAKE3.ROTR32(const x: UInt32; const n: UInt8): UInt32;
+begin
+  Result := (x shr n) or (x shl (32 - n));
+end;
+
+class procedure TUBLAKE3.G(var State: TState; const a, b, c, d, mx, my: UInt32);
+begin
+  State[a] := State[a] + State[b] + mx;
+  State[d] := ROTR32(State[d] xor State[a], 16);
+  State[c] := State[c] + State[d];
+  State[b] := ROTR32(State[b] xor State[c], 12);
+  State[a] := State[a] + State[b] + my;
+  State[d] := ROTR32(State[d] xor State[a], 8);
+  State[c] := State[c] + State[d];
+  State[b] := ROTR32(State[b] xor State[c], 7);
+end;
+
+class function TUBLAKE3.BytesToWords(const BlockBytes: TUInt8Array): TUInt32Arr16;
+  var i: Int32;
+begin
+  for i := 0 to 15 do
+  begin
+    Result[i] := PUInt32(@BlockBytes[i * 4])^;
+  end;
+end;
+
+class procedure TUBLAKE3.Round(
+  var State: TState;
+  const Msg: TBlock
+);
+begin
+  G(State, 0, 4, 8, 12, Msg[0], Msg[1]);
+  G(State, 1, 5, 9, 13, Msg[2], Msg[3]);
+  G(State, 2, 6, 10, 14, Msg[4], Msg[5]);
+  G(State, 3, 7, 11, 15, Msg[6], Msg[7]);
+  G(State, 0, 5, 10, 15, Msg[8], Msg[9]);
+  G(State, 1, 6, 11, 12, Msg[10], Msg[11]);
+  G(State, 2, 7, 8, 13, Msg[12], Msg[13]);
+  G(State, 3, 4, 9, 14, Msg[14], Msg[15]);
+end;
+
+class procedure TUBLAKE3.Permute(var Msg: TBlock);
+  var Permuted: TBlock;
+  var i: Int32;
+begin
+  for i := 0 to 15 do
+  begin
+    Permuted[i] := Msg[MSG_PERMUTATION[i]];
+  end;
+  Msg := Permuted;
+end;
+
+class function TUBLAKE3.Compress(
+  const ChainingValue: TUInt32Arr8;
+  const BlockWords: TBlock;
+  const Counter: UInt64;
+  const BlockLen: UInt32;
+  const Flags: UInt32
+): TBlock;
+  var State: TState;
+  var i: Int32;
+  var Block: TBlock;
+begin
+  Block := BlockWords;
+  Move(ChainingValue, State, SizeOf(ChainingValue));
+  State[8] := IV[0];
+  State[9] := IV[1];
+  State[10] := IV[2];
+  State[11] := IV[3];
+  State[12] := UInt32(Counter and $ffffffff);
+  State[13] := UInt32(Counter shr 32);
+  State[14] := BlockLen;
+  State[15] := Flags;
+  for i := 0 to 5 do
+  begin
+    Round(State, Block);
+    Permute(Block);
+  end;
+  Round(State, Block);
+  for i := 0 to 7 do
+  begin
+    Result[i] := State[i] xor State[i + 8];
+    Result[i + 8] := State[i + 8] xor ChainingValue[i];
+  end;
+end;
+
+class function TUBLAKE3.ParentOutput(
+  const LeftChildCV, RightChildCV: TUInt32Arr8;
+  const Key: TUInt32Arr8;
+  const Flags: UInt32
+): TOutput;
+  var BlockWords: TBlock;
+  var i: Integer;
+begin
+  for i := 0 to 7 do
+  begin
+    BlockWords[i] := LeftChildCV[i];
+    BlockWords[i + 8] := RightChildCV[i];
+  end;
+  Result.InputChainingValue := Key;
+  Result.BlockWords := BlockWords;
+  Result.Counter := 0;
+  Result.BlockLen := BLOCK_LEN;
+  Result.Flags := PARENT or Flags;
+end;
+
+class function TUBLAKE3.Hash(const Data: TUInt8Array; const OutputLengthInBytes: UInt32): TUInt8Array;
+  var Hasher: THasher;
+begin
+  Hasher.Init;
+  Hasher.Update(Data);
+  Result := Hasher.Finalize(OutputLengthInBytes);
+end;
+
+function TUBLAKE3.TOutput.ChainingValue: TUInt32Arr8;
+  var Out16: TUInt32Arr16;
+  var i: Int32;
+begin
+  Out16 := TUBLAKE3.Compress(InputChainingValue, BlockWords, Counter, BlockLen, Flags);
+  for i := 0 to 7 do Result[i] := Out16[i];
+end;
+
+function TUBLAKE3.TOutput.RootBytes(
+  const OutLen: UInt32
+): TUInt8Array;
+  var OutputBlockCounter: UInt64;
+  var OutputWords: TUInt32Arr16;
+  var i, j: Int32;
+  var Offset: UInt32;
+begin
+  Result := nil;
+  SetLength(Result, OutLen);
+  OutputBlockCounter := 0;
+  Offset := 0;
+  while Offset < OutLen do
+  begin
+    OutputWords := TUBLAKE3.Compress(
+      InputChainingValue, BlockWords, OutputBlockCounter, BlockLen,
+      Flags or ROOT
+    );
+    for i := 0 to 15 do
+    begin
+      for j := 0 to 3 do
+      begin
+        if Offset < OutLen then
+        begin
+          Result[Offset] := UInt8((OutputWords[i] shr (j * 8)) and $ff);
+          Inc(Offset);
+        end;
+      end;
+    end;
+    Inc(OutputBlockCounter);
+  end;
+end;
+
+function TUBLAKE3.TChunkState.Len: UInt32;
+begin
+  Result := BLOCK_LEN * BlocksCompressed + BlockLen;
+end;
+
+function TUBLAKE3.TChunkState.StartFlag: UInt32;
+begin
+  if BlocksCompressed = 0 then Exit(CHUNK_START) else Exit(0);
+end;
+
+function TUBLAKE3.TChunkState.Output: TOutput;
+  var BlockWords: TBlock;
+begin
+  BlockWords := TUBLAKE3.BytesToWords(Block);
+  Result.InputChainingValue := ChainingValue;
+  Result.BlockWords := BlockWords;
+  Result.Counter := ChunkCounter;
+  Result.BlockLen := BlockLen;
+  Result.Flags := Flags or StartFlag or CHUNK_END;
+end;
+
+procedure TUBLAKE3.TChunkState.Init(
+  const AKey: TUInt32Arr8;
+  const AChunkCounter: UInt64;
+  const AFlags: UInt32
+);
+begin
+  ChainingValue := AKey;
+  ChunkCounter := AChunkCounter;
+  UClear(Block, SizeOf(Block));
+  BlockLen := 0;
+  BlocksCompressed := 0;
+  Flags := AFlags;
+end;
+
+procedure TUBLAKE3.TChunkState.Update(
+  const Input: TUInt8Array;
+  var InputOffset: Int32;
+  const InputLen: Int32
+);
+  var Take: Int32;
+  var BlockWords: TBlock;
+  var Out16: TUInt32Arr16;
+  var CV: TUInt32Arr8;
+begin
+  while InputOffset < InputLen do
+  begin
+    if BlockLen = BLOCK_LEN then
+    begin
+      BlockWords := TUBLAKE3.BytesToWords(Block);
+      Out16 := TUBLAKE3.Compress(
+        ChainingValue, BlockWords, ChunkCounter, BLOCK_LEN,
+        Flags or StartFlag
+      );
+      UMove(CV, Out16, SizeOf(CV));
+      ChainingValue := CV;
+      UClear(Block, SizeOf(Block));
+      BlockLen := 0;
+      Inc(BlocksCompressed);
+    end;
+    Take := BLOCK_LEN - BlockLen;
+    if Take > InputLen - InputOffset then
+    begin
+      Take := InputLen - InputOffset;
+    end;
+    Move(Input[InputOffset], Block[BlockLen], Take);
+    BlockLen := BlockLen + Take;
+    Inc(InputOffset, Take);
+  end;
+end;
+
+procedure TUBLAKE3.THasher.Init;
+  var i: Int32;
+begin
+  for i := 0 to High(Key) do
+  begin
+    Key[i] := IV[i];
+  end;
+  ChunkState.Init(Key, 0, 0);
+  SetLength(CVStack, 54);
+  CVStackLen := 0;
+  Flags := 0;
+end;
+
+procedure TUBLAKE3.THasher.Update(const Input: TUInt8Array);
+  var InputOffset, InputLen: Int32;
+  var CV: TUInt32Arr8;
+  var ChunkCounter: UInt64;
+  var O: TOutput;
+begin
+  InputOffset := 0;
+  InputLen := Length(Input);
+  while InputOffset < InputLen do
+  begin
+    if ChunkState.Len = CHUNK_LEN then
+    begin
+      O := ChunkState.Output;
+      CV := O.ChainingValue;
+      ChunkCounter := ChunkState.ChunkCounter + 1;
+      AddChunkChainingValue(CV, ChunkCounter);
+      ChunkState.Init(Key, ChunkCounter, Flags);
+    end;
+    ChunkState.Update(Input, InputOffset, InputLen);
+  end;
+end;
+
+function TUBLAKE3.THasher.Finalize(const OutLen: UInt32): TUInt8Array;
+  var Output: TOutput;
+  var ParentNodesRemaining: Integer;
+  var CV: TUInt32Arr8;
+begin
+  Output := ChunkState.Output;
+  ParentNodesRemaining := CVStackLen;
+  while ParentNodesRemaining > 0 do
+  begin
+    Dec(ParentNodesRemaining);
+    CV := Output.ChainingValue;
+    Output := TUBLAKE3.ParentOutput(CVStack[ParentNodesRemaining], CV, Key, Flags);
+  end;
+  Result := Output.RootBytes(OutLen);
+end;
+
+procedure TUBLAKE3.THasher.PushStack(const CV: TUInt32Arr8);
+begin
+  Move(CV, CVStack[CVStackLen], SizeOf(TUInt32Arr8));
+  Inc(CVStackLen);
+end;
+
+function TUBLAKE3.THasher.PopStack: TUInt32Arr8;
+begin
+  Dec(CVStackLen);
+  Move(CVStack[CVStackLen], Result, SizeOf(TUInt32Arr8));
+end;
+
+procedure TUBLAKE3.THasher.AddChunkChainingValue(
+  var NewCV: TUInt32Arr8;
+  const TotalChunks: UInt64
+);
+  var RightChild, LeftChild: TUInt32Arr8;
+  var TotalChunksTmp: UInt64;
+begin
+  TotalChunksTmp := TotalChunks;
+  while (TotalChunksTmp and 1) = 0 do
+  begin
+    RightChild := NewCV;
+    LeftChild := PopStack;
+    NewCV := TUBLAKE3.ParentOutput(LeftChild, RightChild, Key, Flags).ChainingValue;
+    TotalChunksTmp := TotalChunksTmp shr 1;
+  end;
+  PushStack(NewCV);
 end;
 
 function UEncrypt_AES_PKCS7_ECB_128(
