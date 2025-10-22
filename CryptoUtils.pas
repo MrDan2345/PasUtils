@@ -688,26 +688,28 @@ public
     function IsValid: Boolean;
     function IsValid(const n: TBigInt): Boolean;
   end;
+  class var Curve_SECP256R1: TCurve;
 public
   class function PointAdd(const Curve: TCurve; const a, b: TPoint): TPoint; static;
   class function PointMultiply(const Curve: TCurve; const a: TPoint; const b: TBigInt): TPoint; static;
   class function MakeKey(const Curve: TCurve): TKey; static;
-  class function SignECDSA(
+  class function Sign(
     const Curve: TCurve;
     const PrivateKey: TBigInt;
     const MessageHash: TBigInt
   ): TSignature; static;
-  class function VerifyECDSA(
+  class function Verify(
     const Curve: TCurve;
     const PublicKey: TPoint;
     const MessageHash: TBigInt;
     const Signature: TSignature
   ): Boolean; static;
-  class function SharedECDH(
+  class function SharedKey(
     const Curve: TCurve;
     const PublicKey: TPoint;
     const PrivateKey: TBigInt
   ): TBigInt; static;
+  class constructor CreateClass;
 end;
 
 type TUBLAKE3 = record
@@ -934,9 +936,9 @@ function UKMAC_256(
   const Customization: TUInt8Array
 ): TUInt8Array;
 
-function USign_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
-function USign_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
-function UVerify(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
+function USign_RSA_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
+function USign_RSA_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
+function UVerify_RSA(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
 
 function UPBKDF2(
   const FuncAuth: TUFuncAuth;
@@ -1221,6 +1223,24 @@ function UDecrypt_DES_Triple_PKCS7_CTR(
   const Key: TUDES.TKey3;
   const Nonce: TUDES.TInitVector
 ): TUInt8Array;
+
+function USign_ECDSA(
+  const MessageHash: TUECC.TBigInt;
+  const PrivateKey: TUECC.TBigInt
+): TUECC.TSignature;
+function USign_ECDSA_SHA2_256(
+  const Message: TUInt8Array;
+  const PrivateKey: TUECC.TBigInt
+): TUECC.TSignature;
+function UVerify_ECDSA(
+  const MessageHash: TUECC.TBigInt;
+  const PublicKey: TUECC.TPoint;
+  const Signature: TUECC.TSignature
+): Boolean;
+function USharedKey_ECDH(
+  const PublicKey: TUECC.TPoint;
+  const PrivateKey: TUECC.TBigInt
+): TUECC.TBigInt;
 
 implementation
 
@@ -4384,17 +4404,17 @@ begin
   Result := KMAC(@Data[1], Length(Data), OutputSize, Key, Customization, 32);
 end;
 
-function USign_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
+function USign_RSA_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
 begin
   Result := TURSA.Sign_SHA256(Data, Key);
 end;
 
-function USign_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
+function USign_RSA_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
 begin
   Result := TURSA.Sign_SHA512(Data, Key);
 end;
 
-function UVerify(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
+function UVerify_RSA(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
 begin
   Result := TURSA.Verify(Data, Signature, Key);
 end;
@@ -6124,7 +6144,7 @@ begin
   until not Result.q.IsAtInfinity and Curve.IsOnCurve(Result.q);
 end;
 
-class function TUECC.SignECDSA(const Curve: TCurve; const PrivateKey: TBigInt;
+class function TUECC.Sign(const Curve: TCurve; const PrivateKey: TBigInt;
   const MessageHash: TBigInt): TSignature;
   function GenerateK: TBigInt;
     function FixedSizeBytes(
@@ -6204,7 +6224,7 @@ begin
   Result.s := s;
 end;
 
-class function TUECC.VerifyECDSA(
+class function TUECC.Verify(
   const Curve: TCurve;
   const PublicKey: TPoint;
   const MessageHash: TBigInt;
@@ -6232,7 +6252,7 @@ begin
   Result := (x1 = r);
 end;
 
-class function TUECC.SharedECDH(
+class function TUECC.SharedKey(
   const Curve: TCurve;
   const PublicKey: TPoint;
   const PrivateKey: TBigInt
@@ -6245,6 +6265,11 @@ begin
   SharedPoint := PointMultiply(Curve, PublicKey, PrivateKey);
   if SharedPoint.IsAtInfinity then Exit(TBigInt.Invalid);
   Result := SharedPoint.x;
+end;
+
+class constructor TUECC.CreateClass;
+begin
+  Curve_SECP256R1 := TCurve.Make_SECP256R1;
 end;
 
 class function TUBLAKE3.KeyFromHex(const Hex: String): TKey;
@@ -6935,6 +6960,58 @@ function UDecrypt_DES_Triple_PKCS7_CTR(
 ): TUInt8Array;
 begin
   Result := TUDES.Process_Triple_CTR(Cipher, Key, Nonce);
+end;
+
+function USign_ECDSA(
+  const MessageHash: TUECC.TBigInt;
+  const PrivateKey: TUECC.TBigInt
+): TUECC.TSignature;
+begin
+  Result := TUECC.Sign(
+    TUECC.Curve_SECP256R1,
+    PrivateKey,
+    MessageHash
+  );
+end;
+
+function USign_ECDSA_SHA2_256(
+  const Message: TUInt8Array;
+  const PrivateKey: TUECC.TBigInt
+): TUECC.TSignature;
+  var MessageHash: TUDigestSHA2_256;
+begin
+  MessageHash := USHA2_256(Message);
+  Result := TUECC.Sign(
+    TUECC.Curve_SECP256R1,
+    PrivateKey,
+    TUECC.TBigInt.Make(MessageHash)
+  );
+end;
+
+function UVerify_ECDSA(
+  const MessageHash: TUECC.TBigInt;
+  const PublicKey: TUECC.TPoint;
+  const Signature: TUECC.TSignature
+): Boolean;
+begin
+  Result := TUECC.Verify(
+    TUECC.Curve_SECP256R1,
+    PublicKey,
+    MessageHash,
+    Signature
+  );
+end;
+
+function USharedKey_ECDH(
+  const PublicKey: TUECC.TPoint;
+  const PrivateKey: TUECC.TBigInt
+): TUECC.TBigInt;
+begin
+  Result := TUECC.SharedKey(
+    TUECC.Curve_SECP256R1,
+    PublicKey,
+    PrivateKey
+  );
 end;
 
 end.
