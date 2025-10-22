@@ -1224,6 +1224,7 @@ function UDecrypt_DES_Triple_PKCS7_CTR(
   const Nonce: TUDES.TInitVector
 ): TUInt8Array;
 
+function UMakeECCKey: TUECC.TKey;
 function USign_ECDSA(
   const MessageHash: TUECC.TBigInt;
   const PrivateKey: TUECC.TBigInt
@@ -6960,6 +6961,11 @@ function UDecrypt_DES_Triple_PKCS7_CTR(
 ): TUInt8Array;
 begin
   Result := TUDES.Process_Triple_CTR(Cipher, Key, Nonce);
+end;
+
+function UMakeECCKey: TUECC.TKey;
+begin
+  Result := TUECC.MakeKey(TUECC.Curve_SECP256R1);
 end;
 
 function USign_ECDSA(
