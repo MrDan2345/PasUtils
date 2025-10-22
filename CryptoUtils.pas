@@ -677,6 +677,7 @@ public
     var g: TPoint; // generation point
     function IsOnCurve(const Point: TPoint): Boolean;
     class function Make_SECP256R1: TCurve; static;
+    class function Make_SECP256K1: TCurve; static;
   end;
   type TKey = record
     var d: TBigInt;
@@ -689,6 +690,7 @@ public
     function IsValid(const n: TBigInt): Boolean;
   end;
   class var Curve_SECP256R1: TCurve;
+  class var Curve_SECP256K1: TCurve;
 public
   class function PointAdd(const Curve: TCurve; const a, b: TPoint): TPoint; static;
   class function PointMultiply(const Curve: TCurve; const a: TPoint; const b: TBigInt): TPoint; static;
@@ -1650,7 +1652,7 @@ begin
       TempLen := TempLen shr 8;
     end;
   end;
-  Result := specialize UArrConcat<TUInt8Array>([[Tag], LenBytes, Value]);
+  Result := UBytesConcat([[Tag], LenBytes, Value]);
 end;
 
 class function TURSA.DecodeTLV(
@@ -2585,30 +2587,30 @@ begin
 end;
 
 class function TURSA.ExportKeyPublic_X509(const Key: TURSA.TKey): String;
-  var KeyContent: TUInt8Array;
-  var BitStringWrapper: TUInt8Array;
-  var AlgIdContent: TUInt8Array;
   var SequenceContent: TUInt8Array;
   const Header: String = '-----BEGIN PUBLIC KEY-----';
   const Footer: String = '-----END PUBLIC KEY-----';
 begin
-  KeyContent := specialize UArrConcat<TUInt8Array>([
-    EncodeTLV($02, PackDER(Key.n)),
-    EncodeTLV($02, PackDER(Key.e))
-  ]);
-  BitStringWrapper := specialize UArrConcat<TUInt8Array>([
-    [$00],
-    EncodeTLV($30, KeyContent)
-  ]);
-  AlgIdContent := specialize UArrConcat<TUInt8Array>([
-    EncodeTLV($06, OID_RSA),
-    EncodeTLV($05, [])
-  ]);
   SequenceContent := EncodeTLV(
     $30,
-    specialize UArrConcat<TUInt8Array>([
-      EncodeTLV($30, AlgIdContent),
-      EncodeTLV($03, BitStringWrapper)
+    UBytesConcat([
+      EncodeTLV($30,
+        UBytesConcat([
+          EncodeTLV($06, OID_RSA),
+          EncodeTLV($05, [])
+        ])
+      ),
+      EncodeTLV($03,
+        UBytesConcat([
+          [$00],
+          EncodeTLV($30,
+            UBytesConcat([
+              EncodeTLV($02, PackDER(Key.n)),
+              EncodeTLV($02, PackDER(Key.e))
+            ])
+          )
+        ])
+      )
     ])
   );
   Result := ASN1ToBase64(SequenceContent, Header, Footer);
@@ -3501,33 +3503,6 @@ end;
 function USHA2_256(const Data: String): TUDigestSHA2_256;
 begin
   Result := USHA2_256(@Data[1], Length(Data));
-end;
-
-function UModInverse(const e, phi: TURSA.TBigInt): TURSA.TBigInt;
-  function GCD(const a, b: TURSA.TBigInt; var x: TURSA.TBigInt; var y: TURSA.TBigInt): TURSA.TBigInt;
-    var x1, y1, gcd_val: TURSA.TBigInt;
-  begin
-    if a = TURSA.TBigInt.Zero then
-    begin
-      x := TURSA.TBigInt.Zero;
-      y := TURSA.TBigInt.One;
-      Exit(b);
-    end;
-    x1 := TURSA.TBigInt.Zero;
-    y1 := TURSA.TBigInt.Zero;
-    gcd_val := GCD(b mod a, a, x1, y1);
-    x := y1 - (b div a) * x1;
-    y := x1;
-    Result := gcd_val;
-  end;
-  var x, y, gcd_val: TURSA.TBigInt;
-begin
-  x := TURSA.TBigInt.Zero;
-  y := TURSA.TBigInt.Zero;
-  gcd_val := GCD(e, phi, x, y);
-  if gcd_val <> TURSA.TBigInt.One then Exit(TURSA.TBigInt.Invalid);
-  if x < TURSA.TBigInt.Zero then x := x + phi;
-  Result := x;
 end;
 
 function UMillerRabinTest(const Number: TURSA.TBigInt; const Iterations: Int32): Boolean;
@@ -6049,6 +6024,16 @@ begin
   Result.g.y := '$4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5';
 end;
 
+class function TUECC.TCurve.Make_SECP256K1: TCurve;
+begin
+  Result.p := '$fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f';
+  Result.a := 0;
+  Result.b := 7;
+  Result.n := '$fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141';
+  Result.g.x := '$79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
+  Result.g.y := '$483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8';
+end;
+
 function TUECC.TSignature.IsValid: Boolean;
 begin
   Result := (r > TBigInt.Zero) and (s > TBigInt.Zero);
@@ -6153,7 +6138,7 @@ class function TUECC.Sign(const Curve: TCurve; const PrivateKey: TBigInt;
       const NumBytes: UInt32
     ): TUInt8Array;
       var Bytes: TUInt8Array;
-      var i, PadCount: UInt32;
+      var PadCount: UInt32;
     begin
       Bytes := Num.ToBytesBE;
       PadCount := NumBytes - Length(Bytes);
@@ -6271,6 +6256,7 @@ end;
 class constructor TUECC.CreateClass;
 begin
   Curve_SECP256R1 := TCurve.Make_SECP256R1;
+  Curve_SECP256K1 := TCurve.Make_SECP256K1;
 end;
 
 class function TUBLAKE3.KeyFromHex(const Hex: String): TKey;
@@ -6356,7 +6342,7 @@ class function TUBLAKE3.Compress(
   var Block: TBlock;
 begin
   Block := BlockWords;
-  Move(ChainingValue, State, SizeOf(ChainingValue));
+  UMove(State, ChainingValue, SizeOf(ChainingValue));
   State[8] := IV[0];
   State[9] := IV[1];
   State[10] := IV[2];
@@ -6433,7 +6419,7 @@ begin
   Hasher.Init(DERIVE_KEY_CONTEXT);
   Hasher.Update(Context);
   ContextKey := Hasher.Finalize(32);
-  Move(ContextKey[0], Key, SizeOf(Key));
+  UMove(Key, ContextKey[0], SizeOf(Key));
   Hasher.Init(Key, DERIVE_KEY_MATERIAL);
   Hasher.Update(Password);
   Result := Hasher.Finalize(OutputSize);
@@ -6616,7 +6602,7 @@ end;
 function TUBLAKE3.THasher.PopStack: TUInt32Arr8;
 begin
   Dec(CVStackLen);
-  Move(CVStack[CVStackLen], Result, SizeOf(TUInt32Arr8));
+  UMove(Result, CVStack[CVStackLen], SizeOf(TUInt32Arr8));
 end;
 
 procedure TUBLAKE3.THasher.AddChunkChainingValue(
