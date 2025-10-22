@@ -860,7 +860,7 @@ public
   class function Zero: TSelf; static;
   class function One: TSelf; static;
   class function Invalid: TSelf; static;
-  function Top: Int32;
+  function Top: UInt32;
   function IsZero: Boolean;
   function IsOdd: Boolean;
   function IsPositive: Boolean;
@@ -871,6 +871,7 @@ public
   function ToHex: String;
   function ToInt: Int64;
   function ToBytes: TUInt8Array;
+  function ToBytesBE: TUInt8Array;
   function BitsUsed: Int32;
   function BytesUsed: Int32;
   procedure SetPositive(const Value: Boolean);
@@ -887,6 +888,8 @@ public
   class function Division(const a, b: TSelf; out r: TSelf): TSelf; static; overload;
   class function Division(const a, b: TSelf): TSelf; static; overload;
   class function Modulo(const a, b: TSelf): TSelf; static;
+  class function ModPower(const Base, Exp, Modulus: TSelf): TSelf; static;
+  class function ModInverse(const Exp, Phi: TSelf): TSelf; static;
   class function Compare(const a, b: TSelf): Int8; static;
   class function ShrOne(const Number: TSelf): TSelf; static;
   class function ShlOne(const Number: TSelf): TSelf; static;
@@ -917,6 +920,36 @@ public
   class operator xor (const a, b: TSelf): TSelf;
   class operator not (const a: TSelf): TSelf;
 end;
+
+type generic TUMontgomeryReduction<T> = record
+public
+  type TBigInt = T;
+private
+  var N: TBigInt;
+  var N_prime: UInt32;
+  var R2_mod_N: TBigInt;
+  var NumItems: UInt32;
+public
+  procedure Init(const Modulus: TBigInt);
+  function Conv(const Number: TBigInt): TBigInt;
+  function Mul(const a, b: TBigInt): TBigInt;
+end;
+
+type TUSize4 = record const Value = 4; end;
+type TUInt128 = specialize TUBigInt<TUSize4>;
+type TUInt128Array = array of TUInt128;
+
+type TUSize8 = record const Value = 8; end;
+type TUInt256 = specialize TUBigInt<TUSize8>;
+type TUInt256Array = array of TUInt256;
+
+type TUSize16 = record const Value = 16; end;
+type TUInt512 = specialize TUBigInt<TUSize16>;
+type TUInt512Array = array of TUInt512;
+
+type TUSize32 = record const Value = 32; end;
+type TUInt1024 = specialize TUBigInt<TUSize32>;
+type TUInt1024Array = array of TUInt1024;
 
 type TUSize64 = record const Value = 64; end;
 type TUInt2048 = specialize TUBigInt<TUSize64>;
@@ -1799,6 +1832,7 @@ function UBase64ToBytes(const Base64: String): TUInt8Array;
 function UStrToBytes(const Str: String): TUInt8Array;
 function UBytesToString(const Bytes: TUInt8Array): String;
 function UBytesMake(const Data: Pointer; const DataSize: UInt32): TUInt8Array;
+function UBytesReverse(const Bytes: TUInt8Array): TUInt8Array;
 function UBytesJoin(const a, b: array of UInt8): TUInt8Array; inline;
 function UBytesConcat(const Bytes: array of TUInt8Array): TUInt8Array; inline;
 function UBytesCompare(const a, b: array of UInt8): Int8; inline;
@@ -4873,8 +4907,8 @@ begin
   Result.SetFlag(sf_invalid);
 end;
 
-function TUBigInt.Top: Int32;
-  var i: Int32;
+function TUBigInt.Top: UInt32;
+  var i: UInt32;
 begin
   for i := MaxItem downto 0 do
   if Self[i] > 0 then
@@ -5006,6 +5040,11 @@ begin
   Move(Self, Result[0], n);
 end;
 
+function TUBigInt.ToBytesBE: TUInt8Array;
+begin
+  Result := UBytesReverse(ToBytes);
+end;
+
 function TUBigInt.BitsUsed: Int32;
 begin
   Result := TopBit + 1;
@@ -5129,9 +5168,17 @@ class function TUBigInt.Make(const Number: String): TSelf;
       end;
     end;
   end;
+  const HexMarkers: array of AnsiChar = ('$', '#');
+  var i: Int32;
 begin
   Result := Zero;
-  if Number.StartsWith('$') then FromHex else FromDec;
+  for i := 0 to High(HexMarkers) do
+  if Number.StartsWith(HexMarkers[i]) then
+  begin
+    FromHex;
+    Exit;
+  end;
+  FromDec;
 end;
 
 class function TUBigInt.Make(const Bytes: TUInt8Array): TSelf;
@@ -5258,6 +5305,54 @@ class function TUBigInt.Modulo(const a, b: TSelf): TSelf;
 begin
   MagDiv(a, b, Result);
   Result.SetNegative(a.IsNegative);
+end;
+
+class function TUBigInt.ModPower(const Base, Exp, Modulus: TSelf): TSelf;
+  var Context: specialize TUMontgomeryReduction<TSelf>;
+  var BaseMont: TSelf;
+  var ResultMont: TSelf;
+  var CurrentExponent: TSelf;
+begin
+  Context.Init(Modulus);
+  BaseMont := Context.Conv(Base);
+  ResultMont := Context.Conv(One);
+  CurrentExponent := Exp;
+  while not CurrentExponent.IsZero do
+  begin
+    if CurrentExponent.IsOdd then
+    begin
+      ResultMont := Context.Mul(ResultMont, BaseMont);
+    end;
+    BaseMont := Context.Mul(BaseMont, BaseMont);
+    CurrentExponent := ShrOne(CurrentExponent);
+  end;
+  Result := Context.Mul(ResultMont, One);
+end;
+
+class function TUBigInt.ModInverse(const Exp, Phi: TSelf): TSelf;
+  var ZeroN: TSelf;
+  var OneN: TSelf;
+  var x0, x1, a, m, q, temp: TSelf;
+begin
+  ZeroN := Zero;
+  OneN := One;
+  if Phi = OneN then Exit(Zero);
+  x0 := ZeroN;
+  x1 := OneN;
+  a := ((Exp mod Phi) + Phi) mod Phi;
+  m := Phi;
+  while a > OneN do
+  begin
+    q := Division(a, m, temp);
+    a := m;
+    m := temp;
+    temp := x0;
+    x0 := x1 - (q * x0);
+    x1 := temp;
+  end;
+  if a <> OneN then Exit(Invalid);
+  if (x1 < 0) then x1 := x1 + Phi;
+  Result := x1;
 end;
 
 class function TUBigInt.Compare(const a, b: TSelf): Int8;
@@ -5478,6 +5573,75 @@ begin
   Result := BitNot(a);
 end;
 // TUBigInt end
+
+// TUMontgomeryReduction begin
+procedure TUMontgomeryReduction.Init(const Modulus: TBigInt);
+  var Inv: UInt32;
+  var i: Int32;
+  var R_val, R2_val, R_mod_N: TBigInt;
+begin
+  N := Modulus;
+  NumItems := N.Top + 1;
+  Inv := 1;
+  for i := 1 to 5 do
+  begin
+    Inv := Inv * (2 - N[0] * Inv);
+  end;
+  N_prime := -Inv;
+  R_val := TBigInt.Zero;
+  if NumItems <= TBigInt.MaxItem then
+  begin
+    R_val[NumItems] := 1;
+  end;
+  R_mod_N := R_val mod N;
+  R2_val := R_mod_N * R_mod_N;
+  R2_mod_N := R2_val mod N;
+end;
+
+function TUMontgomeryReduction.Conv(const Number: TBigInt): TBigInt;
+begin
+  Result := Mul(Number, R2_mod_N);
+end;
+
+function TUMontgomeryReduction.Mul(const a, b: TBigInt): TBigInt;
+  var Tmp: TBigInt;
+  var m: UInt32;
+  var i, j, k: Int32;
+  var Carry: UInt64;
+  var Product, Sum: UInt64;
+begin
+  Result := TBigInt.Zero;
+  Tmp := a * b;
+  for i := 0 to NumItems - 1 do
+  begin
+    m := Tmp[i] * N_prime;
+    Carry := 0;
+    for j := 0 to NumItems - 1 do
+    begin
+      Product := UInt64(m) * N[j];
+      Sum := UInt64(Tmp[i + j]) + (Product and $ffffffff) + Carry;
+      Tmp[i + j] := Sum and $ffffffff;
+      Carry := (Product shr 32) + (Sum shr 32);
+    end;
+    k := i + NumItems;
+    while (Carry > 0) and (k <= TBigInt.MaxItem) do
+    begin
+      Sum := UInt64(Tmp[k]) + Carry;
+      Tmp[k] := Sum and $ffffffff;
+      Carry := Sum shr 32;
+      Inc(k);
+    end;
+  end;
+  for i := 0 to NumItems - 1 do
+  begin
+    Result[i] := Tmp[i + NumItems];
+  end;
+  if Result >= N then
+  begin
+    Result := Result - N;
+  end;
+end;
+// TUMontgomeryReduction end
 
 // TUInt4096_Debug begin
 function TUInt4096_DebugImpl.Top: Int32;
@@ -10630,6 +10794,18 @@ begin
   Result := nil;
   SetLength(Result, DataSize);
   Move(Data^, Result[0], DataSize);
+end;
+
+function UBytesReverse(const Bytes: TUInt8Array): TUInt8Array;
+  var i, h: Int32;
+begin
+  Result := nil;
+  SetLength(Result, Length(Bytes));
+  h := High(Bytes);
+  for i := 0 to h do
+  begin
+    Result[i] := Bytes[h - i];
+  end;
 end;
 
 function UBytesJoin(const a, b: array of UInt8): TUInt8Array;
