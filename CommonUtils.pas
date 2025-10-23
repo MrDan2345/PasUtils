@@ -6785,10 +6785,12 @@ begin
     if Length(Arg) < 2 then Continue;
     _Args[i].Value := Arg[1];
   end;
+  {
   for i := 0 to High(_Args) do
   begin
     WriteLn(_Args[i].Param, '=', _Args[i].Value);
   end;
+  //}
 end;
 
 function TUArguments.HasParam(const ParamName: String): Boolean;

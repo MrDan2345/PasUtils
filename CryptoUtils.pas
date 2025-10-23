@@ -870,6 +870,7 @@ function UcSHAKE_256(const Data: String; const OutputSize: UInt32; const Functio
 function UBLAKE3_Hash(const Data: TUInt8Array; const OutputSize: UInt32): TUInt8Array;
 function UBLAKE3_Hash(const Data: TUInt8Array; const Key: TUBLAKE3.TKey; const OutputSize: UInt32): TUInt8Array;
 function UBLAKE3_KDF(const Context, Password: TUInt8Array; const OutputSize: UInt32): TUInt8Array;
+function UBLAKE3_KDF(const Context, Password: String; const OutputSize: UInt32): TUInt8Array;
 
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
 function UDigestSHA1(const Data: TUInt8Array): TUInt8Array;
@@ -996,8 +997,10 @@ function UMakeRSAKey(
 function UExportRSAKey_PKCS1(const Key: TURSA.TKey): String;
 function UExportRSAKey_PKCS8(const Key: TURSA.TKey): String;
 function UExportRSAKey_PKCS8(const Key: TURSA.TKey; const Password: String; const Iterations: UInt32 = 600000): String;
+function UExportRSAKey_PKCS8(const Key: TURSA.TKey; const Password: TUInt8Array; const Iterations: UInt32 = 600000): String;
 function UExportRSAKey_X509(const Key: TURSA.TKey): String;
 function UImportRSAKey(const KeyASN1: String; const Password: String = ''): TURSA.TKey;
+function UImportRSAKey(const KeyASN1: String; const Password: TUInt8Array): TURSA.TKey;
 function UEncrypt_RSA_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
@@ -4151,6 +4154,14 @@ begin
   Result := TUBLAKE3.KDF(Context, Password, OutputSize);
 end;
 
+function UBLAKE3_KDF(
+  const Context, Password: String;
+  const OutputSize: UInt32
+): TUInt8Array;
+begin
+  Result := UBLAKE3_KDF(UStrToBytes(Context), UStrToBytes(Password), OutputSize);
+end;
+
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
 begin
   Result := UMD5(Data);
@@ -4574,6 +4585,11 @@ begin
   Result := TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA256_AES256_CBC(Key, UStrToBytes(Password), Iterations);
 end;
 
+function UExportRSAKey_PKCS8(const Key: TURSA.TKey; const Password: TUInt8Array; const Iterations: UInt32): String;
+begin
+  Result := TURSA.ExportKeyPrivateEncrypted_PKCS8_SHA256_AES256_CBC(Key, Password, Iterations);
+end;
+
 function UExportRSAKey_X509(const Key: TURSA.TKey): String;
 begin
   Result := TURSA.ExportKeyPublic_X509(Key);
@@ -4582,6 +4598,11 @@ end;
 function UImportRSAKey(const KeyASN1: String; const Password: String): TURSA.TKey;
 begin
   Result := TURSA.ImportKey(KeyASN1, UStrToBytes(Password));
+end;
+
+function UImportRSAKey(const KeyASN1: String; const Password: TUInt8Array): TURSA.TKey;
+begin
+  Result := TURSA.ImportKey(KeyASN1, Password);
 end;
 
 function UEncrypt_RSA_PKCS1(
