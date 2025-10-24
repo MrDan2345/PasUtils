@@ -695,6 +695,7 @@ public
   class function PointAdd(const Curve: TCurve; const a, b: TPoint): TPoint; static;
   class function PointMultiply(const Curve: TCurve; const a: TPoint; const b: TBigInt): TPoint; static;
   class function MakeKey(const Curve: TCurve): TKey; static;
+  class function DeriveKey(const Curve: TCurve; const BaseData, Context: TUInt8Array): TKey; static;
   class function Sign(
     const Curve: TCurve;
     const PrivateKey: TBigInt;
@@ -6149,6 +6150,21 @@ begin
     Result.d := TBigInt.MakeRandomRange(TBigInt.One, Curve.n - TBigInt.One);
     Result.q := PointMultiply(Curve, Curve.g, Result.d);
   until not Result.q.IsAtInfinity and Curve.IsOnCurve(Result.q);
+end;
+
+class function TUECC.DeriveKey(
+  const Curve: TCurve;
+  const BaseData, Context: TUInt8Array
+): TKey;
+  var PrivateKey: TBigInt;
+begin
+  PrivateKey := TBigInt.Make(
+    UBytesReverse(
+      UBLAKE3_KDF(Context, BaseData, 32)
+    )
+  );
+  Result.d := (PrivateKey mod (Curve.n - TBigInt.One)) + TBigInt.One;
+  Result.q := PointMultiply(Curve, Curve.g, Result.d);
 end;
 
 class function TUECC.Sign(const Curve: TCurve; const PrivateKey: TBigInt;
