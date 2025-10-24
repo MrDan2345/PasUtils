@@ -1639,6 +1639,7 @@ strict private
   var _Cache: TItem;
   var _List: TItem;
   var _Cached: Boolean;
+  function GetIsEmpty: Boolean;
   procedure SetCached(const Value: Boolean);
   procedure ItemAdd(var LinkedList: TItem; var Item: TItem);
   procedure ItemRemove(var LinkedList: TItem; var Item: TItem);
@@ -1648,7 +1649,9 @@ strict private
 public
   property Cached: Boolean read _Cached write SetCached;
   property List: TItem read _List;
+  property IsEmpty: Boolean read GetIsEmpty;
   function NewItem: TItem;
+  function Pop: T;
   procedure FreeItem(var Item: TItem);
   procedure Clear;
   class operator Initialize(var v: TSelf);
@@ -9517,6 +9520,11 @@ end;
 //TUArrayObjUtils end
 
 //TULinkedList begin
+function TULinkedList.GetIsEmpty: Boolean;
+begin
+  Result := _List = nil;
+end;
+
 procedure TULinkedList.SetCached(const Value: Boolean);
 begin
   if Value = _Cached then Exit;
@@ -9574,6 +9582,13 @@ begin
     Result := TItem.Create;
   end;
   ItemAdd(_List, Result);
+end;
+
+function TULinkedList.Pop: T;
+begin
+  if not Assigned(_List) then Exit(Default(T));
+  Result := _List.Data;
+  FreeItem(_List);
 end;
 
 procedure TULinkedList.FreeItem(var Item: TItem);
