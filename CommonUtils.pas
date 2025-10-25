@@ -192,6 +192,15 @@ end;
 type TUInt8ArrayImpl = type helper for TUInt8Array
 public
   class function Make(const Size: UInt32): TUInt8Array; static;
+  function ToString: String;
+  function ToHex: String;
+  function ToBase64: String;
+  function Append(const Bytes: array of UInt8): TUInt8Array;
+  function Append(const Bytes: array of TUInt8Array): TUInt8Array;
+  function Append(const Str: String): TUInt8Array;
+  function Append(const Num: UInt8): TUInt8Array;
+  function Append(const Num: UInt16): TUInt8Array;
+  function Append(const Num: UInt32): TUInt8Array;
 end;
 
 type TUInt16Impl = type helper for TUInt16
@@ -1836,8 +1845,8 @@ function UStrToBytes(const Str: String): TUInt8Array;
 function UBytesToString(const Bytes: TUInt8Array): String;
 function UBytesMake(const Data: Pointer; const DataSize: UInt32): TUInt8Array;
 function UBytesReverse(const Bytes: TUInt8Array): TUInt8Array;
-function UBytesJoin(const a, b: array of UInt8): TUInt8Array; inline;
-function UBytesConcat(const Bytes: array of TUInt8Array): TUInt8Array; inline;
+function UBytesJoin(const a, b: array of UInt8): TUInt8Array;
+function UBytesConcat(const Bytes: array of TUInt8Array): TUInt8Array;
 function UBytesCompare(const a, b: array of UInt8): Int8; inline;
 function UBytesEqual(const a, b: array of UInt8): Boolean;
 function UMatToQuat(const m: TUMat): TUQuat;
@@ -2290,6 +2299,53 @@ class function TUInt8ArrayImpl.Make(const Size: UInt32): TUInt8Array;
 begin
   Result := nil;
   SetLength(Result, Size);
+end;
+
+function TUInt8ArrayImpl.ToString: String;
+begin
+  Result := UBytesToString(Self);
+end;
+
+function TUInt8ArrayImpl.ToHex: String;
+begin
+  Result := UBytesToHex(Self);
+end;
+
+function TUInt8ArrayImpl.ToBase64: String;
+begin
+  Result := UBytesToBase64(Self);
+end;
+
+function TUInt8ArrayImpl.Append(const Bytes: array of UInt8): TUInt8Array;
+begin
+  Result := UBytesJoin(Self, Bytes);
+end;
+
+function TUInt8ArrayImpl.Append(const Bytes: array of TUInt8Array): TUInt8Array;
+begin
+  Result := UBytesJoin(Self, UBytesConcat(Bytes));
+end;
+
+function TUInt8ArrayImpl.Append(const Str: String): TUInt8Array;
+begin
+  Result := UBytesJoin(Self, UStrToBytes(Str));
+end;
+
+function TUInt8ArrayImpl.Append(const Num: UInt8): TUInt8Array;
+begin
+  Result := UBytesJoin(Self, [Num]);
+end;
+
+function TUInt8ArrayImpl.Append(const Num: UInt16): TUInt8Array;
+  var AsArr: array[0..1] of UInt8 absolute Num;
+begin
+  Result := UBytesJoin(Self, AsArr);
+end;
+
+function TUInt8ArrayImpl.Append(const Num: UInt32): TUInt8Array;
+  var AsArr: array[0..3] of UInt8 absolute Num;
+begin
+  Result := UBytesJoin(Self, AsArr);
 end;
 // TUInt8ArrayImpl end
 
