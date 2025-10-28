@@ -13,7 +13,6 @@ uses
   SysUtils,
   Classes,
   CommonUtils,
-  Sockets,
   DateUtils;
 
 {$if defined(windows)}

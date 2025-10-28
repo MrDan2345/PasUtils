@@ -2007,6 +2007,7 @@ function UThreadRandomize: UInt32;
 function UThreadRandom(const Size: UInt32): UInt32;
 function URandom(var RandomSeed: UInt32; const Size: UInt32): UInt32;
 function URandomBytes(const Size: UInt32): TUInt8Array;
+function USysRandom(const Size: UInt32): TUInt8Array;
 function UAddMat(const m0, m1: TUMat): TUMat;
 function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 function USubMat(const m0, m1: TUMat): TUMat;
@@ -12041,12 +12042,56 @@ function URandomBytes(const Size: UInt32): TUInt8Array;
   var i: UInt32;
 begin
   Result := nil;
+  if Size = 0 then Exit;
   SetLength(Result, Size);
   for i := 0 to High(Result) do
   begin
     Result[i] := UThreadRandom(256);
   end;
 end;
+
+{$if defined(windows)}
+function SysRandomWin(
+  RandomBuffer: Pointer;
+  RandomBufferLength: UInt32
+): ByteBool; stdcall; external 'advapi32.dll' name 'SystemFunction036';
+{$endif}
+
+function USysRandom(const Size: UInt32): TUInt8Array;
+{$if defined(linux)}
+  const RandFile = '/dev/urandom';
+  var fs: TFileStream;
+  var BytesRead, i: UInt32;
+begin
+  Result := nil;
+  if Size = 0 then Exit;
+  if not FileExists(RandFile) then Exit(URandomBytes(Size));
+  SetLength(Result, Size);
+  fs := TFileStream.Create(RandFile, fmOpenRead or fmShareDenyNone);
+  try
+    BytesRead := fs.Read(Result[0], Size);
+    if BytesRead = Size then Exit;
+    for i := BytesRead to Size - 1 do
+    begin
+      Result[i] := UThreadRandom(256);
+    end;
+  finally
+    fs.Free;
+  end;
+end;
+{$elseif defined(windows)}
+begin
+  Result := nil;
+  if Size = 0 then Exit;
+  SetLength(Result, Size);
+  if SysRandomWin(@Result[0], Size) <> 0 then Exit;
+  Result := URandomBytes(Size);
+end;
+{$else}
+begin
+  Result := URandomBytes(Size);
+end;
+{$endif}
 
 function UAddMat(const m0, m1: TUMat): TUMat;
 begin
