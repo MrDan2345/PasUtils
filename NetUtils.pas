@@ -238,20 +238,20 @@ type TUMacAddr = array[0..5] of UInt8;
 type PUMacAddr = ^TUMacAddr;
 type TUMacAddrArray = array of TUMacAddr;
 
-type PUInAddr = ^TUInAddr;
-TUInAddr = packed record
+type TUInAddr = packed record
   case UInt8 of
   0: (Addr8: array[0..3] of UInt8);
   1: (Addr32: UInt32);
 end;
+type PUInAddr = ^TUInAddr;
 type TUInAddrArray = array of TUInAddr;
 operator = (const a, b: TUInAddr): Boolean;
 
 type TUSockAddr = packed record
-  sin_family: UInt16;
-  sin_port: UInt16;
-  sin_addr: TUInAddr;
-  sin_zero: packed array[0..7] of UInt8;
+  var Family: UInt16;
+  var Port: UInt16;
+  var Addr: TUInAddr;
+  var Zero: packed array[0..7] of UInt8;
 end;
 type PUSockAddr = ^TUSockAddr;
 type TUInetSockAddr = TUSockAddr;
@@ -264,85 +264,85 @@ TUInAddr6 = packed record
   2: (Addr32: array[0..3] of UInt32);
 end;
 
-type PUSockAddr6 = ^TUSockAddr6;
-TUSockAddr6 = packed record
-  sin6_len: UInt8;
-  sin6_family: UInt8;
-  sin6_port: UInt16;
-  sin6_flowinfo: UInt32;
-  sin6_addr: TUInAddr6;
-  sin6_scope_id: UInt32;
+type TUSockAddr6 = packed record
+  Len: UInt8;
+  Family: UInt8;
+  Port: UInt16;
+  FlowInfo: UInt32;
+  Addr: TUInAddr6;
+  ScopeId: UInt32;
 end;
+type PUSockAddr6 = ^TUSockAddr6;
 
 type PPUAddrInfo = ^PUAddrInfo;
 PUAddrInfo = ^TUAddrInfo;
 TUAddrInfo = record
-  ai_flags: Int32;
-  ai_family: Int32;
-  ai_socktype: Int32;
-  ai_protocol: Int32;
-  ai_addrlen: Int32;
-  ai_addr: PUSockAddr;
-  ai_canonname: PAnsiChar;
-  ai_next: PUAddrInfo;
+  Flags: Int32;
+  Family: Int32;
+  SockType: Int32;
+  Protocol: Int32;
+  AddrLen: Int32;
+  Addr: PUSockAddr;
+  CanonName: PAnsiChar;
+  Next: PUAddrInfo;
 end;
 
 type PUHostEnt = ^TUHostEnt;
 TUHostEnt = record
-  h_name: PAnsiChar;
-  h_aliases: ^PAnsiChar;
-  h_addrtype: LongInt;
-  h_length: LongInt;
-  h_addr_list: ^PAnsiChar;
+  Name: PAnsiChar;
+  Aliases: ^PAnsiChar;
+  AddrType: LongInt;
+  Len: LongInt;
+  AddrList: ^PAnsiChar;
 end;
 
 type PPUIfAddrs = ^PUIfAddrs;
 PUIfAddrs = ^TUIfAddrs;
 TUIfAddrs = record
-  ifa_next: PUIfAddrs;
-  ifa_name: PAnsiChar;
-  ifa_flags: UInt32;
-  ifa_addr: PUSockAddr;
-  ifa_netmask: PUSockAddr;
-  ifa_ifu: PUSockAddr;
-  ifa_data: Pointer;
+  Next: PUIfAddrs;
+  Name: PAnsiChar;
+  Flags: UInt32;
+  Addr: PUSockAddr;
+  NetMask: PUSockAddr;
+  Ifu: PUSockAddr;
+  Data: Pointer;
 end;
 
 type TUIfMap = record
-  mem_start: UInt64;
-  mem_end: UInt64;
-  base_addr: UInt16;
-  irq: UInt8;
-  dma: UInt8;
-  port: UInt8;
+  MemStart: UInt64;
+  MemEnd: UInt64;
+  BaseAddr: UInt16;
+  Irq: UInt8;
+  Dma: UInt8;
+  Port: UInt8;
 end;
 
 const UNET_IF_NAMESIZE = 16;
 type TUIfReq = record
   const IFHWADDRLEN = 6;
   const IFNAMSIZ = UNET_IF_NAMESIZE;
-  var ifrn_name: array[0..IFNAMSIZ - 1] of AnsiChar;
+  var Name: array[0..IFNAMSIZ - 1] of AnsiChar;
   case Int32 of
-  0: (ifru_addr: TUSockAddr);
-  1: (ifru_dstaddr: TUSockAddr);
-  2: (ifru_broadaddr: TUSockAddr);
-  3: (ifru_netmask: TUSockAddr);
-  4: (ifru_hwaddr: TUSockAddr);
-  5: (ifru_flags: Int16);
-  6: (ifru_ivalue: Int32);
-  7: (ifru_mtu: Int32);
-  8: (ifru_map: TUIfMap);
-  9: (ifru_slave: array[0..IFNAMSIZ - 1] of AnsiChar);
-  10: (ifru_newname: array[0..IFNAMSIZ - 1] of AnsiChar);
-  11: (ifru_data: Pointer);
+  0: (Addr: TUSockAddr);
+  1: (DstAddr: TUSockAddr);
+  2: (BroadAddr: TUSockAddr);
+  3: (NetMask: TUSockAddr);
+  4: (HwAddr: TUSockAddr);
+  5: (Flags: Int16);
+  6: (IValue: Int32);
+  7: (Mtu: Int32);
+  8: (Map: TUIfMap);
+  9: (Slave: array[0..IFNAMSIZ - 1] of AnsiChar);
+  10: (NewName: array[0..IFNAMSIZ - 1] of AnsiChar);
+  11: (Data: Pointer);
 end;
 type PUIfReq = ^TUIfReq;
 
 type TUIfConf = record
-  ifc_len: Int32;
+  Len: Int32;
   case UInt8 of
-  0: (ifcu_buf: Pointer);
-  1: (ifcu_req: PUIfReq);
+  0: (Buf: Pointer);
+  1: (Req: PUIfReq);
 end;
 type PUIfConf = ^TUIfConf;
 
@@ -351,8 +351,8 @@ type PUSocket = ^TUSocket;
 const INVALID_SOCKET = TUSocket(not(0));
 
 type TTimeVal = record
-  tv_sec: Int32;
-  tv_usec: Int32;
+  Sec: Int32;
+  USec: Int32;
 end;
 type PTimeVal = ^TTimeVal;
 
@@ -393,9 +393,10 @@ end;
 
 type TUSockAddrImpl = type helper for TUSockAddr
   const Default: TUSockAddr = (
-    sin_family: AF_INET;
-    sin_port: 0; sin_addr: (Addr32: 0);
-    sin_zero: (0, 0, 0, 0, 0, 0, 0, 0);
+    Family: AF_INET;
+    Port: 0;
+    Addr: (Addr32: 0);
+    Zero: (0, 0, 0, 0, 0, 0, 0, 0);
   );
 end;
 
@@ -1076,8 +1077,8 @@ function TUSocketImpl.SelectRead(const TimeoutMs: UInt32): Int32;
   var tv: TTimeVal;
 begin
   if TimeoutMs = UInt32(-1) then Exit(USelect([Self], [], [], nil));
-  tv.tv_sec := TimeoutMs div 1000;
-  tv.tv_usec := (TimeoutMs mod 1000) * 1000;
+  tv.Sec := TimeoutMs div 1000;
+  tv.USec := (TimeoutMs mod 1000) * 1000;
   Result := USelect([Self], [], [], @tv);
 end;
 
@@ -1085,8 +1086,8 @@ function TUSocketImpl.SelectWrite(const TimeoutMs: UInt32): Int32;
   var tv: TTimeVal;
 begin
   if TimeoutMs = UInt32(-1) then Exit(USelect([], [Self], [], nil));
-  tv.tv_sec := TimeoutMs div 1000;
-  tv.tv_usec := (TimeoutMs mod 1000) * 1000;
+  tv.Sec := TimeoutMs div 1000;
+  tv.USec := (TimeoutMs mod 1000) * 1000;
   Result := USelect([Self], [], [], @tv);
 end;
 
@@ -1317,7 +1318,7 @@ procedure TUNet.TBeacon.TListener.Execute;
 begin
   _Sock := TUSocket.CreateUDP();
   SockAddr := TUSockAddr.Default;
-  SockAddr.sin_port := UNetHostToNetShort(Beacon.Port);
+  SockAddr.Port := UNetHostToNetShort(Beacon.Port);
   _Sock.Bind(@SockAddr, SizeOf(SockAddr));
   OtherAddr := TUSockAddr.Default;
   OtherAddrLen := SizeOf(OtherAddr);
@@ -1325,7 +1326,7 @@ begin
   begin
     n := _Sock.RecvFrom(@Buffer, SizeOf(Buffer), 0, @OtherAddr, @OtherAddrLen);
     if n <= 0 then Break;
-    if OtherAddr.sin_addr.Addr32 = Beacon.LocalAddr.Addr32 then Continue;
+    if OtherAddr.Addr.Addr32 = Beacon.LocalAddr.Addr32 then Continue;
     if n < SizeOf(TPacket) then Continue;
     if PPacket(@Buffer)^.Marker <> Marker then Continue;
     if PPacket(@Buffer)^.Version > $0100 then Continue;
@@ -1344,9 +1345,9 @@ begin
       SetLength(Message, MessageLength);
       Move(Buffer[SizeOf(TPacket) + NameLength], Message[1], MessageLength);
     end;
-    Beacon.AddPeer(OtherAddr.sin_addr, Name, Message);
+    Beacon.AddPeer(OtherAddr.Addr, Name, Message);
     if not (PPacket(@Buffer)^.PacketType = pt_broadcast) then Continue;
-    OtherAddr.sin_port := UNetHostToNetShort(Beacon.Port);
+    OtherAddr.Port := UNetHostToNetShort(Beacon.Port);
     n := _Sock.SendTo(
       @Packet[0], Length(Packet), 0,
       @OtherAddr, SizeOf(OtherAddr)
@@ -1372,9 +1373,9 @@ begin
   _Sock := TUSocket.CreateUDP();
   _Sock.SetSockOpt(SO_BROADCAST, 1);
   SockAddr := TUSockAddr.Default;
-  SockAddr.sin_addr := Beacon.LocalAddr;
-  SockAddr.sin_addr.Addr8[3] := 255;
-  SockAddr.sin_port := UNetHostToNetShort(Beacon.Port);
+  SockAddr.Addr := Beacon.LocalAddr;
+  SockAddr.Addr.Addr8[3] := 255;
+  SockAddr.Port := UNetHostToNetShort(Beacon.Port);
   _Event.Unsignal;
   while not Terminated do
   begin
@@ -1507,7 +1508,7 @@ begin
   begin
     Sock := TUSocket.CreateUDP();
     SockAddr := TUSockAddr.Default;
-    SockAddr.sin_port := UNetHostToNetShort(_Port);
+    SockAddr.Port := UNetHostToNetShort(_Port);
     n := SizeOf(SockAddr);
     if Sock.Bind(@SockAddr, n) <> 0 then
     begin
@@ -1559,8 +1560,8 @@ begin
     n := SizeOf(OtherAddr);
     r := Broker.Sock.RecvFrom(@Message, SizeOf(Message), 0, @OtherAddr, @n);
     if r <> SizeOf(Message) then Continue;
-    WriteLn('Connection: ', UNetNetAddrToStr(OtherAddr.sin_addr), ':', IntToStr(ntohs(OtherAddr.sin_port)));
-    Broker.Connection(OtherAddr.sin_addr, OtherAddr.sin_port, Message);
+    WriteLn('Connection: ', UNetNetAddrToStr(OtherAddr.Addr), ':', IntToStr(ntohs(OtherAddr.Port)));
+    Broker.Connection(OtherAddr.Addr, OtherAddr.Port, Message);
   end;
 end;
 
@@ -1599,8 +1600,8 @@ end;
 function TUNet.TBroker.TClient.MakeSockAddr: TUSockAddr;
 begin
   Result := TUSockAddr.Default;
-  Result.sin_addr := Addr;
-  Result.sin_port := Port;
+  Result.Addr := Addr;
+  Result.Port := Port;
 end;
 
 function TUNet.TBroker.TDomain.FindClient(const ClientId: TGuid): TClient;
@@ -1708,16 +1709,16 @@ begin
     a := IfAddrs;
     while Assigned(a) do
     try
-      if not Assigned(a^.ifa_addr) then Continue;
-      if a^.ifa_addr^.sin_family <> AF_INET then Continue;
-      Addr := a^.ifa_addr^.sin_addr;
+      if not Assigned(a^.Addr) then Continue;
+      if a^.Addr^.Family <> AF_INET then Continue;
+      Addr := a^.Addr^.Addr;
       if (Result.Addr32 = 0)
       or (Addr.Addr8[0] = 192) then
       begin
         Result := Addr;
       end;
     finally
-      a := a^.ifa_next;
+      a := a^.Next;
     end;
   finally
     FreeIfAddrs(IfAddrs);
@@ -1766,23 +1767,23 @@ function UNetLocalMacAddr: TUMacAddr;
     if (not Sock.IsValid) then Exit;
     try
       UClear(Conf, SizeOf(Conf));
-      Conf.ifc_len := SizeOf(Buffer);
-      Conf.ifcu_buf := @Buffer;
+      Conf.Len := SizeOf(Buffer);
+      Conf.Buf := @Buffer;
       r := UNetIOCtl(Sock, UNET_SIOCGIFCONF, @Conf);
       if r <> 0 then Exit;
       i := SizeOf(TUIfReq);
-      n := Conf.ifc_len div i;
-      ReqList := Conf.ifcu_req;
+      n := Conf.Len div i;
+      ReqList := Conf.Req;
       for i := 0 to n - 1 do
       begin
-        //WriteLn(ReqList^.ifrn_name);
+        //WriteLn(ReqList^.Name);
         try
           UClear(Req, SizeOf(Req));
-          Req.ifrn_name := ReqList^.ifrn_name;
+          Req.Name := ReqList^.Name;
           if not (UNetIOCtl(Sock, UNET_SIOCGIFFLAGS, @Req) = 0) then Continue;
-          if (Req.ifru_flags and UNET_IFF_LOOPBACK) > 0 then Continue;
+          if (Req.Flags and UNET_IFF_LOOPBACK) > 0 then Continue;
           if UNetIOCtl(Sock, UNET_SIOCGIFHWADDR, @Req) <> 0 then Continue;
-          Addr := PUMacAddr(@Req.ifru_hwaddr.sin_port)^;
+          Addr := PUMacAddr(@Req.HwAddr.Port)^;
           specialize UArrAppend<TUMacAddr>(Result, Addr);
         finally
           Inc(ReqList);
@@ -1804,16 +1805,16 @@ function UNetLocalMacAddr: TUMacAddr;
       a := IfAddrs;
       while Assigned(a) do
       try
-        if not Assigned(a^.ifa_addr) then Continue;
-        if (a^.ifa_flags and UNET_IFF_LOOPBACK) > 0 then Continue;
-        if a^.ifa_addr^.sin_family <> AF_PACKET then Continue;
-        if a^.ifa_addr^.sin_zero[3] <> 6 then Continue;
-        //Write('Name = ', a^.ifa_name, ' Family = ', a^.ifa_addr^.sin_family, ' Flags = ', a^.ifa_flags, ' Addr = ');
-        Addr := PUMacAddr(@a^.ifa_addr^.sin_zero[4])^;
+        if not Assigned(a^.Addr) then Continue;
+        if (a^.Flags and UNET_IFF_LOOPBACK) > 0 then Continue;
+        if a^.Addr^.Family <> AF_PACKET then Continue;
+        if a^.Addr^.Zero[3] <> 6 then Continue;
+        //Write('Name = ', a^.Name, ' Family = ', a^.Addr^.Family, ' Flags = ', a^.Flags, ' Addr = ');
+        Addr := PUMacAddr(@a^.Addr^.Zero[4])^;
         specialize UArrAppend<TUMacAddr>(Result, Addr);
         //WriteLn(UNetMacAddrToStr(Addr));
       finally
-        a := a^.ifa_next;
+        a := a^.Next;
       end;
     finally
       FreeIfAddrs(IfAddrs);
@@ -1861,10 +1862,10 @@ begin
   Result := False;
   try
     Addr := TUSockAddr.Default;
-    Addr.sin_addr := UNetStrToNetAddr('192.168.1.255');
-    Addr.sin_port := UNetHostToNetShort(7);
+    Addr.Addr := UNetStrToNetAddr('192.168.1.255');
+    Addr.Port := UNetHostToNetShort(7);
     Result := Result or SendToAddr(Addr);
-    Addr.sin_addr := TUInAddr.Broadcast;
+    Addr.Addr := TUInAddr.Broadcast;
     Result := Result or SendToAddr(Addr);
   finally
     Sock.Close;
@@ -1907,7 +1908,7 @@ begin
   if Sock = INVALID_SOCKET then Exit(False);
   try
     Addr := TUSockAddr.Default;
-    Addr.sin_addr := InAddrN;
+    Addr.Addr := InAddrN;
     UClear(Request, SizeOf(Request));
     Request.RequestType := ICMP_ECHO;
     Request.Identifier := GetCurrentThreadId mod 32768;
@@ -1915,8 +1916,8 @@ begin
     Request.Checksum := Checksum(@Request, SizeOf(Request));
     r := Sock.SendTo(@Request, SizeOf(Request), 0, @Addr, SizeOf(Addr));
     if r = SOCKET_ERROR then Exit(False);
-    TimeOut.tv_sec := 1;
-    TimeOut.tv_usec := 0;
+    TimeOut.Sec := 1;
+    TimeOut.USec := 0;
     Sock.SetSockOpt(SOL_SOCKET, SO_RCVTIMEO, @TimeOut, SizeOf(TimeOut));
     SockLen := SizeOf(Addr);
     r := Sock.RecvFrom(@ResponseBuffer, SizeOf(ResponseBuffer), 0, @Addr, @SockLen);
@@ -1984,10 +1985,10 @@ end;
 
 function UNetHostToNet(const Host: TUSockAddr): TUSockAddr;
 begin
-  Result.sin_family := Host.sin_family;
-  Result.sin_port := UNetHostToNetShort(Host.sin_port);
-  Result.sin_addr := UNetHostToNet(Host.sin_addr);
-  Result.sin_zero := Host.sin_zero;
+  Result.Family := Host.Family;
+  Result.Port := UNetHostToNetShort(Host.Port);
+  Result.Addr := UNetHostToNet(Host.Addr);
+  Result.Zero := Host.Zero;
 end;
 
 function UNetNetToHostLong(const Net: UInt32): UInt32;
@@ -2007,10 +2008,10 @@ end;
 
 function UNetNetToHost(const Net: TUSockAddr): TUSockAddr;
 begin
-  Result.sin_family := Net.sin_family;
-  Result.sin_port := UNetNetToHostShort(Net.sin_port);
-  Result.sin_addr := UNetNetToHost(Net.sin_addr);
-  Result.sin_zero := Net.sin_zero;
+  Result.Family := Net.Family;
+  Result.Port := UNetNetToHostShort(Net.Port);
+  Result.Addr := UNetNetToHost(Net.Addr);
+  Result.Zero := Net.Zero;
 end;
 
 function UNetMacAddrToStr(const Addr: TUMacAddr): AnsiString;
