@@ -12054,7 +12054,7 @@ end;
 function SysRandomWin(
   RandomBuffer: Pointer;
   RandomBufferLength: UInt32
-): ByteBool; stdcall; external 'advapi32.dll' name 'SystemFunction036';
+): Boolean; stdcall; external 'advapi32.dll' name 'SystemFunction036';
 {$endif}
 
 function USysRandom(const Size: UInt32): TUInt8Array;
@@ -12084,7 +12084,7 @@ begin
   Result := nil;
   if Size = 0 then Exit;
   SetLength(Result, Size);
-  if SysRandomWin(@Result[0], Size) <> 0 then Exit;
+  if SysRandomWin(@Result[0], Size) then Exit;
   Result := URandomBytes(Size);
 end;
 {$else}

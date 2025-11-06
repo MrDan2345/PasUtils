@@ -1689,7 +1689,7 @@ begin
 {$if defined(windows)}
   Host := UNetGetHostByName(PAnsiChar(UNetHostName));
   if not Assigned(Host) then Exit;
-  AddrArr := PInAddrArr(Host^.h_Addr_List^);
+  AddrArr := PInAddrArr(Host^.AddrList^);
   i := 0;
   while AddrArr^[i].Addr32 <> 0 do
   try
