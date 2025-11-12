@@ -89,18 +89,25 @@ public
   type TBigInt = TUInt8192;
   type TUBigIntArray = array of TBigInt;
   type TKey = record
-    n: TBigInt; // modulus
-    e: TBigInt; // public exponent
-    d: TBigInt; // private exponent
-    p: TBigInt; // first prime
-    q: TBigInt; // second prime
-    exp1: TBigInt; // d mod (p - 1)
-    exp2: TBigInt; // d mod (q - 1)
-    c: TBigInt; // q^-1 mod p
+    var n: TBigInt; // modulus
+    var e: TBigInt; // public exponent
+    var d: TBigInt; // private exponent
+    var p: TBigInt; // first prime
+    var q: TBigInt; // second prime
+    var exp1: TBigInt; // d mod (p - 1)
+    var exp2: TBigInt; // d mod (q - 1)
+    var c: TBigInt; // q^-1 mod p
     function Size: Uint32; // bit size
     function IsPublic: Boolean;
     function IsPrivate: Boolean;
     function IsCRT: Boolean;
+    function IsValid: Boolean;
+    class function MakeInvalid: TKey; static;
+  end;
+  type TKeyPublic = record
+    var n: TBigInt;
+    var e: TBigInt;
+    function Size: Uint32;
     function IsValid: Boolean;
     class function MakeInvalid: TKey; static;
   end;
@@ -682,6 +689,7 @@ public
   type TKey = record
     var d: TBigInt;
     var q: TPoint;
+    function IsValid: Boolean;
   end;
   type TSignature = record
     var r: TBigInt;
@@ -1286,6 +1294,22 @@ begin
   Result.exp1 := TBigInt.Invalid;
   Result.exp2 := TBigInt.Invalid;
   Result.c := TBigInt.Invalid;
+end;
+
+function TURSA.TKeyPublic.Size: Uint32;
+begin
+  Result := n.BytesUsed * 8;
+end;
+
+function TURSA.TKeyPublic.IsValid: Boolean;
+begin
+  Result := n.IsValid and e.IsValid;
+end;
+
+class function TURSA.TKeyPublic.MakeInvalid: TKey;
+begin
+  Result.n := TBigInt.Invalid;
+  Result.e := TBigInt.Invalid;
 end;
 
 procedure TURSA.TMakePrimeThread.Execute;
@@ -6054,6 +6078,11 @@ begin
   Result.n := '$fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141';
   Result.g.x := '$79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
   Result.g.y := '$483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8';
+end;
+
+function TUECC.TKey.IsValid: Boolean;
+begin
+  Result := d.IsValid and not q.IsAtInfinity;
 end;
 
 function TUECC.TSignature.IsValid: Boolean;

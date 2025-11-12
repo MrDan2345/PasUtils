@@ -1088,9 +1088,10 @@ end;
 
 type TUCriticalSection = record
 strict private
+  var _Init: Boolean;
   var _cs: TRTLCriticalSection;
-  procedure Initialize; inline;
-  procedure Finalize; inline;
+  procedure Initialize;
+  procedure Finalize;
 public
   procedure Enter; inline;
   function TryEnter: Boolean; inline;
@@ -6648,10 +6649,13 @@ end;
 procedure TUCriticalSection.Initialize;
 begin
   InitCriticalSection(_cs);
+  _Init := True;
 end;
 
 procedure TUCriticalSection.Finalize;
 begin
+  if not _Init then Exit;
+  _Init := False;
   DoneCriticalSection(_cs);
 end;
 
@@ -6786,7 +6790,9 @@ end;
 
 procedure TUEvent.Finalize;
 begin
+  if not Assigned(_Event) then Exit;
   RTLEventDestroy(_Event);
+  _Event := nil;
 end;
 
 procedure TUEvent.Signal;
