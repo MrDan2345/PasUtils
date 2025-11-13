@@ -30,7 +30,7 @@ type TUDoubleArray = array of TUDouble;
 type TUInt8 = type UInt8;
 type TUInt8Arr = array[UInt32] of TUInt8;
 type PUInt8Arr = ^TUInt8Arr;
-type TUInt8Array = array of TUInt8;
+type TUInt8Array = array of TUInt8; // TUInt8ArrayImpl
 type TUInt16 = type UInt16;
 type TUInt16Arr = array[UInt32] of TUInt16;
 type PUInt16Arr = ^TUInt16Arr;
@@ -189,11 +189,7 @@ public
   function ToBool: Boolean; inline;
 end;
 
-type
-
-{ TUInt8ArrayImpl }
-
- TUInt8ArrayImpl = type helper for TUInt8Array
+type TUInt8ArrayImpl = type helper for TUInt8Array
 public
   class function Make(const Size: UInt32): TUInt8Array; static;
   class function Make(const Arr: array of UInt8): TUInt8Array; static;
@@ -1847,14 +1843,14 @@ function UIntToBool(const i: Integer): Boolean;
 function UBoolToInt(const b: Boolean): Integer;
 function UBoolToStr(const b: Boolean): String;
 function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
-function UBytesToHex(const Bytes: TUInt8Array): String;
+function UBytesToHex(const Bytes: array of UInt8): String;
 function UHexToBytes(const Hex: String): TUInt8Array;
-function UBytesToBase64(const Bytes: TUInt8Array): String;
+function UBytesToBase64(const Bytes: array of UInt8): String;
 function UBase64ToBytes(const Base64: String): TUInt8Array;
 function UStrToBytes(const Str: String): TUInt8Array;
-function UBytesToString(const Bytes: TUInt8Array): String;
+function UBytesToString(const Bytes: array of UInt8): String;
 function UBytesMake(const Data: Pointer; const DataSize: UInt32): TUInt8Array;
-function UBytesReverse(const Bytes: TUInt8Array): TUInt8Array;
+function UBytesReverse(const Bytes: array of UInt8): TUInt8Array;
 function UBytesJoin(const a, b: array of UInt8): TUInt8Array;
 function UBytesConcat(const Bytes: array of TUInt8Array): TUInt8Array;
 function UBytesCompare(const a, b: array of UInt8): Int8; inline;
@@ -2128,6 +2124,7 @@ operator * (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator / (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator mod (const v: TUVec2i; const i: Int32): TUVec2i;
 operator mod (const a, b: TUInt4096_Debug): TUInt4096_Debug;
+operator := (const Bytes: array of UInt8): TUInt8Array;
 operator := (const v: TUVec2): TUVec2i;
 operator := (const v: UInt64): TUInt4096_Debug;
 operator := (const v: String): TUInt4096_Debug;
@@ -10729,7 +10726,7 @@ begin
   if b then Exit(IfTrue) else Exit(IfFalse);
 end;
 
-function UBytesToHex(const Bytes: TUInt8Array): String;
+function UBytesToHex(const Bytes: array of UInt8): String;
   var i: Int32;
 begin
   Result := '';
@@ -10759,7 +10756,7 @@ begin
   end;
 end;
 
-function UBytesToBase64(const Bytes: TUInt8Array): String;
+function UBytesToBase64(const Bytes: array of UInt8): String;
   const Base64Chars: array[0..63] of AnsiChar = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   var i, j, Len: Int32;
   var B1, B2, B3: UInt8;
@@ -10879,7 +10876,7 @@ begin
   Move(Str[1], Result[0], Length(Str));
 end;
 
-function UBytesToString(const Bytes: TUInt8Array): String;
+function UBytesToString(const Bytes: array of UInt8): String;
 begin
   Result := '';
   SetLength(Result, Length(Bytes));
@@ -10893,7 +10890,7 @@ begin
   Move(Data^, Result[0], DataSize);
 end;
 
-function UBytesReverse(const Bytes: TUInt8Array): TUInt8Array;
+function UBytesReverse(const Bytes: array of UInt8): TUInt8Array;
   var i, h: Int32;
 begin
   Result := nil;
@@ -12783,6 +12780,11 @@ end;
 operator mod (const a, b: TUInt4096_Debug): TUInt4096_Debug;
 begin
   Result := TUInt4096_Debug.Modulo(a, b);
+end;
+
+operator := (const Bytes: array of UInt8): TUInt8Array;
+begin
+  Result := TUInt8Array.Make(Bytes);
 end;
 
 operator := (const v: TUVec2): TUVec2i;
