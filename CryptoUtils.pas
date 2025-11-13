@@ -185,7 +185,7 @@ private
   class function PackDER(const Number: TBigInt): TUInt8Array; static;
   class function UnpackDER(const Bytes: TUInt8Array): TBigInt; static;
   class procedure DebugASN1(const Bytes: TUInt8Array; const Offset: String = ''); static;
-  class function EncodeTLV(const Tag: UInt8; const Value: TUInt8Array): TUInt8Array; static;
+  class function EncodeTLV(const Tag: UInt8; const Value: array of UInt8): TUInt8Array; static;
   class function DecodeTLV(const Data: TUInt8Array; var Index: Int32; out Tag: UInt8): TUInt8Array; static;
   class function ASN1ToBase64(const DataASN: TUInt8Array; const Header, Footer: String): String; static;
   class function Base64ToASN1(const Base64: String; const Header, Footer: String): TUInt8Array; static;
@@ -298,10 +298,10 @@ private
   class function ExportKeyPublic_PKCS1(const Key: TURSA.TKey): String; static;
   class function ExportKeyPrivate_PKCS8(const Key: TURSA.TKey): String; static;
   class function ExportKeyPrivateEncrypted_PKCS8(
-    const EncryptedKey: TUint8Array;
-    const HMAC_OID: TUInt8Array;
-    const ALG_OID: TUInt8Array;
-    const Salt, IV: TUInt8Array;
+    const EncryptedKey: array of UInt8;
+    const HMAC_OID: array of UInt8;
+    const ALG_OID: array of UInt8;
+    const Salt, IV: array of UInt8;
     const IterationCount: Int32
   ): String; static;
   class function ExportKeyPrivateEncrypted_PKCS8_SHA256_AES128_CBC(
@@ -797,7 +797,7 @@ private
   end;
   class function ROTR32(const x: UInt32; const n: UInt8): UInt32; static;
   class procedure G(var State: TState; const a, b, c, d, mx, my: UInt32); static;
-  class function BytesToWords(const BlockBytes: TUInt8Array): TUInt32Arr16; static;
+  class function BytesToWords(const BlockBytes: array of UInt8): TUInt32Arr16; static;
   class procedure Round(var State: TState; const Msg: TBlock); static;
   class procedure Permute(var Msg: TBlock); static;
   class function Compress(
@@ -1650,7 +1650,7 @@ end;
 
 class function TURSA.EncodeTLV(
   const Tag: UInt8;
-  const Value: TUInt8Array
+  const Value: array of UInt8
 ): TUInt8Array;
   var Len, TempLen, NumLenBytes, i: Int32;
   var LenBytes: TUInt8Array;
@@ -1680,7 +1680,7 @@ begin
       TempLen := TempLen shr 8;
     end;
   end;
-  Result := UBytesConcat([[Tag], LenBytes, Value]);
+  Result := UBytesConcat([[Tag], LenBytes, TUInt8Array.Make(Value)]);
 end;
 
 class function TURSA.DecodeTLV(
@@ -2273,15 +2273,15 @@ begin
   if Tag <> $05 then Exit(False);
   if UBytesEqual(OID, OID_SHA_256) then
   begin
-    Hash := USHA2_256(Data);
+    Hash := TUInt8Array.Make(USHA2_256(Data));
   end
   else if UBytesEqual(OID, OID_SHA_512) then
   begin
-    Hash := USHA2_512(Data);
+    Hash := TUInt8Array.Make(USHA2_512(Data));
   end
   else if UBytesEqual(OID, OID_SHA1) then
   begin
-    Hash := USHA1(Data);
+    Hash := TUInt8Array.Make(USHA1(Data));
   end
   else
   begin
@@ -2428,10 +2428,10 @@ begin
 end;
 
 class function TURSA.ExportKeyPrivateEncrypted_PKCS8(
-  const EncryptedKey: TUint8Array;
-  const HMAC_OID: TUInt8Array;
-  const ALG_OID: TUInt8Array;
-  const Salt, IV: TUInt8Array;
+  const EncryptedKey: array of UInt8;
+  const HMAC_OID: array of UInt8;
+  const ALG_OID: array of UInt8;
+  const Salt, IV: array of UInt8;
   const IterationCount: Int32
 ): String;
   var SequenceContent: TUInt8Array;
@@ -2485,7 +2485,7 @@ begin
   EncryptedKey := UEncrypt_AES_PKCS7_CBC_128(KeyPKCS8, AESKey, AESIV);
   Result := ExportKeyPrivateEncrypted_PKCS8(
     EncryptedKey, TURSA.OID_HMAC_SHA256, TURSA.OID_AES128_CBC,
-    Salt, AESIV, IterationCount
+    Salt, TUInt8Array.Make(AESIV), IterationCount
   );
 end;
 
@@ -4189,42 +4189,42 @@ end;
 
 function UDigestMD5(const Data: TUInt8Array): TUInt8Array;
 begin
-  Result := UMD5(Data);
+  Result := TUInt8Array.Make(UMD5(Data));
 end;
 
 function UDigestSHA1(const Data: TUInt8Array): TUInt8Array;
 begin
-  Result := USHA1(Data);
+  Result := TUInt8Array.Make(USHA1(Data));
 end;
 
 function UDigestSHA2_256(const Data: TUInt8Array): TUInt8Array;
 begin
-  Result := USHA2_256(Data);
+  Result := TUInt8Array.Make(USHA2_256(Data));
 end;
 
 function UDigestSHA2_512(const Data: TUInt8Array): TUInt8Array;
 begin
-  Result := USHA2_512(Data);
+  Result := TUInt8Array.Make(USHA2_512(Data));
 end;
 
 function UDigestSHA3_224(const Data: TUInt8Array): TUInt8Array;
 begin
-  Result := USHA3_224(Data);
+  Result := TUInt8Array.Make(USHA3_224(Data));
 end;
 
 function UDigestSHA3_256(const Data: TUInt8Array): TUInt8Array;
 begin
-  Result := USHA3_256(Data);
+  Result := TUInt8Array.Make(USHA3_256(Data));
 end;
 
 function UDigestSHA3_384(const Data: TUInt8Array): TUInt8Array;
 begin
-  Result := USHA3_384(Data);
+  Result := TUInt8Array.Make(USHA3_384(Data));
 end;
 
 function UDigestSHA3_512(const Data: TUInt8Array): TUInt8Array;
 begin
-  Result := USHA3_512(Data);
+  Result := TUInt8Array.Make(USHA3_512(Data));
 end;
 
 generic function UHMAC<TDigest>(
@@ -4293,37 +4293,37 @@ end;
 
 function UAuthHMAC_SHA1(const Key, Data: TUInt8Array): TUInt8Array;
 begin
-  Result := UHMAC_SHA1(Key, Data);
+  Result := TUInt8Array.Make(UHMAC_SHA1(Key, Data));
 end;
 
 function UAuthHMAC_SHA2_256(const Key, Data: TUInt8Array): TUInt8Array;
 begin
-  Result := UHMAC_SHA2_256(Key, Data);
+  Result := TUInt8Array.Make(UHMAC_SHA2_256(Key, Data));
 end;
 
 function UAuthHMAC_SHA2_512(const Key, Data: TUInt8Array): TUInt8Array;
 begin
-  Result := UHMAC_SHA2_512(Key, Data);
+  Result := TUInt8Array.Make(UHMAC_SHA2_512(Key, Data));
 end;
 
 function UAuthHMAC_SHA3_224(const Key, Data: TUInt8Array): TUInt8Array;
 begin
-  Result := UHMAC_SHA3_224(Key, Data);
+  Result := TUInt8Array.Make(UHMAC_SHA3_224(Key, Data));
 end;
 
 function UAuthHMAC_SHA3_256(const Key, Data: TUInt8Array): TUInt8Array;
 begin
-  Result := UHMAC_SHA3_256(Key, Data);
+  Result := TUInt8Array.Make(UHMAC_SHA3_256(Key, Data));
 end;
 
 function UAuthHMAC_SHA3_384(const Key, Data: TUInt8Array): TUInt8Array;
 begin
-  Result := UHMAC_SHA3_384(Key, Data);
+  Result := TUInt8Array.Make(UHMAC_SHA3_384(Key, Data));
 end;
 
 function UAuthHMAC_SHA3_512(const Key, Data: TUInt8Array): TUInt8Array;
 begin
-  Result := UHMAC_SHA3_512(Key, Data);
+  Result := TUInt8Array.Make(UHMAC_SHA3_512(Key, Data));
 end;
 
 function KMAC(
@@ -6229,17 +6229,17 @@ class function TUECC.Sign(const Curve: TCurve; const PrivateKey: TBigInt;
     SetLength(V, HashLen);
     FillChar(V[0], HashLen, 1);
     TempBytes := UBytesConcat([V, [0], DBytes, ZBytes]);
-    K := UHMAC_SHA2_256(K, TempBytes);
-    V := UHMAC_SHA2_256(K, V);
+    K := TUInt8Array.Make(UHMAC_SHA2_256(K, TempBytes));
+    V := TUInt8Array.Make(UHMAC_SHA2_256(K, V));
     TempBytes := UBytesConcat([V, [1], DBytes, ZBytes]);
-    K := UHMAC_SHA2_256(K, TempBytes);
-    V := UHMAC_SHA2_256(K, V);
+    K := TUInt8Array.Make(UHMAC_SHA2_256(K, TempBytes));
+    V := TUInt8Array.Make(UHMAC_SHA2_256(K, V));
     while True do
     begin
       T := nil;
       while Length(T) < RLen do
       begin
-        V := UHMAC_SHA2_256(K, V);
+        V := TUInt8Array.Make(UHMAC_SHA2_256(K, V));
         T := UBytesJoin(T, V);
       end;
       SetLength(T, RLen);
@@ -6249,8 +6249,8 @@ class function TUECC.Sign(const Curve: TCurve; const PrivateKey: TBigInt;
         Exit(KCandidate);
       end;
       TempBytes := UBytesJoin(V, [0]);
-      K := UHMAC_SHA2_256(K, TempBytes);
-      V := UHMAC_SHA2_256(K, V);
+      K := TUInt8Array.Make(UHMAC_SHA2_256(K, TempBytes));
+      V := TUInt8Array.Make(UHMAC_SHA2_256(K, V));
     end;
   end;
   var k, kInv, r, s: TBigInt;
@@ -6361,7 +6361,7 @@ begin
   State[b] := ROTR32(State[b] xor State[c], 7);
 end;
 
-class function TUBLAKE3.BytesToWords(const BlockBytes: TUInt8Array): TUInt32Arr16;
+class function TUBLAKE3.BytesToWords(const BlockBytes: array of UInt8): TUInt32Arr16;
   var i: Int32;
 begin
   for i := 0 to 15 do

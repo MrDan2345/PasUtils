@@ -189,9 +189,14 @@ public
   function ToBool: Boolean; inline;
 end;
 
-type TUInt8ArrayImpl = type helper for TUInt8Array
+type
+
+{ TUInt8ArrayImpl }
+
+ TUInt8ArrayImpl = type helper for TUInt8Array
 public
   class function Make(const Size: UInt32): TUInt8Array; static;
+  class function Make(const Arr: array of UInt8): TUInt8Array; static;
   function ToString: String;
   function ToHex: String;
   function ToBase64: String;
@@ -841,7 +846,11 @@ public
   function Overlap(const Other: TUBounds3i): Boolean;
 end;
 
-type generic TUBigInt<Size32> = record
+type
+
+{ TUBigInt }
+
+ generic TUBigInt<Size32> = record
 public
   type TSelf = specialize TUBigInt<Size32>;
   class function MaxItem: Int32; static;
@@ -887,7 +896,7 @@ public
   procedure SetNegative(const Value: Boolean);
   class function Make(const Number: Int64): TSelf; static;
   class function Make(const Number: String): TSelf; static;
-  class function Make(const Bytes: TUInt8Array): TSelf; static;
+  class function Make(const Bytes: array of UInt8): TSelf; static;
   class function MakeRandom(const BitCount: Int32 = 2048): TSelf; static;
   class function MakeRandomRange(const Min, Max: TSelf): TSelf; static;
   class function FromBase64(const Base64: String): TSelf; static;
@@ -2301,6 +2310,14 @@ class function TUInt8ArrayImpl.Make(const Size: UInt32): TUInt8Array;
 begin
   Result := nil;
   SetLength(Result, Size);
+end;
+
+class function TUInt8ArrayImpl.Make(const Arr: array of UInt8): TUInt8Array;
+begin
+  Result := nil;
+  if Length(Arr) = 0 then Exit;
+  SetLength(Result, Length(Arr));
+  Move(Arr[0], Result[0], Length(Arr));
 end;
 
 function TUInt8ArrayImpl.ToString: String;
@@ -5242,7 +5259,7 @@ begin
   FromDec;
 end;
 
-class function TUBigInt.Make(const Bytes: TUInt8Array): TSelf;
+class function TUBigInt.Make(const Bytes: array of UInt8): TSelf;
 begin
   Result := Zero;
   Move(Bytes[0], Result, UMin(Size32.Value * 4, Length(Bytes)));
