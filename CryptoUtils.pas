@@ -6423,10 +6423,27 @@ class function TUECC.Montgomery.ScalarMultiply(
   const Curve: TCurve;
   const k, u: TBigInt
 ): TBigInt;
+  procedure CSwap(var a, b: TBigInt; const Swap: Boolean);
+    var Mask: TBigInt;
+    var Temp: TBigInt;
+  begin
+    if Swap then
+    begin
+      Mask := TBigInt.MaxValue;
+    end
+    else
+    begin
+      Mask := TBigInt.Zero;
+    end;
+    Temp := a xor b;
+    Temp := Temp and Mask;
+    a := a xor Temp;
+    b := b xor Temp;
+  end;
   var x1, x2, z2, x3, z3: TBigInt;
   var Tmp0, Tmp1: TBigInt;
   var A, AA, B, BB, E, C, D, DA, CB: TBigInt;
-  var Swap, Bit: UInt8;
+  var Swap, Bit: Boolean;
   var i: Int32;
   var a24: TBigInt;
 begin
@@ -6436,15 +6453,13 @@ begin
   z2 := TBigInt.Zero;
   x3 := u;
   z3 := TBigInt.One;
-  Swap := 0;
+  Swap := False;
   for i := 254 downto 0 do
   begin
-    Bit := UInt8(k.GetBit(i));
-    if (Swap xor Bit) > 0 then
-    begin
-      Tmp0 := x2; x2 := x3; x3 := Tmp0;
-      Tmp0 := z2; z2 := z3; z3 := Tmp0;
-    end;
+    Bit := k.GetBit(i);
+    Swap := Swap xor Bit;
+    CSwap(x2, x3, Swap);
+    CSwap(z2, z3, Swap);
     Swap := Bit;
     A := Curve.Add(x2, z2);
     AA := Curve.Mul(A, A);
@@ -6465,11 +6480,8 @@ begin
     Tmp1 := Curve.Add(AA, Tmp0);
     z2 := Curve.Mul(E, Tmp1);
   end;
-  if Swap > 0 then
-  begin
-    Tmp0 := x2; x2 := x3; x3 := Tmp0;
-    Tmp0 := z2; z2 := z3; z3 := Tmp0;
-  end;
+  CSwap(x2, x3, Swap);
+  CSwap(z2, z3, Swap);
   Result := Curve.Mul(x2, Curve.Inv(z2));
 end;
 
