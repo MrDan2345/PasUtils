@@ -842,11 +842,7 @@ public
   function Overlap(const Other: TUBounds3i): Boolean;
 end;
 
-type
-
-{ TUBigInt }
-
- generic TUBigInt<Size32> = record
+type generic TUBigInt<Size32> = record
 public
   type TSelf = specialize TUBigInt<Size32>;
   class function MaxItem: Int32; static;
@@ -873,6 +869,7 @@ public
   property Data[const Index: Int32]: UInt32 read GetData write SetData; default;
   class function Zero: TSelf; static;
   class function One: TSelf; static;
+  class function MaxValue: TSelf; static;
   class function Invalid: TSelf; static;
   function Top: UInt32;
   function IsZero: Boolean;
@@ -890,6 +887,9 @@ public
   function BytesUsed: Int32;
   procedure SetPositive(const Value: Boolean);
   procedure SetNegative(const Value: Boolean);
+  function GetBit(const Index: Int32): Boolean;
+  procedure SetBit(const Index: Int32);
+  procedure ClearBit(const Index: Int32);
   class function Make(const Number: Int64): TSelf; static;
   class function Make(const Number: String): TSelf; static;
   class function Make(const Bytes: array of UInt8): TSelf; static;
@@ -902,8 +902,8 @@ public
   class function Division(const a, b: TSelf; out r: TSelf): TSelf; static; overload;
   class function Division(const a, b: TSelf): TSelf; static; overload;
   class function Modulo(const a, b: TSelf): TSelf; static;
-  class function ModPower(const Base, Exp, Modulus: TSelf): TSelf; static;
-  class function ModInverse(const Exp, Phi: TSelf): TSelf; static;
+  class function ModPow(const Base, Exp, Modulus: TSelf): TSelf; static;
+  class function ModInv(const Exp, Phi: TSelf): TSelf; static;
   class function Compare(const a, b: TSelf): Int8; static;
   class function ShrOne(const Number: TSelf): TSelf; static;
   class function ShlOne(const Number: TSelf): TSelf; static;
@@ -4976,6 +4976,16 @@ begin
   Result._Data[0] := 1;
 end;
 
+class function TUBigInt.MaxValue: TSelf;
+  var i: Int32;
+begin
+  for i := 0 to MaxItem do
+  begin
+    Result._Data[i] := $ffffffff;
+  end;
+  Result._Flags := [];
+end;
+
 class function TUBigInt.Invalid: TSelf;
 begin
   Result := Zero;
@@ -5145,6 +5155,30 @@ end;
 procedure TUBigInt.SetNegative(const Value: Boolean);
 begin
   SetFlag(sf_negative, Value);
+end;
+
+function TUBigInt.GetBit(const Index: Int32): Boolean;
+  var ItemInd, BitInd: Int32;
+begin
+  ItemInd := Index div 32;
+  BitInd := Index mod 32;
+  Result := (_Data[ItemInd] shr BitInd) and 1 = 1;
+end;
+
+procedure TUBigInt.SetBit(const Index: Int32);
+  var ItemInd, BitInd: Int32;
+begin
+  ItemInd := Index div 32;
+  BitInd := Index mod 32;
+  _Data[ItemInd] := _Data[ItemInd] or (1 shl BitInd);
+end;
+
+procedure TUBigInt.ClearBit(const Index: Int32);
+  var ItemInd, BitInd: Int32;
+begin
+  ItemInd := Index div 32;
+  BitInd := Index mod 32;
+  _Data[ItemInd] := _Data[ItemInd] and not UInt32(1 shl BitInd);
 end;
 
 class function TUBigInt.Make(const Number: Int64): TSelf;
@@ -5382,7 +5416,7 @@ begin
   Result.SetNegative(a.IsNegative);
 end;
 
-class function TUBigInt.ModPower(const Base, Exp, Modulus: TSelf): TSelf;
+class function TUBigInt.ModPow(const Base, Exp, Modulus: TSelf): TSelf;
   var Context: specialize TUMontgomeryReduction<TSelf>;
   var BaseMont: TSelf;
   var ResultMont: TSelf;
@@ -5404,7 +5438,7 @@ begin
   Result := Context.Mul(ResultMont, One);
 end;
 
-class function TUBigInt.ModInverse(const Exp, Phi: TSelf): TSelf;
+class function TUBigInt.ModInv(const Exp, Phi: TSelf): TSelf;
   var ZeroN: TSelf;
   var OneN: TSelf;
   var x0, x1, a, m, q, temp: TSelf;

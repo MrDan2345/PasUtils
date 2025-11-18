@@ -669,58 +669,98 @@ end;
 type TUECC = record
 public
   type TBigInt = TUInt512;
-  type TPoint = record
-    var x: TBigInt;
-    var y: TBigInt;
-    class function AtInfinity: TPoint; static;
-    function IsAtInfinity: Boolean;
-    class operator = (const a, b: TPoint): Boolean;
+  type Weierstrass = record
+    type TPoint = record
+      var x: TBigInt;
+      var y: TBigInt;
+      class function AtInfinity: TPoint; static;
+      function IsAtInfinity: Boolean;
+      class operator = (const a, b: TPoint): Boolean;
+    end;
+    type TCurve = record
+      var p: TBigInt; // prime modulus
+      var a: TBigInt; // param a
+      var b: TBigInt; // param b
+      var n: TBigInt; // order modulus
+      var g: TPoint; // generation point
+      function IsOnCurve(const Point: TPoint): Boolean;
+      class function Make_SECP256R1: TCurve; static;
+      class function Make_SECP256K1: TCurve; static;
+    end;
+    type TKey = record
+      var d: TBigInt;
+      var q: TPoint;
+      function IsValid: Boolean;
+    end;
+    type TSignature = record
+      var r: TBigInt;
+      var s: TBigInt;
+      function IsValid: Boolean;
+      function IsValid(const n: TBigInt): Boolean;
+    end;
+    class var Curve_SECP256R1: TCurve;
+    class var Curve_SECP256K1: TCurve;
+    class function PointAdd(const Curve: TCurve; const a, b: TPoint): TPoint; static;
+    class function PointMultiply(const Curve: TCurve; const a: TPoint; const b: TBigInt): TPoint; static;
+    class function MakeKey(const Curve: TCurve): TKey; static;
+    class function DeriveKey(const Curve: TCurve; const BaseData, Context: TUInt8Array): TKey; static;
+    class function Sign(
+      const Curve: TCurve;
+      const PrivateKey: TBigInt;
+      const MessageHash: TBigInt
+    ): TSignature; static;
+    class function Verify(
+      const Curve: TCurve;
+      const PublicKey: TPoint;
+      const MessageHash: TBigInt;
+      const Signature: TSignature
+    ): Boolean; static;
+    class function SharedKey(
+      const Curve: TCurve;
+      const PublicKey: TPoint;
+      const PrivateKey: TBigInt
+    ): TBigInt; static;
+    class constructor CreateClass;
   end;
-  type TCurve = record
-    var p: TBigInt; // prime modulus
-    var a: TBigInt; // param a
-    var b: TBigInt; // param b
-    var n: TBigInt; // order modulus
-    var g: TPoint; // generation point
-    function IsOnCurve(const Point: TPoint): Boolean;
-    class function Make_SECP256R1: TCurve; static;
-    class function Make_SECP256K1: TCurve; static;
+  type Montgomery = record
+  public
+    type TCurve = record
+      var p: TBigInt; // prime modulus
+      var a: TBigInt; // param a
+      var b: TBigInt; // param b
+      var u: TBigInt; // base point
+      var n: TBigInt; // order
+      var h: TBigInt; // cofactor
+      function Add(const v1, v2: TBigInt): TBigInt;
+      function Sub(const v1, v2: TBigInt): TBigInt;
+      function Mul(const v1, v2: TBigInt): TBigInt;
+      function Inv(const v: TBigInt): TBigInt;
+    end;
+    type TKey = record
+      var d: TBigInt;
+      var q: TBigInt;
+      function IsValid: Boolean;
+    end;
+    class var Curve_25519: TCurve;
+    class var LowOrderPoints: array [0..4] of TBigInt;
+    class function IsLowOrderPoint(const p: TBigInt): Boolean; static;
+    class function ScalarClamp(const k: TBigInt): TBigInt; static;
+    class function ScalarMultiply(
+      const Curve: TCurve;
+      const k, u: TBigInt
+    ): TBigInt; static;
+    class function X25519(
+      const Curve: TCurve;
+      const k, u: TBigInt
+    ): TBigInt; static;
+    class function MakeKey(const Curve: TCurve): TKey; static;
+    class function SharedKey(
+      const Curve: TCurve;
+      const PublicKey: TBigInt;
+      const PrivateKey: TBigInt
+    ): TBigInt; static;
+    class constructor CreateClass;
   end;
-  type TKey = record
-    var d: TBigInt;
-    var q: TPoint;
-    function IsValid: Boolean;
-  end;
-  type TSignature = record
-    var r: TBigInt;
-    var s: TBigInt;
-    function IsValid: Boolean;
-    function IsValid(const n: TBigInt): Boolean;
-  end;
-  class var Curve_SECP256R1: TCurve;
-  class var Curve_SECP256K1: TCurve;
-public
-  class function PointAdd(const Curve: TCurve; const a, b: TPoint): TPoint; static;
-  class function PointMultiply(const Curve: TCurve; const a: TPoint; const b: TBigInt): TPoint; static;
-  class function MakeKey(const Curve: TCurve): TKey; static;
-  class function DeriveKey(const Curve: TCurve; const BaseData, Context: TUInt8Array): TKey; static;
-  class function Sign(
-    const Curve: TCurve;
-    const PrivateKey: TBigInt;
-    const MessageHash: TBigInt
-  ): TSignature; static;
-  class function Verify(
-    const Curve: TCurve;
-    const PublicKey: TPoint;
-    const MessageHash: TBigInt;
-    const Signature: TSignature
-  ): Boolean; static;
-  class function SharedKey(
-    const Curve: TCurve;
-    const PublicKey: TPoint;
-    const PrivateKey: TBigInt
-  ): TBigInt; static;
-  class constructor CreateClass;
 end;
 
 type TUBLAKE3 = record
@@ -1238,22 +1278,22 @@ function UDecrypt_DES_Triple_PKCS7_CTR(
   const Nonce: TUDES.TInitVector
 ): TUInt8Array;
 
-function UMakeECCKey: TUECC.TKey;
+function UMakeECCKey: TUECC.Weierstrass.TKey;
 function USign_ECDSA(
   const MessageHash: TUECC.TBigInt;
   const PrivateKey: TUECC.TBigInt
-): TUECC.TSignature;
+): TUECC.Weierstrass.TSignature;
 function USign_ECDSA_SHA2_256(
   const Message: TUInt8Array;
   const PrivateKey: TUECC.TBigInt
-): TUECC.TSignature;
+): TUECC.Weierstrass.TSignature;
 function UVerify_ECDSA(
   const MessageHash: TUECC.TBigInt;
-  const PublicKey: TUECC.TPoint;
-  const Signature: TUECC.TSignature
+  const PublicKey: TUECC.Weierstrass.TPoint;
+  const Signature: TUECC.Weierstrass.TSignature
 ): Boolean;
 function USharedKey_ECDH(
-  const PublicKey: TUECC.TPoint;
+  const PublicKey: TUECC.Weierstrass.TPoint;
   const PrivateKey: TUECC.TBigInt
 ): TUECC.TBigInt;
 
@@ -1555,12 +1595,12 @@ begin
   for i := 1 to Iterations do
   begin
     a := TBigInt.MakeRandomRange(Two, n_minus_2);
-    x := TBigInt.ModPower(a, d, Number);
+    x := TBigInt.ModPow(a, d, Number);
     if (x = TBigInt.One) or (x = n_minus_1) then Continue;
     m_temp := m;
     while m_temp > 1 do
     begin
-      x := TBigInt.ModPower(x, Two, Number);
+      x := TBigInt.ModPow(x, Two, Number);
       if x = TBigInt.One then Exit(False);
       if x = n_minus_1 then Break;
       Dec(m_temp);
@@ -1844,7 +1884,7 @@ begin
     q_minus_1 := q - One;
     phi := p_minus_1 * q_minus_1;
   until (p <> q) and (GCD(e, phi) = One);
-  d := TBigInt.ModInverse(e, phi);
+  d := TBigInt.ModInv(e, phi);
   Result.n := n;
   Result.e := e;
   Result.d := d;
@@ -1852,7 +1892,7 @@ begin
   Result.p := p;
   Result.exp1 := d mod p_minus_1;
   Result.exp2 := d mod q_minus_1;
-  Result.c := TBigInt.ModInverse(q, p);
+  Result.c := TBigInt.ModInv(q, p);
 end;
 
 class function TURSA.PackData_PKCS1(
@@ -2122,7 +2162,7 @@ class function TURSA.Encrypt_PKCS1(
 begin
   Block := PackData_PKCS1(Data, DataSize, Key.Size);
   if not Block.IsValid then Exit(TBigInt.Invalid);
-  Result := TBigInt.ModPower(Block, Key.e, Key.n);
+  Result := TBigInt.ModPow(Block, Key.e, Key.n);
 end;
 
 class function TURSA.Decrypt_PKCS1_Str(
@@ -2154,7 +2194,7 @@ class function TURSA.Encrypt_OAEP(
 begin
   Block := PackData_OAEP(Data, DataSize, Key.Size);
   if not Block.IsValid then Exit(TBigInt.Invalid);
-  Result := TBigInt.ModPower(Block, Key.e, Key.n);
+  Result := TBigInt.ModPow(Block, Key.e, Key.n);
 end;
 
 class function TURSA.Decrypt_OAEP_Str(
@@ -2185,8 +2225,8 @@ class function TURSA.Decrypt_CRT(
 begin
   c_mod_p := Cipher mod Key.p;
   c_mod_q := Cipher mod Key.q;
-  m1 := TBigInt.ModPower(c_mod_p, Key.exp1, Key.p);
-  m2 := TBigInt.ModPower(c_mod_q, Key.exp2, Key.q);
+  m1 := TBigInt.ModPow(c_mod_p, Key.exp1, Key.p);
+  m2 := TBigInt.ModPow(c_mod_q, Key.exp2, Key.q);
   if m1 < m2 then
   begin
     h := m1 + Key.p;
@@ -2207,7 +2247,7 @@ class function TURSA.Decrypt(
 ): TBigInt;
 begin
   if Key.IsCRT then Exit(Decrypt_CRT(Cipher, Key));
-  Result := TBigInt.ModPower(Cipher, Key.d, Key.n);
+  Result := TBigInt.ModPow(Cipher, Key.d, Key.n);
 end;
 
 class function TURSA.Sign_SHA256(const Data: TUInt8Array; const Key: TKey): TUInt8Array;
@@ -2224,7 +2264,7 @@ begin
     EncodeTLV($04, Hash)
   ]));
   PackedHash := PackData_Singature(@HashDER[0], Length(HashDER), Key.Size);
-  Signature := TBigInt.ModPower(PackedHash, Key.d, Key.n);
+  Signature := TBigInt.ModPow(PackedHash, Key.d, Key.n);
   Result := Signature.ToBytes;
 end;
 
@@ -2242,7 +2282,7 @@ begin
     EncodeTLV($04, Hash)
   ]));
   PackedHash := PackData_Singature(@HashDER[0], Length(HashDER), Key.Size);
-  Signature := TBigInt.ModPower(PackedHash, Key.d, Key.n);
+  Signature := TBigInt.ModPow(PackedHash, Key.d, Key.n);
   Result := Signature.ToBytes;
 end;
 
@@ -2256,7 +2296,7 @@ class function TURSA.Verify(
   var Index: Int32;
   var Tag: UInt8;
 begin
-  PackedHash := TBigInt.ModPower(TBigInt(Signature), Key.e, Key.n);
+  PackedHash := TBigInt.ModPow(TBigInt(Signature), Key.e, Key.n);
   Index := 0;
   UnpackedDER := UnpackData_Singature(PackedHash, Key.Size);
   SignedHashDER := DecodeTLV(UnpackedDER, Index, Tag);
@@ -3557,12 +3597,12 @@ begin
   for i := 1 to Iterations do
   begin
     a := TURSA.TBigInt.MakeRandomRange(Two, n_minus_2);
-    x := TURSA.TBigInt.ModPower(a, d, Number);
+    x := TURSA.TBigInt.ModPow(a, d, Number);
     if (x = TURSA.TBigInt.One) or (x = n_minus_1) then Continue;
     m_temp := m;
     while m_temp > 1 do
     begin
-      x := TURSA.TBigInt.ModPower(x, Two, Number);
+      x := TURSA.TBigInt.ModPow(x, Two, Number);
       if x = TURSA.TBigInt.One then Exit(False);
       if x = n_minus_1 then Break;
       Dec(m_temp);
@@ -6032,23 +6072,23 @@ begin
   end;
 end;
 
-class function TUECC.TPoint.AtInfinity: TPoint;
+class function TUECC.Weierstrass.TPoint.AtInfinity: TPoint;
 begin
   Result.x := TBigInt.Zero;
   Result.y := TBigInt.Zero;
 end;
 
-function TUECC.TPoint.IsAtInfinity: Boolean;
+function TUECC.Weierstrass.TPoint.IsAtInfinity: Boolean;
 begin
   Result := (x = TBigInt.Zero) and (y = TBigInt.Zero);
 end;
 
-class operator TUECC.TPoint.=(const a, b: TPoint): Boolean;
+class operator TUECC.Weierstrass.TPoint.=(const a, b: TPoint): Boolean;
 begin
   Result := (a.x = b.x) and (a.y = b.y);
 end;
 
-function TUECC.TCurve.IsOnCurve(const Point: TPoint): Boolean;
+function TUECC.Weierstrass.TCurve.IsOnCurve(const Point: TPoint): Boolean;
   var LeftSide, RightSide: TUInt512;
 begin
   if Point.IsAtInfinity then Exit(True);
@@ -6060,7 +6100,7 @@ begin
   Result := (LeftSide = RightSide);
 end;
 
-class function TUECC.TCurve.Make_SECP256R1: TCurve;
+class function TUECC.Weierstrass.TCurve.Make_SECP256R1: TCurve;
 begin
   Result.p := '$ffffffff00000001000000000000000000000000ffffffffffffffffffffffff';
   Result.a := '$ffffffff00000001000000000000000000000000fffffffffffffffffffffffc';
@@ -6070,7 +6110,7 @@ begin
   Result.g.y := '$4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5';
 end;
 
-class function TUECC.TCurve.Make_SECP256K1: TCurve;
+class function TUECC.Weierstrass.TCurve.Make_SECP256K1: TCurve;
 begin
   Result.p := '$fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f';
   Result.a := 0;
@@ -6080,22 +6120,22 @@ begin
   Result.g.y := '$483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8';
 end;
 
-function TUECC.TKey.IsValid: Boolean;
+function TUECC.Weierstrass.TKey.IsValid: Boolean;
 begin
   Result := d.IsValid and not q.IsAtInfinity;
 end;
 
-function TUECC.TSignature.IsValid: Boolean;
+function TUECC.Weierstrass.TSignature.IsValid: Boolean;
 begin
   Result := (r > TBigInt.Zero) and (s > TBigInt.Zero);
 end;
 
-function TUECC.TSignature.IsValid(const n: TBigInt): Boolean;
+function TUECC.Weierstrass.TSignature.IsValid(const n: TBigInt): Boolean;
 begin
   Result := (r > TBigInt.Zero) and (s > TBigInt.Zero) and (r < n) and (s < n);
 end;
 
-class function TUECC.PointAdd(const Curve: TCurve; const a, b: TPoint): TPoint;
+class function TUECC.Weierstrass.PointAdd(const Curve: TCurve; const a, b: TPoint): TPoint;
   var Lambda, Temp: TUInt512;
   var x3, y3: TUInt512;
   var Two, Three: TUInt512;
@@ -6114,7 +6154,7 @@ begin
       Temp := (Temp + Curve.A) mod Curve.p;
       Two := 2;
       Lambda := (Two * a.y) mod Curve.p;
-      Lambda := TBigInt.ModInverse(Lambda, Curve.p);
+      Lambda := TBigInt.ModInv(Lambda, Curve.p);
       Lambda := (Temp * Lambda) mod Curve.p;
     end
     else
@@ -6126,7 +6166,7 @@ begin
   begin
     Temp := (b.y - a.y + Curve.p) mod Curve.p;
     Lambda := (b.x - a.x + Curve.p) mod Curve.p;
-    Lambda := TBigInt.ModInverse(Lambda, Curve.p);
+    Lambda := TBigInt.ModInv(Lambda, Curve.p);
     Lambda := (Temp * Lambda) mod Curve.p;
   end;
   x3 := (Lambda * Lambda) mod Curve.p;
@@ -6139,7 +6179,7 @@ begin
   Result.y := y3;
 end;
 
-class function TUECC.PointMultiply(
+class function TUECC.Weierstrass.PointMultiply(
   const Curve: TCurve;
   const a: TPoint;
   const b: TBigInt
@@ -6173,7 +6213,7 @@ begin
   Result := R;
 end;
 
-class function TUECC.MakeKey(const Curve: TCurve): TKey;
+class function TUECC.Weierstrass.MakeKey(const Curve: TCurve): TKey;
 begin
   repeat
     Result.d := TBigInt.MakeRandomRange(TBigInt.One, Curve.n - TBigInt.One);
@@ -6181,7 +6221,7 @@ begin
   until not Result.q.IsAtInfinity and Curve.IsOnCurve(Result.q);
 end;
 
-class function TUECC.DeriveKey(
+class function TUECC.Weierstrass.DeriveKey(
   const Curve: TCurve;
   const BaseData, Context: TUInt8Array
 ): TKey;
@@ -6196,7 +6236,7 @@ begin
   Result.q := PointMultiply(Curve, Curve.g, Result.d);
 end;
 
-class function TUECC.Sign(const Curve: TCurve; const PrivateKey: TBigInt;
+class function TUECC.Weierstrass.Sign(const Curve: TCurve; const PrivateKey: TBigInt;
   const MessageHash: TBigInt): TSignature;
   function GenerateK: TBigInt;
     function FixedSizeBytes(
@@ -6267,7 +6307,7 @@ begin
   kG := PointMultiply(Curve, Curve.g, k);
   if kG.IsAtInfinity then Exit;
   r := kG.x mod n;
-  kInv := TBigInt.ModInverse(k, n);
+  kInv := TBigInt.ModInv(k, n);
   s := (r * PrivateKey) mod n;
   s := (z + s) mod n;
   s := (kInv * s) mod n;
@@ -6276,7 +6316,7 @@ begin
   Result.s := s;
 end;
 
-class function TUECC.Verify(
+class function TUECC.Weierstrass.Verify(
   const Curve: TCurve;
   const PublicKey: TPoint;
   const MessageHash: TBigInt;
@@ -6293,7 +6333,7 @@ begin
   if not Curve.IsOnCurve(PublicKey) then Exit(False);
   if s > (n div 2) then Exit(False);
   z := MessageHash mod Curve.n;
-  sInv := TBigInt.ModInverse(s, n);
+  sInv := TBigInt.ModInv(s, n);
   u1 := (z * sInv) mod n;
   u2 := (r * sInv) mod n;
   P1 := PointMultiply(Curve, Curve.g, u1);
@@ -6304,7 +6344,7 @@ begin
   Result := (x1 = r);
 end;
 
-class function TUECC.SharedKey(
+class function TUECC.Weierstrass.SharedKey(
   const Curve: TCurve;
   const PublicKey: TPoint;
   const PrivateKey: TBigInt
@@ -6319,10 +6359,156 @@ begin
   Result := SharedPoint.x;
 end;
 
-class constructor TUECC.CreateClass;
+class constructor TUECC.Weierstrass.CreateClass;
 begin
   Curve_SECP256R1 := TCurve.Make_SECP256R1;
   Curve_SECP256K1 := TCurve.Make_SECP256K1;
+end;
+
+function TUECC.Montgomery.TCurve.Add(const v1, v2: TBigInt): TBigInt;
+begin
+  Result := (v1 + v2) mod p;
+end;
+
+function TUECC.Montgomery.TCurve.Sub(const v1, v2: TBigInt): TBigInt;
+begin
+  Result := (v1 - v2 + p) mod p;
+end;
+
+function TUECC.Montgomery.TCurve.Mul(const v1, v2: TBigInt): TBigInt;
+begin
+  Result := (v1 * v2) mod p;
+end;
+
+function TUECC.Montgomery.TCurve.Inv(const v: TBigInt): TBigInt;
+begin
+  Result := TBigInt.ModPow(v, (p - 2), p);
+end;
+
+function TUECC.Montgomery.TKey.IsValid: Boolean;
+begin
+  Result := d.IsValid and q.IsValid;
+end;
+
+class function TUECC.Montgomery.IsLowOrderPoint(const p: TBigInt): Boolean;
+  var i: Int32;
+begin
+  for i := 0 to High(LowOrderPoints) do
+  if p = LowOrderPoints[i] then
+  begin
+    Exit(True);
+  end;
+  Result := False;
+end;
+
+class function TUECC.Montgomery.ScalarClamp(const k: TBigInt): TBigInt;
+begin
+  Result := k;
+  Result.Data[0] := k.Data[0] and $fffffff8;
+  Result.ClearBit(255);
+  Result.SetBit(254);
+end;
+
+class function TUECC.Montgomery.ScalarMultiply(
+  const Curve: TCurve;
+  const k, u: TBigInt
+): TBigInt;
+  var x1, x2, z2, x3, z3: TBigInt;
+  var Tmp0, Tmp1: TBigInt;
+  var A, AA, B, BB, E, C, D, DA, CB: TBigInt;
+  var Swap, Bit: UInt8;
+  var i: Int32;
+  var a24: TBigInt;
+begin
+  a24 := 121666;
+  x1 := u;
+  x2 := TBigInt.One;
+  z2 := TBigInt.Zero;
+  x3 := u;
+  z3 := TBigInt.One;
+  Swap := 0;
+  for i := 254 downto 0 do
+  begin
+    Bit := UInt8(k.GetBit(i));
+    if (Swap xor Bit) > 0 then
+    begin
+      Tmp0 := x2; x2 := x3; x3 := Tmp0;
+      Tmp0 := z2; z2 := z3; z3 := Tmp0;
+    end;
+    Swap := Bit;
+    A := Curve.Add(x2, z2);
+    AA := Curve.Mul(A, A);
+    B := Curve.Sub(x2, z2);
+    BB := Curve.Mul(B, B);
+    E := Curve.Sub(AA, BB);
+    C := Curve.Add(x3, z3);
+    D := Curve.Sub(x3, z3);
+    DA := Curve.Mul(D, A);
+    CB := Curve.Mul(C, B);
+    Tmp0 := Curve.Add(DA, CB);
+    x3 := Curve.Mul(Tmp0, Tmp0);
+    Tmp0 := Curve.Sub(DA, CB);
+    Tmp1 := Curve.Mul(Tmp0, Tmp0);
+    z3 := Curve.Mul(x1, Tmp1);
+    x2 := Curve.Mul(AA, BB);
+    Tmp0 := Curve.Mul(a24, E);
+    Tmp1 := Curve.Add(AA, Tmp0);
+    z2 := Curve.Mul(E, Tmp1);
+  end;
+  if Swap > 0 then
+  begin
+    Tmp0 := x2; x2 := x3; x3 := Tmp0;
+    Tmp0 := z2; z2 := z3; z3 := Tmp0;
+  end;
+  Result := Curve.Mul(x2, Curve.Inv(z2));
+end;
+
+class function TUECC.Montgomery.X25519(
+  const Curve: TCurve;
+  const k, u: TBigInt
+): TBigInt;
+begin
+  Result := ScalarMultiply(Curve, ScalarClamp(k), u);
+end;
+
+class function TUECC.Montgomery.MakeKey(const Curve: TCurve): TKey;
+begin
+  repeat
+    Result.d := ScalarClamp(TBigInt.Make(USysRandom(32)));
+    Result.q := ScalarMultiply(Curve, Result.d, Curve.u);
+  until not IsLowOrderPoint(Result.q);
+end;
+
+class function TUECC.Montgomery.SharedKey(
+  const Curve: TCurve;
+  const PublicKey: TBigInt;
+  const PrivateKey: TBigInt
+): TBigInt;
+begin
+  if not PublicKey.IsValid then Exit(TBigInt.Invalid);
+  if not PrivateKey.IsValid then Exit(TBigInt.Invalid);
+  if (PublicKey < TBigInt.Zero) then Exit(TBigInt.Invalid);
+  if (PublicKey >= Curve.p) then Exit(TBigInt.Invalid);
+  if (PrivateKey < TBigInt.Zero) then Exit(TBigInt.Invalid);
+  if (PrivateKey >= Curve.n) then Exit(TBigInt.Invalid);
+  if IsLowOrderPoint(PublicKey) then Exit(TBigInt.Invalid);
+  Result := ScalarMultiply(Curve, PrivateKey, PublicKey);
+  if Result.IsZero then Exit(TBigInt.Invalid);
+end;
+
+class constructor TUECC.Montgomery.CreateClass;
+begin
+  Curve_25519.p := '$7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed';
+  Curve_25519.a := 486662;
+  Curve_25519.b := 1;
+  Curve_25519.u := 9;
+  Curve_25519.n := '$1000000000000000000000000000000014def9dea2f79cd65812631a5cf5d3ed';
+  Curve_25519.h := 8;
+  LowOrderPoints[0] := TBigInt.Zero;
+  LowOrderPoints[1] := TBigInt.One;
+  LowOrderPoints[2] := '$5f9c95bcbca5804c120b1d5bc9835efb04445cc4581c8e86d8224eddd09f1157';
+  LowOrderPoints[3] := '$e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800';
+  LowOrderPoints[4] := '$ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f';
 end;
 
 class function TUBLAKE3.KeyFromHex(const Hex: String): TKey;
@@ -7015,18 +7201,18 @@ begin
   Result := TUDES.Process_Triple_CTR(Cipher, Key, Nonce);
 end;
 
-function UMakeECCKey: TUECC.TKey;
+function UMakeECCKey: TUECC.Weierstrass.TKey;
 begin
-  Result := TUECC.MakeKey(TUECC.Curve_SECP256R1);
+  Result := TUECC.Weierstrass.MakeKey(TUECC.Weierstrass.Curve_SECP256R1);
 end;
 
 function USign_ECDSA(
   const MessageHash: TUECC.TBigInt;
   const PrivateKey: TUECC.TBigInt
-): TUECC.TSignature;
+): TUECC.Weierstrass.TSignature;
 begin
-  Result := TUECC.Sign(
-    TUECC.Curve_SECP256R1,
+  Result := TUECC.Weierstrass.Sign(
+    TUECC.Weierstrass.Curve_SECP256R1,
     PrivateKey,
     MessageHash
   );
@@ -7035,12 +7221,12 @@ end;
 function USign_ECDSA_SHA2_256(
   const Message: TUInt8Array;
   const PrivateKey: TUECC.TBigInt
-): TUECC.TSignature;
+): TUECC.Weierstrass.TSignature;
   var MessageHash: TUDigestSHA2_256;
 begin
   MessageHash := USHA2_256(Message);
-  Result := TUECC.Sign(
-    TUECC.Curve_SECP256R1,
+  Result := TUECC.Weierstrass.Sign(
+    TUECC.Weierstrass.Curve_SECP256R1,
     PrivateKey,
     TUECC.TBigInt.Make(MessageHash)
   );
@@ -7048,12 +7234,12 @@ end;
 
 function UVerify_ECDSA(
   const MessageHash: TUECC.TBigInt;
-  const PublicKey: TUECC.TPoint;
-  const Signature: TUECC.TSignature
+  const PublicKey: TUECC.Weierstrass.TPoint;
+  const Signature: TUECC.Weierstrass.TSignature
 ): Boolean;
 begin
-  Result := TUECC.Verify(
-    TUECC.Curve_SECP256R1,
+  Result := TUECC.Weierstrass.Verify(
+    TUECC.Weierstrass.Curve_SECP256R1,
     PublicKey,
     MessageHash,
     Signature
@@ -7061,12 +7247,12 @@ begin
 end;
 
 function USharedKey_ECDH(
-  const PublicKey: TUECC.TPoint;
+  const PublicKey: TUECC.Weierstrass.TPoint;
   const PrivateKey: TUECC.TBigInt
 ): TUECC.TBigInt;
 begin
-  Result := TUECC.SharedKey(
-    TUECC.Curve_SECP256R1,
+  Result := TUECC.Weierstrass.SharedKey(
+    TUECC.Weierstrass.Curve_SECP256R1,
     PublicKey,
     PrivateKey
   );
