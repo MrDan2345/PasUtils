@@ -703,6 +703,7 @@ public
     class function PointAdd(const Curve: TCurve; const a, b: TPoint): TPoint; static;
     class function PointMultiply(const Curve: TCurve; const a: TPoint; const b: TBigInt): TPoint; static;
     class function MakeKey(const Curve: TCurve): TKey; static;
+    class function DerivePublicKey(const Curve: TCurve; const PrivateKey: TBigInt): TPoint; static;
     class function DeriveKey(const Curve: TCurve; const BaseData, Context: TUInt8Array): TKey; static;
     class function Sign(
       const Curve: TCurve;
@@ -754,6 +755,7 @@ public
       const k, u: TBigInt
     ): TBigInt; static;
     class function MakeKey(const Curve: TCurve): TKey; static;
+    class function DerivePublicKey(const Curve: TCurve; const PrivateKey: TBigInt): TBigInt; static;
     class function SharedKey(
       const Curve: TCurve;
       const PublicKey: TBigInt;
@@ -6221,6 +6223,14 @@ begin
   until not Result.q.IsAtInfinity and Curve.IsOnCurve(Result.q);
 end;
 
+class function TUECC.Weierstrass.DerivePublicKey(
+  const Curve: TCurve;
+  const PrivateKey: TBigInt
+): TPoint;
+begin
+  Result := PointMultiply(Curve, Curve.g, PrivateKey);
+end;
+
 class function TUECC.Weierstrass.DeriveKey(
   const Curve: TCurve;
   const BaseData, Context: TUInt8Array
@@ -6420,7 +6430,7 @@ class function TUECC.Montgomery.ScalarMultiply(
   var i: Int32;
   var a24: TBigInt;
 begin
-  a24 := 121666;
+  a24 := 121665;
   x1 := u;
   x2 := TBigInt.One;
   z2 := TBigInt.Zero;
@@ -6479,6 +6489,14 @@ begin
   until not IsLowOrderPoint(Result.q);
 end;
 
+class function TUECC.Montgomery.DerivePublicKey(
+  const Curve: TCurve;
+  const PrivateKey: TBigInt
+): TBigInt;
+begin
+  Result := X25519(Curve, PrivateKey, Curve.u);
+end;
+
 class function TUECC.Montgomery.SharedKey(
   const Curve: TCurve;
   const PublicKey: TBigInt;
@@ -6490,13 +6508,13 @@ begin
   if (PublicKey < TBigInt.Zero) then Exit(TBigInt.Invalid);
   if (PublicKey >= Curve.p) then Exit(TBigInt.Invalid);
   if (PrivateKey < TBigInt.Zero) then Exit(TBigInt.Invalid);
-  if (PrivateKey >= Curve.n) then Exit(TBigInt.Invalid);
   if IsLowOrderPoint(PublicKey) then Exit(TBigInt.Invalid);
-  Result := ScalarMultiply(Curve, PrivateKey, PublicKey);
+  Result := X25519(Curve, PrivateKey, PublicKey);
   if Result.IsZero then Exit(TBigInt.Invalid);
 end;
 
 class constructor TUECC.Montgomery.CreateClass;
+  var p, n: TBigInt;
 begin
   Curve_25519.p := '$7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed';
   Curve_25519.a := 486662;

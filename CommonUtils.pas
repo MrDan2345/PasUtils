@@ -880,6 +880,7 @@ public
   function ToString: String;
   function ToBase64: String;
   function ToHex: String;
+  function ToHexLC: String;
   function ToInt: Int64;
   function ToBytes: TUInt8Array;
   function ToBytesBE: TUInt8Array;
@@ -5099,6 +5100,11 @@ begin
   end;
   Result := Result.TrimLeft('0');
   if IsNegative then Result := '-' + Result;
+end;
+
+function TUBigInt.ToHexLC: String;
+begin
+  Result := LowerCase(ToHex);
 end;
 
 function TUBigInt.ToInt: Int64;
