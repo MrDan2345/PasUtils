@@ -867,7 +867,7 @@ private
   procedure SetData(const Index: Int32; const Value: UInt32); inline;
 public
   property Data[const Index: Int32]: UInt32 read GetData write SetData; default;
-  class var Zero: TSelf;
+  class function Zero: TSelf; static;
   class function One: TSelf; static;
   class function MaxValue: TSelf; static;
   class function Invalid: TSelf; static;
@@ -4968,6 +4968,12 @@ begin
   _Data[Index] := Value;
 end;
 
+class function TUBigInt.Zero: TSelf;
+begin
+  UClear(Zero._Data, SizeOf(Zero._Data));
+  Zero._Flags := [];
+end;
+
 class function TUBigInt.One: TSelf;
 begin
   Result := Zero;
@@ -5186,8 +5192,6 @@ end;
 
 class constructor TUBigInt.CreateClass;
 begin
-  UClear(Zero._Data, SizeOf(Zero._Data));
-  Zero._Flags := [];
 end;
 
 class function TUBigInt.Make(const Number: Int64): TSelf;

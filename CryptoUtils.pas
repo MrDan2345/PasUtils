@@ -783,6 +783,8 @@ public
       var n: TBigInt; // order
       var h: TBigInt; // cofactor
       var b: TPoint; // base point
+      function IsOnCurve(const Point: TPoint): Boolean;
+      function ToAffine(const Point: TPoint): TPoint;
       function Add(const v1, v2: TBigInt): TBigInt;
       function Sub(const v1, v2: TBigInt): TBigInt;
       function Mul(const v1, v2: TBigInt): TBigInt;
@@ -792,7 +794,6 @@ public
     class function PointAdd(const Curve: TCurve; const p, q: TPoint): TPoint; static;
     class function PointDouble(const Curve: TCurve; const p: TPoint): TPoint; static;
     class function ScalarMultiply(const Curve: TCurve; const k: TBigInt; const p: TPoint): TPoint; static;
-    class function PointToAffine(const Curve: TCurve; const p: TPoint): TPoint; static;
     class function PointCompress(const Curve: TCurve; const p: TPoint): TPointCompressed; static;
     class function PointDecompress(const Curve: TCurve; const pc: TPointCompressed): TPoint; static;
     class constructor CreateClass;
@@ -6600,6 +6601,32 @@ begin
   Result := x.IsValid and y.IsValid and z.IsValid and t.IsValid;
 end;
 
+function TUECC.Edwards.TCurve.IsOnCurve(const Point: TPoint): Boolean;
+  var Affine: TPoint;
+  var lhs, rhs, x2, y2, x2y2: TBigInt;
+begin
+  Affine := ToAffine(Point);
+  x2 := Mul(Affine.x, Affine.x);
+  y2 := Mul(Affine.y, Affine.y);
+  x2y2 := Mul(x2, y2);
+  lhs := Sub(y2, x2);
+  rhs := Mul(d, x2y2);
+  rhs := Add(rhs, TBigInt.One);
+  Result := lhs = rhs;
+end;
+
+function TUECC.Edwards.TCurve.ToAffine(const Point: TPoint): TPoint;
+  var InvZ: TBigInt;
+begin
+  if not Point.IsValid then Exit(TPoint.Invalid);
+  if Point.z = TBigInt.Zero then Exit(TPoint.Invalid);
+  InvZ := Inv(Point.z);
+  Result.x := Mul(Point.x, InvZ);
+  Result.y := Mul(Point.y, InvZ);
+  Result.z := TBigInt.One;
+  Result.t := Mul(Result.x, Result.y);
+end;
+
 function TUECC.Edwards.TCurve.Add(const v1, v2: TBigInt): TBigInt;
 begin
   Result := (v1 + v2) mod p;
@@ -6697,18 +6724,6 @@ begin
   Result := R0;
 end;
 
-class function TUECC.Edwards.PointToAffine(const Curve: TCurve; const p: TPoint): TPoint;
-  var InvZ: TBigInt;
-begin
-  if not p.IsValid then Exit(TPoint.Invalid);
-  if p.z = TBigInt.Zero then Exit(TPoint.Invalid);
-  InvZ := Curve.Inv(p.z);
-  Result.x := Curve.Mul(p.x, InvZ);
-  Result.y := Curve.Mul(p.y, InvZ);
-  Result.z := TBigInt.One;
-  Result.t := Curve.Mul(Result.x, Result.y);
-end;
-
 class function TUECC.Edwards.PointCompress(
   const Curve: TCurve;
   const p: TPoint
@@ -6717,10 +6732,10 @@ class function TUECC.Edwards.PointCompress(
   var BytesY: TUInt8Array;
   var i: Int32;
 begin
-  Affine := PointToAffine(Curve, p);
+  Affine := Curve.ToAffine(p);
   BytesY := Affine.y.ToBytes;
   UInit(Result[0], BytesY[0], UMin(Length(BytesY), SizeOf(Result)));
-  for i := Length(BytesY) to SizeOf(Result) do Result[i] := 0;
+  for i := Length(BytesY) to High(Result) do Result[i] := 0;
   if Affine.x.GetBit(0) then
   begin
     Result[31] := Result[31] or $80;
@@ -6740,7 +6755,7 @@ class function TUECC.Edwards.PointDecompress(
   var SignBit: Boolean;
   var Three, Five, Eight: TBigInt;
 begin
-  SignBit := Boolean((pc[31] shr 7) and 1);
+  SignBit := (pc[31] and $80) > 0;
   BytesY := pc;
   BytesY[31] := BytesY[31] and $7F;
   y := BytesY;
