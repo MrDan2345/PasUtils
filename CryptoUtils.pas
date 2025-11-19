@@ -729,9 +729,9 @@ public
       var p: TBigInt; // prime modulus
       var a: TBigInt; // param a
       var b: TBigInt; // param b
-      var u: TBigInt; // base point
       var n: TBigInt; // order
       var h: TBigInt; // cofactor
+      var u: TBigInt; // base point
       function Add(const v1, v2: TBigInt): TBigInt;
       function Sub(const v1, v2: TBigInt): TBigInt;
       function Mul(const v1, v2: TBigInt): TBigInt;
@@ -761,6 +761,40 @@ public
       const PublicKey: TBigInt;
       const PrivateKey: TBigInt
     ): TBigInt; static;
+    class constructor CreateClass;
+  end;
+  type Edwards = record
+  public
+    type TPoint = record
+      var x: TBigInt;
+      var y: TBigInt;
+      var z: TBigInt;
+      var t: TBigInt;
+      class function Neutral: TPoint; static;
+      function IsNeutral: Boolean;
+      class function Invalid: TPoint; static;
+      function IsValid: Boolean;
+    end;
+    type TPointCompressed = array[0..31] of UInt8;
+    type TCurve = record
+      var p: TBigInt; // prime modulus
+      var a: TBigInt; // param a
+      var d: TBigInt; // param d
+      var n: TBigInt; // order
+      var h: TBigInt; // cofactor
+      var b: TPoint; // base point
+      function Add(const v1, v2: TBigInt): TBigInt;
+      function Sub(const v1, v2: TBigInt): TBigInt;
+      function Mul(const v1, v2: TBigInt): TBigInt;
+      function Inv(const v: TBigInt): TBigInt;
+    end;
+    class var Curve_Ed25519: TCurve;
+    class function PointAdd(const Curve: TCurve; const p, q: TPoint): TPoint; static;
+    class function PointDouble(const Curve: TCurve; const p: TPoint): TPoint; static;
+    class function ScalarMultiply(const Curve: TCurve; const k: TBigInt; const p: TPoint): TPoint; static;
+    class function PointToAffine(const Curve: TCurve; const p: TPoint): TPoint; static;
+    class function PointCompress(const Curve: TCurve; const p: TPoint): TPointCompressed; static;
+    class function PointDecompress(const Curve: TCurve; const pc: TPointCompressed): TPoint; static;
     class constructor CreateClass;
   end;
 end;
@@ -6526,7 +6560,6 @@ begin
 end;
 
 class constructor TUECC.Montgomery.CreateClass;
-  var p, n: TBigInt;
 begin
   Curve_25519.p := '$7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed';
   Curve_25519.a := 486662;
@@ -6539,6 +6572,225 @@ begin
   LowOrderPoints[2] := '$5f9c95bcbca5804c120b1d5bc9835efb04445cc4581c8e86d8224eddd09f1157';
   LowOrderPoints[3] := '$e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800';
   LowOrderPoints[4] := '$ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f';
+end;
+
+class function TUECC.Edwards.TPoint.Neutral: TPoint;
+begin
+  Result.x := TBigInt.Zero;
+  Result.y := TBigInt.One;
+  Result.z := TBigInt.One;
+  Result.t := TBigInt.Zero;
+end;
+
+function TUECC.Edwards.TPoint.IsNeutral: Boolean;
+begin
+  Result := (x.IsZero) and (y = z) and (t.IsZero);
+end;
+
+class function TUECC.Edwards.TPoint.Invalid: TPoint;
+begin
+  Result.x := TBigInt.Invalid;
+  Result.y := TBigInt.Invalid;
+  Result.z := TBigInt.Invalid;
+  Result.t := TBigInt.Invalid;
+end;
+
+function TUECC.Edwards.TPoint.IsValid: Boolean;
+begin
+  Result := x.IsValid and y.IsValid and z.IsValid and t.IsValid;
+end;
+
+function TUECC.Edwards.TCurve.Add(const v1, v2: TBigInt): TBigInt;
+begin
+  Result := (v1 + v2) mod p;
+end;
+
+function TUECC.Edwards.TCurve.Sub(const v1, v2: TBigInt): TBigInt;
+begin
+  Result := (v1 - v2 + p) mod p;
+end;
+
+function TUECC.Edwards.TCurve.Mul(const v1, v2: TBigInt): TBigInt;
+begin
+  Result := (v1 * v2) mod p;
+end;
+
+function TUECC.Edwards.TCurve.Inv(const v: TBigInt): TBigInt;
+begin
+  Result := TBigInt.ModPow(v, (p - 2), p);
+end;
+
+class function TUECC.Edwards.PointAdd(
+  const Curve: TCurve;
+  const p, q: TPoint
+): TPoint;
+  var A, B, C, D, E, F, G, H: TBigInt;
+begin
+  A := Curve.Mul(P.x, Q.x);
+  B := Curve.Mul(P.y, Q.y);
+  C := Curve.Mul(P.t, Q.t);
+  C := Curve.Mul(Curve.d, C);
+  D := Curve.Mul(P.z, Q.z);
+  E := Curve.Add(P.x, P.y);
+  E := Curve.Mul(E, Curve.Add(Q.x, Q.y));
+  E := Curve.Sub(E, A);
+  E := Curve.Sub(E, B);
+  F := Curve.Sub(D, C);
+  G := Curve.Add(D, C);
+  H := Curve.Mul(Curve.a, A);
+  H := Curve.Sub(B, H);
+  Result.x := Curve.Mul(E, F);
+  Result.y := Curve.Mul(G, H);
+  Result.z := Curve.Mul(F, G);
+  Result.t := Curve.Mul(E, H);
+end;
+
+class function TUECC.Edwards.PointDouble(
+  const Curve: TCurve;
+  const p: TPoint
+): TPoint;
+  var A, B, C, D, E, F, H, G: TBigInt;
+begin
+  A := Curve.Mul(P.x, P.x);
+  B := Curve.Mul(P.y, P.y);
+  C := Curve.Mul(P.z, P.z);
+  C := Curve.Add(C, C);
+  D := Curve.Mul(Curve.a, A);
+  E := Curve.Add(P.x, P.y);
+  E := Curve.Mul(E, E);
+  E := Curve.Sub(E, A);
+  E := Curve.Sub(E, B);
+  G := Curve.Add(D, B);
+  F := Curve.Sub(G, C);
+  H := Curve.Sub(D, B);
+  Result.x := Curve.Mul(E, F);
+  Result.y := Curve.Mul(G, H);
+  Result.z := Curve.Mul(F, G);
+  Result.t := Curve.Mul(E, H);
+end;
+
+class function TUECC.Edwards.ScalarMultiply(
+  const Curve: TCurve;
+  const k: TBigInt;
+  const p: TPoint
+): TPoint;
+  var R0, R1: TPoint;
+  var i: Int32;
+  var TempK: TBigInt;
+begin
+  TempK := k mod Curve.n;
+  R0 := TPoint.Neutral;
+  R1 := P;
+  for i := 254 downto 0 do
+  begin
+    if TempK.GetBit(i) then
+    begin
+      R0 := PointAdd(Curve, R0, R1);
+      R1 := PointDouble(Curve, R1);
+    end
+    else
+    begin
+      R1 := PointAdd(Curve, R0, R1);
+      R0 := PointDouble(Curve, R0);
+    end;
+  end;
+  Result := R0;
+end;
+
+class function TUECC.Edwards.PointToAffine(const Curve: TCurve; const p: TPoint): TPoint;
+  var InvZ: TBigInt;
+begin
+  if not p.IsValid then Exit(TPoint.Invalid);
+  if p.z = TBigInt.Zero then Exit(TPoint.Invalid);
+  InvZ := Curve.Inv(p.z);
+  Result.x := Curve.Mul(p.x, InvZ);
+  Result.y := Curve.Mul(p.y, InvZ);
+  Result.z := TBigInt.One;
+  Result.t := Curve.Mul(Result.x, Result.y);
+end;
+
+class function TUECC.Edwards.PointCompress(
+  const Curve: TCurve;
+  const p: TPoint
+): TPointCompressed;
+  var Affine: TPoint;
+  var BytesY: TUInt8Array;
+  var i: Int32;
+begin
+  Affine := PointToAffine(Curve, p);
+  BytesY := Affine.y.ToBytes;
+  UInit(Result[0], BytesY[0], UMin(Length(BytesY), SizeOf(Result)));
+  for i := Length(BytesY) to SizeOf(Result) do Result[i] := 0;
+  if Affine.x.GetBit(0) then
+  begin
+    Result[31] := Result[31] or $80;
+  end
+  else
+  begin
+    Result[31] := Result[31] and $7F;
+  end;
+end;
+
+class function TUECC.Edwards.PointDecompress(
+  const Curve: TCurve;
+  const pc: TPointCompressed
+): TPoint;
+  var BytesY: TUInt8Array;
+  var y, x, x2, y2, u, v, v3, v7, TempX: TBigInt;
+  var SignBit: Boolean;
+  var Three, Five, Eight: TBigInt;
+begin
+  SignBit := Boolean((pc[31] shr 7) and 1);
+  BytesY := pc;
+  BytesY[31] := BytesY[31] and $7F;
+  y := BytesY;
+  if y >= Curve.p then Exit(TPoint.Invalid);
+  y2 := Curve.Mul(y, y);
+  u := Curve.Sub(y2, TBigInt.One);
+  v := Curve.Mul(Curve.d, y2);
+  v := Curve.Add(v, TBigInt.One);
+  x2 := Curve.Mul(u, Curve.Inv(v));
+  Three := 3;
+  Five := 5;
+  Eight := 8;
+  TempX := TBigInt.ModPow(x2, (Curve.p + Three) div Eight, Curve.p);
+  if Curve.Mul(TempX, TempX) <> x2 then
+  begin
+    v3 := Curve.Mul(v, v);
+    v3 := Curve.Mul(v3, v);
+    v7 := Curve.Mul(v3, v3);
+    v7 := Curve.Mul(v7, v);
+    x := Curve.Mul(u, v7);
+    x := TBigInt.ModPow(x, (Curve.p - Five) div Eight, Curve.p);
+    x := Curve.Mul(Curve.Mul(u, v3), x);
+    x2 := Curve.Mul(x, x);
+    if Curve.Mul(v, x2) <> u then Exit(TPoint.Invalid);
+  end
+  else
+  begin
+    x := TempX;
+  end;
+  if x.GetBit(0) <> SignBit then
+  begin
+    x := Curve.Sub(TBigInt.Zero, x);
+  end;
+  Result.x := x;
+  Result.y := y;
+  Result.z := TBigInt.One;
+  Result.t := Curve.Mul(x, y);
+end;
+
+class constructor TUECC.Edwards.CreateClass;
+begin
+  Curve_Ed25519.p := '$7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed';
+  Curve_Ed25519.a := Curve_Ed25519.p - TBigInt.One;
+  Curve_Ed25519.d := '$52036cee2b6ffe738cc740797779e89800700a4d4141d8ab75eb4dca135978a3';
+  Curve_Ed25519.n := '$1000000000000000000000000000000014def9dea2f79cd65812631a5cf5d3ed';
+  Curve_Ed25519.h := 8;
+  Curve_Ed25519.b.x := '$216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51a';
+  Curve_Ed25519.b.y := '$6666666666666666666666666666666666666666666666666666666666666658';
+  Curve_Ed25519.b.z := TBigInt.One;;
+  Curve_Ed25519.b.t := '$67875f0fd78604e27eb9e7db11961b2c8c9f37cc6f0d87fe4569dc00c6e5b2a4';
 end;
 
 class function TUBLAKE3.KeyFromHex(const Hex: String): TKey;

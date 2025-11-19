@@ -867,7 +867,7 @@ private
   procedure SetData(const Index: Int32; const Value: UInt32); inline;
 public
   property Data[const Index: Int32]: UInt32 read GetData write SetData; default;
-  class function Zero: TSelf; static;
+  class var Zero: TSelf;
   class function One: TSelf; static;
   class function MaxValue: TSelf; static;
   class function Invalid: TSelf; static;
@@ -891,6 +891,7 @@ public
   function GetBit(const Index: Int32): Boolean;
   procedure SetBit(const Index: Int32);
   procedure ClearBit(const Index: Int32);
+  class constructor CreateClass;
   class function Make(const Number: Int64): TSelf; static;
   class function Make(const Number: String): TSelf; static;
   class function Make(const Bytes: array of UInt8): TSelf; static;
@@ -905,6 +906,7 @@ public
   class function Modulo(const a, b: TSelf): TSelf; static;
   class function ModPow(const Base, Exp, Modulus: TSelf): TSelf; static;
   class function ModInv(const Exp, Phi: TSelf): TSelf; static;
+  class function ModDiv(const a, b, Modulus: TSelf; out r: TSelf): TSelf; static;
   class function Compare(const a, b: TSelf): Int8; static;
   class function ShrOne(const Number: TSelf): TSelf; static;
   class function ShlOne(const Number: TSelf): TSelf; static;
@@ -1834,6 +1836,7 @@ type TUExprMatchHelper = type helper for TUExprMatch
 end;
 
 procedure UClear(out x; const Size: UInt32);
+procedure UInit(out Dest; const Src; const Size: UInt32);
 procedure UMove(out Dest; const Src; const Size: UInt32);
 function UIntToPtr(const i: PtrUInt): Pointer;
 function UCopyVarRec(constref src: TVarRec): TVarRec;
@@ -4965,12 +4968,6 @@ begin
   _Data[Index] := Value;
 end;
 
-class function TUBigInt.Zero: TSelf;
-begin
-  UClear(Result._Data, SizeOf(Result._Data));
-  Result._Flags := [];
-end;
-
 class function TUBigInt.One: TSelf;
 begin
   Result := Zero;
@@ -5185,6 +5182,12 @@ begin
   ItemInd := Index div 32;
   BitInd := Index mod 32;
   _Data[ItemInd] := _Data[ItemInd] and not UInt32(1 shl BitInd);
+end;
+
+class constructor TUBigInt.CreateClass;
+begin
+  UClear(Zero._Data, SizeOf(Zero._Data));
+  Zero._Flags := [];
 end;
 
 class function TUBigInt.Make(const Number: Int64): TSelf;
@@ -5468,6 +5471,13 @@ begin
   if a <> OneN then Exit(Invalid);
   if (x1 < 0) then x1 := x1 + Phi;
   Result := x1;
+end;
+
+class function TUBigInt.ModDiv(const a, b, Modulus: TSelf; out r: TSelf): TSelf;
+  var d: TSelf;
+begin
+  if a < b then d := a + Modulus else d := a;
+  Result := Division(d, b, r);
 end;
 
 class function TUBigInt.Compare(const a, b: TSelf): Int8;
@@ -10620,6 +10630,13 @@ procedure UClear(out x; const Size: UInt32);
 begin
   {$push}{$hints off}
   FillChar(x, Size, 0);
+  {$pop}
+end;
+
+procedure UInit(out Dest; const Src; const Size: UInt32);
+begin
+  {$push}{$hints off}
+  Move(Src, Dest, Size);
   {$pop}
 end;
 
