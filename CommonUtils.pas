@@ -191,8 +191,13 @@ end;
 
 type TUInt8ArrayImpl = type helper for TUInt8Array
 public
+  class function Make(const Str: String): TUInt8Array; static;
   class function Make(const Size: UInt32): TUInt8Array; static;
+  class function Make(const Data: Pointer; const Size: UInt32): TUInt8Array; static;
   class function Make(const Arr: array of UInt8): TUInt8Array; static;
+  class function Make(const Arr: array of UInt16): TUInt8Array; static;
+  class function Make(const Arr: array of UInt32): TUInt8Array; static;
+  class function Make(const Arr: array of UInt64): TUInt8Array; static;
   function ToString: String;
   function ToHex: String;
   function ToBase64: String;
@@ -919,7 +924,7 @@ public
   class operator Initialize(var v: TSelf);
   class operator := (const v: Int64): TSelf;
   class operator := (const v: String): TSelf;
-  class operator := (const v: TUInt8Array): TSelf;
+  class operator := (const v: array of UInt8): TSelf;
   class operator + (const a, b: TSelf): TSelf;
   class operator - (const a, b: TSelf): TSelf;
   class operator * (const a, b: TSelf): TSelf;
@@ -1848,6 +1853,7 @@ function UBoolToInt(const b: Boolean): Integer;
 function UBoolToStr(const b: Boolean): String;
 function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
 function UBytesToHex(const Bytes: array of UInt8): String;
+function UBytesToHexLC(const Bytes: array of UInt8): String;
 function UHexToBytes(const Hex: String): TUInt8Array;
 function UBytesToBase64(const Bytes: array of UInt8): String;
 function UBase64ToBytes(const Base64: String): TUInt8Array;
@@ -2129,6 +2135,10 @@ operator / (const v: TUVec2i; const f: TUFloat): TUVec2;
 operator mod (const v: TUVec2i; const i: Int32): TUVec2i;
 operator mod (const a, b: TUInt4096_Debug): TUInt4096_Debug;
 operator := (const Bytes: array of UInt8): TUInt8Array;
+operator := (const Bytes: array of UInt16): TUInt8Array;
+operator := (const Bytes: array of UInt32): TUInt8Array;
+operator := (const Bytes: array of UInt64): TUInt8Array;
+operator := (const Str: String): TUInt8Array;
 operator := (const v: TUVec2): TUVec2i;
 operator := (const v: UInt64): TUInt4096_Debug;
 operator := (const v: String): TUInt4096_Debug;
@@ -2307,10 +2317,26 @@ end;
 // TUInt8Impl end
 
 // TUInt8ArrayImpl begin
+class function TUInt8ArrayImpl.Make(const Str: String): TUInt8Array;
+begin
+  Result := nil;
+  if Length(Str) = 0 then Exit;
+  SetLength(Result, Length(Str));
+  Move(Str[1], Result[0], Length(Str));
+end;
+
 class function TUInt8ArrayImpl.Make(const Size: UInt32): TUInt8Array;
 begin
   Result := nil;
   SetLength(Result, Size);
+end;
+
+class function TUInt8ArrayImpl.Make(const Data: Pointer; const Size: UInt32): TUInt8Array;
+begin
+  Result := nil;
+  if Size = 0 then Exit;
+  SetLength(Result, Size);
+  Move(Data^, Result[0], Size);
 end;
 
 class function TUInt8ArrayImpl.Make(const Arr: array of UInt8): TUInt8Array;
@@ -2319,6 +2345,30 @@ begin
   if Length(Arr) = 0 then Exit;
   SetLength(Result, Length(Arr));
   Move(Arr[0], Result[0], Length(Arr));
+end;
+
+class function TUInt8ArrayImpl.Make(const Arr: array of UInt16): TUInt8Array;
+begin
+  Result := nil;
+  if Length(Arr) = 0 then Exit;
+  SetLength(Result, Length(Arr) * SizeOf(Arr[0]));
+  Move(Arr[0], Result[0], Length(Arr) * SizeOf(Arr[0]));
+end;
+
+class function TUInt8ArrayImpl.Make(const Arr: array of UInt32): TUInt8Array;
+begin
+  Result := nil;
+  if Length(Arr) = 0 then Exit;
+  SetLength(Result, Length(Arr) * SizeOf(Arr[0]));
+  Move(Arr[0], Result[0], Length(Arr) * SizeOf(Arr[0]));
+end;
+
+class function TUInt8ArrayImpl.Make(const Arr: array of UInt64): TUInt8Array;
+begin
+  Result := nil;
+  if Length(Arr) = 0 then Exit;
+  SetLength(Result, Length(Arr) * SizeOf(Arr[0]));
+  Move(Arr[0], Result[0], Length(Arr) * SizeOf(Arr[0]));
 end;
 
 function TUInt8ArrayImpl.ToString: String;
@@ -5617,7 +5667,7 @@ begin
   Result := Make(v);
 end;
 
-class operator TUBigInt.:=(const v: TUInt8Array): TSelf;
+class operator TUBigInt.:=(const v: array of UInt8): TSelf;
 begin
   Result := Make(v);
 end;
@@ -10797,6 +10847,11 @@ begin
   end;
 end;
 
+function UBytesToHexLC(const Bytes: array of UInt8): String;
+begin
+  Result := LowerCase(UBytesToHex(Bytes));
+end;
+
 function UHexToBytes(const Hex: String): TUInt8Array;
   var ByteCount: Int32;
   var i, j: Int32;
@@ -12846,6 +12901,26 @@ end;
 operator := (const Bytes: array of UInt8): TUInt8Array;
 begin
   Result := TUInt8Array.Make(Bytes);
+end;
+
+operator := (const Bytes: array of UInt16): TUInt8Array;
+begin
+  Result := TUInt8Array.Make(Bytes);
+end;
+
+operator := (const Bytes: array of UInt32): TUInt8Array;
+begin
+  Result := TUInt8Array.Make(Bytes);
+end;
+
+operator := (const Bytes: array of UInt64): TUInt8Array;
+begin
+  Result := TUInt8Array.Make(Bytes);
+end;
+
+operator := (const Str: String): TUInt8Array;
+begin
+  Result := TUInt8Array.Make(Str);
 end;
 
 operator := (const v: TUVec2): TUVec2i;
