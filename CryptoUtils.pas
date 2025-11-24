@@ -768,6 +768,9 @@ public
       const Bytes: Pointer;
       const First, Last: UInt32
     ); static;
+    class function IsAllZero(
+      const Arr: array of UInt8
+    ): Boolean; static;
   public
     type TPoint = record
       var x: TBigInt;
@@ -789,7 +792,7 @@ public
       var n: TBigInt; // order
       var h: TBigInt; // cofactor
       var b: TPoint; // base point
-      var SqrtM1: TBigInt;
+      var SqrtM1: TBigInt; // cached sqrt(-1)
       function IsOnCurve(const Point: TPoint): Boolean;
       function ToAffine(const Point: TPoint): TPoint;
       function Add(const v1, v2: TBigInt): TBigInt;
@@ -799,13 +802,13 @@ public
     end;
     type TKey = record
       var d: TUInt8Arr32;
-      var q: TPointCompressed;
+      var q: TUInt8Arr32;
       function IsValid: Boolean;
       class function Invalid: TKey; static;
     end;
     type TSignature = record
-      var r: TPointCompressed;
-      var s: TBigInt;
+      var r: TUInt8Arr32;
+      var s: TUInt8Arr32;
       function IsValid(const Curve: TCurve): Boolean;
       class function Invalid: TSignature; static;
       function ToHex: String;
@@ -6712,18 +6715,8 @@ begin
 end;
 
 function TUECC.Edwards.TKey.IsValid: Boolean;
-  function IsAllZero(const Arr: array of UInt8): Boolean;
-    var i: Int32;
-  begin
-    for i := 0 to High(Arr) do
-    if Arr[i] > 0 then
-    begin
-      Exit(False);
-    end;
-    Result := True;
-  end;
 begin
-  Result := not IsAllZero(d) and not IsAllZero(q);
+  Result := not Edwards.IsAllZero(d) and not Edwards.IsAllZero(q);
 end;
 
 class function TUECC.Edwards.TKey.Invalid: TKey;
@@ -6734,7 +6727,7 @@ end;
 function TUECC.Edwards.TSignature.IsValid(const Curve: TCurve): Boolean;
   var i: Int32;
 begin
-  if not s.IsValid then Exit(False);
+  if Edwards.IsAllZero(s) then Exit(False);
   if s >= Curve.n then Exit(False);
   for i := 0 to High(r) do if r[i] > 0 then Exit(True);
   Result := False;
@@ -6742,13 +6735,12 @@ end;
 
 class function TUECC.Edwards.TSignature.Invalid: TSignature;
 begin
-  UClear(Result.r, SizeOf(Result.r));
-  Result.s := TBigInt.Invalid;
+  UClear(Result, SizeOf(Result));
 end;
 
 function TUECC.Edwards.TSignature.ToHex: String;
 begin
-  Result := UBytesToHexLC(UBytesJoin(r, s.ToBytes));
+  Result := UBytesToHexLC(UBytesJoin(r, s));
 end;
 
 class procedure TUECC.Edwards.Clamp(
@@ -6758,6 +6750,17 @@ class procedure TUECC.Edwards.Clamp(
 begin
   PUInt8Arr(Bytes)^[First] := PUInt8Arr(Bytes)^[First] and $f8;
   PUInt8Arr(Bytes)^[Last] := (PUInt8Arr(Bytes)^[Last] and $7f) or $40;
+end;
+
+class function TUECC.Edwards.IsAllZero(const Arr: array of UInt8): Boolean;
+  var i: Int32;
+begin
+  for i := 0 to High(Arr) do
+  if Arr[i] > 0 then
+  begin
+    Exit(False);
+  end;
+  Result := True;
 end;
 
 class function TUECC.Edwards.PointAdd(
@@ -6955,7 +6958,7 @@ begin
   Hram := TBigInt.Make(USHA2_512(Temp)) mod Curve.n;
   S := (Hram * a) mod Curve.n;
   S := (Nonce + S) mod Curve.n;
-  Result.s := S;
+  UInit(Result.s, S, SizeOf(Result.s));
 end;
 
 class function TUECC.Edwards.Verify_Ed25519(
@@ -7041,7 +7044,7 @@ begin
   Hram := TBigInt.Make(UBLAKE3_Hash(Temp, 64)) mod Curve.n;
   S := (Hram * a) mod Curve.n;
   S := (Nonce + S) mod Curve.n;
-  Result.s := S;
+  UInit(Result.s, S, SizeOf(Result.s));
 end;
 
 class function TUECC.Edwards.Verify_Ed25519_BLAKE3(
@@ -7127,7 +7130,7 @@ begin
   Hram := TBigInt.Make(USHAKE_256(Temp, 64)) mod Curve.n;
   S := (Hram * a) mod Curve.n;
   S := (Nonce + S) mod Curve.n;
-  Result.s := S;
+  UInit(Result.s, S, SizeOf(Result.s));
 end;
 
 class function TUECC.Edwards.Verify_Ed25519_SHAKE(
