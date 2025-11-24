@@ -668,7 +668,7 @@ end;
 
 type TUECC = record
 public
-  type TBigInt = TUInt512;
+  type TBigInt = TUInt1024;
   type Weierstrass = record
     type TPoint = record
       var x: TBigInt;
@@ -724,7 +724,6 @@ public
     class constructor CreateClass;
   end;
   type Montgomery = record
-  public
     type TCurve = record
       var p: TBigInt; // prime modulus
       var a: TBigInt; // param a
@@ -790,6 +789,7 @@ public
       var n: TBigInt; // order
       var h: TBigInt; // cofactor
       var b: TPoint; // base point
+      var SqrtM1: TBigInt;
       function IsOnCurve(const Point: TPoint): Boolean;
       function ToAffine(const Point: TPoint): TPoint;
       function Add(const v1, v2: TBigInt): TBigInt;
@@ -6159,7 +6159,7 @@ begin
 end;
 
 function TUECC.Weierstrass.TCurve.IsOnCurve(const Point: TPoint): Boolean;
-  var LeftSide, RightSide: TUInt512;
+  var LeftSide, RightSide: TBigInt;
 begin
   if Point.IsAtInfinity then Exit(True);
   LeftSide := (Point.y * Point.y) mod p;
@@ -6206,9 +6206,9 @@ begin
 end;
 
 class function TUECC.Weierstrass.PointAdd(const Curve: TCurve; const a, b: TPoint): TPoint;
-  var Lambda, Temp: TUInt512;
-  var x3, y3: TUInt512;
-  var Two, Three: TUInt512;
+  var Lambda, Temp: TBigInt;
+  var x3, y3: TBigInt;
+  var Two, Three: TBigInt;
 begin
   if a.IsAtInfinity then Exit(b);
   if b.IsAtInfinity then Exit(a);
@@ -6636,7 +6636,7 @@ end;
 
 class operator TUECC.Edwards.TPoint.=(const a, b: TPoint): Boolean;
 begin
-  Result := (a.x = b.x) and (a.y = b.y);
+  Result := (a.x = b.x) and (a.y = b.y) and (a.z = b.z) and (a.t = b.t);
 end;
 
 function TUECC.Edwards.TCurve.IsOnCurve(const Point: TPoint): Boolean;
@@ -6722,7 +6722,7 @@ end;
 
 function TUECC.Edwards.TSignature.ToHex: String;
 begin
-  Result := UBytesToHexLC(UBytesReverse(UBytesJoin(r, s.ToBytes)));
+  Result := UBytesToHexLC(UBytesJoin(r, s.ToBytes));
 end;
 
 class procedure TUECC.Edwards.Clamp(
@@ -6837,40 +6837,34 @@ class function TUECC.Edwards.PointDecompress(
   const Curve: TCurve;
   const pc: TPointCompressed
 ): TPoint;
-  var BytesY: TUInt8Array;
-  var y, x, x2, y2, u, v, v3, v7, TempX: TBigInt;
-  var SignBit: Boolean;
-  var Three, Five, Eight: TBigInt;
+var
+  BytesY: TUInt8Array;
+  y, x, x2, y2, u, v, v3, v7, Candidate: TBigInt;
+  SignBit: Boolean;
+  Five, Eight: TBigInt;
 begin
   SignBit := (pc[31] and $80) > 0;
   BytesY := pc;
-  BytesY[31] := BytesY[31] and $7F;
+  BytesY[31] := BytesY[31] and $7f;
   y := BytesY;
   if y >= Curve.p then Exit(TPoint.Invalid);
   y2 := Curve.Mul(y, y);
   u := Curve.Sub(y2, TBigInt.One);
   v := Curve.Mul(Curve.d, y2);
   v := Curve.Add(v, TBigInt.One);
-  x2 := Curve.Mul(u, Curve.Inv(v));
-  Three := 3;
+  v3 := Curve.Mul(Curve.Mul(v, v), v);
+  v7 := Curve.Mul(Curve.Mul(v3, v3), v);
   Five := 5;
   Eight := 8;
-  TempX := TBigInt.ModPow(x2, (Curve.p + Three) div Eight, Curve.p);
-  if Curve.Mul(TempX, TempX) <> x2 then
+  Candidate := Curve.Mul(u, v7);
+  Candidate := TBigInt.ModPow(Candidate, (Curve.p - Five) div Eight, Curve.p);
+  x := Curve.Mul(Curve.Mul(u, v3), Candidate);
+  x2 := Curve.Mul(x, x);
+  if Curve.Mul(v, x2) <> u then
   begin
-    v3 := Curve.Mul(v, v);
-    v3 := Curve.Mul(v3, v);
-    v7 := Curve.Mul(v3, v3);
-    v7 := Curve.Mul(v7, v);
-    x := Curve.Mul(u, v7);
-    x := TBigInt.ModPow(x, (Curve.p - Five) div Eight, Curve.p);
-    x := Curve.Mul(Curve.Mul(u, v3), x);
+    x := Curve.Mul(x, Curve.SqrtM1);
     x2 := Curve.Mul(x, x);
     if Curve.Mul(v, x2) <> u then Exit(TPoint.Invalid);
-  end
-  else
-  begin
-    x := TempX;
   end;
   if x.GetBit(0) <> SignBit then
   begin
@@ -6979,6 +6973,7 @@ begin
   Curve_Ed25519.b.y := '$6666666666666666666666666666666666666666666666666666666666666658';
   Curve_Ed25519.b.z := TBigInt.One;
   Curve_Ed25519.b.t := '$67875f0fd78604e27eb9e7db11961b2c8c9f37cc6f0d87fe4569dc00c6e5b2a4';
+  Curve_Ed25519.SqrtM1 := TBigInt.ModPow(2, (Curve_Ed25519.p - TBigInt.One) div 4, Curve_Ed25519.p);
 end;
 
 class function TUBLAKE3.KeyFromHex(const Hex: String): TKey;
