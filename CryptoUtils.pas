@@ -829,6 +829,32 @@ public
       const Message: TUInt8Array;
       const Signature: TSignature
     ): Boolean; static;
+    class function MakeKey_BLAKE3(const Curve: TCurve; const Seed: array of UInt8): TKey; static;
+    class function MakeKey_BLAKE3(const Curve: TCurve): TKey; static;
+    class function Sign_Ed25519_BLAKE3(
+      const Curve: TCurve;
+      const Key: TKey;
+      const Message: TUInt8Array
+    ): TSignature; static;
+    class function Verify_Ed25519_BLAKE3(
+      const Curve: TCurve;
+      const PublicKey: TPointCompressed;
+      const Message: TUInt8Array;
+      const Signature: TSignature
+    ): Boolean; static;
+    class function MakeKey_SHAKE(const Curve: TCurve; const Seed: array of UInt8): TKey; static;
+    class function MakeKey_SHAKE(const Curve: TCurve): TKey; static;
+    class function Sign_Ed25519_SHAKE(
+      const Curve: TCurve;
+      const Key: TKey;
+      const Message: TUInt8Array
+    ): TSignature; static;
+    class function Verify_Ed25519_SHAKE(
+      const Curve: TCurve;
+      const PublicKey: TPointCompressed;
+      const Message: TUInt8Array;
+      const Signature: TSignature
+    ): Boolean; static;
     class constructor CreateClass;
   end;
 end;
@@ -6954,6 +6980,178 @@ begin
   if not R.IsValid then Exit(False);
   Temp := UBytesConcat([Signature.r, PublicKey, Message]);
   Hram := TBigInt.Make(USHA2_512(Temp)) mod Curve.n;
+  SB := ScalarMultiply(Curve, Signature.s, Curve.b);
+  HramA := ScalarMultiply(Curve, Hram, A);
+  RHramA := PointAdd(Curve, R, HramA);
+  AffineSB := Curve.ToAffine(SB);
+  AaffineRHram := Curve.ToAffine(RHramA);
+  Result := AffineSB = AaffineRHram;
+end;
+
+class function TUECC.Edwards.MakeKey_BLAKE3(
+  const Curve: TCurve;
+  const Seed: array of UInt8
+): TKey;
+  var Hash: TUInt8Array;
+  var Scalar: TBigInt;
+  var ScalarBytes: TUInt8Array;
+  var PublicPoint: TPoint;
+begin
+  if Length(Seed) < 32 then Exit(TKey.Invalid);
+  UInit(Result.d, Seed[0], SizeOf(Result.d));
+  Hash := UBLAKE3_Hash(Seed, 64);
+  ScalarBytes := TUInt8Array.Make(@Hash[0], 32);
+  Clamp(@ScalarBytes[0], 0, 31);
+  Scalar := ScalarBytes;
+  PublicPoint := ScalarMultiply(Curve, Scalar, Curve.b);
+  Result.q := PointCompress(Curve, PublicPoint);
+end;
+
+class function TUECC.Edwards.MakeKey_BLAKE3(const Curve: TCurve): TKey;
+begin
+  Result := MakeKey_BLAKE3(Curve, USysRandom(32));
+end;
+
+class function TUECC.Edwards.Sign_Ed25519_BLAKE3(
+  const Curve: TCurve;
+  const Key: TKey;
+  const Message: TUInt8Array
+): TSignature;
+  var Hash: TUInt8Array;
+  var ScalarBytes: TUInt8Array;
+  var a: TBigInt;
+  var Prefix: TUInt8Array;
+  var Nonce: TBigInt;
+  var R: TPoint;
+  var Hram: TBigInt;
+  var S: TBigInt;
+  var Temp: TUInt8Array;
+begin
+  if not Key.IsValid then Exit(TSignature.Invalid);
+  Hash := UBLAKE3_Hash(Key.d, 64);
+  ScalarBytes := TUInt8Array.Make(@Hash[0], 32);
+  Clamp(@ScalarBytes[0], 0, 31);
+  a := ScalarBytes;
+  Prefix := TUInt8Array.Make(@Hash[32], 32);
+  Temp := UBytesConcat([Prefix, Message]);
+  Nonce := TBigInt.Make(UBLAKE3_Hash(Temp, 64)) mod Curve.n;
+  R := ScalarMultiply(Curve, Nonce, Curve.b);
+  Result.r := PointCompress(Curve, R);
+  Temp := UBytesConcat([Result.r, Key.q, Message]);
+  Hram := TBigInt.Make(UBLAKE3_Hash(Temp, 64)) mod Curve.n;
+  S := (Hram * a) mod Curve.n;
+  S := (Nonce + S) mod Curve.n;
+  Result.s := S;
+end;
+
+class function TUECC.Edwards.Verify_Ed25519_BLAKE3(
+  const Curve: TCurve;
+  const PublicKey: TPointCompressed;
+  const Message: TUInt8Array;
+  const Signature: TSignature
+): Boolean;
+  var A: TPoint;
+  var R: TPoint;
+  var Hram: TBigInt;
+  var SB: TPoint;
+  var HramA: TPoint;
+  var RHramA: TPoint;
+  var AffineSB, AaffineRHram: TPoint;
+  var Temp: TUInt8Array;
+begin
+  if not Signature.IsValid(Curve) then Exit(False);
+  A := PointDecompress(Curve, PublicKey);
+  if not A.IsValid then Exit(False);
+  R := PointDecompress(Curve, Signature.r);
+  if not R.IsValid then Exit(False);
+  Temp := UBytesConcat([Signature.r, PublicKey, Message]);
+  Hram := TBigInt.Make(UBLAKE3_Hash(Temp, 64)) mod Curve.n;
+  SB := ScalarMultiply(Curve, Signature.s, Curve.b);
+  HramA := ScalarMultiply(Curve, Hram, A);
+  RHramA := PointAdd(Curve, R, HramA);
+  AffineSB := Curve.ToAffine(SB);
+  AaffineRHram := Curve.ToAffine(RHramA);
+  Result := AffineSB = AaffineRHram;
+end;
+
+class function TUECC.Edwards.MakeKey_SHAKE(
+  const Curve: TCurve;
+  const Seed: array of UInt8
+): TKey;
+  var Hash: TUInt8Array;
+  var Scalar: TBigInt;
+  var ScalarBytes: TUInt8Array;
+  var PublicPoint: TPoint;
+begin
+  if Length(Seed) < 32 then Exit(TKey.Invalid);
+  UInit(Result.d, Seed[0], SizeOf(Result.d));
+  Hash := USHAKE_256(Seed, 64);
+  ScalarBytes := TUInt8Array.Make(@Hash[0], 32);
+  Clamp(@ScalarBytes[0], 0, 31);
+  Scalar := ScalarBytes;
+  PublicPoint := ScalarMultiply(Curve, Scalar, Curve.b);
+  Result.q := PointCompress(Curve, PublicPoint);
+end;
+
+class function TUECC.Edwards.MakeKey_SHAKE(const Curve: TCurve): TKey;
+begin
+  Result := MakeKey_SHAKE(Curve, USysRandom(32));
+end;
+
+class function TUECC.Edwards.Sign_Ed25519_SHAKE(
+  const Curve: TCurve;
+  const Key: TKey;
+  const Message: TUInt8Array
+): TSignature;
+  var Hash: TUInt8Array;
+  var ScalarBytes: TUInt8Array;
+  var a: TBigInt;
+  var Prefix: TUInt8Array;
+  var Nonce: TBigInt;
+  var R: TPoint;
+  var Hram: TBigInt;
+  var S: TBigInt;
+  var Temp: TUInt8Array;
+begin
+  if not Key.IsValid then Exit(TSignature.Invalid);
+  Hash := USHAKE_256(Key.d, 64);
+  ScalarBytes := TUInt8Array.Make(@Hash[0], 32);
+  Clamp(@ScalarBytes[0], 0, 31);
+  a := ScalarBytes;
+  Prefix := TUInt8Array.Make(@Hash[32], 32);
+  Temp := UBytesConcat([Prefix, Message]);
+  Nonce := TBigInt.Make(USHAKE_256(Temp, 64)) mod Curve.n;
+  R := ScalarMultiply(Curve, Nonce, Curve.b);
+  Result.r := PointCompress(Curve, R);
+  Temp := UBytesConcat([Result.r, Key.q, Message]);
+  Hram := TBigInt.Make(USHAKE_256(Temp, 64)) mod Curve.n;
+  S := (Hram * a) mod Curve.n;
+  S := (Nonce + S) mod Curve.n;
+  Result.s := S;
+end;
+
+class function TUECC.Edwards.Verify_Ed25519_SHAKE(
+  const Curve: TCurve;
+  const PublicKey: TPointCompressed;
+  const Message: TUInt8Array;
+  const Signature: TSignature
+): Boolean;
+  var A: TPoint;
+  var R: TPoint;
+  var Hram: TBigInt;
+  var SB: TPoint;
+  var HramA: TPoint;
+  var RHramA: TPoint;
+  var AffineSB, AaffineRHram: TPoint;
+  var Temp: TUInt8Array;
+begin
+  if not Signature.IsValid(Curve) then Exit(False);
+  A := PointDecompress(Curve, PublicKey);
+  if not A.IsValid then Exit(False);
+  R := PointDecompress(Curve, Signature.r);
+  if not R.IsValid then Exit(False);
+  Temp := UBytesConcat([Signature.r, PublicKey, Message]);
+  Hram := TBigInt.Make(USHAKE_256(Temp, 64)) mod Curve.n;
   SB := ScalarMultiply(Curve, Signature.s, Curve.b);
   HramA := ScalarMultiply(Curve, Hram, A);
   RHramA := PointAdd(Curve, R, HramA);
