@@ -207,6 +207,7 @@ public
   function Append(const Num: UInt8): TUInt8Array;
   function Append(const Num: UInt16): TUInt8Array;
   function Append(const Num: UInt32): TUInt8Array;
+  function IsEmpty: Boolean;
 end;
 
 type TUInt16Impl = type helper for TUInt16
@@ -911,7 +912,6 @@ public
   class function Modulo(const a, b: TSelf): TSelf; static;
   class function ModPow(const Base, Exp, Modulus: TSelf): TSelf; static;
   class function ModInv(const Exp, Phi: TSelf): TSelf; static;
-  class function ModDiv(const a, b, Modulus: TSelf; out r: TSelf): TSelf; static;
   class function Compare(const a, b: TSelf): Int8; static;
   class function ShrOne(const Number: TSelf): TSelf; static;
   class function ShlOne(const Number: TSelf): TSelf; static;
@@ -2416,6 +2416,11 @@ function TUInt8ArrayImpl.Append(const Num: UInt32): TUInt8Array;
   var AsArr: array[0..3] of UInt8 absolute Num;
 begin
   Result := UBytesJoin(Self, AsArr);
+end;
+
+function TUInt8ArrayImpl.IsEmpty: Boolean;
+begin
+  Result := Length(Self) = 0;
 end;
 // TUInt8ArrayImpl end
 
@@ -5525,13 +5530,6 @@ begin
   if a <> OneN then Exit(Invalid);
   if (x1 < 0) then x1 := x1 + Phi;
   Result := x1;
-end;
-
-class function TUBigInt.ModDiv(const a, b, Modulus: TSelf; out r: TSelf): TSelf;
-  var d: TSelf;
-begin
-  if a < b then d := a + Modulus else d := a;
-  Result := Division(d, b, r);
 end;
 
 class function TUBigInt.Compare(const a, b: TSelf): Int8;

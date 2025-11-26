@@ -18,7 +18,7 @@ type TUDigestSHA3_256 = array[0..31] of UInt8;
 type TUDigestSHA3_384 = array[0..47] of UInt8;
 type TUDigestSHA3_512 = array[0..63] of UInt8;
 type TUFuncDigest = function (const Data: TUInt8Array): TUInt8Array;
-type TUFuncAuth = function (const Key, Data: TUInt8Array): TUInt8Array;
+type TUFuncMAC = function (const Key, Data: TUInt8Array): TUInt8Array;
 
 type TUDigestMD5_Impl = type helper for TUDigestMD5
 private
@@ -1092,7 +1092,7 @@ function USign_RSA_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt
 function UVerify_RSA(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
 
 function UPBKDF2(
-  const FuncAuth: TUFuncAuth;
+  const FuncAuth: TUFuncMAC;
   const DigestSize: UInt32;
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
@@ -1112,6 +1112,73 @@ function UPBKDF2_HMAC_SHA2_512(
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32;
   const Iterations: Int32 = 600000
+): TUInt8Array;
+
+function UHKDF_Extract_SHA2_256(const Salt, IKM: TUInt8Array): TUDigestSHA2_256;
+function UHKDF_Extract_SHA2_512(const Salt, IKM: TUInt8Array): TUDigestSHA2_512;
+function UHKDF_Extract_SHA3_224(const Salt, IKM: TUInt8Array): TUDigestSHA3_224;
+function UHKDF_Extract_SHA3_256(const Salt, IKM: TUInt8Array): TUDigestSHA3_256;
+function UHKDF_Extract_SHA3_384(const Salt, IKM: TUInt8Array): TUDigestSHA3_384;
+function UHKDF_Extract_SHA3_512(const Salt, IKM: TUInt8Array): TUDigestSHA3_512;
+function UHKDF_Expand_SHA2_256(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+function UHKDF_Expand_SHA2_512(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+function UHKDF_Expand_SHA3_224(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+function UHKDF_Expand_SHA3_256(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+function UHKDF_Expand_SHA3_384(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+function UHKDF_Expand_SHA3_512(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+function UHKDF_SHA2_256(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+function UHKDF_SHA2_512(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+function UHKDF_SHA3_224(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+function UHKDF_SHA3_256(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+function UHKDF_SHA3_384(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+function UHKDF_SHA3_512(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
 ): TUInt8Array;
 
 generic function UEvpKDF<TDigest>(
@@ -4571,7 +4638,7 @@ begin
 end;
 
 function UPBKDF2(
-  const FuncAuth: TUFuncAuth;
+  const FuncAuth: TUFuncMAC;
   const DigestSize: UInt32;
   const Password, Salt: TUInt8Array;
   const KeyLength: Int32; const Iterations: Int32
@@ -4639,6 +4706,211 @@ begin
     @UAuthHMAC_SHA2_512, SizeOf(TUDigestSHA2_512),
     Password, Salt, KeyLength, Iterations
   );
+end;
+
+function HKDF_Salt(const Salt: TUInt8Array; const Size: UInt32): TUInt8Array;
+begin
+  if not Salt.IsEmpty then Exit(Salt);
+  Result := TUInt8Array.Make(Size);
+  UClear(Result[0], Size);
+end;
+
+function UHKDF_Extract_SHA2_256(const Salt, IKM: TUInt8Array): TUDigestSHA2_256;
+begin
+  Result := UHMAC_SHA2_256(HKDF_Salt(Salt, SizeOf(Result)), IKM);
+end;
+
+function UHKDF_Extract_SHA2_512(const Salt, IKM: TUInt8Array): TUDigestSHA2_512;
+begin
+  Result := UHMAC_SHA2_512(HKDF_Salt(Salt, SizeOf(Result)), IKM);
+end;
+
+function UHKDF_Extract_SHA3_224(const Salt, IKM: TUInt8Array): TUDigestSHA3_224;
+begin
+  Result := UHMAC_SHA3_224(HKDF_Salt(Salt, SizeOf(Result)), IKM);
+end;
+
+function UHKDF_Extract_SHA3_256(const Salt, IKM: TUInt8Array): TUDigestSHA3_256;
+begin
+  Result := UHMAC_SHA3_256(HKDF_Salt(Salt, SizeOf(Result)), IKM);
+end;
+
+function UHKDF_Extract_SHA3_384(const Salt, IKM: TUInt8Array): TUDigestSHA3_384;
+begin
+  Result := UHMAC_SHA3_384(HKDF_Salt(Salt, SizeOf(Result)), IKM);
+end;
+
+function UHKDF_Extract_SHA3_512(const Salt, IKM: TUInt8Array): TUDigestSHA3_512;
+begin
+  Result := UHMAC_SHA3_512(HKDF_Salt(Salt, SizeOf(Result)), IKM);
+end;
+
+function HKDF_Expand(
+  const FuncHMAC: TUFuncMAC;
+  const HashLen: UInt32;
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+  var N: UInt32;
+  var T, TLast: TUInt8Array;
+  var i: UInt32;
+  var Remaining: UInt32;
+begin
+  if OutLength > 255 * HashLen then Exit(nil);
+  N := (OutLength + HashLen - 1) div HashLen;
+  Result := TUInt8Array.Make(OutLength);
+  TLast := nil;
+  for i := 1 to N do
+  begin
+    T := FuncHMAC(PRK, UBytesConcat([TLast, Info, [UInt8(i)]]));
+    Remaining := OutLength - (i - 1) * HashLen;
+    Move(T[0], Result[(i - 1) * HashLen], UMin(HashLen, Remaining));
+    TLast := T;
+  end;
+end;
+
+function UHKDF_Expand_SHA2_256(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+begin
+  Result := HKDF_Expand(
+    @UAuthHMAC_SHA2_256,
+    SizeOf(TUDigestSHA2_256),
+    PRK, Info, OutLength
+  );
+end;
+
+function UHKDF_Expand_SHA2_512(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+begin
+  Result := HKDF_Expand(
+    @UAuthHMAC_SHA2_512,
+    SizeOf(TUDigestSHA2_512),
+    PRK, Info, OutLength
+  );
+end;
+
+function UHKDF_Expand_SHA3_224(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+begin
+  Result := HKDF_Expand(
+    @UAuthHMAC_SHA3_224,
+    SizeOf(TUDigestSHA3_224),
+    PRK, Info, OutLength
+  );
+end;
+
+function UHKDF_Expand_SHA3_256(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+begin
+  Result := HKDF_Expand(
+    @UAuthHMAC_SHA3_256,
+    SizeOf(TUDigestSHA3_256),
+    PRK, Info, OutLength
+  );
+end;
+
+function UHKDF_Expand_SHA3_384(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+begin
+  Result := HKDF_Expand(
+    @UAuthHMAC_SHA3_384,
+    SizeOf(TUDigestSHA3_384),
+    PRK, Info, OutLength
+  );
+end;
+
+function UHKDF_Expand_SHA3_512(
+  const PRK, Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+begin
+  Result := HKDF_Expand(
+    @UAuthHMAC_SHA3_512,
+    SizeOf(TUDigestSHA3_512),
+    PRK, Info, OutLength
+  );
+end;
+
+function UHKDF_SHA2_256(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+  var PRK: TUInt8Array;
+begin
+  PRK := UHKDF_Extract_SHA2_256(Salt, IKM);
+  Result := UHKDF_Expand_SHA2_256(PRK, Info, OutLength);
+end;
+
+function UHKDF_SHA2_512(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+  var PRK: TUInt8Array;
+begin
+  PRK := UHKDF_Extract_SHA2_512(Salt, IKM);
+  Result := UHKDF_Expand_SHA2_512(PRK, Info, OutLength);
+end;
+
+function UHKDF_SHA3_224(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+  var PRK: TUInt8Array;
+begin
+  PRK := UHKDF_Extract_SHA3_224(Salt, IKM);
+  Result := UHKDF_Expand_SHA3_224(PRK, Info, OutLength);
+end;
+
+function UHKDF_SHA3_256(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+  var PRK: TUInt8Array;
+begin
+  PRK := UHKDF_Extract_SHA3_256(Salt, IKM);
+  Result := UHKDF_Expand_SHA3_256(PRK, Info, OutLength);
+end;
+
+function UHKDF_SHA3_384(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+  var PRK: TUInt8Array;
+begin
+  PRK := UHKDF_Extract_SHA3_384(Salt, IKM);
+  Result := UHKDF_Expand_SHA3_384(PRK, Info, OutLength);
+end;
+
+function UHKDF_SHA3_512(
+  const IKM: TUInt8Array;
+  const Salt: TUInt8Array;
+  const Info: TUInt8Array;
+  const OutLength: UInt32
+): TUInt8Array;
+  var PRK: TUInt8Array;
+begin
+  PRK := UHKDF_Extract_SHA3_512(Salt, IKM);
+  Result := UHKDF_Expand_SHA3_512(PRK, Info, OutLength);
 end;
 
 generic function UEvpKDF<TDigest>(
