@@ -967,6 +967,27 @@ public
   ): TUInt8Array; static;
 end;
 
+type TUASN1 = class (TURefClass)
+public
+  type TTag = (
+    der_boolean = $01,
+    der_integer = $02,
+    der_bit_string = $03,
+    der_octet_string = $04,
+    der_null = $05,
+    der_object_identifier = $06,
+    der_utf8_string = $0c,
+    der_sequence = $30,
+    der_set = $31,
+    der_printable_string = $13,
+    der_ia5_string = $16,
+    der_utc_time = $17,
+    der_generalized_time = $18
+  );
+private
+  var _Tag: TTag;
+end;
+
 function UMD5(const Data: Pointer; const DataSize: UInt32): TUDigestMD5;
 function UMD5(const Data: TUInt8Array): TUDigestMD5;
 function UMD5(const Data: String): TUDigestMD5;
