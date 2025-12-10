@@ -1867,13 +1867,13 @@ function UBytesCompare(const a, b: array of UInt8): Int8; inline;
 function UBytesEqual(const a, b: array of UInt8): Boolean;
 function UMatToQuat(const m: TUMat): TUQuat;
 function UQuatToMat(const q: TUQuat): TUMat;
-generic function USignOf<T>(const v: T): T;
-function USignOf(const v: Int8): Int8;
-function USignOf(const v: Int16): Int16;
-function USignOf(const v: Int32): Int32;
-function USignOf(const v: Int64): Int64;
-function USignOf(const v: TUFloat): TUFloat;
-function USignOf(const v: TUDouble): TUDouble;
+generic function USignOf<T>(const v: T): T; inline; overload;
+function USignOf(const v: Int8): Int8; inline; overload;
+function USignOf(const v: Int16): Int16; inline; overload;
+function USignOf(const v: Int32): Int32; inline; overload;
+function USignOf(const v: Int64): Int64; inline; overload;
+function USignOf(const v: TUFloat): TUFloat; inline; overload;
+function USignOf(const v: TUDouble): TUDouble; inline; overload;
 generic function UMin<T>(const a, b: T): T; inline; overload;
 function UMin(const a, b: Int8): Int8; inline; overload;
 function UMin(const a, b: Int16): Int16; inline; overload;
@@ -2146,6 +2146,9 @@ operator := (const v: TUint8Array): TUInt4096_Debug;
 operator := (const v: TUVec2i): TUVec2;
 operator := (const i: Int32): TUVec2i;
 operator := (const f: TUFloat): TUVec2;
+operator := (const v: TUFloatArray): TUVec2;
+operator := (const v: TUFloatArray): TUVec3;
+operator := (const v: TUFloatArray): TUVec4;
 operator + (const a, b: TUVec3): TUVec3;
 operator - (const a, b: TUVec3): TUVec3;
 operator * (const a, b: TUVec3): TUVec3;
@@ -12968,6 +12971,27 @@ operator := (const f: TUFloat): TUVec2;
 begin
   Result[0] := f;
   Result[1] := f;
+end;
+
+operator := (const v: TUFloatArray): TUVec2;
+  var i: Int32;
+begin
+  for i := 0 to UMin(High(v), High(Result)) do Result[i] := v[i];
+  for i := High(v) to High(Result) do Result[i] := 0;
+end;
+
+operator := (const v: TUFloatArray): TUVec3;
+  var i: Int32;
+begin
+  for i := 0 to UMin(High(v), High(Result)) do Result[i] := v[i];
+  for i := High(v) to High(Result) do Result[i] := 0;
+end;
+
+operator := (const v: TUFloatArray): TUVec4;
+  var i: Int32;
+begin
+  for i := 0 to UMin(High(v), High(Result)) do Result[i] := v[i];
+  for i := High(v) to High(Result) do Result[i] := 0;
 end;
 
 operator + (const a, b: TUVec3): TUVec3;
