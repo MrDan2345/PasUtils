@@ -88,6 +88,13 @@ type TURSA = record
 public
   type TBigInt = TUInt8192;
   type TUBigIntArray = array of TBigInt;
+  type TKeyPublic = record
+    var n: TBigInt; // modulus
+    var e: TBigInt; // public exponent
+    function Size: Uint32;
+    function IsValid: Boolean;
+    class function MakeInvalid: TKeyPublic; static;
+  end;
   type TKey = record
     var n: TBigInt; // modulus
     var e: TBigInt; // public exponent
@@ -97,18 +104,12 @@ public
     var exp1: TBigInt; // d mod (p - 1)
     var exp2: TBigInt; // d mod (q - 1)
     var c: TBigInt; // q^-1 mod p
-    function Size: Uint32; // bit size
+    function Size: UInt32; // bit size
     function IsPublic: Boolean;
     function IsPrivate: Boolean;
     function IsCRT: Boolean;
     function IsValid: Boolean;
-    class function MakeInvalid: TKey; static;
-  end;
-  type TKeyPublic = record
-    var n: TBigInt;
-    var e: TBigInt;
-    function Size: Uint32;
-    function IsValid: Boolean;
+    function PublicKey: TKeyPublic;
     class function MakeInvalid: TKey; static;
   end;
 //public
@@ -245,7 +246,7 @@ private
   class function Encrypt_PKCS1(
     const Data: Pointer;
     const DataSize: UInt32;
-    const Key: TURSA.TKey
+    const Key: TURSA.TKeyPublic
   ): TBigInt; static;
   class function Decrypt_PKCS1_Str(
     const Cipher: TBigInt;
@@ -258,7 +259,7 @@ private
   class function Encrypt_OAEP(
     const Data: Pointer;
     const DataSize: UInt32;
-    const Key: TURSA.TKey
+    const Key: TURSA.TKeyPublic
   ): TBigInt; static;
   class function Decrypt_OAEP_Str(
     const Cipher: TBigInt;
@@ -286,7 +287,7 @@ private
   ): TUInt8Array; static;
   class function Verify(
     const Data, Signature: TUInt8Array;
-    const Key: TKey
+    const Key: TKeyPublic
   ): Boolean; static;
   class function ExportKeyPrivate_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array; static;
   class function ImportKeyPrivate_PKCS1_DER(const Key: TUInt8Array): TURSA.TKey; static;
@@ -736,10 +737,17 @@ public
       function Mul(const v1, v2: TBigInt): TBigInt;
       function Inv(const v: TBigInt): TBigInt;
     end;
+    type TKeyPublic = record
+      var q: TBigInt;
+      function IsValid: Boolean;
+      class function Invalid: TKeyPublic; static;
+    end;
     type TKey = record
       var d: TBigInt;
       var q: TBigInt;
+      function PublicKey: TKeyPublic;
       function IsValid: Boolean;
+      class function Invalid: TKey; static;
     end;
     class var Curve_25519: TCurve;
     class var LowOrderPoints: array [0..4] of TBigInt;
@@ -784,7 +792,6 @@ public
       class operator = (const a, b: TPoint): Boolean;
     end;
     type TUInt8Arr32 = array[0..31] of UInt8;
-    type TPointCompressed = TUInt8Arr32;
     type TCurve = record
       var p: TBigInt; // prime modulus
       var a: TBigInt; // param a
@@ -806,19 +813,26 @@ public
       function IsValid: Boolean;
       class function Invalid: TKey; static;
     end;
+    type TKeyPublic = record
+      var q: TUInt8Arr32;
+      function IsValid: Boolean;
+      class function Invalid: TKeyPublic; static;
+    end;
     type TSignature = record
       var r: TUInt8Arr32;
       var s: TUInt8Arr32;
       function IsValid(const Curve: TCurve): Boolean;
       class function Invalid: TSignature; static;
+      class function Make(const Bytes: TUInt8Array): TSignature; static;
+      function ToBytes: TUInt8Array;
       function ToHex: String;
     end;
     class var Curve_Ed25519: TCurve;
     class function PointAdd(const Curve: TCurve; const p, q: TPoint): TPoint; static;
     class function PointDouble(const Curve: TCurve; const p: TPoint): TPoint; static;
     class function ScalarMultiply(const Curve: TCurve; const k: TBigInt; const p: TPoint): TPoint; static;
-    class function PointCompress(const Curve: TCurve; const p: TPoint): TPointCompressed; static;
-    class function PointDecompress(const Curve: TCurve; const pc: TPointCompressed): TPoint; static;
+    class function PointCompress(const Curve: TCurve; const p: TPoint): TUInt8Arr32; static;
+    class function PointDecompress(const Curve: TCurve; const pc: TUInt8Arr32): TPoint; static;
     class function MakeKey(const Curve: TCurve; const Seed: array of UInt8): TKey; static;
     class function MakeKey(const Curve: TCurve): TKey; static;
     class function Sign_Ed25519(
@@ -828,7 +842,7 @@ public
     ): TSignature; static;
     class function Verify_Ed25519(
       const Curve: TCurve;
-      const PublicKey: TPointCompressed;
+      const PublicKey: TUInt8Arr32;
       const Message: TUInt8Array;
       const Signature: TSignature
     ): Boolean; static;
@@ -841,7 +855,7 @@ public
     ): TSignature; static;
     class function Verify_Ed25519_BLAKE3(
       const Curve: TCurve;
-      const PublicKey: TPointCompressed;
+      const PublicKey: TUInt8Arr32;
       const Message: TUInt8Array;
       const Signature: TSignature
     ): Boolean; static;
@@ -854,7 +868,7 @@ public
     ): TSignature; static;
     class function Verify_Ed25519_SHAKE(
       const Curve: TCurve;
-      const PublicKey: TPointCompressed;
+      const PublicKey: TUInt8Arr32;
       const Message: TUInt8Array;
       const Signature: TSignature
     ): Boolean; static;
@@ -866,6 +880,7 @@ type TUBLAKE3 = record
 public
   type TKey = array[0..31] of UInt8;
   class function KeyFromHex(const Hex: String): TKey; static;
+  class function KeyFromBytes(const Bytes: TUInt8Array): TKey; static;
 private
   const BLOCK_LEN = 64;
   const CHUNK_LEN = 1024;
@@ -1110,7 +1125,7 @@ function UKMAC_256(
 
 function USign_RSA_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
 function USign_RSA_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
-function UVerify_RSA(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
+function UVerify_RSA(const Data, Signature: TUInt8Array; const Key: TURSA.TKeyPublic): Boolean;
 
 function UPBKDF2(
   const FuncAuth: TUFuncMAC;
@@ -1240,15 +1255,15 @@ function UImportRSAKey(const KeyASN1: String; const Password: TUInt8Array): TURS
 function UEncrypt_RSA_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UEncrypt_RSA_PKCS1(
-  const Data: TUInt8Array;
-  const Key: TURSA.TKey
+  const Data: array of UInt8;
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UEncrypt_RSA_PKCS1_Str(
   const Str: String;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UDecrypt_RSA_PKCS1_Str(
   const Cipher: TURSA.TBigInt;
@@ -1261,15 +1276,15 @@ function UDecrypt_RSA_PKCS1(
 function UEncrypt_RSA_OAEP(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UEncrypt_RSA_OAEP(
-  const Data: TUInt8Array;
-  const Key: TURSA.TKey
+  const Data: array of UInt8;
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UEncrypt_RSA_OAEP_Str(
   const Str: String;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UDecrypt_RSA_OAEP_Str(
   const Cipher: TURSA.TBigInt;
@@ -1486,7 +1501,7 @@ function USharedKey_ECDH(
 
 implementation
 
-function TURSA.TKey.Size: Uint32;
+function TURSA.TKey.Size: UInt32;
 begin
   Result := n.BytesUsed * 8;
 end;
@@ -1511,6 +1526,12 @@ begin
   Result := IsPublic or IsPrivate;
 end;
 
+function TURSA.TKey.PublicKey: TKeyPublic;
+begin
+  Result.e := e;
+  Result.n := n;
+end;
+
 class function TURSA.TKey.MakeInvalid: TKey;
 begin
   Result.n := TBigInt.Invalid;
@@ -1533,7 +1554,7 @@ begin
   Result := n.IsValid and e.IsValid;
 end;
 
-class function TURSA.TKeyPublic.MakeInvalid: TKey;
+class function TURSA.TKeyPublic.MakeInvalid: TKeyPublic;
 begin
   Result.n := TBigInt.Invalid;
   Result.e := TBigInt.Invalid;
@@ -2343,7 +2364,7 @@ end;
 class function TURSA.Encrypt_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TBigInt;
   var Block: TBigInt;
 begin
@@ -2375,7 +2396,7 @@ end;
 class function TURSA.Encrypt_OAEP(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TBigInt;
   var Block: TBigInt;
 begin
@@ -2475,7 +2496,7 @@ end;
 
 class function TURSA.Verify(
   const Data, Signature: TUInt8Array;
-  const Key: TKey
+  const Key: TKeyPublic
 ): Boolean;
   var Hash: TUInt8Array;
   var PackedHash: TBigInt;
@@ -4653,7 +4674,7 @@ begin
   Result := TURSA.Sign_SHA512(Data, Key);
 end;
 
-function UVerify_RSA(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
+function UVerify_RSA(const Data, Signature: TUInt8Array; const Key: TURSA.TKeyPublic): Boolean;
 begin
   Result := TURSA.Verify(Data, Signature, Key);
 end;
@@ -5065,15 +5086,15 @@ end;
 function UEncrypt_RSA_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := TURSA.Encrypt_PKCS1(Data, DataSize, Key);
 end;
 
 function UEncrypt_RSA_PKCS1(
-  const Data: TUInt8Array;
-  const Key: TURSA.TKey
+  const Data: array of UInt8;
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := TURSA.Encrypt_PKCS1(@Data[0], Length(Data), Key);
@@ -5081,7 +5102,7 @@ end;
 
 function UEncrypt_RSA_PKCS1_Str(
   const Str: String;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := UEncrypt_RSA_PKCS1(@Str[1], Length(Str), Key);
@@ -5106,15 +5127,15 @@ end;
 function UEncrypt_RSA_OAEP(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := TURSA.Encrypt_OAEP(Data, DataSize, Key);
 end;
 
 function UEncrypt_RSA_OAEP(
-  const Data: TUInt8Array;
-  const Key: TURSA.TKey
+  const Data: array of UInt8;
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := TURSA.Encrypt_OAEP(@Data[0], Length(Data), Key);
@@ -5122,7 +5143,7 @@ end;
 
 function UEncrypt_RSA_OAEP_Str(
   const Str: String;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := TURSA.Encrypt_OAEP(@Str[1], Length(Str), Key);
@@ -6785,9 +6806,30 @@ begin
   Result := TBigInt.ModPow(v, (p - 2), p);
 end;
 
+function TUECC.Montgomery.TKey.PublicKey: TKeyPublic;
+begin
+  Result.q := q;
+end;
+
 function TUECC.Montgomery.TKey.IsValid: Boolean;
 begin
   Result := d.IsValid and q.IsValid;
+end;
+
+class function TUECC.Montgomery.TKey.Invalid: TKey;
+begin
+  Result.d := TBigInt.Invalid;
+  Result.q := TBigInt.Invalid;
+end;
+
+function TUECC.Montgomery.TKeyPublic.IsValid: Boolean;
+begin
+  Result := q.IsValid;
+end;
+
+class function TUECC.Montgomery.TKeyPublic.Invalid: TKeyPublic;
+begin
+  Result.q := TBigInt.Invalid;
 end;
 
 class function TUECC.Montgomery.IsLowOrderPoint(const p: TBigInt): Boolean;
@@ -7017,6 +7059,16 @@ begin
   UClear(Result, SizeOf(Result));
 end;
 
+function TUECC.Edwards.TKeyPublic.IsValid: Boolean;
+begin
+  Result := not Edwards.IsAllZero(q);
+end;
+
+class function TUECC.Edwards.TKeyPublic.Invalid: TKeyPublic;
+begin
+  UClear(Result, SizeOf(Result));
+end;
+
 function TUECC.Edwards.TSignature.IsValid(const Curve: TCurve): Boolean;
   var i: Int32;
 begin
@@ -7031,9 +7083,22 @@ begin
   UClear(Result, SizeOf(Result));
 end;
 
+class function TUECC.Edwards.TSignature.Make(const Bytes: TUInt8Array): TSignature;
+begin
+  Result := Invalid;
+  if Length(Bytes) <> Length(Result.r) + Length(Result.s) then Exit;
+  UInit(Result.r, Bytes[0], SizeOf(Result.r));
+  UInit(Result.s, Bytes[SizeOf(Result.r)], SizeOf(Result.s));
+end;
+
+function TUECC.Edwards.TSignature.ToBytes: TUInt8Array;
+begin
+  Result := UBytesJoin(r, s);
+end;
+
 function TUECC.Edwards.TSignature.ToHex: String;
 begin
-  Result := UBytesToHexLC(UBytesJoin(r, s));
+  Result := UBytesToHexLC(ToBytes);
 end;
 
 class procedure TUECC.Edwards.Clamp(
@@ -7136,7 +7201,7 @@ end;
 class function TUECC.Edwards.PointCompress(
   const Curve: TCurve;
   const p: TPoint
-): TPointCompressed;
+): TUInt8Arr32;
   var Affine: TPoint;
   var BytesY: TUInt8Array;
   var i: Int32;
@@ -7157,7 +7222,7 @@ end;
 
 class function TUECC.Edwards.PointDecompress(
   const Curve: TCurve;
-  const pc: TPointCompressed
+  const pc: TUInt8Arr32
 ): TPoint;
 var
   BytesY: TUInt8Array;
@@ -7256,7 +7321,7 @@ end;
 
 class function TUECC.Edwards.Verify_Ed25519(
   const Curve: TCurve;
-  const PublicKey: TPointCompressed;
+  const PublicKey: TUInt8Arr32;
   const Message: TUInt8Array;
   const Signature: TSignature
 ): Boolean;
@@ -7342,7 +7407,7 @@ end;
 
 class function TUECC.Edwards.Verify_Ed25519_BLAKE3(
   const Curve: TCurve;
-  const PublicKey: TPointCompressed;
+  const PublicKey: TUInt8Arr32;
   const Message: TUInt8Array;
   const Signature: TSignature
 ): Boolean;
@@ -7428,7 +7493,7 @@ end;
 
 class function TUECC.Edwards.Verify_Ed25519_SHAKE(
   const Curve: TCurve;
-  const PublicKey: TPointCompressed;
+  const PublicKey: TUInt8Arr32;
   const Message: TUInt8Array;
   const Signature: TSignature
 ): Boolean;
@@ -7487,6 +7552,13 @@ begin
     j := i * 2 + 1;
     Result[i] := UInt8(StrToInt('$' + Hex[j] + Hex[j + 1]));
   end;
+end;
+
+class function TUBLAKE3.KeyFromBytes(const Bytes: TUInt8Array): TKey;
+begin
+  UClear(Result, SizeOf(Result));
+  if Length(Bytes) = 0 then Exit;
+  Move(Bytes[0], Result, UMin(Length(Bytes), SizeOf(Result)));
 end;
 
 class function TUBLAKE3.ROTR32(const x: UInt32; const n: UInt8): UInt32;
@@ -7618,11 +7690,8 @@ begin
   Result := Hasher.Finalize(OutputSize);
 end;
 
-class function TUBLAKE3.KDF(
-  const Context: TUInt8Array;
-  const Password: TUInt8Array;
-  const OutputSize: Uint32
-): TUInt8Array;
+class function TUBLAKE3.KDF(const Context, Password: TUInt8Array;
+  const OutputSize: Uint32): TUInt8Array;
   var Hasher: THasher;
   var ContextKey: TUInt8Array;
   var Key: TKey;
