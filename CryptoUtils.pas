@@ -2034,6 +2034,7 @@ class function TURSA.MakePrimes(
 ): TUBigIntArray;
   var Threads: array of TMakePrimeThread;
   var Context: TMakePrimeContext;
+  var r: TUInt8Array;
   var i: Int32;
 begin
   if (PrimeCount < 1) or (ThreadCount < 1) then Exit(nil);
@@ -2046,9 +2047,10 @@ begin
   SetLength(Context.Primes, PrimeCount);
   for i := 0 to High(Threads) do
   begin
+    r := USysRandom(4);
     Threads[i] := TMakePrimeThread.Create(True);
     Threads[i].Context := @Context;
-    Threads[i].RandSeed := Random(High(UInt32));
+    Threads[i].RandSeed := PUInt32(@r[0])^;
   end;
   try
     for i := 0 to High(Threads) do
