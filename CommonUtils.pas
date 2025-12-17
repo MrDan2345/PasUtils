@@ -9868,6 +9868,7 @@ procedure TUFIFOList.Initialize;
 begin
   _First := nil;
   _Last := nil;
+  _Cache := nil;
   _Cached := False;
 end;
 
@@ -9890,7 +9891,7 @@ begin
     Item := TItem.Create;
   end;
   Item.Next := nil;
-  Item.Data := T;
+  Item.Data := Data;
   if not Assigned(_Last) then
   begin
     _First := Item;
