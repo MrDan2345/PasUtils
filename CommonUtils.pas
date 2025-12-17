@@ -208,6 +208,7 @@ public
   function Append(const Num: UInt16): TUInt8Array;
   function Append(const Num: UInt32): TUInt8Array;
   function IsEmpty: Boolean;
+  function Size: UInt32;
 end;
 
 type TUInt16Impl = type helper for TUInt16
@@ -1681,6 +1682,31 @@ public
   class operator Finalize(var v: TSelf);
 end;
 
+generic TUFIFOList<T> = record
+  type TSelf = specialize TUFIFOList<T>;
+  type TItem = class
+    var Data: T;
+    var Next: TItem;
+  end;
+strict private
+  _Cached: Boolean;
+  var _Cache: TItem;
+  var _First: TItem;
+  var _Last: TItem;
+  procedure SetCached(const Value: Boolean);
+  procedure ClearCache;
+  procedure Initialize;
+  procedure Finalize;
+public
+  property Cached: Boolean read _Cached write SetCached;
+  procedure Enqueue(const Data: T);
+  function Dequeue: T;
+  procedure Clear;
+  function IsEmpty: Boolean;
+  class operator Initialize(var v: TSelf);
+  class operator Finalize(var v: TSelf);
+end;
+
 type TUXML = class (TURefClass)
 public
   type TAttribute = class
@@ -2424,6 +2450,11 @@ end;
 function TUInt8ArrayImpl.IsEmpty: Boolean;
 begin
   Result := Length(Self) = 0;
+end;
+
+function TUInt8ArrayImpl.Size: UInt32;
+begin
+  Result := Length(Self);
 end;
 // TUInt8ArrayImpl end
 
@@ -9812,6 +9843,113 @@ begin
   v.Finalize;
 end;
 // TULinkedList end
+
+// TUFIFOList begin
+procedure TUFIFOList.SetCached(const Value: Boolean);
+  var Temp: TItem;
+begin
+  if _Cached = Value then Exit;
+  _Cached := Value;
+  if not _Cached then ClearCache;
+end;
+
+procedure TUFIFOList.ClearCache;
+  var Temp: TItem;
+begin
+  while Assigned(_Cache) do
+  begin
+    Temp := _Cache;
+    _Cache := _Cache.Next;
+    FreeAndNil(Temp);
+  end;
+end;
+
+procedure TUFIFOList.Initialize;
+begin
+  _First := nil;
+  _Last := nil;
+  _Cached := False;
+end;
+
+procedure TUFIFOList.Finalize;
+begin
+  if _Cached then ClearCache;
+  Clear;
+end;
+
+procedure TUFIFOList.Enqueue(const Data: T);
+  var Item: TItem;
+begin
+  if Assigned(_Cache) then
+  begin
+    Item := _Cache;
+    _Cache := _Cache.Next;
+  end
+  else
+  begin
+    Item := TItem.Create;
+  end;
+  Item.Next := nil;
+  Item.Data := T;
+  if not Assigned(_Last) then
+  begin
+    _First := Item;
+    _Last := Item;
+  end
+  else
+  begin
+    _Last.Next := Item;
+    _Last := Item;
+  end;
+end;
+
+function TUFIFOList.Dequeue: T;
+  var Temp: TItem;
+begin
+  if IsEmpty then Exit(Default(T));
+  Result := _First.Data;
+  Temp := _First;
+  _First := Temp.Next;
+  if _Cached then
+  begin
+    Temp.Next := _Cache;
+    _Cache := Temp;
+  end
+  else
+  begin
+    FreeAndNil(Temp);
+  end;
+  if Assigned(_First) then Exit;
+  _Last := nil;
+end;
+
+procedure TUFIFOList.Clear;
+  var Temp: TItem;
+begin
+  while Assigned(_First) do
+  begin
+    Temp := _First;
+    _First := _First.Next;
+    FreeAndNil(Temp);
+  end;
+  _Last := nil;
+end;
+
+function TUFIFOList.IsEmpty: Boolean;
+begin
+  Result := not Assigned(_First);
+end;
+
+class operator TUFIFOList.Initialize(var v: TSelf);
+begin
+  v.Initialize;
+end;
+
+class operator TUFIFOList.Finalize(var v: TSelf);
+begin
+  v.Finalize;
+end;
+// TUFIFOList end
 
 // TUXML begin
 function TUXML.TEnumerator.GetCurrent: TUXML;
