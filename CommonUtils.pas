@@ -1688,19 +1688,24 @@ generic TUFIFOList<T> = record
     var Data: T;
     var Next: TItem;
   end;
+  type TDataArray = array of T;
 strict private
   _Cached: Boolean;
   var _Cache: TItem;
   var _First: TItem;
   var _Last: TItem;
+  var _Size: UInt32;
   procedure SetCached(const Value: Boolean);
   procedure ClearCache;
+  procedure FreeItem(var Item: TItem);
   procedure Initialize;
   procedure Finalize;
 public
   property Cached: Boolean read _Cached write SetCached;
+  property Size: UInt32 read _Size;
   procedure Enqueue(const Data: T);
   function Dequeue: T;
+  function DequeueAll: TDataArray;
   procedure Clear;
   function IsEmpty: Boolean;
   class operator Initialize(var v: TSelf);
@@ -9864,6 +9869,20 @@ begin
   end;
 end;
 
+procedure TUFIFOList.FreeItem(var Item: TItem);
+begin
+  if _Cached then
+  begin
+    Item.Next := _Cache;
+    _Cache := Item;
+  end
+  else
+  begin
+    Item.Free;
+  end;
+  Item := nil;
+end;
+
 procedure TUFIFOList.Initialize;
 begin
   _First := nil;
@@ -9902,6 +9921,7 @@ begin
     _Last.Next := Item;
     _Last := Item;
   end;
+  Inc(_Size);
 end;
 
 function TUFIFOList.Dequeue: T;
@@ -9911,17 +9931,29 @@ begin
   Result := _First.Data;
   Temp := _First;
   _First := Temp.Next;
-  if _Cached then
-  begin
-    Temp.Next := _Cache;
-    _Cache := Temp;
-  end
-  else
-  begin
-    FreeAndNil(Temp);
-  end;
+  FreeItem(Temp);
+  Dec(_Size);
   if Assigned(_First) then Exit;
   _Last := nil;
+end;
+
+function TUFIFOList.DequeueAll: TDataArray;
+  var i: UInt32;
+  var Temp: TItem;
+begin
+  Result := nil;
+  if IsEmpty then Exit;
+  SetLength(Result, _Size);
+  i := 0;
+  while Assigned(_First) do
+  begin
+    Temp := _First;
+    _First := _First.Next;
+    Result[i] := Temp.Data;
+    FreeItem(Temp);
+  end;
+  _Last := nil;
+  _Size := 0;
 end;
 
 procedure TUFIFOList.Clear;
@@ -9934,6 +9966,7 @@ begin
     FreeAndNil(Temp);
   end;
   _Last := nil;
+  _Size := 0;
 end;
 
 function TUFIFOList.IsEmpty: Boolean;

@@ -792,21 +792,6 @@ public
       class operator = (const a, b: TPoint): Boolean;
     end;
     type TUInt8Arr32 = array[0..31] of UInt8;
-    type TCurve = record
-      var p: TBigInt; // prime modulus
-      var a: TBigInt; // param a
-      var d: TBigInt; // param d
-      var n: TBigInt; // order
-      var h: TBigInt; // cofactor
-      var b: TPoint; // base point
-      var SqrtM1: TBigInt; // cached sqrt(-1)
-      function IsOnCurve(const Point: TPoint): Boolean;
-      function ToAffine(const Point: TPoint): TPoint;
-      function Add(const v1, v2: TBigInt): TBigInt;
-      function Sub(const v1, v2: TBigInt): TBigInt;
-      function Mul(const v1, v2: TBigInt): TBigInt;
-      function Inv(const v: TBigInt): TBigInt;
-    end;
     type TKey = record
       var d: TUInt8Arr32;
       var q: TUInt8Arr32;
@@ -821,11 +806,64 @@ public
     type TSignature = record
       var r: TUInt8Arr32;
       var s: TUInt8Arr32;
-      function IsValid(const Curve: TCurve): Boolean;
       class function Invalid: TSignature; static;
       class function Make(const Bytes: TUInt8Array): TSignature; static;
       function ToBytes: TUInt8Array;
       function ToHex: String;
+    end;
+    type TCurve = record
+      var p: TBigInt; // prime modulus
+      var a: TBigInt; // param a
+      var d: TBigInt; // param d
+      var n: TBigInt; // order
+      var h: TBigInt; // cofactor
+      var b: TPoint; // base point
+      var SqrtM1: TBigInt; // cached sqrt(-1)
+      function IsValidSignature(const Signature: TSignature): Boolean;
+      function IsOnCurve(const Point: TPoint): Boolean;
+      function ToAffine(const Point: TPoint): TPoint;
+      function Add(const v1, v2: TBigInt): TBigInt;
+      function Sub(const v1, v2: TBigInt): TBigInt;
+      function Mul(const v1, v2: TBigInt): TBigInt;
+      function Inv(const v: TBigInt): TBigInt;
+      function PointAdd(const p1, p2: TPoint): TPoint;
+      function PointDouble(const p1: TPoint): TPoint;
+      function ScalarMultiply(const k: TBigInt; const p1: TPoint): TPoint;
+      function PointCompress(const p1: TPoint): TUInt8Arr32;
+      function PointDecompress(const pc: TUInt8Arr32): TPoint;
+      function MakeKey(const Seed: array of UInt8): TKey;
+      function MakeKey: TKey;
+      function Sign(
+        const Key: TKey;
+        const Message: TUInt8Array
+      ): TSignature;
+      function Verify(
+        const PublicKey: TKeyPublic;
+        const Message: TUInt8Array;
+        const Signature: TSignature
+      ): Boolean;
+      function MakeKey_BLAKE3(const Seed: array of UInt8): TKey;
+      function MakeKey_BLAKE3: TKey;
+      function Sign_BLAKE3(
+        const Key: TKey;
+        const Message: TUInt8Array
+      ): TSignature;
+      function Verify_BLAKE3(
+        const PublicKey: TKeyPublic;
+        const Message: TUInt8Array;
+        const Signature: TSignature
+      ): Boolean;
+      function MakeKey_SHAKE(const Seed: array of UInt8): TKey;
+      function MakeKey_SHAKE: TKey;
+      function Sign_SHAKE(
+        const Key: TKey;
+        const Message: TUInt8Array
+      ): TSignature;
+      function Verify_SHAKE(
+        const PublicKey: TKeyPublic;
+        const Message: TUInt8Array;
+        const Signature: TSignature
+      ): Boolean;
     end;
     class var Curve_Ed25519: TCurve;
     class function PointAdd(const Curve: TCurve; const p, q: TPoint): TPoint; static;
@@ -842,7 +880,7 @@ public
     ): TSignature; static;
     class function Verify_Ed25519(
       const Curve: TCurve;
-      const PublicKey: TUInt8Arr32;
+      const PublicKey: TKeyPublic;
       const Message: TUInt8Array;
       const Signature: TSignature
     ): Boolean; static;
@@ -855,7 +893,7 @@ public
     ): TSignature; static;
     class function Verify_Ed25519_BLAKE3(
       const Curve: TCurve;
-      const PublicKey: TUInt8Arr32;
+      const PublicKey: TKeyPublic;
       const Message: TUInt8Array;
       const Signature: TSignature
     ): Boolean; static;
@@ -868,7 +906,7 @@ public
     ): TSignature; static;
     class function Verify_Ed25519_SHAKE(
       const Curve: TCurve;
-      const PublicKey: TUInt8Arr32;
+      const PublicKey: TKeyPublic;
       const Message: TUInt8Array;
       const Signature: TSignature
     ): Boolean; static;
@@ -7005,6 +7043,15 @@ begin
   Result := (a.x = b.x) and (a.y = b.y) and (a.z = b.z) and (a.t = b.t);
 end;
 
+function TUECC.Edwards.TCurve.IsValidSignature(const Signature: TSignature): Boolean;
+  var i: Int32;
+begin
+  if Edwards.IsAllZero(Signature.s) then Exit(False);
+  if Signature.s >= n then Exit(False);
+  for i := 0 to High(Signature.r) do if Signature.r[i] > 0 then Exit(True);
+  Result := False;
+end;
+
 function TUECC.Edwards.TCurve.IsOnCurve(const Point: TPoint): Boolean;
   var Affine: TPoint;
   var lhs, rhs, x2, y2, x2y2: TBigInt;
@@ -7051,6 +7098,112 @@ begin
   Result := TBigInt.ModPow(v, (p - 2), p);
 end;
 
+function TUECC.Edwards.TCurve.PointAdd(const p1, p2: TPoint): TPoint;
+begin
+  Result := Edwards.PointAdd(Self, p1, p2);
+end;
+
+function TUECC.Edwards.TCurve.PointDouble(const p1: TPoint): TPoint;
+begin
+  Result := Edwards.PointDouble(Self, p1);
+end;
+
+function TUECC.Edwards.TCurve.ScalarMultiply(const k: TBigInt; const p1: TPoint): TPoint;
+begin
+  Result := Edwards.ScalarMultiply(Self, k, p1);
+end;
+
+function TUECC.Edwards.TCurve.PointCompress(const p1: TPoint): TUInt8Arr32;
+begin
+  Result := Edwards.PointCompress(Self, p1);
+end;
+
+function TUECC.Edwards.TCurve.PointDecompress(const pc: TUInt8Arr32): TPoint;
+begin
+  Result := Edwards.PointDecompress(Self, pc);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey(const Seed: array of UInt8): TKey;
+begin
+  Result := Edwards.MakeKey(Self, Seed);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey: TKey;
+begin
+  Result := Edwards.MakeKey(Self);
+end;
+
+function TUECC.Edwards.TCurve.Sign(
+  const Key: TKey;
+  const Message: TUInt8Array
+): TSignature;
+begin
+  Result := Edwards.Sign_Ed25519(Self, Key, Message);
+end;
+
+function TUECC.Edwards.TCurve.Verify(
+  const PublicKey: TKeyPublic;
+  const Message: TUInt8Array;
+  const Signature: TSignature
+): Boolean;
+begin
+  Result := Edwards.Verify_Ed25519(Self, PublicKey, Message, Signature);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey_BLAKE3(const Seed: array of UInt8): TKey;
+begin
+  Result := Edwards.MakeKey_BLAKE3(Self, Seed);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey_BLAKE3: TKey;
+begin
+  Result := Edwards.MakeKey_BLAKE3(Self);
+end;
+
+function TUECC.Edwards.TCurve.Sign_BLAKE3(
+  const Key: TKey;
+  const Message: TUInt8Array
+): TSignature;
+begin
+  Result := Edwards.Sign_Ed25519_BLAKE3(Self, Key, Message);
+end;
+
+function TUECC.Edwards.TCurve.Verify_BLAKE3(
+  const PublicKey: TKeyPublic;
+  const Message: TUInt8Array;
+  const Signature: TSignature
+): Boolean;
+begin
+  Result := Edwards.Verify_Ed25519_BLAKE3(Self, PublicKey, Message, Signature);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey_SHAKE(const Seed: array of UInt8): TKey;
+begin
+  Result := Edwards.MakeKey_SHAKE(Self, Seed);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey_SHAKE: TKey;
+begin
+  Result := Edwards.MakeKey_SHAKE(Self);
+end;
+
+function TUECC.Edwards.TCurve.Sign_SHAKE(
+  const Key: TKey;
+  const Message: TUInt8Array
+): TSignature;
+begin
+  Result := Edwards.Sign_Ed25519_SHAKE(Self, Key, Message);
+end;
+
+function TUECC.Edwards.TCurve.Verify_SHAKE(
+  const PublicKey: TKeyPublic;
+  const Message: TUInt8Array;
+  const Signature: TSignature
+): Boolean;
+begin
+  Result := Edwards.Verify_Ed25519_SHAKE(Self, PublicKey, Message, Signature);
+end;
+
 function TUECC.Edwards.TKey.IsValid: Boolean;
 begin
   Result := not Edwards.IsAllZero(d) and not Edwards.IsAllZero(q);
@@ -7069,15 +7222,6 @@ end;
 class function TUECC.Edwards.TKeyPublic.Invalid: TKeyPublic;
 begin
   UClear(Result, SizeOf(Result));
-end;
-
-function TUECC.Edwards.TSignature.IsValid(const Curve: TCurve): Boolean;
-  var i: Int32;
-begin
-  if Edwards.IsAllZero(s) then Exit(False);
-  if s >= Curve.n then Exit(False);
-  for i := 0 to High(r) do if r[i] > 0 then Exit(True);
-  Result := False;
 end;
 
 class function TUECC.Edwards.TSignature.Invalid: TSignature;
@@ -7323,7 +7467,7 @@ end;
 
 class function TUECC.Edwards.Verify_Ed25519(
   const Curve: TCurve;
-  const PublicKey: TUInt8Arr32;
+  const PublicKey: TKeyPublic;
   const Message: TUInt8Array;
   const Signature: TSignature
 ): Boolean;
@@ -7336,12 +7480,12 @@ class function TUECC.Edwards.Verify_Ed25519(
   var AffineSB, AaffineRHram: TPoint;
   var Temp: TUInt8Array;
 begin
-  if not Signature.IsValid(Curve) then Exit(False);
-  A := PointDecompress(Curve, PublicKey);
+  if not Curve.IsValidSignature(Signature) then Exit(False);
+  A := PointDecompress(Curve, PublicKey.q);
   if not A.IsValid then Exit(False);
   R := PointDecompress(Curve, Signature.r);
   if not R.IsValid then Exit(False);
-  Temp := UBytesConcat([Signature.r, PublicKey, Message]);
+  Temp := UBytesConcat([Signature.r, PublicKey.q, Message]);
   Hram := TBigInt.Make(USHA2_512(Temp)) mod Curve.n;
   SB := ScalarMultiply(Curve, Signature.s, Curve.b);
   HramA := ScalarMultiply(Curve, Hram, A);
@@ -7409,7 +7553,7 @@ end;
 
 class function TUECC.Edwards.Verify_Ed25519_BLAKE3(
   const Curve: TCurve;
-  const PublicKey: TUInt8Arr32;
+  const PublicKey: TKeyPublic;
   const Message: TUInt8Array;
   const Signature: TSignature
 ): Boolean;
@@ -7422,12 +7566,12 @@ class function TUECC.Edwards.Verify_Ed25519_BLAKE3(
   var AffineSB, AaffineRHram: TPoint;
   var Temp: TUInt8Array;
 begin
-  if not Signature.IsValid(Curve) then Exit(False);
-  A := PointDecompress(Curve, PublicKey);
+  if not Curve.IsValidSignature(Signature) then Exit(False);
+  A := PointDecompress(Curve, PublicKey.q);
   if not A.IsValid then Exit(False);
   R := PointDecompress(Curve, Signature.r);
   if not R.IsValid then Exit(False);
-  Temp := UBytesConcat([Signature.r, PublicKey, Message]);
+  Temp := UBytesConcat([Signature.r, PublicKey.q, Message]);
   Hram := TBigInt.Make(UBLAKE3_Hash(Temp, 64)) mod Curve.n;
   SB := ScalarMultiply(Curve, Signature.s, Curve.b);
   HramA := ScalarMultiply(Curve, Hram, A);
@@ -7495,7 +7639,7 @@ end;
 
 class function TUECC.Edwards.Verify_Ed25519_SHAKE(
   const Curve: TCurve;
-  const PublicKey: TUInt8Arr32;
+  const PublicKey: TKeyPublic;
   const Message: TUInt8Array;
   const Signature: TSignature
 ): Boolean;
@@ -7508,12 +7652,12 @@ class function TUECC.Edwards.Verify_Ed25519_SHAKE(
   var AffineSB, AaffineRHram: TPoint;
   var Temp: TUInt8Array;
 begin
-  if not Signature.IsValid(Curve) then Exit(False);
-  A := PointDecompress(Curve, PublicKey);
+  if not Curve.IsValidSignature(Signature) then Exit(False);
+  A := PointDecompress(Curve, PublicKey.q);
   if not A.IsValid then Exit(False);
   R := PointDecompress(Curve, Signature.r);
   if not R.IsValid then Exit(False);
-  Temp := UBytesConcat([Signature.r, PublicKey, Message]);
+  Temp := UBytesConcat([Signature.r, PublicKey.q, Message]);
   Hram := TBigInt.Make(USHAKE_256(Temp, 64)) mod Curve.n;
   SB := ScalarMultiply(Curve, Signature.s, Curve.b);
   HramA := ScalarMultiply(Curve, Hram, A);
