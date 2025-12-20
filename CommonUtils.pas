@@ -1874,6 +1874,7 @@ end;
 procedure UClear(out x; const Size: UInt32);
 procedure UInit(out Dest; const Src; const Size: UInt32);
 procedure UMove(out Dest; const Src; const Size: UInt32);
+function UMemCompare(const MemA, MemB: Pointer; const Size: UInt32): Int8;
 function UIntToPtr(const i: PtrUInt): Pointer;
 function UCopyVarRec(constref src: TVarRec): TVarRec;
 function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArray;
@@ -10872,6 +10873,20 @@ begin
   {$push}{$hints off}
   Move(Src, Dest, Size);
   {$pop}
+end;
+
+function UMemCompare(const MemA, MemB: Pointer; const Size: UInt32): Int8;
+  var MemArrA: PUInt8Arr absolute MemA;
+  var MemArrB: PUInt8Arr absolute MemB;
+  var i: UInt32;
+begin
+  if Size = 0 then Exit(0);
+  for i := 0 to Size - 1 do
+  begin
+    if MemArrA^[i] < MemArrB^[i] then Exit(-1);
+    if MemArrA^[i] > MemArrB^[i] then Exit(1);
+  end;
+  Result := 0;
 end;
 
 function UIntToPtr(const i: PtrUInt): Pointer;

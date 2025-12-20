@@ -725,18 +725,6 @@ public
     class constructor CreateClass;
   end;
   type Montgomery = record
-    type TCurve = record
-      var p: TBigInt; // prime modulus
-      var a: TBigInt; // param a
-      var b: TBigInt; // param b
-      var n: TBigInt; // order
-      var h: TBigInt; // cofactor
-      var u: TBigInt; // base point
-      function Add(const v1, v2: TBigInt): TBigInt;
-      function Sub(const v1, v2: TBigInt): TBigInt;
-      function Mul(const v1, v2: TBigInt): TBigInt;
-      function Inv(const v: TBigInt): TBigInt;
-    end;
     type TKeyPublic = record
       var q: TBigInt;
       function IsValid: Boolean;
@@ -748,6 +736,23 @@ public
       function PublicKey: TKeyPublic;
       function IsValid: Boolean;
       class function Invalid: TKey; static;
+    end;
+    type TCurve = record
+      var p: TBigInt; // prime modulus
+      var a: TBigInt; // param a
+      var b: TBigInt; // param b
+      var n: TBigInt; // order
+      var h: TBigInt; // cofactor
+      var u: TBigInt; // base point
+      function Add(const v1, v2: TBigInt): TBigInt;
+      function Sub(const v1, v2: TBigInt): TBigInt;
+      function Mul(const v1, v2: TBigInt): TBigInt;
+      function Inv(const v: TBigInt): TBigInt;
+      function ScalarMultiply(const k, p1: TBigInt): TBigInt;
+      function X25519(const k, p1: TBigInt): TBigInt;
+      function MakeKey: TKey;
+      function DerivePublicKey(const PrivateKey: TBigInt): TBigInt;
+      function SharedKey(const PublicKey: TBigInt; const PrivateKey: TBigInt): TBigInt;
     end;
     class var Curve_25519: TCurve;
     class var LowOrderPoints: array [0..4] of TBigInt;
@@ -6844,6 +6849,34 @@ end;
 function TUECC.Montgomery.TCurve.Inv(const v: TBigInt): TBigInt;
 begin
   Result := TBigInt.ModPow(v, (p - 2), p);
+end;
+
+function TUECC.Montgomery.TCurve.ScalarMultiply(const k, p1: TBigInt): TBigInt;
+begin
+  Result := Montgomery.ScalarMultiply(Self, k, p1);
+end;
+
+function TUECC.Montgomery.TCurve.X25519(const k, p1: TBigInt): TBigInt;
+begin
+  Result := Montgomery.X25519(Self, k, p1);
+end;
+
+function TUECC.Montgomery.TCurve.MakeKey: TKey;
+begin
+  Result := Montgomery.MakeKey(Self);
+end;
+
+function TUECC.Montgomery.TCurve.DerivePublicKey(const PrivateKey: TBigInt): TBigInt;
+begin
+  Result := Montgomery.DerivePublicKey(Self, PrivateKey);
+end;
+
+function TUECC.Montgomery.TCurve.SharedKey(
+  const PublicKey: TBigInt;
+  const PrivateKey: TBigInt
+): TBigInt;
+begin
+  Result := Montgomery.SharedKey(Self, PublicKey, PrivateKey);
 end;
 
 function TUECC.Montgomery.TKey.PublicKey: TKeyPublic;
