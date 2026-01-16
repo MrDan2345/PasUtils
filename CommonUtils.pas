@@ -913,6 +913,8 @@ public
   class function Modulo(const a, b: TSelf): TSelf; static;
   class function ModPow(const Base, Exp, Modulus: TSelf): TSelf; static;
   class function ModInv(const Exp, Phi: TSelf): TSelf; static;
+  class function ModAdd(const a, b, Modulus: TSelf): TSelf; static;
+  class function ModSub(const a, b, Modulus: TSelf): TSelf; static;
   class function Compare(const a, b: TSelf): Int8; static;
   class function ShrOne(const Number: TSelf): TSelf; static;
   class function ShlOne(const Number: TSelf): TSelf; static;
@@ -5570,6 +5572,18 @@ begin
   if a <> OneN then Exit(Invalid);
   if (x1 < 0) then x1 := x1 + Phi;
   Result := x1;
+end;
+
+class function TUBigInt.ModAdd(const a, b, Modulus: TSelf): TSelf;
+begin
+  Result := (a + b) mod Modulus;
+end;
+
+class function TUBigInt.ModSub(const a, b, Modulus: TSelf): TSelf;
+begin
+  Result := a - b;
+  while Result < 0 do Result += Modulus;
+  Result := Result mod Modulus;
 end;
 
 class function TUBigInt.Compare(const a, b: TSelf): Int8;
