@@ -797,16 +797,17 @@ public
       class operator = (const a, b: TPoint): Boolean;
     end;
     type TUInt8Arr32 = array[0..31] of UInt8;
-    type TKey = record
-      var d: TUInt8Arr32;
-      var q: TUInt8Arr32;
-      function IsValid: Boolean;
-      class function Invalid: TKey; static;
-    end;
     type TKeyPublic = record
       var q: TUInt8Arr32;
       function IsValid: Boolean;
       class function Invalid: TKeyPublic; static;
+    end;
+    type TKey = record
+      var d: TUInt8Arr32;
+      var q: TUInt8Arr32;
+      function PublicKey: TKeyPublic;
+      function IsValid: Boolean;
+      class function Invalid: TKey; static;
     end;
     type TSignature = record
       var r: TUInt8Arr32;
@@ -7324,6 +7325,11 @@ function TUECC.Edwards.TCurve.Verify_SHAKE(
 ): Boolean;
 begin
   Result := Edwards.Verify_Ed25519_SHAKE(Self, PublicKey, Message, Signature);
+end;
+
+function TUECC.Edwards.TKey.PublicKey: TKeyPublic;
+begin
+  Result.q := q;
 end;
 
 function TUECC.Edwards.TKey.IsValid: Boolean;
