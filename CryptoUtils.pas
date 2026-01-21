@@ -920,6 +920,62 @@ public
   end;
 end;
 
+type TUKyber768 = record
+public
+  const N = 256;
+  const Q = 3329;
+  const K = 3;
+  const ETA = 2;
+  const ROOT_OF_UNITY = 17;
+  const NTT_Zetas: array [0..127] of Int16 = (
+    -1044, -758, -359, -1517, 1493, 1422, 287, 202,
+    -171, 622, 1577, 182, 962, -1202, -1474, 1468,
+    573, -1325, 264, 383, -829, 1458, -1602, -130,
+    -681, 1017, 732, 608, -1542, 411, -205, -1571,
+    1223, 652, -552, 1015, -1293, 1491, -282, -1544,
+    516, -8, -320, -666, -1618, -1162, 126, 1469,
+    -853, -90, -271, 830, 107, -1421, -247, -951,
+    -398, 961, -1508, -725, 448, -1065, 677, -1275,
+    -1103, 430, 555, 843, -1251, 871, 1550, 105,
+    422, 587, 177, -235, -291, -460, 1574, 1653,
+    -246, 778, 1159, -147, -777, 1483, -602, 1119,
+    -1590, 644, -872, 349, 418, 329, -156, -75,
+    817, 1097, 603, 610, 1322, -1285, -1465, 384,
+    -1215, -136, 1218, -1335, -874, 220, -1187, -1659,
+    -1185, -1530, -1278, 794, -1510, -854, -870, 478,
+    -108, -308, 996, 991, 958, -1460, 1522, 1628
+  );
+  type TPolynomial = array[0..N - 1] of Int16;
+  type TVector = array[0..K - 1] of TPolynomial;
+  type TMatrix = array[0..K - 1] of TVector;
+  class function MontgomeryReduce(const a: Int32): Int16; static;
+  class function BarrettReduce(const a: Int16): Int16; static;
+  class function FQMul(a, b: Int16): Int16; static;
+  class function ModQ(const a: Int64): Int32; static;
+  class function AddModQ(const a, b: Int32): Int32; static;
+  class function SubModQ(const a, b: Int32): Int32; static;
+  class function MulModQ(const a, b: Int32): Int32; static;
+  class function PolyAdd(const a, b: TPolynomial): TPolynomial; static;
+  class function PolySub(const a, b: TPolynomial): TPolynomial; static;
+  class function PolyMulNaive(const a, b: TPolynomial): TPolynomial; static;
+  class function PolyMul(const a, b: TPolynomial): TPolynomial; static;
+  class procedure NTT(var Poly: TPolynomial); static;
+  class procedure InvNTT(var Poly: TPolynomial); static;
+  class function SampleCBD(
+    const RandomBytes: array of UInt8;
+    const TheETA: Int32
+  ): TPolynomial; static;
+  class function SampleUniform(
+    const Seed: array of UInt8;
+    const Nonce1, Nonce2: UInt8
+  ): TPolynomial; static;
+  class function VectorAdd(const a, b: TVector): TVector; static;
+  class function MatrixVectorMul(
+    const Matrix: TMatrix;
+    const Vector: TVector
+  ): TVector; static;
+end;
+
 type TUBLAKE3 = record
 public
   type TKey = array[0..31] of UInt8;
@@ -7718,6 +7774,240 @@ begin
   Curve_Ed25519.b.z := TBigInt.One;
   Curve_Ed25519.b.t := '$67875f0fd78604e27eb9e7db11961b2c8c9f37cc6f0d87fe4569dc00c6e5b2a4';
   Curve_Ed25519.SqrtM1 := TBigInt.ModPow(2, (Curve_Ed25519.p - TBigInt.One) div 4, Curve_Ed25519.p);
+end;
+
+class function TUKyber768.MontgomeryReduce(const a: Int32): Int16;
+  const QINV = -3327;
+begin
+  Result := Int16(a) * QINV;
+  Result := (a - Int32(Result) * Q) shr 16;
+end;
+
+class function TUKyber768.BarrettReduce(const a: Int16): Int16;
+  var t: Int16;
+  const v: Int16 = ((1 shl 26) + (Q shr 1)) div Q;
+begin
+  t := (Int32(v) * a + (1 shl 25)) shr 26;
+  t *= Q;
+  Result := a - t;
+end;
+
+class function TUKyber768.FQMul(a, b: Int16): Int16;
+begin
+  Result := MontgomeryReduce(Int32(a) * b);
+end;
+
+class function TUKyber768.ModQ(const a: Int64): Int32;
+begin
+  Result := a mod Q;
+  if Result < 0 then Result += Q;
+end;
+
+class function TUKyber768.AddModQ(const a, b: Int32): Int32;
+begin
+  Result := ModQ(a + b);
+end;
+
+class function TUKyber768.SubModQ(const a, b: Int32): Int32;
+begin
+  Result := ModQ(a - b);
+end;
+
+class function TUKyber768.MulModQ(const a, b: Int32): Int32;
+begin
+  Result := ModQ(Int64(a) * Int64(b));
+end;
+
+class function TUKyber768.PolyAdd(const a, b: TPolynomial): TPolynomial;
+  var i: Int32;
+begin
+  for i := 0 to N - 1 do
+  begin
+    Result[i] := AddModQ(a[i], b[i]);
+  end;
+end;
+
+class function TUKyber768.PolySub(const a, b: TPolynomial): TPolynomial;
+  var i: Int32;
+begin
+  for i := 0 to N - 1 do
+  begin
+    Result[i] := SubModQ(a[i], b[i]);
+  end;
+end;
+
+class function TUKyber768.PolyMulNaive(const a, b: TPolynomial): TPolynomial;
+  var Temp: array[0..2 * N - 2] of Int32;
+  var i, j: Int32;
+begin
+  UClear(Temp, SizeOf(Temp));
+  for i := 0 to N - 1 do
+  for j := 0 to N - 1 do
+  begin
+    Temp[i + j] := AddModQ(Temp[i + j], MulModQ(a[i], b[j]));
+  end;
+  for i := 0 to N - 1 do
+  begin
+    Result[i] := Temp[i];
+    if i + N <= 2 * N - 2 then
+    begin
+      Result[i] := SubModQ(Result[i], Temp[i + N]);
+    end;
+  end;
+end;
+
+class function TUKyber768.PolyMul(const a, b: TPolynomial): TPolynomial;
+  var a_ntt, b_ntt: TPolynomial;
+  var i: Int32;
+begin
+  a_ntt := a;
+  b_ntt := b;
+  NTT(a_ntt);
+  NTT(b_ntt);
+  for i := 0 to N - 1 do
+  begin
+    Result[i] := MulModQ(a_ntt[i], b_ntt[i]);
+  end;
+  InvNTT(result);
+end;
+
+class procedure TUKyber768.NTT(var Poly: TPolynomial);
+  var Len, Start, j, i: UInt32;
+  var t, zeta: Int16;
+begin
+  i := 1;
+  Len := 128;
+  while Len >= 2 do
+  begin
+    Start := 0;
+    while Start < 256 do
+    begin
+      Zeta := NTT_Zetas[i];
+      Inc(i);
+      j := Start;
+      while j < Start + Len do
+      begin
+        t := FQMul(Zeta, Poly[j + Len]);
+        Poly[j + Len] := Poly[j] - t;
+        Poly[j] := Poly[j] + t;
+        Inc(j);
+      end;
+      Start := start + 2 * len;
+    end;
+    Len := Len shr 1;
+  end;
+end;
+
+class procedure TUKyber768.InvNTT(var Poly: TPolynomial);
+  var start, len, j, i: UInt32;
+  var t, zeta: Int16;
+  const f = 1441;
+begin
+  i := 127;
+  Len := 2;
+  while Len <= 128 do
+  begin
+    Start := 0;
+    while Start < 256 do
+    begin
+      Zeta := NTT_Zetas[i];
+      Dec(i);
+      j := Start;
+      while j < Start + Len do
+      begin
+        t := Poly[j];
+        Poly[j] := BarrettReduce(t + Poly[j + Len]);
+        Poly[j + Len] := Poly[j + Len] - t;
+        Poly[j + Len] := FQMul(Zeta, Poly[j + Len]);
+        Inc(j);
+      end;
+      Start := start + 2 * len;
+    end;
+    Len := Len shl 1;
+  end;
+  for j := 0 to 255 do
+  begin
+    Poly[j] := FQMul(FQMul(Poly[j], f), 1);
+  end;
+end;
+
+class function TUKyber768.SampleCBD(
+  const RandomBytes: array of UInt8;
+  const TheETA: Int32
+): TPolynomial;
+  function GetBit(const BitInd: Int32): Boolean;
+    var ByteInd, Bit: Int32;
+  begin
+    ByteInd := BitInd div 8;
+    Bit := BitInd mod 8;
+    Result := ((RandomBytes[ByteInd] shr Bit) and 1) = 1;
+  end;
+  var i, j, a, b: Int32;
+  var BytePos, BitPos: Int32;
+begin
+  BytePos := 0;
+  for i := 0 to N - 1 do
+  begin
+    a := 0;
+    b := 0;
+    for j := 0 to TheETA - 1 do
+    begin
+      BitPos := (BytePos * 8 + j * 2);
+      if GetBit(BitPos) then Inc(a);
+      if GetBit(BitPos + 1) then Inc(b);
+    end;
+    Result[i] := ModQ(a - b);
+    Inc(BytePos, TheETA div 4);
+  end;
+end;
+
+class function TUKyber768.SampleUniform(
+  const Seed: array of UInt8;
+  const Nonce1, Nonce2: UInt8
+): TPolynomial;
+  var i, j, Val: Int32;
+  var Buf: TUInt8Array;
+begin
+  Buf := USHAKE_128(UBytesConcat([Seed, [Nonce1, Nonce2]]), N * 3);
+  j := 0;
+  i := 0;
+  while i < N do
+  begin
+    Val := Buf[j] + (Buf[j + 1] shl 8);
+    Inc(j, 2);
+    if Val < Q then
+    begin
+      Result[i] := Val;
+      Inc(i);
+    end;
+  end;
+end;
+
+class function TUKyber768.VectorAdd(const a, b: TVector): TVector;
+  var i: Int32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    Result[i] := PolyAdd(a[i], b[i]);
+  end;
+end;
+
+class function TUKyber768.MatrixVectorMul(
+  const Matrix: TMatrix;
+  const Vector: TVector
+): TVector;
+  var i, j: Int32;
+  var Temp: TPolynomial;
+begin
+  for i := 0 to K - 1 do
+  begin
+    UClear(Result[i], SizeOf(Result[i]));
+    for j := 0 to K - 1 do
+    begin
+      Temp := PolyMul(Matrix[i][j], Vector[j]);
+      Result[i] := PolyAdd(Result[i], Temp);
+    end;
+  end;
 end;
 
 class function TUBLAKE3.KeyFromHex(const Hex: String): TKey;
