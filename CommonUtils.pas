@@ -198,6 +198,7 @@ public
   class function Make(const Arr: array of UInt16): TUInt8Array; static;
   class function Make(const Arr: array of UInt32): TUInt8Array; static;
   class function Make(const Arr: array of UInt64): TUInt8Array; static;
+  function SubArray(const Start: UInt32; const Size: UInt32 = 0): TUInt8Array;
   function ToString: String;
   function ToHex: String;
   function ToBase64: String;
@@ -2406,6 +2407,18 @@ begin
   if Length(Arr) = 0 then Exit;
   SetLength(Result, Length(Arr) * SizeOf(Arr[0]));
   Move(Arr[0], Result[0], Length(Arr) * SizeOf(Arr[0]));
+end;
+
+function TUInt8ArrayImpl.SubArray(const Start: UInt32; const Size: UInt32): TUInt8Array;
+  var Len: UInt32;
+begin
+  if Start > High(Self) then Exit(nil);
+  Len := Length(Self) - Start;
+  if Size > 0 then
+  begin
+    Len := UMin(Len, Size);
+  end;
+  Result := TUInt8Array.Make(@Self[Start], Len);
 end;
 
 function TUInt8ArrayImpl.ToString: String;

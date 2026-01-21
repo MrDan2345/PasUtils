@@ -926,6 +926,15 @@ public
   const K = 3;
   const ETA = 2;
   const ROOT_OF_UNITY = 17;
+  const POLYVEC_BYTES = 320 * K;
+  const POLYCIPHERTEXT_BYTES = 320 * K + 128;
+  const POLYCOMPRESSEDBYTES = 128;
+  const POLYVECCOMPRESSEDBYTES = K * 320;
+  const POLYBYTES = 384;
+  const POLYVECBYTES = K * POLYBYTES;
+  const SYMBYTES = 32;
+  const PUBLICKEYBYTES = POLYVECBYTES + SYMBYTES;
+  const SECRETKEYBYTES = POLYVECBYTES;
   const NTT_Zetas: array [0..127] of Int16 = (
     -1044, -758, -359, -1517, 1493, 1422, 287, 202,
     -171, 622, 1577, 182, 962, -1202, -1474, 1468,
@@ -944,9 +953,24 @@ public
     -1185, -1530, -1278, 794, -1510, -854, -870, 478,
     -108, -308, 996, 991, 958, -1460, 1522, 1628
   );
-  type TPolynomial = array[0..N - 1] of Int16;
-  type TVector = array[0..K - 1] of TPolynomial;
-  type TMatrix = array[0..K - 1] of TVector;
+  type TPoly = array[0..N - 1] of Int16;
+  type TVec = array[0..K - 1] of TPoly;
+  type TMatrix = array[0..K - 1] of TVec;
+  type TPolyBytes = array[0..POLYBYTES - 1] of UInt8;
+  type PPolyBytes = ^TPolyBytes;
+  type TVecBytes = array[0..POLYVECBYTES - 1] of UInt8;
+  type PVecBytes = ^TVecBytes;
+  type TPublicKey = record
+    var t: TVec;
+    var rho: array[0..SYMBYTES - 1] of UInt8;
+  end;
+  type TSecretKey = record
+    var s: TVec;
+  end;
+  type TKeyPair = record
+    var PublicKey: TPublicKey;
+    var SecretKey: TSecretKey;
+  end;
   class function MontgomeryReduce(const a: Int32): Int16; static;
   class function BarrettReduce(const a: Int16): Int16; static;
   class function FQMul(a, b: Int16): Int16; static;
@@ -954,25 +978,86 @@ public
   class function AddModQ(const a, b: Int32): Int32; static;
   class function SubModQ(const a, b: Int32): Int32; static;
   class function MulModQ(const a, b: Int32): Int32; static;
-  class function PolyAdd(const a, b: TPolynomial): TPolynomial; static;
-  class function PolySub(const a, b: TPolynomial): TPolynomial; static;
-  class function PolyMulNaive(const a, b: TPolynomial): TPolynomial; static;
-  class function PolyMul(const a, b: TPolynomial): TPolynomial; static;
-  class procedure NTT(var Poly: TPolynomial); static;
-  class procedure InvNTT(var Poly: TPolynomial); static;
+  class function PolyAdd(const a, b: TPoly): TPoly; static;
+  class function PolySub(const a, b: TPoly): TPoly; static;
+  class function PolyMulNaive(const a, b: TPoly): TPoly; static;
+  class function PolyMul(const a, b: TPoly): TPoly; static;
+  class procedure PolyNTT(var Poly: TPoly); static;
+  class procedure PolyInvNTT(var Poly: TPoly); static;
+  class procedure VecNTT(var Vec: TVec); static;
+  class procedure VecInvNTT(var Vec: TVec); static;
+  class procedure ToMont(var Poly: TPoly); static;
+  class procedure ToMont(var Vec: TVec); static;
+  class procedure FromMont(var Poly: TPoly); static;
+  class procedure FromMont(var Vec: TVec); static;
   class function SampleCBD(
     const RandomBytes: array of UInt8;
     const TheETA: Int32
-  ): TPolynomial; static;
+  ): TPoly; static;
   class function SampleUniform(
     const Seed: array of UInt8;
     const Nonce1, Nonce2: UInt8
-  ): TPolynomial; static;
-  class function VectorAdd(const a, b: TVector): TVector; static;
+  ): TPoly; static;
+  class function VectorAdd(const a, b: TVec): TVec; static;
   class function MatrixVectorMul(
     const Matrix: TMatrix;
-    const Vector: TVector
-  ): TVector; static;
+    const Vector: TVec
+  ): TVec; static;
+  class function PolyCompress(const Poly: TPoly): TUInt8Array; static;
+  class function PolyDecompress(const Data: array of UInt8): TPoly; static;
+  class procedure PolyToBytes(const Poly: TPoly; const DstBytes: PPolyBytes); static;
+  class function PolyToBytes(const Poly: TPoly): TUInt8Array; static;
+  class function PolyFromBytes(const SrcBytes: PPolyBytes): TPoly; static;
+  class function PolyFromBytes(const Data: array of UInt8): TPoly; static;
+  class function VecCompress(const Vec: TVec): TUInt8Array; static;
+  class function VecDecompress(const Data: array of UInt8): TVec; static;
+  class procedure VecToBytes(const Vec: TVec; const DstBytes: PVecBytes); static;
+  class function VecToBytes(const Vec: TVec): TUInt8Array; static;
+  class function VecFromBytes(const SrcBytes: PVecBytes): TVec; static;
+  class function VecFromBytes(const Data: array of UInt8): TVec; static;
+  class function GenerateKeyPair(
+    const Seed: array of UInt8
+  ): TKeyPair; static;
+  class function GenerateKeyPair: TKeyPair; static;
+  class function GenerateMatrix(
+    const Seed: array of UInt8;
+    const Transposed: Boolean
+  ): TMatrix; static;
+  class function PackPublicKey(const PublicKey: TPublicKey): TUInt8Array; static;
+  class function UnpackPublicKey(const Data: array of UInt8): TPublicKey; static;
+  class function PackSecretKey(const SecretKey: TSecretKey): TUInt8Array; static;
+  class function UnpackSecretKey(const Data: array of UInt8): TSecretKey; static;
+end;
+
+type TUKeccak = record
+public
+  type TState = array[0..4, 0..4] of UInt64;
+private
+  type TStateArr = array[0..24] of UInt64;
+public
+  class procedure PermuteF1600(var State: TState); static;
+  class function Init: TState; static;
+  class procedure Init(out State: TState); static;
+  class function Absorb(
+    var State: TState;
+    const Pos: UInt32;
+    const Rate: UInt32;
+    const Data: Pointer;
+    const Size: UInt32
+  ): UInt32; static;
+  class procedure Finalize(
+    var State: TState;
+    const Pos: UInt32;
+    const Rate: UInt32;
+    const Domain: UInt8
+  ); static;
+  class function Squeeze(
+    var State: TState;
+    const Pos: UInt32;
+    const Rate: UInt32;
+    const OutSize: UInt32;
+    out Output: TUInt8Array
+  ): UInt32; static;
 end;
 
 type TUBLAKE3 = record
@@ -1091,12 +1176,12 @@ public
     der_null = $05,
     der_object_identifier = $06,
     der_utf8_string = $0c,
-    der_sequence = $30,
-    der_set = $31,
     der_printable_string = $13,
     der_ia5_string = $16,
     der_utc_time = $17,
-    der_generalized_time = $18
+    der_generalized_time = $18,
+    der_sequence = $30,
+    der_set = $31
   );
 private
   var _Tag: TTag;
@@ -3880,58 +3965,6 @@ end;
 function USHA2_256(const Data: String): TUDigestSHA2_256;
 begin
   Result := USHA2_256(@Data[1], Length(Data));
-end;
-
-function UMillerRabinTest(const Number: TURSA.TBigInt; const Iterations: Int32): Boolean;
-  var Two: TURSA.TBigInt;
-  var Cmp: Int8;
-  var i: Int32;
-  var m, m_temp: UInt32;
-  var d, a, x, n_minus_1, n_minus_2: TURSA.TBigInt;
-begin
-  Two := 2;
-  Cmp := TURSA.TBigInt.Compare(Number, Two);
-  if Cmp < 0 then Exit(False);
-  if Cmp = 0 then Exit(True);
-  if not Number.IsOdd then Exit(False);
-  n_minus_1 := Number - TURSA.TBigInt.One;
-  d := n_minus_1;
-  m := 0;
-  while not d.IsOdd and (d > TURSA.TBigInt.Zero) do
-  begin
-    d := TURSA.TBigInt.ShrOne(d);
-    Inc(m);
-  end;
-  n_minus_2 := Number - Two;
-  for i := 1 to Iterations do
-  begin
-    a := TURSA.TBigInt.MakeRandomRange(Two, n_minus_2);
-    x := TURSA.TBigInt.ModPow(a, d, Number);
-    if (x = TURSA.TBigInt.One) or (x = n_minus_1) then Continue;
-    m_temp := m;
-    while m_temp > 1 do
-    begin
-      x := TURSA.TBigInt.ModPow(x, Two, Number);
-      if x = TURSA.TBigInt.One then Exit(False);
-      if x = n_minus_1 then Break;
-      Dec(m_temp);
-    end;
-    if not (x = n_minus_1) then Exit(False);
-  end;
-  Result := True;
-end;
-
-function UMakePrime(const BitCount: Int32): TURSA.TBigInt;
-  var TestCount: Int32;
-begin
-  TestCount := 0;
-  repeat
-    Result := TURSA.TBigInt.MakeRandom(BitCount);
-    Result := Result or (TURSA.TBigInt.One shl (BitCount - 1));
-    Result[0] := Result[0] or 1;
-    Inc(TestCount);
-    if TestCount mod 100 = 0 then WriteLn(TestCount);
-  until UMillerRabinTest(Result, 100);
 end;
 
 function USHA2_512(const Data: Pointer; const DataSize: UInt32): TUDigestSHA2_512;
@@ -7812,7 +7845,7 @@ begin
   Result := ModQ(Int64(a) * Int64(b));
 end;
 
-class function TUKyber768.PolyAdd(const a, b: TPolynomial): TPolynomial;
+class function TUKyber768.PolyAdd(const a, b: TPoly): TPoly;
   var i: Int32;
 begin
   for i := 0 to N - 1 do
@@ -7821,7 +7854,7 @@ begin
   end;
 end;
 
-class function TUKyber768.PolySub(const a, b: TPolynomial): TPolynomial;
+class function TUKyber768.PolySub(const a, b: TPoly): TPoly;
   var i: Int32;
 begin
   for i := 0 to N - 1 do
@@ -7830,7 +7863,7 @@ begin
   end;
 end;
 
-class function TUKyber768.PolyMulNaive(const a, b: TPolynomial): TPolynomial;
+class function TUKyber768.PolyMulNaive(const a, b: TPoly): TPoly;
   var Temp: array[0..2 * N - 2] of Int32;
   var i, j: Int32;
 begin
@@ -7850,22 +7883,22 @@ begin
   end;
 end;
 
-class function TUKyber768.PolyMul(const a, b: TPolynomial): TPolynomial;
-  var a_ntt, b_ntt: TPolynomial;
+class function TUKyber768.PolyMul(const a, b: TPoly): TPoly;
+  var a_ntt, b_ntt: TPoly;
   var i: Int32;
 begin
   a_ntt := a;
   b_ntt := b;
-  NTT(a_ntt);
-  NTT(b_ntt);
+  PolyNTT(a_ntt);
+  PolyNTT(b_ntt);
   for i := 0 to N - 1 do
   begin
     Result[i] := MulModQ(a_ntt[i], b_ntt[i]);
   end;
-  InvNTT(result);
+  PolyInvNTT(Result);
 end;
 
-class procedure TUKyber768.NTT(var Poly: TPolynomial);
+class procedure TUKyber768.PolyNTT(var Poly: TPoly);
   var Len, Start, j, i: UInt32;
   var t, zeta: Int16;
 begin
@@ -7892,7 +7925,7 @@ begin
   end;
 end;
 
-class procedure TUKyber768.InvNTT(var Poly: TPolynomial);
+class procedure TUKyber768.PolyInvNTT(var Poly: TPoly);
   var start, len, j, i: UInt32;
   var t, zeta: Int16;
   const f = 1441;
@@ -7921,14 +7954,69 @@ begin
   end;
   for j := 0 to 255 do
   begin
-    Poly[j] := FQMul(FQMul(Poly[j], f), 1);
+    Poly[j] := FQMul(Poly[j], f);
+  end;
+end;
+
+class procedure TUKyber768.VecNTT(var Vec: TVec);
+  var i: UInt32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    PolyNTT(Vec[i]);
+  end;
+end;
+
+class procedure TUKyber768.VecInvNTT(var Vec: TVec);
+  var i: UInt32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    PolyInvNTT(Vec[i]);
+  end;
+end;
+
+class procedure TUKyber768.ToMont(var Poly: TPoly);
+  const MONT_CONSTANT = 1353;
+  var i: UInt32;
+begin
+  for i := 0 to N - 1 do
+  begin
+    Poly[i] := FQMul(Poly[i], MONT_CONSTANT);
+  end;
+end;
+
+class procedure TUKyber768.ToMont(var Vec: TVec);
+  var i: UInt32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    ToMont(Vec[i]);
+  end;
+end;
+
+class procedure TUKyber768.FromMont(var Poly: TPoly);
+  var i: UInt32;
+begin
+  for i := 0 to N - 1 do
+  begin
+    Poly[i] := FQMul(Poly[i], 1);
+  end;
+end;
+
+class procedure TUKyber768.FromMont(var Vec: TVec);
+  var i: UInt32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    FromMont(Vec[i]);
   end;
 end;
 
 class function TUKyber768.SampleCBD(
   const RandomBytes: array of UInt8;
   const TheETA: Int32
-): TPolynomial;
+): TPoly;
   function GetBit(const BitInd: Int32): Boolean;
     var ByteInd, Bit: Int32;
   begin
@@ -7958,7 +8046,7 @@ end;
 class function TUKyber768.SampleUniform(
   const Seed: array of UInt8;
   const Nonce1, Nonce2: UInt8
-): TPolynomial;
+): TPoly;
   var i, j, Val: Int32;
   var Buf: TUInt8Array;
 begin
@@ -7977,7 +8065,7 @@ begin
   end;
 end;
 
-class function TUKyber768.VectorAdd(const a, b: TVector): TVector;
+class function TUKyber768.VectorAdd(const a, b: TVec): TVec;
   var i: Int32;
 begin
   for i := 0 to K - 1 do
@@ -7988,10 +8076,10 @@ end;
 
 class function TUKyber768.MatrixVectorMul(
   const Matrix: TMatrix;
-  const Vector: TVector
-): TVector;
+  const Vector: TVec
+): TVec;
   var i, j: Int32;
-  var Temp: TPolynomial;
+  var Temp: TPoly;
 begin
   for i := 0 to K - 1 do
   begin
@@ -8002,6 +8090,413 @@ begin
       Result[i] := PolyAdd(Result[i], Temp);
     end;
   end;
+end;
+
+class function TUKyber768.PolyCompress(const Poly: TPoly): TUInt8Array;
+  var i, j: UInt32;
+  var u: Int16;
+  var d0: UInt32;
+  var t: array[0..7] of UInt8;
+  var r: PUInt8Arr;
+begin
+  Result := TUInt8Array.Make(POLYCOMPRESSEDBYTES);
+  r := @Result[0];
+  for i := 0 to N div 8 - 1 do
+  begin
+    for j := 0 to 8 - 1 do
+    begin
+      u := Poly[8 * i + j];
+      u += (u shr 15) and Q;
+      d0 := u shl 4;
+      d0 += 1665;
+      d0 *= 80635;
+      d0 := d0 shr 28;
+      t[j] := d0 and $f;
+    end;
+    r^[0] := t[0] or (t[1] shl 4);
+    r^[1] := t[2] or (t[3] shl 4);
+    r^[2] := t[4] or (t[5] shl 4);
+    r^[3] := t[6] or (t[7] shl 4);
+    Inc(Pointer(r), 4);
+  end;
+end;
+
+class function TUKyber768.PolyDecompress(const Data: array of UInt8): TPoly;
+  var i: UInt32;
+  var a: PUInt8Arr;
+begin
+  a := @Data[0];
+  for i := 0 to N div 2 - 1 do
+  begin
+    Result[2 * i + 0] := ((UInt16(a^[0] and 15) * Q) + 8) shr 4;
+    Result[2 * i + 1] := ((UInt16(a^[0] shr 4) * Q) + 8) shr 4;
+    Inc(Pointer(a), 1);
+  end;
+end;
+
+class procedure TUKyber768.PolyToBytes(
+  const Poly: TPoly;
+  const DstBytes: PPolyBytes
+);
+  var i: UInt32;
+  var t0, t1: UInt16;
+  var r: PUInt8Arr;
+begin
+  r := PUInt8Arr(DstBytes);
+  for i := 0 to N div 2 - 1 do
+  begin
+    t0 := Poly[2 * i];
+    t0 += (Int16(t0) shr 15) and Q;
+    t1 := Poly[2 * i + 1];
+    t1 += (Int16(t1) shr 15) and Q;
+    r^[0] := (t0 shr 0);
+    r^[1] := (t0 shr 8) or (t1 shl 4);
+    r^[2] := (t1 shr 4);
+    Inc(Pointer(r), 3);
+  end;
+end;
+
+class function TUKyber768.PolyToBytes(const Poly: TPoly): TUInt8Array;
+begin
+  Result := TUInt8Array.Make(POLYBYTES);
+  PolyToBytes(Poly, @Result[0]);
+end;
+
+class function TUKyber768.PolyFromBytes(const SrcBytes: PPolyBytes): TPoly;
+  var i: UInt32;
+begin
+  for i := 0 to N div 2 - 1 do
+  begin
+    Result[2 * i + 0] := ((SrcBytes^[3 * i + 0] shr 0) or (UInt16(SrcBytes^[3 * i + 1]) shl 8)) and $fff;
+    Result[2 * i + 1] := ((SrcBytes^[3 * i + 1] shr 4) or (UInt16(SrcBytes^[3 * i + 2]) shl 4)) and $fff;
+  end;
+end;
+
+class function TUKyber768.PolyFromBytes(const Data: array of UInt8): TPoly;
+begin
+  Result := PolyFromBytes(@Data[0]);
+end;
+
+class function TUKyber768.VecCompress(const Vec: TVec): TUInt8Array;
+  var i, j, _k: UInt32;
+  var d0: UInt64;
+  var t: array[0..3] of UInt16;
+  var r: PUInt8Arr;
+begin
+  Result := TUInt8Array.Make(POLYVECCOMPRESSEDBYTES);
+  r := @Result[0];
+  for i := 0 to K - 1 do
+  begin
+    for j := 0 to N div 4 - 1 do
+    begin
+      for _k := 0 to 4 - 1 do
+      begin
+        t[_k] := Vec[i][4 * j + _k];
+        t[_k] += (Int16(t[_k]) shr 15) and Q;
+        d0 := t[_k];
+        d0 := d0 shl 10;
+        d0 += 1665;
+        d0 *= 1290167;
+        d0 := d0 shr 32;
+        t[_k] := d0 and $3ff;
+      end;
+      r^[0] := (t[0] shr 0);
+      r^[1] := (t[0] shr 8) or (t[1] shl 2);
+      r^[2] := (t[1] shr 6) or (t[2] shl 4);
+      r^[3] := (t[2] shr 4) or (t[3] shl 6);
+      r^[4] := (t[3] shr 2);
+      Inc(Pointer(r), 5);
+    end;
+  end;
+end;
+
+class function TUKyber768.VecDecompress(const Data: array of UInt8): TVec;
+  var t: array[0..3] of UInt16;
+  var i, j, _k: UInt32;
+  var a: PUInt8Arr;
+begin
+  a := @Data[0];
+  for i := 0 to K - 1 do
+  begin
+    for j := 0 to N div 4 - 1 do
+    begin
+      t[0] := (a^[0] shr 0) or (UInt16(a^[1]) shl 8);
+      t[1] := (a^[1] shr 2) or (UInt16(a^[2]) shl 6);
+      t[2] := (a^[2] shr 4) or (UInt16(a^[3]) shl 4);
+      t[3] := (a^[3] shr 6) or (UInt16(a^[4]) shl 2);
+      Inc(Pointer(a), 5);
+      for _k := 0 to 4 - 1 do
+      begin
+        Result[i][4 * j + _k] := (UInt32(t[_k] and $3ff) * Q + 512) shr 10;
+      end;
+    end;
+  end;
+end;
+
+class procedure TUKyber768.VecToBytes(const Vec: TVec; const DstBytes: PVecBytes);
+  var i: Int32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    PolyToBytes(Vec[i], PPolyBytes(DstBytes) + i);
+  end;
+end;
+
+class function TUKyber768.VecToBytes(const Vec: TVec): TUInt8Array;
+begin
+  Result := TUInt8Array.Make(POLYVECBYTES);
+  VecToBytes(Vec, @Result[0]);
+end;
+
+class function TUKyber768.VecFromBytes(const SrcBytes: PVecBytes): TVec;
+  var i: UInt32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    Result[i] := PolyFromBytes(PPolyBytes(SrcBytes) + i);
+  end;
+end;
+
+class function TUKyber768.VecFromBytes(const Data: array of UInt8): TVec;
+begin
+  Result := VecFromBytes(@Data[0]);
+end;
+
+class function TUKyber768.GenerateKeyPair(const Seed: array of UInt8): TKeyPair;
+  var rho, sigma: array[0..SYMBYTES - 1] of UInt8;
+  var A: TMatrix;
+  var s, e: TVec;
+  var i: Int32;
+  var Nonce: UInt8;
+  var Hash: TUInt8Array;
+begin
+  if Length(Seed) <> SYMBYTES then Exit;
+  Hash := USHA3_512(Seed);
+  UInit(rho, Hash[0], SYMBYTES);
+  UInit(sigma, Hash[SYMBYTES], SYMBYTES);
+  A := GenerateMatrix(rho, False);
+  Nonce := 0;
+  for i := 0 to K - 1 do
+  begin
+    Hash := USHAKE_256(UBytesConcat([sigma, [Nonce]]), ETA * N div 4);
+    s[i] := SampleCBD(Hash, ETA);
+    Inc(Nonce);
+  end;
+  for i := 0 to K - 1 do
+  begin
+    Hash := USHAKE_256(UBytesConcat([sigma, [Nonce]]), ETA * N div 4);
+    e[i] := SampleCBD(Hash, ETA);
+    Inc(Nonce);
+  end;
+  VecNTT(s);
+  VecNTT(e);
+  Result.PublicKey.t := MatrixVectorMul(A, s);
+  Result.PublicKey.t := VectorAdd(Result.PublicKey.t, e);
+  Move(rho[0], Result.PublicKey.rho[0], SYMBYTES);
+  Result.SecretKey.s := s;
+end;
+
+class function TUKyber768.GenerateKeyPair: TKeyPair;
+begin
+  Result := GenerateKeyPair(USysRandom(32));
+end;
+
+class function TUKyber768.GenerateMatrix(
+  const Seed: array of UInt8;
+  const Transposed: Boolean
+): TMatrix;
+  var i, j: Int32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    for j := 0 to K - 1 do
+    begin
+      if Transposed then
+      begin
+        Result[i][j] := SampleUniform(Seed, i, j)
+      end
+      else
+      begin
+        Result[i][j] := SampleUniform(Seed, j, i);
+      end;
+    end;
+  end;
+end;
+
+class function TUKyber768.PackPublicKey(const PublicKey: TPublicKey): TUInt8Array;
+begin
+  Result := TUInt8Array.Make(PUBLICKEYBYTES);
+  Move(VecToBytes(PublicKey.t)[0], Result[0], POLYVECBYTES);
+  Move(PublicKey.rho[0], Result[POLYVECBYTES], SYMBYTES);
+end;
+
+class function TUKyber768.UnpackPublicKey(const Data: array of UInt8): TPublicKey;
+begin
+  Result.t := VecFromBytes(Copy(Data, 0, POLYVECBYTES));
+  Move(Data[POLYVECBYTES], Result.rho[0], SYMBYTES);
+end;
+
+class function TUKyber768.PackSecretKey(const SecretKey: TSecretKey): TUInt8Array;
+begin
+  Result := VecToBytes(SecretKey.s);
+end;
+
+class function TUKyber768.UnpackSecretKey(const Data: array of UInt8): TSecretKey;
+begin
+  Result.s := VecFromBytes(Data);
+end;
+
+class procedure TUKeccak.PermuteF1600(var State: TState);
+  function ROTL64(const x: UInt64; const n: UInt8): UInt64;
+  begin
+    Result := (x shl n) or (x shr (64 - n));
+  end;
+  const NROUNDS = 24;
+  const RoundConstants: array [0..NROUNDS - 1] of UInt64 = (
+    UInt64($0000000000000001), UInt64($0000000000008082), UInt64($800000000000808a), UInt64($8000000080008000),
+    UInt64($000000000000808b), UInt64($0000000080000001), UInt64($8000000080008081), UInt64($8000000000008009),
+    UInt64($000000000000008a), UInt64($0000000000000088), UInt64($0000000080008009), UInt64($000000008000000a),
+    UInt64($000000008000808b), UInt64($800000000000008b), UInt64($8000000000008089), UInt64($8000000000008003),
+    UInt64($8000000000008002), UInt64($8000000000000080), UInt64($000000000000800a), UInt64($800000008000000a),
+    UInt64($8000000080008081), UInt64($8000000000008080), UInt64($0000000080000001), UInt64($8000000080008008)
+  );
+  const RotationOffsets: array[0..4, 0..4] of UInt8 = (
+    (0, 36, 3, 41, 18),
+    (1, 44, 10, 45, 2),
+    (62, 6, 43, 15, 61),
+    (28, 55, 25, 21, 56),
+    (27, 20, 39, 8, 14)
+  );
+  var r: Int32;
+  var x, y: Int32;
+  var C, D: array[0..4] of UInt64;
+  var B: TState;
+begin
+  for r := 0 to 23 do
+  begin
+    for x := 0 to 4 do
+    begin
+      C[x] := State[x, 0] xor State[x, 1] xor State[x, 2] xor State[x, 3] xor State[x, 4];
+    end;
+    for x := 0 to 4 do
+    begin
+      D[x] := C[(x + 4) mod 5] xor ROTL64(C[(x + 1) mod 5], 1);
+    end;
+    for x := 0 to 4 do
+    for y := 0 to 4 do
+    begin
+      State[x, y] := State[x, y] xor D[x];
+    end;
+    for x := 0 to 4 do
+    for y := 0 to 4 do
+    begin
+      B[y, (2 * x + 3 * y) mod 5] := ROTL64(State[x, y], RotationOffsets[x, y]);
+    end;
+    for x := 0 to 4 do
+    for y := 0 to 4 do
+    begin
+      State[x, y] := B[x, y] xor ((not B[(x + 1) mod 5, y]) and B[(x + 2) mod 5, y]);
+    end;
+    State[0, 0] := State[0, 0] xor RoundConstants[r];
+  end;
+end;
+
+class function TUKeccak.Init: TState;
+begin
+  Init(Result);
+end;
+
+class procedure TUKeccak.Init(out State: TState);
+begin
+  UClear(State, SizeOf(State));
+end;
+
+class function TUKeccak.Absorb(
+  var State: TState;
+  const Pos: UInt32;
+  const Rate: UInt32;
+  const Data: Pointer;
+  const Size: UInt32
+): UInt32;
+  var StateArr: TStateArr absolute State;
+  var i, j, InLen, CurPos: UInt32;
+  var InByte: PUInt8;
+begin
+  InByte := PUInt8(Data);
+  InLen := Size;
+  CurPos := Pos;
+  while (CurPos + InLen >= Rate) do
+  begin
+    for i := CurPos to Rate - 1 do
+    begin
+      j := i shr 3;
+      StateArr[j] := StateArr[j] xor UInt64(InByte^) shl 8 * (i mod 8);
+      Inc(InByte);
+    end;
+    InLen -= Rate - CurPos;
+    PermuteF1600(State);
+    CurPos := 0;
+  end;
+  Result := CurPos + InLen;
+  for i := CurPos to Result do
+  begin
+    j := i shr 3;
+    StateArr[j] := StateArr[j] xor UInt64(InByte^) shl 8 * (i mod 8);
+    Inc(InByte);
+  end;
+end;
+
+class procedure TUKeccak.Finalize(
+  var State: TState;
+  const Pos: UInt32;
+  const Rate: UInt32;
+  const Domain: UInt8
+);
+  var StateArr: TStateArr absolute State;
+  var i: Int32;
+begin
+  i := Pos shr 3;
+  StateArr[i] := StateArr[i] xor UInt64(Domain) shl 8 * (Pos mod 8);
+  i := Rate div 8 - 1;
+  StateArr[i] := StateArr[i] xor 1 shl 63;
+end;
+
+class function TUKeccak.Squeeze(
+  var State: TState;
+  const Pos: UInt32;
+  const Rate: UInt32;
+  const OutSize: UInt32;
+  out Output: TUInt8Array
+): UInt32;
+  var StateArr: TStateArr absolute State;
+  var i: Int32;
+  var OutLen: UInt32;
+  var CurPos: UInt32;
+  var OutByte: PUInt8;
+begin
+  if OutSize = 0 then Exit(Pos);
+  Output := TUInt8Array.Make(OutSize);
+  OutByte := @Output[0];
+  OutLen := OutSize;
+  CurPos := Pos;
+  while OutLen > 0 do
+  begin
+    if CurPos = Rate then
+    begin
+      PermuteF1600(State);
+      CurPos := 0;
+    end;
+    i := CurPos;
+    while (i < Rate) and (i < CurPos + OutLen) do
+    begin
+      OutByte^ := StateArr[i shr 3] shr 8 * (i mod 8);
+      Inc(OutByte);
+      Inc(i);
+    end;
+    OutLen -= i - pos;
+    CurPos := i;
+  end;
+  Result := CurPos;
 end;
 
 class function TUBLAKE3.KeyFromHex(const Hex: String): TKey;
