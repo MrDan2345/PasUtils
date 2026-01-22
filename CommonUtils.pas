@@ -1715,6 +1715,34 @@ public
   class operator Finalize(var v: TSelf);
 end;
 
+type TUPtrHelper = type helper for Pointer
+public
+  procedure Read(var Output; const Size: UInt32); inline;
+  procedure Write(const Data; const Size: UInt32); inline;
+  function ReadBool: Boolean; inline;
+  function ReadUInt8: UInt8; inline;
+  function ReadUInt16: UInt16; inline;
+  function ReadUInt32: UInt32; inline;
+  function ReadUInt64: UInt64; inline;
+  function ReadInt8: Int8; inline;
+  function ReadInt16: Int16; inline;
+  function ReadInt32: Int32; inline;
+  function ReadInt64: Int64; inline;
+  function ReadFloat: Single; inline;
+  function ReadDouble: Double; inline;
+  procedure WriteBool(const Value: Boolean); inline;
+  procedure WriteUInt8(const Value: UInt8); inline;
+  procedure WriteUInt16(const Value: UInt16); inline;
+  procedure WriteUInt32(const Value: UInt32); inline;
+  procedure WriteUInt64(const Value: UInt64); inline;
+  procedure WriteInt8(const Value: Int8); inline;
+  procedure WriteInt16(const Value: Int16); inline;
+  procedure WriteInt32(const Value: Int32); inline;
+  procedure WriteInt64(const Value: Int64); inline;
+  procedure WriteFloat(const Value: Single); inline;
+  procedure WriteDouble(const Value: Double); inline;
+end;
+
 type TUXML = class (TURefClass)
 public
   type TAttribute = class
@@ -10013,6 +10041,130 @@ begin
   v.Finalize;
 end;
 // TUFIFOList end
+
+// TUPtrHelper begin
+procedure TUPtrHelper.Read(var Output; const Size: UInt32);
+begin
+  UMove(Output, Self^, Size);
+  Inc(Self, Size);
+end;
+
+procedure TUPtrHelper.Write(const Data; const Size: UInt32);
+begin
+  UMove(Self^, Data, Size);
+  Inc(Self, Size);
+end;
+
+function TUPtrHelper.ReadBool: Boolean;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadUInt8: UInt8;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadUInt16: UInt16;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadUInt32: UInt32;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadUInt64: UInt64;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadInt8: Int8;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadInt16: Int16;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadInt32: Int32;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadInt64: Int64;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadFloat: Single;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadDouble: Double;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+procedure TUPtrHelper.WriteBool(const Value: Boolean);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteUInt8(const Value: UInt8);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteUInt16(const Value: UInt16);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteUInt32(const Value: UInt32);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteUInt64(const Value: UInt64);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteInt8(const Value: Int8);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteInt16(const Value: Int16);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteInt32(const Value: Int32);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteInt64(const Value: Int64);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteFloat(const Value: Single);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteDouble(const Value: Double);
+begin
+  Write(Value, SizeOf(Value));
+end;
+// TUPtrHelper end
 
 // TUXML begin
 function TUXML.TEnumerator.GetCurrent: TUXML;
