@@ -14798,7 +14798,11 @@ procedure InitializeMath;
   end;
   function CheckExt: TCPUExt;
     type TCPUIDResult = array[0..3] of UInt32;
-    procedure GetCPUID(const Leaf, SubLeaf: UInt32; out Info: TCPUIDResult); assembler;
+    type PCPUIDResult = ^TCPUIDResult;
+    procedure GetCPUID(
+      const Leaf, SubLeaf: UInt32;
+      const Info: PCPUIDResult
+    ); assembler;
     asm
       push rbx
       mov eax, Leaf
@@ -14825,7 +14829,7 @@ procedure InitializeMath;
     var XCR0: UInt64;
   begin
     FillChar(Result, SizeOf(Result), 0);
-    GetCPUID(1, 0, CPUInfo);
+    GetCPUID(1, 0, @CPUInfo);
     Result.SSE := CheckFeature(CPUInfo, 3, 25);
     Result.SSE2 := CheckFeature(CPUInfo, 3, 26);
     if not CheckFeature(CPUInfo, 2, 27) then Exit;
@@ -14835,9 +14839,9 @@ procedure InitializeMath;
       and (XCR0 and 6 = 6)
     );
     if not Result.AVX then Exit;
-    GetCPUID(0, 0, CPUInfo);
+    GetCPUID(0, 0, @CPUInfo);
     if CPUInfo[0] < 7 then Exit;
-    GetCPUID(7, 0, CPUInfo);
+    GetCPUID(7, 0, @CPUInfo);
     Result.AVX2 := CheckFeature(CPUInfo, 1, 5);
     Result.AVX512 := (
       CheckFeature(CPUInfo, 1, 16)
