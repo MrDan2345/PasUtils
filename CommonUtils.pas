@@ -65,7 +65,9 @@ type PUColor = ^TUColor;
 type TUColorArr = array[UInt32] of TUColor;
 type PUColorArr = ^TUColorArr;
 type TUColorArray = array of TUColor;
+{$push}{$align 16}
 type TUMat = array[0..3, 0..3] of TUFloat; // TUMatImpl
+{$pop}
 type PUMat = ^TUMat;
 type TUMatArr = array[UInt32] of TUMat;
 type PUMatArr = ^TUMatArr;
@@ -85,7 +87,9 @@ type PUVec3 = ^TUVec3;
 type TUVec3Arr = array[UInt32] of TUVec3;
 type PUVec3Arr = ^TUVec3Arr;
 type TUVec3Array = array of TUVec3;
+{$push}{$align 16}
 type TUVec4 = array[0..3] of TUFloat; // TUVec4Impl
+{$pop}
 type PUVec4 = ^TUVec4;
 type TUVec4Arr = array[UInt32] of TUVec4;
 type PUVec4Arr = ^TUVec4Arr;
@@ -2087,20 +2091,20 @@ function UThreadRandom(const Size: UInt32): UInt32;
 function URandom(var RandomSeed: UInt32; const Size: UInt32): UInt32;
 function URandomBytes(const Size: UInt32): TUInt8Array;
 function USysRandom(const Size: UInt32): TUInt8Array;
-function UAddMat(const m0, m1: TUMat): TUMat;
-function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
-function USubMat(const m0, m1: TUMat): TUMat;
-function USubMatFloat(const m: TUMat; const s: TUFloat): TUMat;
-function UMulMat(const m0, m1: TUMat): TUMat;
-function UMulMatFloat(const m: TUMat; const s: TUFloat): TUMat;
+function UAddMat(const m0, m1: TUMat): TUMat; inline;
+function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat; inline;
+function USubMat(const m0, m1: TUMat): TUMat; inline;
+function USubMatFloat(const m: TUMat; const s: TUFloat): TUMat; inline;
+function UMulMat(const m0, m1: TUMat): TUMat; inline;
+function UMulMatFloat(const m: TUMat; const s: TUFloat): TUMat; inline;
 function UMulVec2Mat3x3(const v: TUVec2; const m: TUMat): TUVec2;
 function UMulVec2Mat4x3(const v: TUVec2; const m: TUMat): TUVec2;
 function UMulVec2Mat4x4(const v: TUVec2; const m: TUMat): TUVec2;
-function UMulVec3Mat3x3(const v: TUVec3; const m: TUMat): TUVec3;
-function UMulVec3Mat4x3(const v: TUVec3; const m: TUMat): TUVec3;
-function UMulVec3Mat4x4(const v: TUVec3; const m: TUMat): TUVec3;
+function UMulVec3Mat3x3(const v: TUVec3; const m: TUMat): TUVec3; inline;
+function UMulVec3Mat4x3(const v: TUVec3; const m: TUMat): TUVec3; inline;
+function UMulVec3Mat4x4(const v: TUVec3; const m: TUMat): TUVec3; inline;
 function UMulVec3Quat(const v: TUVec3; const q: TUQuat): TUVec3;
-function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4;
+function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4; inline;
 function UMulQuat(const a, b: TUQuat): TUQuat;
 
 function UTriangleNormal(const v0, v1, v2: TUVec3): TUVec3;
@@ -3065,22 +3069,22 @@ begin
   - (m[0, 1] * m[1, 2] * m[2, 3] * m[3, 0]) - (m[0, 2] * m[1, 3] * m[2, 1] * m[3, 0]) - (m[0, 3] * m[1, 1] * m[2, 2] * m[3, 0])
   + (m[0, 3] * m[1, 2] * m[2, 1] * m[3, 0]) + (m[0, 2] * m[1, 1] * m[2, 3] * m[3, 0]) + (m[0, 1] * m[1, 3] * m[2, 2] * m[3, 0]);
   Det := 1 / Det;
-  Result[0, 0] := (m[1,1]*m[2,2]*m[3,3] + m[1,2]*m[2,3]*m[3,1] + m[1,3]*m[2,1]*m[3,2] - m[1,3]*m[2,2]*m[3,1] - m[1,2]*m[2,1]*m[3,3] - m[1,1]*m[2,3]*m[3,2]) * det;
-  Result[0, 1] := (-m[0,1]*m[2,2]*m[3,3] - m[0,2]*m[2,3]*m[3,1] - m[0,3]*m[2,1]*m[3,2] + m[0,3]*m[2,2]*m[3,1] + m[0,2]*m[2,1]*m[3,3] + m[0,1]*m[2,3]*m[3,2]) * det;
-  Result[0, 2] := (m[0,1]*m[1,2]*m[3,3] + m[0,2]*m[1,3]*m[3,1] + m[0,3]*m[1,1]*m[3,2] - m[0,3]*m[1,2]*m[3,1] - m[0,2]*m[1,1]*m[3,3] - m[0,1]*m[1,3]*m[3,2]) * det;
-  Result[0, 3] := (-m[0,1]*m[1,2]*m[2,3] - m[0,2]*m[1,3]*m[2,1] - m[0,3]*m[1,1]*m[2,2] + m[0,3]*m[1,2]*m[2,1] + m[0,2]*m[1,1]*m[2,3] + m[0,1]*m[1,3]*m[2,2]) * det;
-  Result[1, 0] := (-m[1,0]*m[2,2]*m[3,3] - m[1,2]*m[2,3]*m[3,0] - m[1,3]*m[2,0]*m[3,2] + m[1,3]*m[2,2]*m[3,0] + m[1,2]*m[2,0]*m[3,3] + m[1,0]*m[2,3]*m[3,2]) * det;
-  Result[1, 1] := (m[0,0]*m[2,2]*m[3,3] + m[0,2]*m[2,3]*m[3,0] + m[0,3]*m[2,0]*m[3,2] - m[0,3]*m[2,2]*m[3,0] - m[0,2]*m[2,0]*m[3,3] - m[0,0]*m[2,3]*m[3,2]) * det;
-  Result[1, 2] := (-m[0,0]*m[1,2]*m[3,3] - m[0,2]*m[1,3]*m[3,0] - m[0,3]*m[1,0]*m[3,2] + m[0,3]*m[1,2]*m[3,0] + m[0,2]*m[1,0]*m[3,3] + m[0,0]*m[1,3]*m[3,2]) * det;
-  Result[1, 3] := (m[0,0]*m[1,2]*m[2,3] + m[0,2]*m[1,3]*m[2,0] + m[0,3]*m[1,0]*m[2,2] - m[0,3]*m[1,2]*m[2,0] - m[0,2]*m[1,0]*m[2,3] - m[0,0]*m[1,3]*m[2,2]) * det;
-  Result[2, 0] := (m[1,0]*m[2,1]*m[3,3] + m[1,1]*m[2,3]*m[3,0] + m[1,3]*m[2,0]*m[3,1] - m[1,3]*m[2,1]*m[3,0] - m[1,1]*m[2,0]*m[3,3] - m[1,0]*m[2,3]*m[3,1]) * det;
-  Result[2, 1] := (-m[0,0]*m[2,1]*m[3,3] - m[0,1]*m[2,3]*m[3,0] - m[0,3]*m[2,0]*m[3,1] + m[0,3]*m[2,1]*m[3,0] + m[0,1]*m[2,0]*m[3,3] + m[0,0]*m[2,3]*m[3,1]) * det;
-  Result[2, 2] := (m[0,0]*m[1,1]*m[3,3] + m[0,1]*m[1,3]*m[3,0] + m[0,3]*m[1,0]*m[3,1] - m[0,3]*m[1,1]*m[3,0] - m[0,1]*m[1,0]*m[3,3] - m[0,0]*m[1,3]*m[3,1]) * det;
-  Result[2, 3] := (-m[0,0]*m[1,1]*m[2,3] - m[0,1]*m[1,3]*m[2,0] - m[0,3]*m[1,0]*m[2,1] + m[0,3]*m[1,1]*m[2,0] + m[0,1]*m[1,0]*m[2,3] + m[0,0]*m[1,3]*m[2,1]) * det;
-  Result[3, 0] := (-m[1,0]*m[2,1]*m[3,2] - m[1,1]*m[2,2]*m[3,0] - m[1,2]*m[2,0]*m[3,1] + m[1,2]*m[2,1]*m[3,0] + m[1,1]*m[2,0]*m[3,2] + m[1,0]*m[2,2]*m[3,1]) * det;
-  Result[3, 1] := (m[0,0]*m[2,1]*m[3,2] + m[0,1]*m[2,2]*m[3,0] + m[0,2]*m[2,0]*m[3,1] - m[0,2]*m[2,1]*m[3,0] - m[0,1]*m[2,0]*m[3,2] - m[0,0]*m[2,2]*m[3,1]) * det;
-  Result[3, 2] := (-m[0,0]*m[1,1]*m[3,2] - m[0,1]*m[1,2]*m[3,0] - m[0,2]*m[1,0]*m[3,1] + m[0,2]*m[1,1]*m[3,0] + m[0,1]*m[1,0]*m[3,2] + m[0,0]*m[1,2]*m[3,1]) * det;
-  Result[3, 3] := (m[0,0]*m[1,1]*m[2,2] + m[0,1]*m[1,2]*m[2,0] + m[0,2]*m[1,0]*m[2,1] - m[0,2]*m[1,1]*m[2,0] - m[0,1]*m[1,0]*m[2,2] - m[0,0]*m[1,2]*m[2,1]) * det;
+  Result[0, 0] := (m[1,1]*m[2,2]*m[3,3] + m[1,2]*m[2,3]*m[3,1] + m[1,3]*m[2,1]*m[3,2] - m[1,3]*m[2,2]*m[3,1] - m[1,2]*m[2,1]*m[3,3] - m[1,1]*m[2,3]*m[3,2]) * Det;
+  Result[0, 1] := (-m[0,1]*m[2,2]*m[3,3] - m[0,2]*m[2,3]*m[3,1] - m[0,3]*m[2,1]*m[3,2] + m[0,3]*m[2,2]*m[3,1] + m[0,2]*m[2,1]*m[3,3] + m[0,1]*m[2,3]*m[3,2]) * Det;
+  Result[0, 2] := (m[0,1]*m[1,2]*m[3,3] + m[0,2]*m[1,3]*m[3,1] + m[0,3]*m[1,1]*m[3,2] - m[0,3]*m[1,2]*m[3,1] - m[0,2]*m[1,1]*m[3,3] - m[0,1]*m[1,3]*m[3,2]) * Det;
+  Result[0, 3] := (-m[0,1]*m[1,2]*m[2,3] - m[0,2]*m[1,3]*m[2,1] - m[0,3]*m[1,1]*m[2,2] + m[0,3]*m[1,2]*m[2,1] + m[0,2]*m[1,1]*m[2,3] + m[0,1]*m[1,3]*m[2,2]) * Det;
+  Result[1, 0] := (-m[1,0]*m[2,2]*m[3,3] - m[1,2]*m[2,3]*m[3,0] - m[1,3]*m[2,0]*m[3,2] + m[1,3]*m[2,2]*m[3,0] + m[1,2]*m[2,0]*m[3,3] + m[1,0]*m[2,3]*m[3,2]) * Det;
+  Result[1, 1] := (m[0,0]*m[2,2]*m[3,3] + m[0,2]*m[2,3]*m[3,0] + m[0,3]*m[2,0]*m[3,2] - m[0,3]*m[2,2]*m[3,0] - m[0,2]*m[2,0]*m[3,3] - m[0,0]*m[2,3]*m[3,2]) * Det;
+  Result[1, 2] := (-m[0,0]*m[1,2]*m[3,3] - m[0,2]*m[1,3]*m[3,0] - m[0,3]*m[1,0]*m[3,2] + m[0,3]*m[1,2]*m[3,0] + m[0,2]*m[1,0]*m[3,3] + m[0,0]*m[1,3]*m[3,2]) * Det;
+  Result[1, 3] := (m[0,0]*m[1,2]*m[2,3] + m[0,2]*m[1,3]*m[2,0] + m[0,3]*m[1,0]*m[2,2] - m[0,3]*m[1,2]*m[2,0] - m[0,2]*m[1,0]*m[2,3] - m[0,0]*m[1,3]*m[2,2]) * Det;
+  Result[2, 0] := (m[1,0]*m[2,1]*m[3,3] + m[1,1]*m[2,3]*m[3,0] + m[1,3]*m[2,0]*m[3,1] - m[1,3]*m[2,1]*m[3,0] - m[1,1]*m[2,0]*m[3,3] - m[1,0]*m[2,3]*m[3,1]) * Det;
+  Result[2, 1] := (-m[0,0]*m[2,1]*m[3,3] - m[0,1]*m[2,3]*m[3,0] - m[0,3]*m[2,0]*m[3,1] + m[0,3]*m[2,1]*m[3,0] + m[0,1]*m[2,0]*m[3,3] + m[0,0]*m[2,3]*m[3,1]) * Det;
+  Result[2, 2] := (m[0,0]*m[1,1]*m[3,3] + m[0,1]*m[1,3]*m[3,0] + m[0,3]*m[1,0]*m[3,1] - m[0,3]*m[1,1]*m[3,0] - m[0,1]*m[1,0]*m[3,3] - m[0,0]*m[1,3]*m[3,1]) * Det;
+  Result[2, 3] := (-m[0,0]*m[1,1]*m[2,3] - m[0,1]*m[1,3]*m[2,0] - m[0,3]*m[1,0]*m[2,1] + m[0,3]*m[1,1]*m[2,0] + m[0,1]*m[1,0]*m[2,3] + m[0,0]*m[1,3]*m[2,1]) * Det;
+  Result[3, 0] := (-m[1,0]*m[2,1]*m[3,2] - m[1,1]*m[2,2]*m[3,0] - m[1,2]*m[2,0]*m[3,1] + m[1,2]*m[2,1]*m[3,0] + m[1,1]*m[2,0]*m[3,2] + m[1,0]*m[2,2]*m[3,1]) * Det;
+  Result[3, 1] := (m[0,0]*m[2,1]*m[3,2] + m[0,1]*m[2,2]*m[3,0] + m[0,2]*m[2,0]*m[3,1] - m[0,2]*m[2,1]*m[3,0] - m[0,1]*m[2,0]*m[3,2] - m[0,0]*m[2,2]*m[3,1]) * Det;
+  Result[3, 2] := (-m[0,0]*m[1,1]*m[3,2] - m[0,1]*m[1,2]*m[3,0] - m[0,2]*m[1,0]*m[3,1] + m[0,2]*m[1,1]*m[3,0] + m[0,1]*m[1,0]*m[3,2] + m[0,0]*m[1,2]*m[3,1]) * Det;
+  Result[3, 3] := (m[0,0]*m[1,1]*m[2,2] + m[0,1]*m[1,2]*m[2,0] + m[0,2]*m[1,0]*m[2,1] - m[0,2]*m[1,1]*m[2,0] - m[0,1]*m[1,0]*m[2,2] - m[0,0]*m[1,2]*m[2,1]) * Det;
 end;
 
 class function TUMatImpl.Transpose(const m: TUMat): TUMat;
@@ -12597,124 +12601,344 @@ begin
 end;
 {$endif}
 
+procedure AddMat_Pas(out mr: TUMat; constref m0, m1: TUMat);
+begin
+  mr[0, 0] := m0[0, 0] + m1[0, 0];
+  mr[1, 0] := m0[1, 0] + m1[1, 0];
+  mr[2, 0] := m0[2, 0] + m1[2, 0];
+  mr[3, 0] := m0[3, 0] + m1[3, 0];
+  mr[0, 1] := m0[0, 1] + m1[0, 1];
+  mr[1, 1] := m0[1, 1] + m1[1, 1];
+  mr[2, 1] := m0[2, 1] + m1[2, 1];
+  mr[3, 1] := m0[3, 1] + m1[3, 1];
+  mr[0, 2] := m0[0, 2] + m1[0, 2];
+  mr[1, 2] := m0[1, 2] + m1[1, 2];
+  mr[2, 2] := m0[2, 2] + m1[2, 2];
+  mr[3, 2] := m0[3, 2] + m1[3, 2];
+  mr[0, 3] := m0[0, 3] + m1[0, 3];
+  mr[1, 3] := m0[1, 3] + m1[1, 3];
+  mr[2, 3] := m0[2, 3] + m1[2, 3];
+  mr[3, 3] := m0[3, 3] + m1[3, 3];
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure AddMat_SSE(out mr: TUMat; constref m0, m1: TUMat); assembler; nostackframe;
+asm
+  movaps xmm0, dqword ptr [m0]
+  movaps xmm1, dqword ptr [m1]
+  addps xmm0, xmm1
+  movaps [mr], xmm0
+  movaps xmm0, dqword ptr [m0 + 10h]
+  movaps xmm1, dqword ptr [m1 + 10h]
+  addps xmm0, xmm1
+  movaps [mr + 10h], xmm0
+  movaps xmm0, dqword ptr [m0 + 20h]
+  movaps xmm1, dqword ptr [m1 + 20h]
+  addps xmm0, xmm1
+  movaps [mr + 20h], xmm0
+  movaps xmm0, dqword ptr [m0 + 30h]
+  movaps xmm1, dqword ptr [m1 + 30h]
+  addps xmm0, xmm1
+  movaps [mr + 30h], xmm0
+end;
+{$endif}
+
+var AddMat: procedure (out mr: TUMat; constref m0, m1: TUMat) = @AddMat_Pas;
+
 function UAddMat(const m0, m1: TUMat): TUMat;
 begin
-  Result[0, 0] := m0[0, 0] + m1[0, 0];
-  Result[1, 0] := m0[1, 0] + m1[1, 0];
-  Result[2, 0] := m0[2, 0] + m1[2, 0];
-  Result[3, 0] := m0[3, 0] + m1[3, 0];
-  Result[0, 1] := m0[0, 1] + m1[0, 1];
-  Result[1, 1] := m0[1, 1] + m1[1, 1];
-  Result[2, 1] := m0[2, 1] + m1[2, 1];
-  Result[3, 1] := m0[3, 1] + m1[3, 1];
-  Result[0, 2] := m0[0, 2] + m1[0, 2];
-  Result[1, 2] := m0[1, 2] + m1[1, 2];
-  Result[2, 2] := m0[2, 2] + m1[2, 2];
-  Result[3, 2] := m0[3, 2] + m1[3, 2];
-  Result[0, 3] := m0[0, 3] + m1[0, 3];
-  Result[1, 3] := m0[1, 3] + m1[1, 3];
-  Result[2, 3] := m0[2, 3] + m1[2, 3];
-  Result[3, 3] := m0[3, 3] + m1[3, 3];
+  AddMat(Result, m0, m1);
 end;
+
+procedure AddMatFloat_Pas(out mr: TUMat; constref m0: TUMat; const s: TUFloat);
+begin
+  mr[0, 0] := m0[0, 0] + s;
+  mr[1, 0] := m0[1, 0] + s;
+  mr[2, 0] := m0[2, 0] + s;
+  mr[3, 0] := m0[3, 0] + s;
+  mr[0, 1] := m0[0, 1] + s;
+  mr[1, 1] := m0[1, 1] + s;
+  mr[2, 1] := m0[2, 1] + s;
+  mr[3, 1] := m0[3, 1] + s;
+  mr[0, 2] := m0[0, 2] + s;
+  mr[1, 2] := m0[1, 2] + s;
+  mr[2, 2] := m0[2, 2] + s;
+  mr[3, 2] := m0[3, 2] + s;
+  mr[0, 3] := m0[0, 3] + s;
+  mr[1, 3] := m0[1, 3] + s;
+  mr[2, 3] := m0[2, 3] + s;
+  mr[3, 3] := m0[3, 3] + s;
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure AddMatFloat_SSE(out mr: TUMat; constref m0: TUMat; const s: TUFloat); assembler; nostackframe;
+asm
+  movss xmm0, [s]
+  shufps xmm0, xmm0, 0
+  movaps xmm1, [m0 + 0h]
+  addps xmm1, xmm0
+  movaps [mr + 0h], xmm1
+  movaps xmm1, [m0 + 10h]
+  addps xmm1, xmm0
+  movaps [mr + 10h], xmm1
+  movaps xmm1, [m0 + 20h]
+  addps xmm1, xmm0
+  movaps [mr + 20h], xmm1
+  movaps xmm1, [m0 + 30h]
+  addps xmm1, xmm0
+  movaps [mr + 30h], xmm1
+end;
+{$endif}
+
+var AddMatFloat: procedure (out mr: TUMat; constref m0: TUMat; const s: TUFloat) = @AddMatFloat_Pas;
 
 function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 begin
-  Result[0, 0] := m[0, 0] + s;
-  Result[1, 0] := m[1, 0] + s;
-  Result[2, 0] := m[2, 0] + s;
-  Result[3, 0] := m[3, 0] + s;
-  Result[0, 1] := m[0, 1] + s;
-  Result[1, 1] := m[1, 1] + s;
-  Result[2, 1] := m[2, 1] + s;
-  Result[3, 1] := m[3, 1] + s;
-  Result[0, 2] := m[0, 2] + s;
-  Result[1, 2] := m[1, 2] + s;
-  Result[2, 2] := m[2, 2] + s;
-  Result[3, 2] := m[3, 2] + s;
-  Result[0, 3] := m[0, 3] + s;
-  Result[1, 3] := m[1, 3] + s;
-  Result[2, 3] := m[2, 3] + s;
-  Result[3, 3] := m[3, 3] + s;
+  AddMatFloat(Result, m, s);
 end;
+
+procedure SubMat_Pas(out mr: TUMat; constref m0, m1: TUMat);
+begin
+  mr[0, 0] := m0[0, 0] - m1[0, 0];
+  mr[1, 0] := m0[1, 0] - m1[1, 0];
+  mr[2, 0] := m0[2, 0] - m1[2, 0];
+  mr[3, 0] := m0[3, 0] - m1[3, 0];
+  mr[0, 1] := m0[0, 1] - m1[0, 1];
+  mr[1, 1] := m0[1, 1] - m1[1, 1];
+  mr[2, 1] := m0[2, 1] - m1[2, 1];
+  mr[3, 1] := m0[3, 1] - m1[3, 1];
+  mr[0, 2] := m0[0, 2] - m1[0, 2];
+  mr[1, 2] := m0[1, 2] - m1[1, 2];
+  mr[2, 2] := m0[2, 2] - m1[2, 2];
+  mr[3, 2] := m0[3, 2] - m1[3, 2];
+  mr[0, 3] := m0[0, 3] - m1[0, 3];
+  mr[1, 3] := m0[1, 3] - m1[1, 3];
+  mr[2, 3] := m0[2, 3] - m1[2, 3];
+  mr[3, 3] := m0[3, 3] - m1[3, 3];
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure SubMat_SSE(out mr: TUMat; constref m0, m1: TUMat); assembler; nostackframe;
+asm
+  movaps xmm0, [m0 + 0h]
+  movaps xmm1, [m1 + 0h]
+  addps xmm0, xmm1
+  movaps [mr + 0h], xmm0
+  movaps xmm0, [m0 + 10h]
+  movaps xmm1, [m1 + 10h]
+  addps xmm0, xmm1
+  movaps [mr + 10h], xmm0
+  movaps xmm0, [m0 + 20h]
+  movaps xmm1, [m1 + 20h]
+  addps xmm0, xmm1
+  movaps [mr + 20h], xmm0
+  movaps xmm0, [m0 + 30h]
+  movaps xmm1, [m1 + 30h]
+  addps xmm0, xmm1
+  movaps [mr + 30h], xmm0
+end;
+{$endif}
+
+var SubMat: procedure (out mr: TUMat; constref m0, m1: TUMat) = @SubMat_Pas;
 
 function USubMat(const m0, m1: TUMat): TUMat;
 begin
-  Result[0, 0] := m0[0, 0] - m1[0, 0];
-  Result[1, 0] := m0[1, 0] - m1[1, 0];
-  Result[2, 0] := m0[2, 0] - m1[2, 0];
-  Result[3, 0] := m0[3, 0] - m1[3, 0];
-  Result[0, 1] := m0[0, 1] - m1[0, 1];
-  Result[1, 1] := m0[1, 1] - m1[1, 1];
-  Result[2, 1] := m0[2, 1] - m1[2, 1];
-  Result[3, 1] := m0[3, 1] - m1[3, 1];
-  Result[0, 2] := m0[0, 2] - m1[0, 2];
-  Result[1, 2] := m0[1, 2] - m1[1, 2];
-  Result[2, 2] := m0[2, 2] - m1[2, 2];
-  Result[3, 2] := m0[3, 2] - m1[3, 2];
-  Result[0, 3] := m0[0, 3] - m1[0, 3];
-  Result[1, 3] := m0[1, 3] - m1[1, 3];
-  Result[2, 3] := m0[2, 3] - m1[2, 3];
-  Result[3, 3] := m0[3, 3] - m1[3, 3];
+  SubMat(Result, m0, m1);
 end;
+
+procedure SubMatFloat_Pas(out mr: TUMat; constref m0: TUMat; const s: TUFloat);
+begin
+  mr[0, 0] := m0[0, 0] - s;
+  mr[1, 0] := m0[1, 0] - s;
+  mr[2, 0] := m0[2, 0] - s;
+  mr[3, 0] := m0[3, 0] - s;
+  mr[0, 1] := m0[0, 1] - s;
+  mr[1, 1] := m0[1, 1] - s;
+  mr[2, 1] := m0[2, 1] - s;
+  mr[3, 1] := m0[3, 1] - s;
+  mr[0, 2] := m0[0, 2] - s;
+  mr[1, 2] := m0[1, 2] - s;
+  mr[2, 2] := m0[2, 2] - s;
+  mr[3, 2] := m0[3, 2] - s;
+  mr[0, 3] := m0[0, 3] - s;
+  mr[1, 3] := m0[1, 3] - s;
+  mr[2, 3] := m0[2, 3] - s;
+  mr[3, 3] := m0[3, 3] - s;
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure SubMatFloat_SSE(out mr: TUMat; constref m0: TUMat; const s: TUFloat); assembler; nostackframe;
+asm
+  movss xmm0, [s]
+  shufps xmm0, xmm0, 0
+  movaps xmm1, [m0 + 0h]
+  addps xmm1, xmm0
+  movaps [mr + 0h], xmm1
+  movaps xmm1, [m0 + 10h]
+  addps xmm1, xmm0
+  movaps [mr + 10h], xmm1
+  movaps xmm1, [m0 + 20h]
+  addps xmm1, xmm0
+  movaps [mr + 20h], xmm1
+  movaps xmm1, [m0 + 30h]
+  addps xmm1, xmm0
+  movaps [mr + 30h], xmm1
+end;
+{$endif}
+
+var SubMatFloat: procedure (out mr: TUMat; constref m0: TUMat; const s: TUFloat) = @SubMatFloat_Pas;
 
 function USubMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 begin
-  Result[0, 0] := m[0, 0] - s;
-  Result[1, 0] := m[1, 0] - s;
-  Result[2, 0] := m[2, 0] - s;
-  Result[3, 0] := m[3, 0] - s;
-  Result[0, 1] := m[0, 1] - s;
-  Result[1, 1] := m[1, 1] - s;
-  Result[2, 1] := m[2, 1] - s;
-  Result[3, 1] := m[3, 1] - s;
-  Result[0, 2] := m[0, 2] - s;
-  Result[1, 2] := m[1, 2] - s;
-  Result[2, 2] := m[2, 2] - s;
-  Result[3, 2] := m[3, 2] - s;
-  Result[0, 3] := m[0, 3] - s;
-  Result[1, 3] := m[1, 3] - s;
-  Result[2, 3] := m[2, 3] - s;
-  Result[3, 3] := m[3, 3] - s;
+  SubMatFloat(Result, m, s);
 end;
+
+procedure MulMat_Pas(out mr: TUMat; constref m0, m1: TUMat);
+begin
+  mr[0, 0] := m0[0, 0] * m1[0, 0] + m0[0, 1] * m1[1, 0] + m0[0, 2] * m1[2, 0] + m0[0, 3] * m1[3, 0];
+  mr[1, 0] := m0[1, 0] * m1[0, 0] + m0[1, 1] * m1[1, 0] + m0[1, 2] * m1[2, 0] + m0[1, 3] * m1[3, 0];
+  mr[2, 0] := m0[2, 0] * m1[0, 0] + m0[2, 1] * m1[1, 0] + m0[2, 2] * m1[2, 0] + m0[2, 3] * m1[3, 0];
+  mr[3, 0] := m0[3, 0] * m1[0, 0] + m0[3, 1] * m1[1, 0] + m0[3, 2] * m1[2, 0] + m0[3, 3] * m1[3, 0];
+  mr[0, 1] := m0[0, 0] * m1[0, 1] + m0[0, 1] * m1[1, 1] + m0[0, 2] * m1[2, 1] + m0[0, 3] * m1[3, 1];
+  mr[1, 1] := m0[1, 0] * m1[0, 1] + m0[1, 1] * m1[1, 1] + m0[1, 2] * m1[2, 1] + m0[1, 3] * m1[3, 1];
+  mr[2, 1] := m0[2, 0] * m1[0, 1] + m0[2, 1] * m1[1, 1] + m0[2, 2] * m1[2, 1] + m0[2, 3] * m1[3, 1];
+  mr[3, 1] := m0[3, 0] * m1[0, 1] + m0[3, 1] * m1[1, 1] + m0[3, 2] * m1[2, 1] + m0[3, 3] * m1[3, 1];
+  mr[0, 2] := m0[0, 0] * m1[0, 2] + m0[0, 1] * m1[1, 2] + m0[0, 2] * m1[2, 2] + m0[0, 3] * m1[3, 2];
+  mr[1, 2] := m0[1, 0] * m1[0, 2] + m0[1, 1] * m1[1, 2] + m0[1, 2] * m1[2, 2] + m0[1, 3] * m1[3, 2];
+  mr[2, 2] := m0[2, 0] * m1[0, 2] + m0[2, 1] * m1[1, 2] + m0[2, 2] * m1[2, 2] + m0[2, 3] * m1[3, 2];
+  mr[3, 2] := m0[3, 0] * m1[0, 2] + m0[3, 1] * m1[1, 2] + m0[3, 2] * m1[2, 2] + m0[3, 3] * m1[3, 2];
+  mr[0, 3] := m0[0, 0] * m1[0, 3] + m0[0, 1] * m1[1, 3] + m0[0, 2] * m1[2, 3] + m0[0, 3] * m1[3, 3];
+  mr[1, 3] := m0[1, 0] * m1[0, 3] + m0[1, 1] * m1[1, 3] + m0[1, 2] * m1[2, 3] + m0[1, 3] * m1[3, 3];
+  mr[2, 3] := m0[2, 0] * m1[0, 3] + m0[2, 1] * m1[1, 3] + m0[2, 2] * m1[2, 3] + m0[2, 3] * m1[3, 3];
+  mr[3, 3] := m0[3, 0] * m1[0, 3] + m0[3, 1] * m1[1, 3] + m0[3, 2] * m1[2, 3] + m0[3, 3] * m1[3, 3];
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulMat_SSE(out mr: TUMat; constref m0, m1: TUMat); assembler; nostackframe;
+asm
+  movss xmm0, dword ptr [m0]
+  movaps xmm4, [m1]
+  shufps xmm0, xmm0, 0
+  mulps xmm0, xmm4
+  movss xmm1, dword ptr [m0 + 4]
+  movaps xmm5, [m1 + 10h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm5
+  addps xmm0, xmm1
+  movss xmm1, dword ptr [m0 + 8]
+  movaps xmm6, [m1 + 20h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm6
+  addps xmm0, xmm1
+  movss xmm1, dword ptr [m0 + 0Ch]
+  movaps xmm7, [m1 + 30h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm7
+  addps xmm0, xmm1
+  movss xmm1, dword ptr [m0 + 10h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm4
+  movss xmm2, dword ptr [m0 + 14h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm5
+  addps xmm1, xmm2
+  movss xmm2, dword ptr [m0 + 18h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm6
+  addps xmm1, xmm2
+  movss xmm2, dword ptr [m0 + 1Ch]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm7
+  addps xmm1, xmm2
+  movss xmm2, dword ptr [m0 + 20h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm4
+  movss xmm3, dword ptr [m0 + 24h]
+  shufps xmm3, xmm3, 0
+  mulps xmm3, xmm5
+  addps xmm2, xmm3
+  movss xmm3, dword ptr [m0 + 28h]
+  shufps xmm3, xmm3, 0
+  mulps xmm3, xmm6
+  addps xmm2, xmm3
+  movss xmm3, dword ptr [m0 + 2Ch]
+  shufps xmm3, xmm3, 0
+  mulps xmm3, xmm7
+  addps xmm2, xmm3
+  movss xmm3, dword ptr [m0 + 30h]
+  movaps [mr], xmm0
+  shufps xmm3, xmm3, 0
+  mulps xmm3, xmm4
+  movss xmm4, dword ptr [m0 + 34h]
+  movaps [mr + 10h], xmm1
+  shufps xmm4, xmm4, 0
+  mulps xmm4, xmm5
+  addps xmm3, xmm4
+  movss xmm4, dword ptr [m0 + 38h]
+  movaps [mr + 20h], xmm2
+  shufps xmm4, xmm4, 0
+  mulps xmm4, xmm6
+  addps xmm3, xmm4
+  movss xmm4, dword ptr [m0 + 3Ch]
+  shufps xmm4, xmm4, 0
+  mulps xmm4, xmm7
+  addps xmm3, xmm4
+  movaps [mr + 30h], xmm3
+end;
+{$endif}
+
+var MulMat: procedure (out mr: TUMat; constref m0, m1: TUMat) = @MulMat_Pas;
 
 function UMulMat(const m0, m1: TUMat): TUMat;
 begin
-  Result[0, 0] := m0[0, 0] * m1[0, 0] + m0[0, 1] * m1[1, 0] + m0[0, 2] * m1[2, 0] + m0[0, 3] * m1[3, 0];
-  Result[1, 0] := m0[1, 0] * m1[0, 0] + m0[1, 1] * m1[1, 0] + m0[1, 2] * m1[2, 0] + m0[1, 3] * m1[3, 0];
-  Result[2, 0] := m0[2, 0] * m1[0, 0] + m0[2, 1] * m1[1, 0] + m0[2, 2] * m1[2, 0] + m0[2, 3] * m1[3, 0];
-  Result[3, 0] := m0[3, 0] * m1[0, 0] + m0[3, 1] * m1[1, 0] + m0[3, 2] * m1[2, 0] + m0[3, 3] * m1[3, 0];
-  Result[0, 1] := m0[0, 0] * m1[0, 1] + m0[0, 1] * m1[1, 1] + m0[0, 2] * m1[2, 1] + m0[0, 3] * m1[3, 1];
-  Result[1, 1] := m0[1, 0] * m1[0, 1] + m0[1, 1] * m1[1, 1] + m0[1, 2] * m1[2, 1] + m0[1, 3] * m1[3, 1];
-  Result[2, 1] := m0[2, 0] * m1[0, 1] + m0[2, 1] * m1[1, 1] + m0[2, 2] * m1[2, 1] + m0[2, 3] * m1[3, 1];
-  Result[3, 1] := m0[3, 0] * m1[0, 1] + m0[3, 1] * m1[1, 1] + m0[3, 2] * m1[2, 1] + m0[3, 3] * m1[3, 1];
-  Result[0, 2] := m0[0, 0] * m1[0, 2] + m0[0, 1] * m1[1, 2] + m0[0, 2] * m1[2, 2] + m0[0, 3] * m1[3, 2];
-  Result[1, 2] := m0[1, 0] * m1[0, 2] + m0[1, 1] * m1[1, 2] + m0[1, 2] * m1[2, 2] + m0[1, 3] * m1[3, 2];
-  Result[2, 2] := m0[2, 0] * m1[0, 2] + m0[2, 1] * m1[1, 2] + m0[2, 2] * m1[2, 2] + m0[2, 3] * m1[3, 2];
-  Result[3, 2] := m0[3, 0] * m1[0, 2] + m0[3, 1] * m1[1, 2] + m0[3, 2] * m1[2, 2] + m0[3, 3] * m1[3, 2];
-  Result[0, 3] := m0[0, 0] * m1[0, 3] + m0[0, 1] * m1[1, 3] + m0[0, 2] * m1[2, 3] + m0[0, 3] * m1[3, 3];
-  Result[1, 3] := m0[1, 0] * m1[0, 3] + m0[1, 1] * m1[1, 3] + m0[1, 2] * m1[2, 3] + m0[1, 3] * m1[3, 3];
-  Result[2, 3] := m0[2, 0] * m1[0, 3] + m0[2, 1] * m1[1, 3] + m0[2, 2] * m1[2, 3] + m0[2, 3] * m1[3, 3];
-  Result[3, 3] := m0[3, 0] * m1[0, 3] + m0[3, 1] * m1[1, 3] + m0[3, 2] * m1[2, 3] + m0[3, 3] * m1[3, 3];
+  MulMat(Result, m0, m1);
 end;
+
+procedure MulMatFloat_Pas(out mr: TUMat; constref m0: TUMat; const s: TUFloat);
+begin
+  mr[0, 0] := m0[0, 0] * s;
+  mr[1, 0] := m0[1, 0] * s;
+  mr[2, 0] := m0[2, 0] * s;
+  mr[3, 0] := m0[3, 0] * s;
+  mr[0, 1] := m0[0, 1] * s;
+  mr[1, 1] := m0[1, 1] * s;
+  mr[2, 1] := m0[2, 1] * s;
+  mr[3, 1] := m0[3, 1] * s;
+  mr[0, 2] := m0[0, 2] * s;
+  mr[1, 2] := m0[1, 2] * s;
+  mr[2, 2] := m0[2, 2] * s;
+  mr[3, 2] := m0[3, 2] * s;
+  mr[0, 3] := m0[0, 3] * s;
+  mr[1, 3] := m0[1, 3] * s;
+  mr[2, 3] := m0[2, 3] * s;
+  mr[3, 3] := m0[3, 3] * s;
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulMatFloat_SSE(out mr: TUMat; constref m0: TUMat; const s: TUFloat); assembler; nostackframe;
+asm
+  movss xmm0, [s]
+  shufps xmm0, xmm0, 0
+  movaps xmm1, [m0 + 0h]
+  mulps xmm1, xmm0
+  movaps [mr + 0h], xmm1
+  movaps xmm1, [m0 + 10h]
+  mulps xmm1, xmm0
+  movaps [mr + 10h], xmm1
+  movaps xmm1, [m0 + 20h]
+  mulps xmm1, xmm0
+  movaps [mr + 20h], xmm1
+  movaps xmm1, [m0 + 30h]
+  mulps xmm1, xmm0
+  movaps [mr + 30h], xmm1
+end;
+{$endif}
+
+var MulMatFloat: procedure (out mr: TUMat; constref m0: TUMat; const s: TUFloat) = @MulMatFloat_Pas;
 
 function UMulMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 begin
-  Result[0, 0] := m[0, 0] * s;
-  Result[1, 0] := m[1, 0] * s;
-  Result[2, 0] := m[2, 0] * s;
-  Result[3, 0] := m[3, 0] * s;
-  Result[0, 1] := m[0, 1] * s;
-  Result[1, 1] := m[1, 1] * s;
-  Result[2, 1] := m[2, 1] * s;
-  Result[3, 1] := m[3, 1] * s;
-  Result[0, 2] := m[0, 2] * s;
-  Result[1, 2] := m[1, 2] * s;
-  Result[2, 2] := m[2, 2] * s;
-  Result[3, 2] := m[3, 2] * s;
-  Result[0, 3] := m[0, 3] * s;
-  Result[1, 3] := m[1, 3] * s;
-  Result[2, 3] := m[2, 3] * s;
-  Result[3, 3] := m[3, 3] * s;
+  MulMatFloat(Result, m, s);
 end;
 
 function UMulVec2Mat3x3(const v: TUVec2; const m: TUMat): TUVec2;
@@ -12743,33 +12967,131 @@ begin
   );
 end;
 
-function UMulVec3Mat3x3(const v: TUVec3; const m: TUMat): TUVec3;
+procedure MulVec3Mat3x3_Pas(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat);
 begin
-  Result := TUVec3.Make(
-    v.x * m[0, 0] + v.y * m[1, 0] + v.z * m[2, 0],
-    v.x * m[0, 1] + v.y * m[1, 1] + v.z * m[2, 1],
-    v.x * m[0, 2] + v.y * m[1, 2] + v.z * m[2, 2]
+  vr := TUVec3.Make(
+    v0.x * m0[0, 0] + v0.y * m0[1, 0] + v0.z * m0[2, 0],
+    v0.x * m0[0, 1] + v0.y * m0[1, 1] + v0.z * m0[2, 1],
+    v0.x * m0[0, 2] + v0.y * m0[1, 2] + v0.z * m0[2, 2]
   );
 end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulVec3Mat3x3_SSE(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat); assembler; nostackframe;
+asm
+  movups xmm0, [m0 + 0h]
+  movss xmm1, dword ptr [v0 + 0h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm0
+  movups xmm0, [m0 + 10h]
+  movss xmm2, dword ptr [v0 + 4h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movups xmm0, [m0 + 20h]
+  movss xmm2, dword ptr [v0 + 8h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movlps [vr], xmm1
+  movhlps xmm1, xmm1
+  movss dword ptr [vr + 8h], xmm1
+end;
+{$endif}
+
+var MulVec3Mat3x3: procedure (out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat) = @MulVec3Mat3x3_Pas;
+
+function UMulVec3Mat3x3(const v: TUVec3; const m: TUMat): TUVec3;
+begin
+  MulVec3Mat3x3(Result, v, m);
+end;
+
+procedure MulVec3Mat4x3_Pas(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat);
+begin
+  vr := TUVec3.Make(
+    v0.x * m0[0, 0] + v0.y * m0[1, 0] + v0.z * m0[2, 0] + m0[3, 0],
+    v0.x * m0[0, 1] + v0.y * m0[1, 1] + v0.z * m0[2, 1] + m0[3, 1],
+    v0.x * m0[0, 2] + v0.y * m0[1, 2] + v0.z * m0[2, 2] + m0[3, 2]
+  );
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulVec3Mat4x3_SSE(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat); assembler; nostackframe;
+asm
+  movups xmm0, [m0 + 0h]
+  movss xmm1, dword ptr [v0 + 0h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm0
+  movups xmm0, [m0 + 10h]
+  movss xmm2, dword ptr [v0 + 4h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movups xmm0, [m0 + 20h]
+  movss xmm2, dword ptr [v0 + 8h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movups xmm0, [m0 + 30h]
+  addps xmm1, xmm0
+  movlps [vr], xmm1
+  movhlps xmm1, xmm1
+  movss dword ptr [vr + 8], xmm1
+end;
+{$endif}
+
+var MulVec3Mat4x3: procedure (out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat) = @MulVec3Mat4x3_Pas;
 
 function UMulVec3Mat4x3(const v: TUVec3; const m: TUMat): TUVec3;
 begin
-  Result := TUVec3.Make(
-    v.x * m[0, 0] + v.y * m[1, 0] + v.z * m[2, 0] + m[3, 0],
-    v.x * m[0, 1] + v.y * m[1, 1] + v.z * m[2, 1] + m[3, 1],
-    v.x * m[0, 2] + v.y * m[1, 2] + v.z * m[2, 2] + m[3, 2]
+  MulVec3Mat4x3(Result, v, m);
+end;
+
+procedure MulVec3Mat4x4_Pas(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat);
+  var w: TUFloat;
+begin
+  w := 1 / (v0.x * m0[0, 3] + v0.y * m0[1, 3] + v0.z * m0[2, 3] + m0[3, 3]);
+  vr := TUVec3.Make(
+    (v0.x * m0[0, 0] + v0.y * m0[1, 0] + v0.z * m0[2, 0] + m0[3, 0]) * w,
+    (v0.x * m0[0, 1] + v0.y * m0[1, 1] + v0.z * m0[2, 1] + m0[3, 1]) * w,
+    (v0.x * m0[0, 2] + v0.y * m0[1, 2] + v0.z * m0[2, 2] + m0[3, 2]) * w
   );
 end;
 
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulVec3Mat4x4_SSE(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat); assembler; nostackframe;
+asm
+  movups xmm0, [m0 + 0h]
+  movss xmm1, dword ptr [v0 + 0h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm0
+  movups xmm0, [m0 + 10h]
+  movss xmm2, dword ptr [v0 + 4h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movups xmm0, [m0 + 20h]
+  movss xmm2, dword ptr [v0 + 8h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movups xmm0, [m0 + 30h]
+  addps xmm1, xmm0
+  movaps xmm0, xmm1
+  shufps xmm0, xmm0, $ff
+  rcpps xmm0, xmm0
+  mulps xmm1, xmm0
+  movlps [vr], xmm1
+  movhlps xmm1, xmm1
+  movss dword ptr [vr + 8h], xmm1
+end;
+{$endif}
+
+var MulVec3Mat4x4: procedure (out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat) = @MulVec3Mat4x4_Pas;
+
 function UMulVec3Mat4x4(const v: TUVec3; const m: TUMat): TUVec3;
-  var w: TUFloat;
 begin
-  w := 1 / (v.x * m[0, 3] + v.y * m[1, 3] + v.z * m[2, 3] + m[3, 3]);
-  Result := TUVec3.Make(
-    (v.x * m[0, 0] + v.y * m[1, 0] + v.z * m[2, 0] + m[3, 0]) * w,
-    (v.x * m[0, 1] + v.y * m[1, 1] + v.z * m[2, 1] + m[3, 1]) * w,
-    (v.x * m[0, 2] + v.y * m[1, 2] + v.z * m[2, 2] + m[3, 2]) * w
-  );
+  MulVec3Mat4x4(Result, v, m)
 end;
 
 function UMulVec3Quat(const v: TUVec3; const q: TUQuat): TUVec3;
@@ -12781,14 +13103,47 @@ begin
   Result := 2 * u.Dot(v) * u + (s * s - u.Dot(u)) * v + 2 * s * u.Cross(v);
 end;
 
+procedure MulVec4Mat_Pas(out vr: TUVec4; constref v0: TUVec4; constref m0: TUMat);
+begin
+  vr := TUVec4.Make(
+    v0.x * m0[0, 0] + v0.y * m0[1, 0] + v0.z * m0[2, 0] + v0.w * m0[3, 0],
+    v0.x * m0[0, 1] + v0.y * m0[1, 1] + v0.z * m0[2, 1] + v0.w * m0[3, 1],
+    v0.x * m0[0, 2] + v0.y * m0[1, 2] + v0.z * m0[2, 2] + v0.w * m0[3, 2],
+    v0.x * m0[0, 3] + v0.y * m0[1, 3] + v0.z * m0[2, 3] + v0.w * m0[3, 3]
+  );
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulVec4Mat_SSE(out vr: TUVec4; constref v0: TUVec4; constref m0: TUMat); assembler; nostackframe;
+asm
+  movaps xmm0, [m0 + 0h]
+  movss xmm1, dword ptr [v0 + 0h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm0
+  movaps xmm0, [m0 + 10h]
+  movss xmm2, dword ptr [v0 + 4h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movaps xmm0, [m0 + 20h]
+  movss xmm2, dword ptr [v0 + 8h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movaps xmm0, [m0 + 30h]
+  movss xmm2, dword ptr [v0 + 0Ch]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movaps [vr], xmm1
+end;
+{$endif}
+
+var MulVec4Mat: procedure (out vr: TUVec4; constref v0: TUVec4; constref m0: TUMat) = @MulVec4Mat_Pas;
+
 function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4;
 begin
-  Result := TUVec4.Make(
-    v.x * m[0, 0] + v.y * m[1, 0] + v.z * m[2, 0] + v.w * m[3, 0],
-    v.x * m[0, 1] + v.y * m[1, 1] + v.z * m[2, 1] + v.w * m[3, 1],
-    v.x * m[0, 2] + v.y * m[1, 2] + v.z * m[2, 2] + v.w * m[3, 2],
-    v.x * m[0, 3] + v.y * m[1, 3] + v.z * m[2, 3] + v.w * m[3, 3]
-  );
+  MulVec4Mat(Result, v, m);
 end;
 
 function UMulQuat(const a, b: TUQuat): TUQuat;
@@ -14419,5 +14774,86 @@ begin
   Result := 0;
 end;
 // Functions end
+
+procedure InitializeMath;
+  procedure SetupSSE;
+  begin
+    AddMat := @AddMat_SSE;
+    AddMatFloat := @AddMatFloat_SSE;
+    SubMat := @SubMat_SSE;
+    SubMatFloat := @SubMatFloat_SSE;
+    MulMat := @MulMat_SSE;
+    MulMatFloat := @MulMatFloat_SSE;
+    MulVec3Mat3x3 := @MulVec3Mat3x3_SSE;
+    MulVec3Mat4x3 := @MulVec3Mat4x3_SSE;
+    MulVec3Mat4x4 := @MulVec3Mat4x4_SSE;
+    MulVec4Mat := @MulVec4Mat_SSE;
+  end;
+  type TCPUExt = record
+    var SSE: Boolean;
+    var SSE2: Boolean;
+    var AVX: Boolean;
+    var AVX2: Boolean;
+    var AVX512: Boolean;
+  end;
+  function CheckExt: TCPUExt;
+    type TCPUIDResult = array[0..3] of UInt32;
+    procedure GetCPUID(const Leaf, SubLeaf: UInt32; out Info: TCPUIDResult); assembler;
+    asm
+      push rbx
+      mov eax, Leaf
+      mov ecx, SubLeaf
+      cpuid
+      mov dword ptr [Info + 0], eax
+      mov dword ptr [Info + 4], ebx
+      mov dword ptr [Info + 8], ecx
+      mov dword ptr [Info + 12], edx
+      pop rbx
+    end;
+    function GetXCR0: UInt64; assembler;
+    asm
+      xor ecx, ecx
+      xgetbv
+      mov dword ptr [Result], eax
+      mov dword ptr [Result + 4], edx
+    end;
+    function CheckFeature(const CPUInfo: TCPUIDResult; const RegId, Bit: UInt32): Boolean;
+    begin
+      Result := CPUInfo[RegId] and (1 shl Bit) <> 0;
+    end;
+    var CPUInfo: TCPUIDResult;
+    var XCR0: UInt64;
+  begin
+    FillChar(Result, SizeOf(Result), 0);
+    GetCPUID(1, 0, CPUInfo);
+    Result.SSE := CheckFeature(CPUInfo, 3, 25);
+    Result.SSE2 := CheckFeature(CPUInfo, 3, 26);
+    if not CheckFeature(CPUInfo, 2, 27) then Exit;
+    XCR0 := GetXCR0;
+    Result.AVX := (
+      CheckFeature(CPUInfo, 2, 28)
+      and (XCR0 and 6 = 6)
+    );
+    if not Result.AVX then Exit;
+    GetCPUID(0, 0, CPUInfo);
+    if CPUInfo[0] < 7 then Exit;
+    GetCPUID(7, 0, CPUInfo);
+    Result.AVX2 := CheckFeature(CPUInfo, 1, 5);
+    Result.AVX512 := (
+      CheckFeature(CPUInfo, 1, 16)
+      and (XCR0 and $e6 = $e6)
+    );
+  end;
+  var Ext: TCPUExt;
+begin
+  Ext := CheckExt;
+  if not Ext.SSE then Exit;
+  SetupSSE;
+end;
+
+initialization
+begin
+  InitializeMath;
+end;
 
 end.
