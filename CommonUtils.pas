@@ -14776,6 +14776,7 @@ end;
 // Functions end
 
 procedure InitializeMath;
+{$if defined(CPU386) or defined(CPUX64)}
   procedure SetupSSE;
   begin
     AddMat := @AddMat_SSE;
@@ -14854,6 +14855,10 @@ begin
   if not Ext.SSE then Exit;
   SetupSSE;
 end;
+{$else}
+begin
+end;
+{$endif}
 
 initialization
 begin
