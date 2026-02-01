@@ -1721,7 +1721,7 @@ end;
 
 type TUPtrHelper = type helper for Pointer
 public
-  procedure Read(var Output; const Size: UInt32); inline;
+  procedure Read(out Output; const Size: UInt32); inline;
   procedure Write(const Data; const Size: UInt32); inline;
   function ReadBool: Boolean; inline;
   function ReadUInt8: UInt8; inline;
@@ -10047,7 +10047,7 @@ end;
 // TUFIFOList end
 
 // TUPtrHelper begin
-procedure TUPtrHelper.Read(var Output; const Size: UInt32);
+procedure TUPtrHelper.Read(out Output; const Size: UInt32);
 begin
   UMove(Output, Self^, Size);
   Inc(Self, Size);
@@ -14802,17 +14802,21 @@ procedure InitializeMath;
     type PCPUIDResult = ^TCPUIDResult;
     procedure GetCPUID(
       const Leaf, SubLeaf: UInt32;
-      const Info: PCPUIDResult
+      out Ax, Bx, Cx, Dx: UInt32
     ); assembler;
     asm
       push rbx
       mov eax, Leaf
       mov ecx, SubLeaf
       cpuid
-      mov dword ptr [Info + 0], eax
-      mov dword ptr [Info + 4], ebx
-      mov dword ptr [Info + 8], ecx
-      mov dword ptr [Info + 12], edx
+      mov Ax, eax
+      mov Bx, ebx
+      mov Cx, ecx
+      mov Dx, edx
+      //mov dword ptr [Info + 0], eax
+      //mov dword ptr [Info + 4], ebx
+      //mov dword ptr [Info + 8], ecx
+      //mov dword ptr [Info + 12], edx
       pop rbx
     end;
     function GetXCR0: UInt64; assembler;
@@ -14827,10 +14831,14 @@ procedure InitializeMath;
       Result := CPUInfo[RegId] and (1 shl Bit) <> 0;
     end;
     var CPUInfo: TCPUIDResult;
+    var Ax: UInt32 absolute CPUInfo[0];
+    var Bx: UInt32 absolute CPUInfo[1];
+    var Cx: UInt32 absolute CPUInfo[2];
+    var Dx: UInt32 absolute CPUInfo[3];
     var XCR0: UInt64;
   begin
     FillChar(Result, SizeOf(Result), 0);
-    GetCPUID(1, 0, @CPUInfo);
+    GetCPUID(1, 0, Ax, Bx, Cx, Dx);
     Result.SSE := CheckFeature(CPUInfo, 3, 25);
     Result.SSE2 := CheckFeature(CPUInfo, 3, 26);
     if not CheckFeature(CPUInfo, 2, 27) then Exit;
@@ -14840,9 +14848,9 @@ procedure InitializeMath;
       and (XCR0 and 6 = 6)
     );
     if not Result.AVX then Exit;
-    GetCPUID(0, 0, @CPUInfo);
+    GetCPUID(0, 0, Ax, Bx, Cx, Dx);
     if CPUInfo[0] < 7 then Exit;
-    GetCPUID(7, 0, @CPUInfo);
+    GetCPUID(7, 0, Ax, Bx, Cx, Dx);
     Result.AVX2 := CheckFeature(CPUInfo, 1, 5);
     Result.AVX512 := (
       CheckFeature(CPUInfo, 1, 16)
