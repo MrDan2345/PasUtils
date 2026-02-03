@@ -3,6 +3,7 @@
 {$modeswitch nestedprocvars}
 {$modeswitch typehelpers}
 {$optimization autoinline}
+{$asmmode intel}
 {$macro on}
 {$warn 6058 off}
 {$warn 5024 off}
