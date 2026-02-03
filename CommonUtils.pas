@@ -1715,6 +1715,39 @@ public
   class operator Finalize(var v: TSelf);
 end;
 
+generic TUFastList<T> = record
+  //Unordered list with persistent index preservation
+  type TSelf = specialize TUFastList<T>;
+  type TOnItemDelete = procedure (const Item: T) of object;
+strict private
+  type TIndex = record
+    var Data: Int32;
+    var Remap: Int32;
+  end;
+  type TIndices = array of TIndex;
+  type TData = array of T;
+  var _Ind: TIndices;
+  var _Data: TData;
+  var _Size: Int32;
+  var _OnItemDelete: TOnItemDelete;
+  function GetLastIndex: Int32;
+  function GetData(const Index: Int32): T;
+  procedure SetData(const Index: Int32; const Value: T);
+  procedure Initialize;
+  procedure Finalize;
+public
+  property Data[const Index: Int32]: T read GetData write SetData; default;
+  property Size: Int32 read _Size;
+  property LastIndex: Int32 read GetLastIndex;
+  procedure Reserve(const ItemCount: UInt32);
+  procedure Shrink;
+  function Add(const Item: T): Int32;
+  procedure Delete(const Index: Int32);
+  procedure Clear;
+  class operator Initialize(var v: TSelf);
+  class operator Finalize(var v: TSelf);
+end;
+
 type TUXML = class (TURefClass)
 public
   type TAttribute = class
@@ -10013,6 +10046,105 @@ begin
   v.Finalize;
 end;
 // TUFIFOList end
+
+// TUFastList begin
+function TUFastList.GetLastIndex: Int32;
+begin
+  Result := _Size - 1;
+end;
+
+function TUFastList.GetData(const Index: Int32): T;
+begin
+  Result := _Data[_Ind[Index].Data];
+end;
+
+procedure TUFastList.SetData(const Index: Int32; const Value: T);
+begin
+  _Data[_Ind[Index].Data] := Value;
+end;
+
+procedure TUFastList.Initialize;
+begin
+  _Size := 0;
+end;
+
+procedure TUFastList.Finalize;
+begin
+  Clear;
+end;
+
+procedure TUFastList.Reserve(const ItemCount: UInt32);
+begin
+  if Length(_Data) < ItemCount then
+  begin
+    SetLength(_Data, ItemCount);
+  end;
+  if Length(_Ind) < ItemCount then
+  begin
+    SetLength(_Ind, ItemCount);
+  end;
+end;
+
+procedure TUFastList.Shrink;
+begin
+  if _Size >= Length(_Data) then Exit;
+  SetLength(_Data, _Size);
+end;
+
+function TUFastList.Add(const Item: T): Int32;
+  var NewInd: Boolean;
+begin
+  Result := _Size;
+  NewInd := Result >= Length(_Ind);
+  Inc(_Size);
+  Reserve(_Size);
+  _Data[Result] := Item;
+  if not NewInd then Exit;
+  _Ind[Result].Data := Result;
+  _Ind[Result].Remap := Result;
+end;
+
+procedure TUFastList.Delete(const Index: Int32);
+  var DataInd, LastInd: Int32;
+begin
+  DataInd := _Ind[Index].Data;
+  if Assigned(_OnItemDelete) then
+  begin
+    _OnItemDelete(_Data[DataInd]);
+  end;
+  LastInd := _Size - 1;
+  try
+    if DataInd = LastInd then Exit;
+    _Data[DataInd] := _Data[LastInd];
+    USwap(_Ind[DataInd].Remap, _Ind[LastInd].Remap);
+    _Ind[Index].Data := LastInd;
+    _Ind[DataInd].Data := DataInd;
+  finally
+    Dec(_Size);
+  end;
+end;
+
+procedure TUFastList.Clear;
+  var i: Int32;
+begin
+  if Assigned(_OnItemDelete) then
+  for i := 0 to _Size - 1 do
+  begin
+    _OnItemDelete(_Data[i]);
+  end;
+  _Size := 0;
+end;
+
+class operator TUFastList.Initialize(var v: TSelf);
+begin
+  v.Initialize;
+end;
+
+class operator TUFastList.Finalize(var v: TSelf);
+begin
+  v.Finalize;
+end;
+// TUFastList end
 
 // TUXML begin
 function TUXML.TEnumerator.GetCurrent: TUXML;
