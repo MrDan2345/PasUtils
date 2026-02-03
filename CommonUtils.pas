@@ -10114,6 +10114,7 @@ begin
 end;
 
 procedure TUFastList.Reserve(const ItemCount: UInt32);
+  var i, n: Int32;
 begin
   if Length(_Data) < ItemCount then
   begin
@@ -10121,7 +10122,13 @@ begin
   end;
   if Length(_Ind) < ItemCount then
   begin
+    n := Length(_Ind);
     SetLength(_Ind, ItemCount);
+    for i := n to High(_Ind) do
+    begin
+      _Ind[i].Data := i;
+      _Ind[i].Remap := i;
+    end;
   end;
 end;
 
@@ -10132,16 +10139,11 @@ begin
 end;
 
 function TUFastList.Add(const Item: T): Int32;
-  var NewInd: Boolean;
 begin
   Result := _Size;
-  NewInd := Result >= Length(_Ind);
   Inc(_Size);
   Reserve(_Size);
   _Data[Result] := Item;
-  if not NewInd then Exit;
-  _Ind[Result].Data := Result;
-  _Ind[Result].Remap := Result;
 end;
 
 procedure TUFastList.Delete(const Index: Int32);
