@@ -1734,15 +1734,18 @@ strict private
   var _Data: TData;
   var _Size: Int32;
   var _OnItemDelete: TOnItemDelete;
-  function GetLastIndex: Int32;
+  function GetLastIndex: Int32; inline;
   function GetData(const Index: Int32): T;
   procedure SetData(const Index: Int32; const Value: T);
+  function GetId(const Index: Int32): Int32;
   procedure Initialize;
   procedure Finalize;
 public
   property Data[const Index: Int32]: T read GetData write SetData; default;
+  property Id[const Index: Int32]: Int32 read GetId;
   property Size: Int32 read _Size;
   property LastIndex: Int32 read GetLastIndex;
+  property OnItemDelete: TOnItemDelete read _OnItemDelete write _OnItemDelete;
   procedure Reserve(const ItemCount: UInt32);
   procedure Shrink;
   function Add(const Item: T): Int32;
@@ -10093,6 +10096,11 @@ end;
 procedure TUFastList.SetData(const Index: Int32; const Value: T);
 begin
   _Data[_Ind[Index].Data] := Value;
+end;
+
+function TUFastList.GetId(const Index: Int32): Int32;
+begin
+  Result := _Ind[Index].Remap;
 end;
 
 procedure TUFastList.Initialize;
