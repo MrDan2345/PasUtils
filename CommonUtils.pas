@@ -1666,6 +1666,16 @@ public
     var Prev: TItem;
     var Next: TItem;
   end;
+  type TEnumerator = class
+  private
+    var _Current: TItem;
+    var _List: TItem;
+    function GetCurrent: T; inline;
+  public
+    constructor Create(const List: TItem);
+    function MoveNext: Boolean;
+    property Current: T read GetCurrent;
+  end;
 strict private
   var _Cache: TItem;
   var _List: TItem;
@@ -1685,6 +1695,7 @@ public
   function Pop: T;
   procedure FreeItem(var Item: TItem);
   procedure Clear;
+  function GetEnumerator: TEnumerator;
   class operator Initialize(var v: TSelf);
   class operator Finalize(var v: TSelf);
 end;
@@ -1696,6 +1707,16 @@ generic TUFIFOList<T> = record
     var Next: TItem;
   end;
   type TDataArray = array of T;
+  type TEnumerator = class
+  private
+    var _Current: TItem;
+    var _List: TItem;
+    function GetCurrent: T; inline;
+  public
+    constructor Create(const List: TItem);
+    function MoveNext: Boolean;
+    property Current: T read GetCurrent;
+  end;
 strict private
   _Cached: Boolean;
   var _Cache: TItem;
@@ -1715,6 +1736,7 @@ public
   function DequeueAll: TDataArray;
   procedure Clear;
   function IsEmpty: Boolean;
+  function GetEnumerator: TEnumerator;
   class operator Initialize(var v: TSelf);
   class operator Finalize(var v: TSelf);
 end;
@@ -1722,17 +1744,29 @@ end;
 generic TUFastList<T> = record
   //Unordered list with persistent index preservation
   type TSelf = specialize TUFastList<T>;
+  type TPtr = ^T;
   type TOnItemDelete = procedure (const Item: T) of object;
+  type TEnumerator = class
+  private
+    var _Current: TPtr;
+    var _Count: Int32;
+    function GetCurrent: T; inline;
+  public
+    constructor Create(const AItem: TPtr; const Count: Int32);
+    function MoveNext: Boolean;
+    property Current: T read GetCurrent;
+  end;
 strict private
   type TIndex = record
     var Data: Int32;
-    var Remap: Int32;
+    var Id: Int32;
   end;
   type TIndices = array of TIndex;
   type TData = array of T;
   var _Ind: TIndices;
   var _Data: TData;
   var _Size: Int32;
+  var _Slack: Int32;
   var _OnItemDelete: TOnItemDelete;
   function GetLastIndex: Int32; inline;
   function GetData(const Index: Int32): T;
@@ -1742,8 +1776,10 @@ strict private
   procedure Finalize;
 public
   property Data[const Index: Int32]: T read GetData write SetData; default;
+  property DataRaw: TData read _Data;
   property Id[const Index: Int32]: Int32 read GetId;
   property Size: Int32 read _Size;
+  property Slack: Int32 read _Slack write _Slack;
   property LastIndex: Int32 read GetLastIndex;
   property OnItemDelete: TOnItemDelete read _OnItemDelete write _OnItemDelete;
   procedure Reserve(const ItemCount: UInt32);
@@ -1751,6 +1787,7 @@ public
   function Add(const Item: T): Int32;
   procedure Delete(const Index: Int32);
   procedure Clear;
+  function GetEnumerator: TEnumerator;
   class operator Initialize(var v: TSelf);
   class operator Finalize(var v: TSelf);
 end;
@@ -9837,6 +9874,32 @@ end;
 //TUArrayObjUtils end
 
 //TULinkedList begin
+function TULinkedList.TEnumerator.GetCurrent: T;
+begin
+  Result := _Current.Data;
+end;
+
+constructor TULinkedList.TEnumerator.Create(const List: TItem);
+begin
+  _Current := nil;
+  _List := List;
+end;
+
+function TULinkedList.TEnumerator.MoveNext: Boolean;
+begin
+  if not Assigned(_List) then Exit(False);
+  if Assigned(_Current) then
+  begin
+    if not Assigned(_Current.Next) then Exit(False);
+    _Current := _Current.Next;
+  end
+  else
+  begin
+    _Current := _List;
+  end;
+  Result := True;
+end;
+
 function TULinkedList.GetIsEmpty: Boolean;
 begin
   Result := _List = nil;
@@ -9935,6 +9998,11 @@ begin
   end;
 end;
 
+function TULinkedList.GetEnumerator: TEnumerator;
+begin
+  Result := TEnumerator.Create(_List);
+end;
+
 class operator TULinkedList.Initialize(var v: TSelf);
 begin
   v.Initialize;
@@ -9947,6 +10015,32 @@ end;
 // TULinkedList end
 
 // TUFIFOList begin
+function TUFIFOList.TEnumerator.GetCurrent: T;
+begin
+  Result := _Current.Data;
+end;
+
+constructor TUFIFOList.TEnumerator.Create(const List: TItem);
+begin
+  _Current := nil;
+  _List := List;
+end;
+
+function TUFIFOList.TEnumerator.MoveNext: Boolean;
+begin
+  if not Assigned(_List) then Exit(False);
+  if Assigned(_Current) then
+  begin
+    if not Assigned(_Current.Next) then Exit(False);
+    _Current := _Current.Next;
+  end
+  else
+  begin
+    _Current := _List;
+  end;
+  Result := True;
+end;
+
 procedure TUFIFOList.SetCached(const Value: Boolean);
   var Temp: TItem;
 begin
@@ -10071,6 +10165,11 @@ begin
   Result := not Assigned(_First);
 end;
 
+function TUFIFOList.GetEnumerator: TEnumerator;
+begin
+  Result := TEnumerator.Create(_First);
+end;
+
 class operator TUFIFOList.Initialize(var v: TSelf);
 begin
   v.Initialize;
@@ -10083,6 +10182,28 @@ end;
 // TUFIFOList end
 
 // TUFastList begin
+function TUFastList.TEnumerator.GetCurrent: T;
+begin
+  Result := _Current^;
+end;
+
+constructor TUFastList.TEnumerator.Create(
+  const AItem: TPtr;
+  const Count: Int32
+);
+begin
+  _Current := AItem - 1;
+  _Count := Count;
+end;
+
+function TUFastList.TEnumerator.MoveNext: Boolean;
+begin
+  if _Count <= 0 then Exit(False);
+  Inc(_Current);
+  Dec(_Count);
+  Result := True;
+end;
+
 function TUFastList.GetLastIndex: Int32;
 begin
   Result := _Size - 1;
@@ -10100,12 +10221,14 @@ end;
 
 function TUFastList.GetId(const Index: Int32): Int32;
 begin
-  Result := _Ind[Index].Remap;
+  Result := _Ind[Index].Id;
 end;
 
 procedure TUFastList.Initialize;
 begin
   _Size := 0;
+  _Slack := 31;
+  _OnItemDelete := nil;
 end;
 
 procedure TUFastList.Finalize;
@@ -10118,16 +10241,15 @@ procedure TUFastList.Reserve(const ItemCount: UInt32);
 begin
   if Length(_Data) < ItemCount then
   begin
-    SetLength(_Data, ItemCount);
+    SetLength(_Data, ItemCount + _Slack);
   end;
   if Length(_Ind) < ItemCount then
   begin
     n := Length(_Ind);
-    SetLength(_Ind, ItemCount);
+    SetLength(_Ind, ItemCount + _Slack);
     for i := n to High(_Ind) do
     begin
-      _Ind[i].Data := i;
-      _Ind[i].Remap := i;
+      _Ind[i].Id := i;
     end;
   end;
 end;
@@ -10136,14 +10258,19 @@ procedure TUFastList.Shrink;
 begin
   if _Size >= Length(_Data) then Exit;
   SetLength(_Data, _Size);
+  if _Size > 0 then Exit;
+  _Ind := nil;
 end;
 
 function TUFastList.Add(const Item: T): Int32;
+  var i: Int32;
 begin
-  Result := _Size;
+  i := _Size;
   Inc(_Size);
   Reserve(_Size);
-  _Data[Result] := Item;
+  Result := _Ind[i].Id;
+  _Ind[Result].Data := i;
+  _Data[i] := Item;
 end;
 
 procedure TUFastList.Delete(const Index: Int32);
@@ -10155,15 +10282,14 @@ begin
     _OnItemDelete(_Data[DataInd]);
   end;
   LastInd := _Size - 1;
-  try
-    if DataInd = LastInd then Exit;
+  if DataInd <> LastInd then
+  begin
     _Data[DataInd] := _Data[LastInd];
-    USwap(_Ind[DataInd].Remap, _Ind[LastInd].Remap);
-    _Ind[Index].Data := LastInd;
-    _Ind[DataInd].Data := DataInd;
-  finally
-    Dec(_Size);
+    USwap(_Ind[DataInd].Id, _Ind[LastInd].Id);
+    _Ind[_Ind[DataInd].Id].Data := DataInd;
+    _Ind[_Ind[LastIndex].Id].Data := LastIndex;
   end;
+  Dec(_Size);
 end;
 
 procedure TUFastList.Clear;
@@ -10175,6 +10301,11 @@ begin
     _OnItemDelete(_Data[i]);
   end;
   _Size := 0;
+end;
+
+function TUFastList.GetEnumerator: TEnumerator;
+begin
+  Result := TEnumerator.Create(@_Data[0], _Size);
 end;
 
 class operator TUFastList.Initialize(var v: TSelf);
