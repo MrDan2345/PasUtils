@@ -1782,6 +1782,7 @@ public
   property Slack: Int32 read _Slack write _Slack;
   property LastIndex: Int32 read GetLastIndex;
   property OnItemDelete: TOnItemDelete read _OnItemDelete write _OnItemDelete;
+  function Contains(const Index: Int32): Boolean;
   procedure Reserve(const ItemCount: UInt32);
   procedure Shrink;
   function Add(const Item: T): Int32;
@@ -10236,6 +10237,14 @@ begin
   Clear;
 end;
 
+function TUFastList.Contains(const Index: Int32): Boolean;
+begin
+  if Index < 0 then Exit(False);
+  if Index > High(_Ind) then Exit(False);
+  if _Ind[Index].Data > LastIndex then Exit(False);
+  Result := True;
+end;
+
 procedure TUFastList.Reserve(const ItemCount: UInt32);
   var i, n: Int32;
 begin
@@ -10263,14 +10272,12 @@ begin
 end;
 
 function TUFastList.Add(const Item: T): Int32;
-  var i: Int32;
 begin
-  i := _Size;
+  Reserve(_Size + 1);
+  Result := _Ind[_Size].Id;
+  _Ind[Result].Data := _Size;
+  _Data[_Size] := Item;
   Inc(_Size);
-  Reserve(_Size);
-  Result := _Ind[i].Id;
-  _Ind[Result].Data := i;
-  _Data[i] := Item;
 end;
 
 procedure TUFastList.Delete(const Index: Int32);
@@ -10281,13 +10288,13 @@ begin
   begin
     _OnItemDelete(_Data[DataInd]);
   end;
-  LastInd := _Size - 1;
+  LastInd := LastIndex;
   if DataInd <> LastInd then
   begin
     _Data[DataInd] := _Data[LastInd];
     USwap(_Ind[DataInd].Id, _Ind[LastInd].Id);
     _Ind[_Ind[DataInd].Id].Data := DataInd;
-    _Ind[_Ind[LastIndex].Id].Data := LastIndex;
+    _Ind[_Ind[LastIndex].Id].Data := LastInd;
   end;
   Dec(_Size);
 end;
@@ -10305,7 +10312,14 @@ end;
 
 function TUFastList.GetEnumerator: TEnumerator;
 begin
-  Result := TEnumerator.Create(@_Data[0], _Size);
+  if Length(_Data) > 0 then
+  begin
+    Result := TEnumerator.Create(@_Data[0], _Size);
+  end
+  else
+  begin
+    Result := TEnumerator.Create(nil, 0);
+  end;
 end;
 
 class operator TUFastList.Initialize(var v: TSelf);
