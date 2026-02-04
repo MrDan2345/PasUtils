@@ -1749,7 +1749,7 @@ generic TUFastList<T> = record
   type TEnumerator = class
   private
     var _Current: TPtr;
-    var _Count: Int32;
+    var _End: TPtr;
     function GetCurrent: T; inline;
   public
     constructor Create(const AItem: TPtr; const Count: Int32);
@@ -10193,15 +10193,22 @@ constructor TUFastList.TEnumerator.Create(
   const Count: Int32
 );
 begin
-  _Current := AItem - 1;
-  _Count := Count;
+  if Assigned(AItem) then
+  begin
+    _Current := AItem - 1;
+    _End := _Current + Count;
+  end
+  else
+  begin
+    _Current := nil;
+    _End := nil;
+  end;
 end;
 
 function TUFastList.TEnumerator.MoveNext: Boolean;
 begin
-  if _Count <= 0 then Exit(False);
+  if _Current >= _End then Exit(False);
   Inc(_Current);
-  Dec(_Count);
   Result := True;
 end;
 
@@ -10248,18 +10255,14 @@ end;
 procedure TUFastList.Reserve(const ItemCount: UInt32);
   var i, n: Int32;
 begin
-  if Length(_Data) < ItemCount then
+  if Length(_Data) >= ItemCount then Exit;
+  SetLength(_Data, ItemCount + _Slack);
+  if Length(_Ind) >= ItemCount then Exit;
+  n := Length(_Ind);
+  SetLength(_Ind, ItemCount + _Slack);
+  for i := n to High(_Ind) do
   begin
-    SetLength(_Data, ItemCount + _Slack);
-  end;
-  if Length(_Ind) < ItemCount then
-  begin
-    n := Length(_Ind);
-    SetLength(_Ind, ItemCount + _Slack);
-    for i := n to High(_Ind) do
-    begin
-      _Ind[i].Id := i;
-    end;
+    _Ind[i].Id := i;
   end;
 end;
 
