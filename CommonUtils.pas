@@ -2158,6 +2158,16 @@ function UArcTan2(const y, x: TUFloat): TUFloat;
 function UPow(const b, e: TUFloat): TUFloat;
 function UPoT(const x: UInt64): UInt64;
 function UTopSetBit(const x: UInt64): UInt8;
+generic function URoL<T>(const Value: T; const Bits: T): T; inline; overload;
+function URoL(const Value: UInt8; const Bits: UInt8): UInt8; overload;
+function URoL(const Value: UInt16; const Bits: UInt16): UInt16; overload;
+function URoL(const Value: UInt32; const Bits: UInt32): UInt32; overload;
+function URoL(const Value: UInt64; const Bits: UInt64): UInt64; overload;
+generic function URoR<T>(const Value: T; const Bits: T): T; inline; overload;
+function URoR(const Value: UInt8; const Bits: UInt8): UInt8; overload;
+function URoR(const Value: UInt16; const Bits: UInt16): UInt16; overload;
+function URoR(const Value: UInt32; const Bits: UInt32): UInt32; overload;
+function URoR(const Value: UInt64; const Bits: UInt64): UInt64; overload;
 function URandomPi: TUFloat;
 function URandom2Pi: TUFloat;
 function UThreadRandomize: UInt32;
@@ -12801,6 +12811,62 @@ begin
     Inc(Result);
     n := n shr 1;
   end;
+end;
+
+generic function URoL<T>(const Value: T; const Bits: T): T;
+  var b: UInt8;
+  const s: UInt8 = SizeOf(T) * 8;
+begin
+  b := UInt8(Bits mod s);
+  Result := (Value shl b) or (Value shr (s - b));
+end;
+
+function URoL(const Value: UInt8; const Bits: UInt8): UInt8;
+begin
+  Result := specialize URoL<UInt8>(Value, Bits);
+end;
+
+function URoL(const Value: UInt16; const Bits: UInt16): UInt16;
+begin
+  Result := specialize URoL<UInt16>(Value, Bits);
+end;
+
+function URoL(const Value: UInt32; const Bits: UInt32): UInt32;
+begin
+  Result := specialize URoL<UInt32>(Value, Bits);
+end;
+
+function URoL(const Value: UInt64; const Bits: UInt64): UInt64;
+begin
+  Result := specialize URoL<UInt64>(Value, Bits);
+end;
+
+generic function URoR<T>(const Value: T; const Bits: T): T;
+  var b: UInt8;
+  const s: UInt8 = SizeOf(T) * 8;
+begin
+  b := UInt8(Bits mod s);
+  Result := (Value shl (s - b)) or (Value shr b);
+end;
+
+function URoR(const Value: UInt8; const Bits: UInt8): UInt8;
+begin
+  Result := specialize URoR<UInt8>(Value, Bits);
+end;
+
+function URoR(const Value: UInt16; const Bits: UInt16): UInt16;
+begin
+  Result := specialize URoR<UInt16>(Value, Bits);
+end;
+
+function URoR(const Value: UInt32; const Bits: UInt32): UInt32;
+begin
+  Result := specialize URoR<UInt32>(Value, Bits);
+end;
+
+function URoR(const Value: UInt64; const Bits: UInt64): UInt64;
+begin
+  Result := specialize URoR<UInt64>(Value, Bits);
 end;
 
 function URandomPi: TUFloat;
