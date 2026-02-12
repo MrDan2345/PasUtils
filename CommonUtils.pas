@@ -1204,18 +1204,18 @@ public
 strict private
   type TTaskThread = class (TThread)
   private
-    var _StartTime: QWord;
+    var _StartTime: UInt64;
   public
-    var Ref: Integer;
+    var Ref: Int32;
     var Proc: TFunc;
     var Args: array of TVarRec;
     var Res: TRes;
     procedure AfterConstruction; override;
     procedure Execute; override;
-    function TimeRunning: QWord;
-    function RefInc: Integer;
-    function RefDec: Integer;
-    function RefDecKillThread: Integer;
+    function TimeRunning: UInt64;
+    function RefInc: Int32;
+    function RefDec: Int32;
+    function RefDecKillThread: Int32;
   end;
   var _Thread: TTaskThread;
   procedure Initialize; inline;
@@ -1238,7 +1238,7 @@ public
 end;
 type TUTaskString = specialize TUTask<String>;
 type TUTaskBool = specialize TUTask<Boolean>;
-type TUTaskInt = specialize TUTask<Integer>;
+type TUTaskInt = specialize TUTask<Int32>;
 
 type generic TUSharedRef<T> = record
 public
@@ -1382,110 +1382,110 @@ protected
   var _TypeInfo: PTypeInfo;
   var _TypeData: PTypeData;
   var _PropList: array of PPropInfo;
-  function VerifyProp(const Index: Integer; const PropType: TTypeKinds = tkAny): Boolean;
-  function VerifyArrayProp(const Index, ArrayIndex: Integer; const PropType: TTypeKinds = tkAny): Boolean;
-  function GetArrayData(const Index: Integer): Pointer;
+  function VerifyProp(const Index: Int32; const PropType: TTypeKinds = tkAny): Boolean;
+  function VerifyArrayProp(const Index, ArrayIndex: Int32; const PropType: TTypeKinds = tkAny): Boolean;
+  function GetArrayData(const Index: Int32): Pointer;
   function GetOrdSize(const OrdType: TOrdType): UInt32; inline;
-  function GetArrayElementTypeInfo(const Index: Integer): PTypeInfo;
-  function GetPropCount: Integer; inline;
-  function GetPropInfo(const Index: Integer): PPropInfo; inline;
-  function GetPropArrayInfo(const Index: Integer): PTypeInfo; inline;
-  function GetPropEnum(const Index: Integer): Int32; inline;
-  procedure SetPropEnum(const Index: Integer; const Value: Int32); inline;
-  function GetPropBool(const Index: Integer): Boolean; inline;
-  procedure SetPropBool(const Index: Integer; const Value: Boolean); inline;
-  function GetPropInt8(const Index: Integer): Int8; inline;
-  procedure SetPropInt8(const Index: Integer; const Value: Int8); inline;
-  function GetPropInt16(const Index: Integer): Int16; inline;
-  procedure SetPropInt16(const Index: Integer; const Value: Int16); inline;
-  function GetPropInt32(const Index: Integer): Int32; inline;
-  procedure SetPropInt32(const Index: Integer; const Value: Int32); inline;
-  function GetPropInt64(const Index: Integer): Int64; inline;
-  procedure SetPropInt64(const Index: Integer; const Value: Int64); inline;
-  function GetPropUInt8(const Index: Integer): UInt8; inline;
-  procedure SetPropUInt8(const Index: Integer; const Value: UInt8); inline;
-  function GetPropUInt16(const Index: Integer): UInt16; inline;
-  procedure SetPropUInt16(const Index: Integer; const Value: UInt16); inline;
-  function GetPropUInt32(const Index: Integer): UInt32; inline;
-  procedure SetPropUInt32(const Index: Integer; const Value: UInt32); inline;
-  function GetPropUInt64(const Index: Integer): UInt64; inline;
-  procedure SetPropUInt64(const Index: Integer; const Value: UInt64); inline;
-  function GetPropFloat(const Index: Integer): Single; inline;
-  procedure SetPropFloat(const Index: Integer; const Value: Single); inline;
-  function GetPropDouble(const Index: Integer): Double; inline;
-  procedure SetPropDouble(const Index: Integer; const Value: Double); inline;
-  function GetPropString(const Index: Integer): String; inline;
-  procedure SetPropString(const Index: Integer; const Value: String); inline;
-  function GetPropClass(const Index: Integer): TObject; inline;
-  procedure SetPropClass(const Index: Integer; const Value: TObject); inline;
-  function GetPropArrayLength(const Index: Integer): Integer; inline;
-  procedure SetPropArrayLength(const Index: Integer; const Value: Integer);
-  function GetPropArrayEnum(const Index, ArrayIndex: Integer): Int32; inline;
-  procedure SetPropArrayEnum(const Index, ArrayIndex: Integer; const Value: Int32); inline;
-  function GetPropArrayBool(const Index, ArrayIndex: Integer): Boolean; inline;
-  procedure SetPropArrayBool(const Index, ArrayIndex: Integer; const Value: Boolean); inline;
-  function GetPropArrayInt8(const Index, ArrayIndex: Integer): Int8; inline;
-  procedure SetPropArrayInt8(const Index, ArrayIndex: Integer; const Value: Int8); inline;
-  function GetPropArrayInt16(const Index, ArrayIndex: Integer): Int16; inline;
-  procedure SetPropArrayInt16(const Index, ArrayIndex: Integer; const Value: Int16); inline;
-  function GetPropArrayInt32(const Index, ArrayIndex: Integer): Int32; inline;
-  procedure SetPropArrayInt32(const Index, ArrayIndex: Integer; const Value: Int32); inline;
-  function GetPropArrayInt64(const Index, ArrayIndex: Integer): Int64; inline;
-  procedure SetPropArrayInt64(const Index, ArrayIndex: Integer; const Value: Int64); inline;
-  function GetPropArrayUInt8(const Index, ArrayIndex: Integer): UInt8; inline;
-  procedure SetPropArrayUInt8(const Index, ArrayIndex: Integer; const Value: UInt8); inline;
-  function GetPropArrayUInt16(const Index, ArrayIndex: Integer): UInt16; inline;
-  procedure SetPropArrayUInt16(const Index, ArrayIndex: Integer; const Value: UInt16); inline;
-  function GetPropArrayUInt32(const Index, ArrayIndex: Integer): UInt32; inline;
-  procedure SetPropArrayUInt32(const Index, ArrayIndex: Integer; const Value: UInt32); inline;
-  function GetPropArrayUInt64(const Index, ArrayIndex: Integer): UInt64; inline;
-  procedure SetPropArrayUInt64(const Index, ArrayIndex: Integer; const Value: UInt64); inline;
-  function GetPropArrayFloat(const Index, ArrayIndex: Integer): Single; inline;
-  procedure SetPropArrayFloat(const Index, ArrayIndex: Integer; const Value: Single); inline;
-  function GetPropArrayDouble(const Index, ArrayIndex: Integer): Double; inline;
-  procedure SetPropArrayDouble(const Index, ArrayIndex: Integer; const Value: Double); inline;
-  function GetPropArrayString(const Index, ArrayIndex: Integer): String; inline;
-  procedure SetPropArrayString(const Index, ArrayIndex: Integer; const Value: String); inline;
-  function GetPropArrayClass(const Index, ArrayIndex: Integer): TObject; inline;
-  procedure SetPropArrayClass(const Index, ArrayIndex: Integer; const Value: TObject); inline;
-  generic function GetDynArrayLength<T>(const Index: Integer): Integer;
-  generic procedure SetDynArrayLength<T>(const Index: Integer; const Value: Integer);
-  generic function GetDynArrayElement<T>(const Index, ArrayIndex: Integer): T;
-  generic procedure SetDynArrayElement<T>(const Index, ArrayIndex: Integer; const Value: T);
+  function GetArrayElementTypeInfo(const Index: Int32): PTypeInfo;
+  function GetPropCount: Int32; inline;
+  function GetPropInfo(const Index: Int32): PPropInfo; inline;
+  function GetPropArrayInfo(const Index: Int32): PTypeInfo; inline;
+  function GetPropEnum(const Index: Int32): Int32; inline;
+  procedure SetPropEnum(const Index: Int32; const Value: Int32); inline;
+  function GetPropBool(const Index: Int32): Boolean; inline;
+  procedure SetPropBool(const Index: Int32; const Value: Boolean); inline;
+  function GetPropInt8(const Index: Int32): Int8; inline;
+  procedure SetPropInt8(const Index: Int32; const Value: Int8); inline;
+  function GetPropInt16(const Index: Int32): Int16; inline;
+  procedure SetPropInt16(const Index: Int32; const Value: Int16); inline;
+  function GetPropInt32(const Index: Int32): Int32; inline;
+  procedure SetPropInt32(const Index: Int32; const Value: Int32); inline;
+  function GetPropInt64(const Index: Int32): Int64; inline;
+  procedure SetPropInt64(const Index: Int32; const Value: Int64); inline;
+  function GetPropUInt8(const Index: Int32): UInt8; inline;
+  procedure SetPropUInt8(const Index: Int32; const Value: UInt8); inline;
+  function GetPropUInt16(const Index: Int32): UInt16; inline;
+  procedure SetPropUInt16(const Index: Int32; const Value: UInt16); inline;
+  function GetPropUInt32(const Index: Int32): UInt32; inline;
+  procedure SetPropUInt32(const Index: Int32; const Value: UInt32); inline;
+  function GetPropUInt64(const Index: Int32): UInt64; inline;
+  procedure SetPropUInt64(const Index: Int32; const Value: UInt64); inline;
+  function GetPropFloat(const Index: Int32): Single; inline;
+  procedure SetPropFloat(const Index: Int32; const Value: Single); inline;
+  function GetPropDouble(const Index: Int32): Double; inline;
+  procedure SetPropDouble(const Index: Int32; const Value: Double); inline;
+  function GetPropString(const Index: Int32): String; inline;
+  procedure SetPropString(const Index: Int32; const Value: String); inline;
+  function GetPropClass(const Index: Int32): TObject; inline;
+  procedure SetPropClass(const Index: Int32; const Value: TObject); inline;
+  function GetPropArrayLength(const Index: Int32): Int32; inline;
+  procedure SetPropArrayLength(const Index: Int32; const Value: Int32);
+  function GetPropArrayEnum(const Index, ArrayIndex: Int32): Int32; inline;
+  procedure SetPropArrayEnum(const Index, ArrayIndex: Int32; const Value: Int32); inline;
+  function GetPropArrayBool(const Index, ArrayIndex: Int32): Boolean; inline;
+  procedure SetPropArrayBool(const Index, ArrayIndex: Int32; const Value: Boolean); inline;
+  function GetPropArrayInt8(const Index, ArrayIndex: Int32): Int8; inline;
+  procedure SetPropArrayInt8(const Index, ArrayIndex: Int32; const Value: Int8); inline;
+  function GetPropArrayInt16(const Index, ArrayIndex: Int32): Int16; inline;
+  procedure SetPropArrayInt16(const Index, ArrayIndex: Int32; const Value: Int16); inline;
+  function GetPropArrayInt32(const Index, ArrayIndex: Int32): Int32; inline;
+  procedure SetPropArrayInt32(const Index, ArrayIndex: Int32; const Value: Int32); inline;
+  function GetPropArrayInt64(const Index, ArrayIndex: Int32): Int64; inline;
+  procedure SetPropArrayInt64(const Index, ArrayIndex: Int32; const Value: Int64); inline;
+  function GetPropArrayUInt8(const Index, ArrayIndex: Int32): UInt8; inline;
+  procedure SetPropArrayUInt8(const Index, ArrayIndex: Int32; const Value: UInt8); inline;
+  function GetPropArrayUInt16(const Index, ArrayIndex: Int32): UInt16; inline;
+  procedure SetPropArrayUInt16(const Index, ArrayIndex: Int32; const Value: UInt16); inline;
+  function GetPropArrayUInt32(const Index, ArrayIndex: Int32): UInt32; inline;
+  procedure SetPropArrayUInt32(const Index, ArrayIndex: Int32; const Value: UInt32); inline;
+  function GetPropArrayUInt64(const Index, ArrayIndex: Int32): UInt64; inline;
+  procedure SetPropArrayUInt64(const Index, ArrayIndex: Int32; const Value: UInt64); inline;
+  function GetPropArrayFloat(const Index, ArrayIndex: Int32): Single; inline;
+  procedure SetPropArrayFloat(const Index, ArrayIndex: Int32; const Value: Single); inline;
+  function GetPropArrayDouble(const Index, ArrayIndex: Int32): Double; inline;
+  procedure SetPropArrayDouble(const Index, ArrayIndex: Int32; const Value: Double); inline;
+  function GetPropArrayString(const Index, ArrayIndex: Int32): String; inline;
+  procedure SetPropArrayString(const Index, ArrayIndex: Int32; const Value: String); inline;
+  function GetPropArrayClass(const Index, ArrayIndex: Int32): TObject; inline;
+  procedure SetPropArrayClass(const Index, ArrayIndex: Int32; const Value: TObject); inline;
+  generic function GetDynArrayLength<T>(const Index: Int32): Int32;
+  generic procedure SetDynArrayLength<T>(const Index: Int32; const Value: Int32);
+  generic function GetDynArrayElement<T>(const Index, ArrayIndex: Int32): T;
+  generic procedure SetDynArrayElement<T>(const Index, ArrayIndex: Int32; const Value: T);
 public
-  property PropCount: Integer read GetPropCount;
-  property PropInfo[const Index: Integer]: PPropInfo read GetPropInfo;
-  property PropArrayInfo[const Index: Integer]: PTypeInfo read GetPropArrayInfo;
-  property PropEnum[const Index: Integer]: Int32 read GetPropEnum write SetPropEnum;
-  property PropBool[const Index: Integer]: Boolean read GetPropBool write SetPropBool;
-  property PropInt8[const Index: Integer]: Int8 read GetPropInt8 write SetPropInt8;
-  property PropInt16[const Index: Integer]: Int16 read GetPropInt16 write SetPropInt16;
-  property PropInt32[const Index: Integer]: Int32 read GetPropInt32 write SetPropInt32;
-  property PropInt64[const Index: Integer]: Int64 read GetPropInt64 write SetPropInt64;
-  property PropUInt8[const Index: Integer]: UInt8 read GetPropUInt8 write SetPropUInt8;
-  property PropUInt16[const Index: Integer]: UInt16 read GetPropUInt16 write SetPropUInt16;
-  property PropUInt32[const Index: Integer]: UInt32 read GetPropUInt32 write SetPropUInt32;
-  property PropUInt64[const Index: Integer]: UInt64 read GetPropUInt64 write SetPropUInt64;
-  property PropFloat[const Index: Integer]: Single read GetPropFloat write SetPropFloat;
-  property PropDouble[const Index: Integer]: Double read GetPropDouble write SetPropDouble;
-  property PropString[const Index: Integer]: String read GetPropString write SetPropString;
-  property PropClass[const Index: Integer]: TObject read GetPropClass write SetPropClass;
-  property PropArrayEnum[const Index, ArrayIndex: Integer]: Int32 read GetPropArrayEnum write SetPropArrayEnum;
-  property PropArrayBool[const Index, ArrayIndex: Integer]: Boolean read GetPropArrayBool write SetPropArrayBool;
-  property PropArrayInt8[const Index, ArrayIndex: Integer]: Int8 read GetPropArrayInt8 write SetPropArrayInt8;
-  property PropArrayInt16[const Index, ArrayIndex: Integer]: Int16 read GetPropArrayInt16 write SetPropArrayInt16;
-  property PropArrayInt32[const Index, ArrayIndex: Integer]: Int32 read GetPropArrayInt32 write SetPropArrayInt32;
-  property PropArrayInt64[const Index, ArrayIndex: Integer]: Int64 read GetPropArrayInt64 write SetPropArrayInt64;
-  property PropArrayUInt8[const Index, ArrayIndex: Integer]: UInt8 read GetPropArrayUInt8 write SetPropArrayUInt8;
-  property PropArrayUInt16[const Index, ArrayIndex: Integer]: UInt16 read GetPropArrayUInt16 write SetPropArrayUInt16;
-  property PropArrayUInt32[const Index, ArrayIndex: Integer]: UInt32 read GetPropArrayUInt32 write SetPropArrayUInt32;
-  property PropArrayUInt64[const Index, ArrayIndex: Integer]: UInt64 read GetPropArrayUInt64 write SetPropArrayUInt64;
-  property PropArrayFloat[const Index, ArrayIndex: Integer]: Single read GetPropArrayFloat write SetPropArrayFloat;
-  property PropArrayDouble[const Index, ArrayIndex: Integer]: Double read GetPropArrayDouble write SetPropArrayDouble;
-  property PropArrayString[const Index, ArrayIndex: Integer]: String read GetPropArrayString write SetPropArrayString;
-  property PropArrayClass[const Index, ArrayIndex: Integer]: TObject read GetPropArrayClass write SetPropArrayClass;
-  property PropArrayLength[const Index: Integer]: Integer read GetPropArrayLength write SetPropArrayLength;
-  function FindProp(const Name: String; const PropType: TTypeKinds = tkAny): Integer;
+  property PropCount: Int32 read GetPropCount;
+  property PropInfo[const Index: Int32]: PPropInfo read GetPropInfo;
+  property PropArrayInfo[const Index: Int32]: PTypeInfo read GetPropArrayInfo;
+  property PropEnum[const Index: Int32]: Int32 read GetPropEnum write SetPropEnum;
+  property PropBool[const Index: Int32]: Boolean read GetPropBool write SetPropBool;
+  property PropInt8[const Index: Int32]: Int8 read GetPropInt8 write SetPropInt8;
+  property PropInt16[const Index: Int32]: Int16 read GetPropInt16 write SetPropInt16;
+  property PropInt32[const Index: Int32]: Int32 read GetPropInt32 write SetPropInt32;
+  property PropInt64[const Index: Int32]: Int64 read GetPropInt64 write SetPropInt64;
+  property PropUInt8[const Index: Int32]: UInt8 read GetPropUInt8 write SetPropUInt8;
+  property PropUInt16[const Index: Int32]: UInt16 read GetPropUInt16 write SetPropUInt16;
+  property PropUInt32[const Index: Int32]: UInt32 read GetPropUInt32 write SetPropUInt32;
+  property PropUInt64[const Index: Int32]: UInt64 read GetPropUInt64 write SetPropUInt64;
+  property PropFloat[const Index: Int32]: Single read GetPropFloat write SetPropFloat;
+  property PropDouble[const Index: Int32]: Double read GetPropDouble write SetPropDouble;
+  property PropString[const Index: Int32]: String read GetPropString write SetPropString;
+  property PropClass[const Index: Int32]: TObject read GetPropClass write SetPropClass;
+  property PropArrayEnum[const Index, ArrayIndex: Int32]: Int32 read GetPropArrayEnum write SetPropArrayEnum;
+  property PropArrayBool[const Index, ArrayIndex: Int32]: Boolean read GetPropArrayBool write SetPropArrayBool;
+  property PropArrayInt8[const Index, ArrayIndex: Int32]: Int8 read GetPropArrayInt8 write SetPropArrayInt8;
+  property PropArrayInt16[const Index, ArrayIndex: Int32]: Int16 read GetPropArrayInt16 write SetPropArrayInt16;
+  property PropArrayInt32[const Index, ArrayIndex: Int32]: Int32 read GetPropArrayInt32 write SetPropArrayInt32;
+  property PropArrayInt64[const Index, ArrayIndex: Int32]: Int64 read GetPropArrayInt64 write SetPropArrayInt64;
+  property PropArrayUInt8[const Index, ArrayIndex: Int32]: UInt8 read GetPropArrayUInt8 write SetPropArrayUInt8;
+  property PropArrayUInt16[const Index, ArrayIndex: Int32]: UInt16 read GetPropArrayUInt16 write SetPropArrayUInt16;
+  property PropArrayUInt32[const Index, ArrayIndex: Int32]: UInt32 read GetPropArrayUInt32 write SetPropArrayUInt32;
+  property PropArrayUInt64[const Index, ArrayIndex: Int32]: UInt64 read GetPropArrayUInt64 write SetPropArrayUInt64;
+  property PropArrayFloat[const Index, ArrayIndex: Int32]: Single read GetPropArrayFloat write SetPropArrayFloat;
+  property PropArrayDouble[const Index, ArrayIndex: Int32]: Double read GetPropArrayDouble write SetPropArrayDouble;
+  property PropArrayString[const Index, ArrayIndex: Int32]: String read GetPropArrayString write SetPropArrayString;
+  property PropArrayClass[const Index, ArrayIndex: Int32]: TObject read GetPropArrayClass write SetPropArrayClass;
+  property PropArrayLength[const Index: Int32]: Int32 read GetPropArrayLength write SetPropArrayLength;
+  function FindProp(const Name: String; const PropType: TTypeKinds = tkAny): Int32;
   procedure AfterConstruction; override;
   procedure BeforeDestruction; override;
   procedure SerializeTo(const Stream: TStream); virtual; overload;
@@ -1849,20 +1849,20 @@ private
   function ReadXML(const p: TUParser): Boolean;
   function WriteXML(const Offset: String = ''): String;
   function GetContent: String;
-  function GetAttribute(const Index: Integer): TAttribute; inline;
+  function GetAttribute(const Index: Int32): TAttribute; inline;
   function GetAttributeValue(const AttName: String): String;
-  function GetAttributeCount: Integer; inline;
-  function GetChild(const Index: Integer): TUXML;
-  function GetChildCount: Integer;
+  function GetAttributeCount: Int32; inline;
+  function GetChild(const Index: Int32): TUXML;
+  function GetChildCount: Int32;
   function GetChildContent(const NodeName: String): String; inline;
 public
   property Name: String read _Name;
   property Content: String read GetContent write _Content;
-  property Attributes[const Index: Integer]: TAttribute read GetAttribute;
+  property Attributes[const Index: Int32]: TAttribute read GetAttribute;
   property AttributeValue[const AttName: String]: String read GetAttributeValue;
-  property AttributeCount: Integer read GetAttributeCount;
-  property Children[const Index: Integer]: TUXML read GetChild; default;
-  property ChildCount: Integer read GetChildCount;
+  property AttributeCount: Int32 read GetAttributeCount;
+  property Children[const Index: Int32]: TUXML read GetChild; default;
+  property ChildCount: Int32 read GetChildCount;
   property ChildContent[const NodeName: String]: String read GetChildContent;
   function GetEnumerator: TEnumerator;
   class constructor CreateClass;
@@ -1989,8 +1989,8 @@ function UCopyVarRec(constref src: TVarRec): TVarRec;
 function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArray;
 procedure UFinalizeVarRec(var vr: TVarRec);
 procedure UFinalizeVarRecArr(var arr: array of TVarRec);
-function UIntToBool(const i: Integer): Boolean;
-function UBoolToInt(const b: Boolean): Integer;
+function UIntToBool(const i: Int32): Boolean;
+function UBoolToInt(const b: Boolean): Int32;
 function UBoolToStr(const b: Boolean): String;
 function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
 function UBytesToHex(const Bytes: array of UInt8): String;
@@ -2004,7 +2004,7 @@ function UBytesMake(const Data: Pointer; const DataSize: UInt32): TUInt8Array;
 function UBytesReverse(const Bytes: array of UInt8): TUInt8Array;
 function UBytesJoin(const a, b: array of UInt8): TUInt8Array;
 function UBytesConcat(const Bytes: array of TUInt8Array): TUInt8Array;
-function UBytesCompare(const a, b: array of UInt8): Int8; inline;
+function UBytesCompare(const a, b: array of UInt8): Int8;
 function UBytesEqual(const a, b: array of UInt8): Boolean;
 function UMatToQuat(const m: TUMat): TUQuat;
 function UQuatToMat(const q: TUQuat): TUMat;
@@ -2203,12 +2203,16 @@ function UProj3DPointToBounds(const b: TUBounds3f; const v: TUVec3): TUVec3;
 function UDist3DPointToPlane(const v: TUVec3; const p: TUPlane): TUFloat;
 function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
 
+function UIsCharTrimable(const c: AnsiChar): Boolean;
 function UStrExprMatch(const Str, Expr: String): TUExprMatch;
 function UStrExplode(const Str: String; const Separator: String; const AllowEmpty: Boolean = True): TUStrArray;
 function UStrSubStr(const Str: String; const SubStrStart: Int32; const SubStrLength: Int32 = 0): String;
 function UStrSubPos(const Str, SubStr: String): Int32;
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boolean;
 function UStrExtractNumber(const Str: String; const Offset: Int32 = 1): Int32;
+function UStrTrimLeft(const Str: String): String;
+function UStrTrimRight(const Str: String): String;
+function UStrTrim(const Str: String): String;
 function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32 = 1): UInt32;
@@ -6168,7 +6172,7 @@ end;
 
 class function TUInt4096_DebugImpl.MagDiv(const a, b: TUInt4096_Debug; out r: TUInt4096_Debug): TUInt4096_Debug;
   const NumItems = MaxItem + 1;
-  function CountLeadingZeros(const Value: UInt32): Integer;
+  function CountLeadingZeros(const Value: UInt32): Int32;
     var TmpValue: UInt32;
   begin
     if Value = 0 then Exit(32);
@@ -6180,7 +6184,7 @@ class function TUInt4096_DebugImpl.MagDiv(const a, b: TUInt4096_Debug; out r: TU
     if TmpValue <= $3fffffff then begin Result += 2; TmpValue := TmpValue shl 2; end;
     if TmpValue <= $7fffffff then begin Result += 1; end;
   end;
-  function MultiplyByWord(const A: TUInt4096_Debug; const Word: UInt32; const NumWords: Integer): TUInt4096_Debug;
+  function MultiplyByWord(const A: TUInt4096_Debug; const Word: UInt32; const NumWords: Int32): TUInt4096_Debug;
     var i: Int32;
     var Carry: UInt64;
     var Product: UInt64;
@@ -7227,13 +7231,13 @@ begin
   Result := GetTickCount64 - _StartTime;
 end;
 
-function TUTask.TTaskThread.RefInc: Integer;
+function TUTask.TTaskThread.RefInc: Int32;
 begin
   Inc(Ref);
   Result := Ref;
 end;
 
-function TUTask.TTaskThread.RefDec: Integer;
+function TUTask.TTaskThread.RefDec: Int32;
 begin
   Dec(Ref);
   Result := Ref;
@@ -7244,7 +7248,7 @@ begin
   end;
 end;
 
-function TUTask.TTaskThread.RefDecKillThread: Integer;
+function TUTask.TTaskThread.RefDecKillThread: Int32;
 begin
   Dec(Ref);
   Result := Ref;
@@ -7498,7 +7502,7 @@ begin
 end;
 
 procedure TURefClass.AddReference(const Obj: TURefClass);
-  var i: Integer;
+  var i: Int32;
 begin
   for i := 0 to High(_References) do
   begin
@@ -7510,7 +7514,7 @@ begin
 end;
 
 procedure TURefClass.RemoveReference(const Obj: TURefClass);
-  var i, j: Integer;
+  var i, j: Int32;
 begin
   for i := 0 to High(_References) do
   if _References[i].Ptr = Obj then
@@ -7817,7 +7821,7 @@ end;
 // TUConstMemoryStream end
 
 // TUSerializable begin
-function TUSerializable.VerifyProp(const Index: Integer; const PropType: TTypeKinds): Boolean;
+function TUSerializable.VerifyProp(const Index: Int32; const PropType: TTypeKinds): Boolean;
 begin
   Result := (
     (Index >= 0) and (Index <= High(_PropList))
@@ -7825,7 +7829,7 @@ begin
   );
 end;
 
-function TUSerializable.VerifyArrayProp(const Index, ArrayIndex: Integer; const PropType: TTypeKinds = tkAny): Boolean;
+function TUSerializable.VerifyArrayProp(const Index, ArrayIndex: Int32; const PropType: TTypeKinds = tkAny): Boolean;
   var td: PTypeData;
   var ti: PTypeInfo;
 begin
@@ -7839,7 +7843,7 @@ begin
   );
 end;
 
-function TUSerializable.GetArrayData(const Index: Integer): Pointer;
+function TUSerializable.GetArrayData(const Index: Int32): Pointer;
   type TArr = array of Pointer;
 begin
   if GetPropArrayLength(Index) < 1 then Exit(nil);
@@ -7854,7 +7858,7 @@ begin
   Result := Sizes[Ord(OrdType)];
 end;
 
-function TUSerializable.GetArrayElementTypeInfo(const Index: Integer): PTypeInfo;
+function TUSerializable.GetArrayElementTypeInfo(const Index: Int32): PTypeInfo;
   var td: PTypeData;
 begin
   td := GetTypeData(_PropList[Index]^.PropType);
@@ -7862,18 +7866,18 @@ begin
   if not Assigned(Result) then Result := td^.ElType2;
 end;
 
-function TUSerializable.GetPropCount: Integer;
+function TUSerializable.GetPropCount: Int32;
 begin
   Result := _TypeData^.PropCount;
 end;
 
-function TUSerializable.GetPropInfo(const Index: Integer): PPropInfo;
+function TUSerializable.GetPropInfo(const Index: Int32): PPropInfo;
 begin
   if not VerifyProp(Index) then Exit(nil);
   Result := _PropList[Index];
 end;
 
-function TUSerializable.GetPropArrayInfo(const Index: Integer): PTypeInfo;
+function TUSerializable.GetPropArrayInfo(const Index: Int32): PTypeInfo;
   var td: PTypeData;
 begin
   if not VerifyProp(Index, [tkDynArray]) then Exit(nil);
@@ -7882,175 +7886,175 @@ begin
   if not Assigned(Result) then Result := td^.ElType2;
 end;
 
-function TUSerializable.GetPropEnum(const Index: Integer): Int32;
+function TUSerializable.GetPropEnum(const Index: Int32): Int32;
 begin
   if not VerifyProp(Index, [tkEnumeration]) then Exit(0);
   Result := GetOrdProp(Self, _PropList[Index]);
 end;
 
-procedure TUSerializable.SetPropEnum(const Index: Integer; const Value: Int32);
+procedure TUSerializable.SetPropEnum(const Index: Int32; const Value: Int32);
 begin
   if not VerifyProp(Index, [tkEnumeration]) then Exit;
   SetOrdProp(Self, _PropList[Index], Value);
 end;
 
-function TUSerializable.GetPropBool(const Index: Integer): Boolean;
+function TUSerializable.GetPropBool(const Index: Int32): Boolean;
 begin
   if not VerifyProp(Index, [tkBool]) then Exit(False);
   Result := UIntToBool(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropBool(const Index: Integer; const Value: Boolean);
+procedure TUSerializable.SetPropBool(const Index: Int32; const Value: Boolean);
 begin
   if not VerifyProp(Index, [tkBool]) then Exit;
   SetOrdProp(Self, _PropList[Index], UBoolToInt(Value));
 end;
 
-function TUSerializable.GetPropInt8(const Index: Integer): Int8;
+function TUSerializable.GetPropInt8(const Index: Int32): Int8;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := Int8(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropInt8(const Index: Integer; const Value: Int8);
+procedure TUSerializable.SetPropInt8(const Index: Int32; const Value: Int8);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropInt16(const Index: Integer): Int16;
+function TUSerializable.GetPropInt16(const Index: Int32): Int16;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := Int16(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropInt16(const Index: Integer; const Value: Int16);
+procedure TUSerializable.SetPropInt16(const Index: Int32; const Value: Int16);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropInt32(const Index: Integer): Int32;
+function TUSerializable.GetPropInt32(const Index: Int32): Int32;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := Int32(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropInt32(const Index: Integer; const Value: Int32);
+procedure TUSerializable.SetPropInt32(const Index: Int32; const Value: Int32);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropInt64(const Index: Integer): Int64;
+function TUSerializable.GetPropInt64(const Index: Int32): Int64;
 begin
   if not VerifyProp(Index, [tkInteger, tkInt64]) then Exit(0);
   Result := Int64(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropInt64(const Index: Integer; const Value: Int64);
+procedure TUSerializable.SetPropInt64(const Index: Int32; const Value: Int64);
 begin
   if not VerifyProp(Index, [tkInteger, tkInt64]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropUInt8(const Index: Integer): UInt8;
+function TUSerializable.GetPropUInt8(const Index: Int32): UInt8;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := UInt8(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropUInt8(const Index: Integer; const Value: UInt8);
+procedure TUSerializable.SetPropUInt8(const Index: Int32; const Value: UInt8);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropUInt16(const Index: Integer): UInt16;
+function TUSerializable.GetPropUInt16(const Index: Int32): UInt16;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := UInt16(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropUInt16(const Index: Integer; const Value: UInt16);
+procedure TUSerializable.SetPropUInt16(const Index: Int32; const Value: UInt16);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropUInt32(const Index: Integer): UInt32;
+function TUSerializable.GetPropUInt32(const Index: Int32): UInt32;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := UInt32(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropUInt32(const Index: Integer; const Value: UInt32);
+procedure TUSerializable.SetPropUInt32(const Index: Int32; const Value: UInt32);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropUInt64(const Index: Integer): UInt64;
+function TUSerializable.GetPropUInt64(const Index: Int32): UInt64;
 begin
   if not VerifyProp(Index, [tkInteger, tkQWord]) then Exit(0);
   Result := UInt64(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropUInt64(const Index: Integer; const Value: UInt64);
+procedure TUSerializable.SetPropUInt64(const Index: Int32; const Value: UInt64);
 begin
   if not VerifyProp(Index, [tkInteger, tkQWord]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropFloat(const Index: Integer): Single;
+function TUSerializable.GetPropFloat(const Index: Int32): Single;
 begin
   if not VerifyProp(Index, [tkFloat]) then Exit(0);
   Result := GetFloatProp(Self, _PropList[Index]);
 end;
 
-procedure TUSerializable.SetPropFloat(const Index: Integer; const Value: Single);
+procedure TUSerializable.SetPropFloat(const Index: Int32; const Value: Single);
 begin
   if not VerifyProp(Index, [tkFloat]) then Exit;
   SetFloatProp(Self, _PropList[Index], Value);
 end;
 
-function TUSerializable.GetPropDouble(const Index: Integer): Double;
+function TUSerializable.GetPropDouble(const Index: Int32): Double;
 begin
   if not VerifyProp(Index, [tkFloat]) then Exit(0);
   Result := GetFloatProp(Self, _PropList[Index]);
 end;
 
-procedure TUSerializable.SetPropDouble(const Index: Integer; const Value: Double);
+procedure TUSerializable.SetPropDouble(const Index: Int32; const Value: Double);
 begin
   if not VerifyProp(Index, [tkFloat]) then Exit;
   SetFloatProp(Self, _PropList[Index], Value);
 end;
 
-function TUSerializable.GetPropString(const Index: Integer): String;
+function TUSerializable.GetPropString(const Index: Int32): String;
 begin
   if not VerifyProp(Index, [tkAString]) then Exit;
   Result := GetStrProp(Self, _PropList[Index]);
 end;
 
-procedure TUSerializable.SetPropString(const Index: Integer; const Value: String);
+procedure TUSerializable.SetPropString(const Index: Int32; const Value: String);
 begin
   if not VerifyProp(Index, [tkAString]) then Exit;
   SetStrProp(Self, _PropList[Index], Value);
 end;
 
-function TUSerializable.GetPropClass(const Index: Integer): TObject;
+function TUSerializable.GetPropClass(const Index: Int32): TObject;
 begin
   if not VerifyProp(Index, [tkClass]) then Exit(nil);
   Result := GetObjectProp(Self, _PropList[Index]);
 end;
 
-procedure TUSerializable.SetPropClass(const Index: Integer; const Value: TObject);
+procedure TUSerializable.SetPropClass(const Index: Int32; const Value: TObject);
 begin
   if not VerifyProp(Index, [tkClass]) then Exit;
   SetObjectProp(Self, _PropList[Index], Value);
 end;
 
-function TUSerializable.GetPropArrayLength(const Index: Integer): Integer;
+function TUSerializable.GetPropArrayLength(const Index: Int32): Int32;
   var td: PTypeData;
   var ti: PTypeInfo;
 begin
@@ -8086,10 +8090,10 @@ begin
   end;
 end;
 
-procedure TUSerializable.SetPropArrayLength(const Index: Integer; const Value: Integer);
+procedure TUSerializable.SetPropArrayLength(const Index: Int32; const Value: Int32);
   var td, tde: PTypeData;
   var tie: PTypeInfo;
-  var i, OldSize: Integer;
+  var i, OldSize: Int32;
 begin
   if not VerifyProp(Index, [tkDynArray]) then Exit;
   td := GetTypeData(_PropList[Index]^.PropType);
@@ -8137,7 +8141,7 @@ begin
   end;
 end;
 
-function TUSerializable.GetPropArrayEnum(const Index, ArrayIndex: Integer): Int32;
+function TUSerializable.GetPropArrayEnum(const Index, ArrayIndex: Int32): Int32;
   var td: PTypeData;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkEnumeration]) then Exit(0);
@@ -8155,7 +8159,7 @@ begin
   end;
 end;
 
-procedure TUSerializable.SetPropArrayEnum(const Index, ArrayIndex: Integer; const Value: Int32);
+procedure TUSerializable.SetPropArrayEnum(const Index, ArrayIndex: Int32; const Value: Int32);
   var td: PTypeData;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkEnumeration]) then Exit;
@@ -8172,163 +8176,163 @@ begin
   end;
 end;
 
-function TUSerializable.GetPropArrayBool(const Index, ArrayIndex: Integer): Boolean;
+function TUSerializable.GetPropArrayBool(const Index, ArrayIndex: Int32): Boolean;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkBool]) then Exit(False);
   Result := specialize GetDynArrayElement<Boolean>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayBool(const Index, ArrayIndex: Integer; const Value: Boolean);
+procedure TUSerializable.SetPropArrayBool(const Index, ArrayIndex: Int32; const Value: Boolean);
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkBool]) then Exit;
   specialize SetDynArrayElement<Boolean>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayInt8(const Index, ArrayIndex: Integer): Int8;
+function TUSerializable.GetPropArrayInt8(const Index, ArrayIndex: Int32): Int8;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<Int8>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayInt8(const Index, ArrayIndex: Integer; const Value: Int8);  
+procedure TUSerializable.SetPropArrayInt8(const Index, ArrayIndex: Int32; const Value: Int8);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<Int8>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayInt16(const Index, ArrayIndex: Integer): Int16;     
+function TUSerializable.GetPropArrayInt16(const Index, ArrayIndex: Int32): Int16;     
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<Int16>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayInt16(const Index, ArrayIndex: Integer; const Value: Int16);  
+procedure TUSerializable.SetPropArrayInt16(const Index, ArrayIndex: Int32; const Value: Int16);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<Int16>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayInt32(const Index, ArrayIndex: Integer): Int32;     
+function TUSerializable.GetPropArrayInt32(const Index, ArrayIndex: Int32): Int32;     
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<Int32>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayInt32(const Index, ArrayIndex: Integer; const Value: Int32);  
+procedure TUSerializable.SetPropArrayInt32(const Index, ArrayIndex: Int32; const Value: Int32);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<Int32>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayInt64(const Index, ArrayIndex: Integer): Int64;          
+function TUSerializable.GetPropArrayInt64(const Index, ArrayIndex: Int32): Int64;          
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<Int64>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayInt64(const Index, ArrayIndex: Integer; const Value: Int64); 
+procedure TUSerializable.SetPropArrayInt64(const Index, ArrayIndex: Int32; const Value: Int64); 
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<Int64>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayUInt8(const Index, ArrayIndex: Integer): UInt8;    
+function TUSerializable.GetPropArrayUInt8(const Index, ArrayIndex: Int32): UInt8;    
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<UInt8>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayUInt8(const Index, ArrayIndex: Integer; const Value: UInt8);  
+procedure TUSerializable.SetPropArrayUInt8(const Index, ArrayIndex: Int32; const Value: UInt8);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<UInt8>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayUInt16(const Index, ArrayIndex: Integer): UInt16;        
+function TUSerializable.GetPropArrayUInt16(const Index, ArrayIndex: Int32): UInt16;        
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<UInt16>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayUInt16(const Index, ArrayIndex: Integer; const Value: UInt16);  
+procedure TUSerializable.SetPropArrayUInt16(const Index, ArrayIndex: Int32; const Value: UInt16);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<UInt16>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayUInt32(const Index, ArrayIndex: Integer): UInt32;    
+function TUSerializable.GetPropArrayUInt32(const Index, ArrayIndex: Int32): UInt32;    
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<UInt32>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayUInt32(const Index, ArrayIndex: Integer; const Value: UInt32); 
+procedure TUSerializable.SetPropArrayUInt32(const Index, ArrayIndex: Int32; const Value: UInt32); 
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<UInt32>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayUInt64(const Index, ArrayIndex: Integer): UInt64;        
+function TUSerializable.GetPropArrayUInt64(const Index, ArrayIndex: Int32): UInt64;        
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<UInt64>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayUInt64(const Index, ArrayIndex: Integer; const Value: UInt64); 
+procedure TUSerializable.SetPropArrayUInt64(const Index, ArrayIndex: Int32; const Value: UInt64); 
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<UInt64>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayFloat(const Index, ArrayIndex: Integer): Single;
+function TUSerializable.GetPropArrayFloat(const Index, ArrayIndex: Int32): Single;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkFloat]) then Exit(0);
   Result := specialize GetDynArrayElement<Single>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayFloat(const Index, ArrayIndex: Integer; const Value: Single);   
+procedure TUSerializable.SetPropArrayFloat(const Index, ArrayIndex: Int32; const Value: Single);   
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkFloat]) then Exit;
   specialize SetDynArrayElement<Single>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayDouble(const Index, ArrayIndex: Integer): Double;           
+function TUSerializable.GetPropArrayDouble(const Index, ArrayIndex: Int32): Double;           
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkFloat]) then Exit(0);
   Result := specialize GetDynArrayElement<Double>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayDouble(const Index, ArrayIndex: Integer; const Value: Double);  
+procedure TUSerializable.SetPropArrayDouble(const Index, ArrayIndex: Int32; const Value: Double);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkFloat]) then Exit;
   specialize SetDynArrayElement<Double>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayString(const Index, ArrayIndex: Integer): String;         
+function TUSerializable.GetPropArrayString(const Index, ArrayIndex: Int32): String;         
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkAString]) then Exit('');
   Result := specialize GetDynArrayElement<String>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayString(const Index, ArrayIndex: Integer; const Value: String);  
+procedure TUSerializable.SetPropArrayString(const Index, ArrayIndex: Int32; const Value: String);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkAString]) then Exit;
   specialize SetDynArrayElement<String>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayClass(const Index, ArrayIndex: Integer): TObject;
+function TUSerializable.GetPropArrayClass(const Index, ArrayIndex: Int32): TObject;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkClass]) then Exit(nil);
   Result := specialize GetDynArrayElement<TObject>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayClass(const Index, ArrayIndex: Integer; const Value: TObject);
+procedure TUSerializable.SetPropArrayClass(const Index, ArrayIndex: Int32; const Value: TObject);
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkClass]) then Exit;
   specialize SetDynArrayElement<TObject>(Index, ArrayIndex, Value);
 end;
 
-generic function TUSerializable.GetDynArrayLength<T>(const Index: Integer): Integer;
+generic function TUSerializable.GetDynArrayLength<T>(const Index: Int32): Int32;
   type TArrType = array of T;
   var Ptr: Pointer;
 begin
@@ -8337,7 +8341,7 @@ begin
   Result := Length(TArrType(Ptr));
 end;
 
-generic procedure TUSerializable.SetDynArrayLength<T>(const Index: Integer; const Value: Integer);
+generic procedure TUSerializable.SetDynArrayLength<T>(const Index: Int32; const Value: Int32);
   type TArrType = array of T;
   var Arr: TArrType;
   var Old: Pointer;
@@ -8349,20 +8353,20 @@ begin
   SetDynArrayProp(Self, _PropList[Index], Pointer(Arr));
 end;
 
-generic function TUSerializable.GetDynArrayElement<T>(const Index, ArrayIndex: Integer): T;
+generic function TUSerializable.GetDynArrayElement<T>(const Index, ArrayIndex: Int32): T;
   type TArrType = array of T;
 begin
   Result := TArrType(GetDynArrayProp(Self, _PropList[Index]))[ArrayIndex];
 end;
 
-generic procedure TUSerializable.SetDynArrayElement<T>(const Index, ArrayIndex: Integer; const Value: T);
+generic procedure TUSerializable.SetDynArrayElement<T>(const Index, ArrayIndex: Int32; const Value: T);
   type TArrType = array of T;
 begin
   TArrType(GetDynArrayProp(Self, _PropList[Index]))[ArrayIndex] := Value;
 end;
 
-function TUSerializable.FindProp(const Name: String; const PropType: TTypeKinds): Integer;
-  var i: Integer;
+function TUSerializable.FindProp(const Name: String; const PropType: TTypeKinds): Int32;
+  var i: Int32;
   var NameLC: String;
 begin
   NameLC := LowerCase(Name);
@@ -8376,7 +8380,7 @@ end;
 
 procedure TUSerializable.AfterConstruction;
   var td: PTypeData;
-  var i: Integer;
+  var i: Int32;
 begin
   inherited AfterConstruction;
   _TypeInfo := PTypeInfo(Self.ClassType.ClassInfo);
@@ -8408,7 +8412,7 @@ begin
 end;
 
 procedure TUSerializable.BeforeDestruction;
-  var i: Integer;
+  var i: Int32;
   var td: PTypeData;
   var tie: PTypeInfo;
 begin
@@ -8570,7 +8574,7 @@ end;
 
 procedure TUSerializable.SerializeFrom(const Stream: TStream);
   var sh: TUStreamHelper;
-  var i, n, s, j, al, aes, ai: Integer;
+  var i, n, s, j, al, aes, ai: Int32;
   var Name: String;
   var Kind, ArrKind: TTypeKind;
   var OrdType: TOrdType;
@@ -8717,7 +8721,7 @@ begin
 end;
 
 procedure TUSerializable.Assign(const Serializable: TUSerializable);
-  var i, j, n, a: Integer;
+  var i, j, n, a: Int32;
   var pi, pj: PPropInfo;
   var tedj: PTypeData;
   var tei, tej: PTypeInfo;
@@ -8808,14 +8812,14 @@ begin
 end;
 
 procedure TUSerializable.Dump(const Offset: String);
-  var i, j: Integer;
+  var i, j: Int32;
   var td, tde: PTypeData;
   var tie: PTypeInfo;
   var ss: String;
   var Obj: TObject;
   var nl: Boolean;
-  function FindEnumName(const Names: ShortString; const Index: Integer): ShortString;
-    var i, j, n: Integer;
+  function FindEnumName(const Names: ShortString; const Index: Int32): ShortString;
+    var i, j, n: Int32;
   begin
     i := 0;
     j := 0;
@@ -8977,7 +8981,7 @@ begin
 end;
 
 class operator TUParserToken.in (a: TUParserToken; b: array of TUParserToken): Boolean;
-  var i: Integer;
+  var i: Int32;
 begin
   for i := 0 to High(b) do if a = b[i] then Exit(True);
   Result := False;
@@ -8989,7 +8993,7 @@ begin
 end;
 
 class operator TUParserToken.= (a: TUParserToken; b: array of String): Boolean;
-  var i: Integer;
+  var i: Int32;
 begin
   for i := 0 to High(b) do if a.Value = b[i] then Exit(True);
   Result := False;
@@ -9439,9 +9443,9 @@ begin
 end;
 
 function TUParser.NextToken(out TokenType: TUTokenType): String;
-  var IndArr: array[0..4 * 2 - 1] of Integer;
-  function FilterIndex(const Size: Integer): Boolean;
-    var i: Integer;
+  var IndArr: array[0..4 * 2 - 1] of Int32;
+  function FilterIndex(const Size: Int32): Boolean;
+    var i: Int32;
   begin
     for i := 0 to Length(IndArr) div 2 - 1 do
     if IndArr[i * 2 + 1] < Size then
@@ -9455,12 +9459,11 @@ function TUParser.NextToken(out TokenType: TUTokenType): String;
     end;
     Result := True;
   end;
-  var IndComment: Integer absolute IndArr[0 * 2];
-  var IndCommentLine: Integer absolute IndArr[1 * 2];
-  var IndString: Integer absolute IndArr[2 * 2];
-  var IndSymbol: Integer absolute IndArr[3 * 2];
+  var IndComment: Int32 absolute IndArr[0 * 2];
+  var IndCommentLine: Int32 absolute IndArr[1 * 2];
+  var IndString: Int32 absolute IndArr[2 * 2];
+  var IndSymbol: Int32 absolute IndArr[3 * 2];
   var i, j: Int32;
-  var b: Boolean;
 begin
   while True do
   begin
@@ -9490,7 +9493,7 @@ begin
       if FilterIndex(j) then
       begin
         IndCommentLine := i;
-        PIntegerArray(@IndCommentLine)^[1] := j;
+        PInt32Arr(@IndCommentLine)^[1] := j;
       end;
     end;
     i := IsAtString;
@@ -9500,7 +9503,7 @@ begin
       if FilterIndex(j) then
       begin
         IndString := i;
-        PIntegerArray(@IndString)^[1] := j;
+        PInt32Arr(@IndString)^[1] := j;
       end;
     end;
     i := IsAtSymbol;
@@ -9510,7 +9513,7 @@ begin
       if FilterIndex(j) then
       begin
         IndSymbol := i;
-        PIntegerArray(@IndSymbol)^[1] := j;
+        PInt32Arr(@IndSymbol)^[1] := j;
       end;
     end;
     //Comment
@@ -9564,25 +9567,17 @@ begin
       Inc(_Position, Length(_Syntax^.Symbols[i]));
       Exit;
     end;
-    b := True;
-    while b do
+    while True do
     begin
       Result := Result + _Text[_Position];
       Inc(_Position);
-      if _Position >= Length(_Text) then b := False;
-      if b and (
-        (_Text[_Position] = ' ')
-        or (_Text[_Position] = #$D)
-        or (_Text[_Position] = #$A)
-      ) then b := False;
-      if b then
-      begin
-        b := (
-          b and (IsAtSymbol = -1)
-          and (IsAtCommentStart = -1)
-          and (IsAtCommentLine = -1)
-        );
-      end;
+      if _Position >= Length(_Text) then Break;
+      if UIsCharTrimable(_Text[_Position]) then Break;
+      if not (
+        (IsAtSymbol = -1)
+        and (IsAtCommentStart = -1)
+        and (IsAtCommentLine = -1)
+      ) then Break;
     end;
     if Length(Result) > 0 then
     begin
@@ -10044,7 +10039,6 @@ begin
 end;
 
 procedure TUFIFOList.SetCached(const Value: Boolean);
-  var Temp: TItem;
 begin
   if _Cached = Value then Exit;
   _Cached := Value;
@@ -10570,7 +10564,7 @@ begin
 end;
 
 function TUXML.WriteXML(const Offset: String): String;
-  var i: Integer;
+  var i: Int32;
 begin
   if IsPlainText then
   begin
@@ -10596,7 +10590,7 @@ begin
 end;
 
 function TUXML.GetContent: String;
-  var i: Integer;
+  var i: Int32;
 begin
   Result := _Content;
   for i := 0 to High(_Children) do
@@ -10606,7 +10600,7 @@ begin
   end;
 end;
 
-function TUXML.GetAttribute(const Index: Integer): TAttribute;
+function TUXML.GetAttribute(const Index: Int32): TAttribute;
 begin
   Result := _Attributes[Index];
 end;
@@ -10619,17 +10613,17 @@ begin
   Result := a.Value;
 end;
 
-function TUXML.GetAttributeCount: Integer;
+function TUXML.GetAttributeCount: Int32;
 begin
   Result := Length(_Attributes);
 end;
 
-function TUXML.GetChild(const Index: Integer): TUXML;
+function TUXML.GetChild(const Index: Int32): TUXML;
 begin
   Result := _Children[Index];
 end;
 
-function TUXML.GetChildCount: Integer;
+function TUXML.GetChildCount: Int32;
 begin
   Result := Length(_Children);
 end;
@@ -10696,7 +10690,7 @@ begin
 end;
 
 function TUXML.FindAttribute(const AttName: String): TAttribute;
-  var i: Integer;
+  var i: Int32;
 begin
   for i := 0 to High(_Attributes) do
   if _Attributes[i].Name = AttName then
@@ -10707,7 +10701,7 @@ begin
 end;
 
 function TUXML.FindChild(const NodeName: String): TUXML;
-  var i: Integer;
+  var i: Int32;
 begin
   for i := 0 to High(_Children) do
   if _Children[i].Name = NodeName then
@@ -11431,7 +11425,7 @@ begin
 end;
 
 function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArray;
-  var i: Integer;
+  var i: Int32;
 begin
   Result := nil;
   SetLength(Result, Length(src));
@@ -11472,7 +11466,7 @@ end;
 
 procedure UFinalizeVarRecArr(var arr: array of TVarRec);
 var
-  i: Integer;
+  i: Int32;
 begin
   for i := Low(arr) to High(arr) do
   begin
@@ -11480,12 +11474,12 @@ begin
   end;
 end;
 
-function UIntToBool(const i: Integer): Boolean;
+function UIntToBool(const i: Int32): Boolean;
 begin
   Result := i <> 0;
 end;
 
-function UBoolToInt(const b: Boolean): Integer;
+function UBoolToInt(const b: Boolean): Int32;
 begin
   if b then Exit(1) else Exit(0);
 end;
@@ -12555,7 +12549,7 @@ begin
 end;
 
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
-  var i: Integer;
+  var i: Int32;
   var ti, eti: PTypeInfo;
   var td, etd: PTypeData;
 begin
@@ -14375,6 +14369,11 @@ begin
   Result := TUInt4096_Debug.BitXor(a, b);
 end;
 
+function UIsCharTrimable(const c: AnsiChar): Boolean;
+begin
+  Result := c in [#$9, #$a, #$b, #$c, #$d, #$20, #$a0];
+end;
+
 function UStrExprMatch(const Str, Expr: String): TUExprMatch;
   function CompareSeq(const StrPos: Int32; const Seq: String): Boolean;
     var i: Int32;
@@ -14510,7 +14509,7 @@ begin
 end;
 
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean): Boolean;
-  var i, n: Integer;
+  var i, n: Int32;
   var af: Boolean;
 begin
   if Length(Str) < 1 then Exit(False);
@@ -14544,6 +14543,35 @@ begin
     end;
   end;
   Result := 0;
+end;
+
+function UStrTrimLeft(const Str: String): String;
+  var i: Int32;
+begin
+  Result := '';
+  for i := 1 to Length(Str) do
+  begin
+    if UIsCharTrimable(Str[i]) then Continue;
+    if i = Length(Str) then Exit;
+    Exit(UStrSubStr(Str, i, Length(Str) - i));
+  end;
+end;
+
+function UStrTrimRight(const Str: String): String;
+  var i: Int32;
+begin
+  Result := '';
+  for i := Length(Str) downto 1 do
+  begin
+    if UIsCharTrimable(Str[i]) then Continue;
+    if i = 1 then Exit;
+    Exit(UStrSubStr(Str, 1, i));
+  end;
+end;
+
+function UStrTrim(const Str: String): String;
+begin
+  Result := UStrTrimLeft(UStrTrimRight(Str));
 end;
 
 function UStrClone(const Str: String): String;
@@ -14884,8 +14912,8 @@ begin
 end;
 
 generic procedure UArrSort<T>(var Arr: array of T);
-  procedure SortRange(const RangeStart, RangeEnd: Integer); overload;
-    var i, j: Integer;
+  procedure SortRange(const RangeStart, RangeEnd: Int32); overload;
+    var i, j: Int32;
     var tmp, pivot: T;
   begin
     if RangeEnd <= RangeStart then exit;
@@ -14912,8 +14940,8 @@ begin
 end;
 
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>);
-  procedure SortRange(const RangeStart, RangeEnd: Integer); overload;
-    var i, j: Integer;
+  procedure SortRange(const RangeStart, RangeEnd: Int32); overload;
+    var i, j: Int32;
     var tmp, pivot: T;
   begin
     if RangeEnd <= RangeStart then exit;
@@ -14940,8 +14968,8 @@ begin
 end;
 
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>);
-  procedure SortRange(const RangeStart, RangeEnd: Integer); overload;
-    var i, j: Integer;
+  procedure SortRange(const RangeStart, RangeEnd: Int32); overload;
+    var i, j: Int32;
     var tmp, pivot: T;
   begin
     if RangeEnd <= RangeStart then exit;
@@ -15120,7 +15148,8 @@ procedure InitializeMath;
   end;
   function CheckExt: TCPUExt;
     type TCPUIDResult = array[0..3] of UInt32;
-    type PCPUIDResult = ^TCPUIDResult;
+    //type PCPUIDResult = ^TCPUIDResult;
+{$push}{$warnings off}
     procedure GetCPUID(
       const Leaf, SubLeaf: UInt32;
       out Ax, Bx, Cx, Dx: UInt32
@@ -15140,6 +15169,7 @@ procedure InitializeMath;
       //mov dword ptr [Info + 12], edx
       pop rbx
     end;
+{$pop}
     function GetXCR0: UInt64; assembler;
     asm
       xor ecx, ecx
@@ -15158,7 +15188,7 @@ procedure InitializeMath;
     var Dx: UInt32 absolute CPUInfo[3];
     var XCR0: UInt64;
   begin
-    FillChar(Result, SizeOf(Result), 0);
+    UClear(Result, SizeOf(Result));
     GetCPUID(1, 0, Ax, Bx, Cx, Dx);
     Result.SSE := CheckFeature(CPUInfo, 3, 25);
     Result.SSE2 := CheckFeature(CPUInfo, 3, 26);
