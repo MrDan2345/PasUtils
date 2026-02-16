@@ -2124,6 +2124,7 @@ procedure USwap(var a: TUVec2; var b: TUVec2); inline; overload;
 procedure USwap(var a: TUVec3; var b: TUVec3); inline; overload;
 procedure USwap(var a: TUVec4; var b: TUVec4); inline; overload;
 procedure USwap(var a: TUMat; var b: TUMat); inline; overload;
+function UIsInRange(const Value: Int32; const RangeMin, RangeMax: Int32): Boolean;
 function UMaxValue(out v: TUInt8): TUInt8; inline; overload;
 function UMaxValue(out v: TUInt16): TUInt16; inline; overload;
 function UMaxValue(out v: TUInt32): TUInt32; inline; overload;
@@ -12448,6 +12449,11 @@ end;
 procedure USwap(var a: TUMat; var b: TUMat); 
 begin
   specialize USwap<TUMat>(a, b);
+end;
+
+function UIsInRange(const Value: Int32; const RangeMin, RangeMax: Int32): Boolean;
+begin
+  Result := (Value >= RangeMin) and (Value <= RangeMax);
 end;
 
 function UMaxValue(out v: TUInt8): TUInt8;
