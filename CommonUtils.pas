@@ -2239,6 +2239,11 @@ procedure UCopyDir(const SrcDir, DstDir: String; const LogProc: TUProcedureStrin
 function UAppPath: String;
 function UConfigPath: String;
 function UDataPath: String;
+function UArgsString(
+  const Args: array of const;
+  const Index: Int32;
+  out Value: String
+): Boolean;
 procedure ULog(const Text: String; const Offset: Int32 = 0);
 procedure ULogOffset(const Offset: Int32);
 function UExec(
@@ -14908,6 +14913,18 @@ begin
 end;
 
 var LogOffset: Int32 = 0;
+
+function UArgsString(
+  const Args: array of const;
+  const Index: Int32;
+  out Value: String
+): Boolean;
+begin
+  if not UIsInRange(Index, 0, High(Args)) then Exit(False);
+  if not Args[Index].VType = vtAnsiString then Exit(False);
+  Value := AnsiString(Args[Index].VAnsiString);
+  Result := True
+end;
 
 procedure ULog(const Text: String; const Offset: Int32);
   var Spaces: String;
