@@ -2238,6 +2238,7 @@ procedure UCopyFile(const SrcFile, DstFile: String);
 procedure UCopyDir(const SrcDir, DstDir: String; const LogProc: TUProcedureString = nil);
 function UAppPath: String;
 function UConfigPath: String;
+function UDataPath: String;
 procedure ULog(const Text: String; const Offset: Int32 = 0);
 procedure ULogOffset(const Offset: Int32);
 function UExec(
@@ -14883,9 +14884,27 @@ begin
 end;
 
 function UConfigPath: String;
-  var s: String;
 begin
-  GetEnvironmentVariable('');
+{$if defined(windows)}
+  Result := UDataPath;
+{$elseif defined(linux)}
+  Result := GetEnvironmentVariable('XDG_CONFIG_HOME');
+  if Length(Result) > 0 then Exit;
+  Result := GetEnvironmentVariable('HOME') / '.config';
+{$else}
+  Result := '';
+{$endif}
+end;
+
+function UDataPath: String;
+begin
+{$if defined(windows)}
+  Result := GetEnvironmentVariable('APPDATA');
+{$elseif defined(linux)}
+  Result := GetEnvironmentVariable('HOME') / '.local/share';
+{$else}
+  Result := '';
+{$endif}
 end;
 
 var LogOffset: Int32 = 0;
