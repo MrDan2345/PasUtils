@@ -7,7 +7,8 @@ interface
 uses
   SysUtils, Classes, TypInfo, Process;
 
-type TUProcedure = procedure of object;
+type TUProcedure = procedure (const Args: array of const);
+type TUProcedureObj = procedure (const Args: array of const) of object;
 type TUFunction = function: Boolean of object;
 type TUProcedureString = procedure (const Value: String) of object;
 
@@ -1789,6 +1790,23 @@ public
   procedure Delete(const Index: Int32);
   procedure Clear;
   function GetEnumerator: TEnumerator;
+  class operator Initialize(var v: TSelf);
+  class operator Finalize(var v: TSelf);
+end;
+
+type TUDelegate = record
+public
+  type TSelf = TUDelegate;
+private
+  var _Proc: array of TUProcedureObj;
+  procedure Initialize;
+  procedure Finalize;
+public
+  procedure Add(const Proc: TUProcedureObj);
+  procedure Add(const Proc: TUProcedure);
+  procedure Remove(const Proc: TUProcedureObj);
+  procedure Remove(const Proc: TUProcedure);
+  procedure Broadcast(Args: array of const);
   class operator Initialize(var v: TSelf);
   class operator Finalize(var v: TSelf);
 end;
@@ -10218,6 +10236,62 @@ begin
   if _Current >= _End then Exit(False);
   Inc(_Current);
   Result := True;
+end;
+
+procedure TUDelegate.Initialize;
+begin
+  _Proc := nil;
+end;
+
+procedure TUDelegate.Finalize;
+begin
+end;
+
+procedure TUDelegate.Add(const Proc: TUProcedureObj);
+begin
+  specialize UArrAppend<TUProcedureObj>(_Proc, Proc);
+end;
+
+procedure TUDelegate.Add(const Proc: TUProcedure);
+  type TDblPtr = array[0..1] of Pointer;
+  var DblPtr: TDblPtr;
+begin
+  DblPtr[0] := Proc;
+  DblPtr[1] := nil;
+  Add(TUProcedureObj(DblPtr));
+end;
+
+procedure TUDelegate.Remove(const Proc: TUProcedureObj);
+begin
+  specialize UArrRemove<TUProcedureObj>(_Proc, Proc);
+end;
+
+procedure TUDelegate.Remove(const Proc: TUProcedure);
+  type TDblPtr = array[0..1] of Pointer;
+  var DblPtr: TDblPtr;
+begin
+  DblPtr[0] := Proc;
+  DblPtr[1] := nil;
+  Remove(TUProcedureObj(DblPtr));
+end;
+
+procedure TUDelegate.Broadcast(Args: array of const);
+  var i: Int32;
+begin
+  for i := 0 to High(_Proc) do
+  begin
+    _Proc[i](Args);
+  end;
+end;
+
+class operator TUDelegate.Initialize(var v: TSelf);
+begin
+  v.Initialize;
+end;
+
+class operator TUDelegate.Finalize(var v: TSelf);
+begin
+  v.Finalize;
 end;
 
 function TUFastList.GetLastIndex: Int32;
