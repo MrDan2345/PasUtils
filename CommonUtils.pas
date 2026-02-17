@@ -2237,6 +2237,7 @@ procedure UCopyFileCleanup;
 procedure UCopyFile(const SrcFile, DstFile: String);
 procedure UCopyDir(const SrcDir, DstDir: String; const LogProc: TUProcedureString = nil);
 function UAppPath: String;
+function UConfigPath: String;
 procedure ULog(const Text: String; const Offset: Int32 = 0);
 procedure ULogOffset(const Offset: Int32);
 function UExec(
@@ -14879,6 +14880,12 @@ end;
 function UAppPath: String;
 begin
   Result := ExtractFileDir(ParamStr(0));
+end;
+
+function UConfigPath: String;
+  var s: String;
+begin
+  GetEnvironmentVariable('');
 end;
 
 var LogOffset: Int32 = 0;
