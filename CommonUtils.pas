@@ -2395,6 +2395,26 @@ const URcp255 = 1 / 255;
 const UEps = 1E-5;
 const UDegToRad = UPi / 180;
 const URadToDeg = 180 / UPi;
+const UMaxValueUInt8 = $ff;
+const UMaxValueUInt16 = $ffff;
+const UMaxValueUInt32 = $ffffffff;
+const UMaxValueUInt64 = $ffffffffffffffff;
+const UMaxValueInt8 = $7f;
+const UMaxValueInt16 = $7fff;
+const UMaxValueInt32 = $7fffffff;
+const UMaxValueInt64 = $7fffffffffffffff;
+const UMaxValueFloat = 3.4E38;
+const UMaxValueDouble = 1.7E308;
+const UMinValueUInt8 = 0;
+const UMinValueUInt16 = 0;
+const UMinValueUInt32 = 0;
+const UMinValueUInt64 = 0;
+const UMinValueInt8 = -$80;
+const UMinValueInt16 = -$8000;
+const UMinValueInt32 = -$80000000;
+const UMinValueInt64 = -$8000000000000000;
+const UMinValueFloat = -3.4E38;
+const UMinValueDouble = -1.7E308;
 
 threadvar UThreadRandomSeed: UInt32;
 
@@ -12539,103 +12559,102 @@ end;
 
 function UMaxValue(out v: TUInt8): TUInt8;
 begin
-  Result := $ff;
+  Result := UMaxValueUInt8;
 end;
 
 function UMaxValue(out v: TUInt16): TUInt16;
 begin
-  Result := $ffff;
+  Result := UMaxValueUInt16;
 end;
 
 function UMaxValue(out v: TUInt32): TUInt32;
 begin
-  Result := $ffffffff;
+  Result := UMaxValueUInt32;
 end;
 
 function UMaxValue(out v: TUInt64): TUInt64;
 begin
-  // $ffffffffffffffff; still does not work on all platforms)=
-  Result := $7fffffffffffffff;
+  Result := UMaxValueUInt64;
 end;
 
 function UMaxValue(out v: TInt8): TInt8;
 begin
-  Result := $7f;
+  Result := UMaxValueInt8;
 end;
 
 function UMaxValue(out v: TInt16): TInt16;
 begin
-  Result := $7fff;
+  Result := UMaxValueInt16;
 end;
 
 function UMaxValue(out v: TInt32): TInt32;
 begin
-  Result := $7fffffff;
+  Result := UMaxValueInt32;
 end;
 
 function UMaxValue(out v: TInt64): TInt64;
 begin
-  Result := $7fffffffffffffff;
+  Result := UMaxValueInt64;
 end;
 
 function UMaxValue(out v: TUFloat): TUFloat;
 begin
-  Result := 3.4E38;
+  Result := UMaxValueFloat;
 end;
 
 function UMaxValue(out v: TUDouble): TUDouble;
 begin
-  Result := 1.7E308;
+  Result := UMaxValueDouble;
 end;
 
 function UMinValue(out v: TUInt8): TUInt8;
 begin
-  Result := 0;
+  Result := UMinValueUInt8;
 end;
 
 function UMinValue(out v: TUInt16): TUInt16;
 begin
-  Result := 0;
+  Result := UMinValueUInt16;
 end;
 
 function UMinValue(out v: TUInt32): TUInt32;
 begin
-  Result := 0;
+  Result := UMinValueUInt32;
 end;
 
 function UMinValue(out v: TUInt64): TUInt64;
 begin
-  Result := 0;
+  Result := UMinValueUInt64;
 end;
 
 function UMinValue(out v: TInt8): TInt8;
 begin
-  Result := -$80;
+  Result := UMinValueInt8;
 end;
 
 function UMinValue(out v: TInt16): TInt16;
 begin
-  Result := -$8000;
+  Result := UMinValueInt16;
 end;
 
 function UMinValue(out v: TInt32): TInt32;
 begin
-  Result := -$80000000;
+  Result := UMinValueInt32;
 end;
 
 function UMinValue(out v: TInt64): TInt64;
 begin
-  Result := -$8000000000000000;
+  Result := UMinValueInt64;
 end;
 
 function UMinValue(out v: TUFloat): TUFloat;
 begin
-  Result := 1.5E-45;
+  Result := UMinValueFloat;
 end;
 
 function UMinValue(out v: TUDouble): TUDouble;
 begin
-  Result := 5.0E-324;
+  Result := UMinValueDouble;
 end;
 
 generic function UEnumToStr<T>(const Enum: T): String;
