@@ -10194,6 +10194,7 @@ begin
     _First := _First.Next;
     Result[i] := Temp.Data;
     FreeItem(Temp);
+    Inc(i);
   end;
   _Last := nil;
   _Size := 0;
