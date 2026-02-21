@@ -14726,7 +14726,7 @@ begin
   begin
     if UIsCharTrimable(Str[i]) then Continue;
     if i = Length(Str) then Exit;
-    Exit(UStrSubStr(Str, i, Length(Str) - i));
+    Exit(UStrSubStr(Str, i, Length(Str) - i + 1));
   end;
 end;
 
