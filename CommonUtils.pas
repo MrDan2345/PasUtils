@@ -1376,6 +1376,7 @@ public
   constructor Create(const Buffer: Pointer; const BufferSize: UInt32);
 end;
 
+type TUJson = class;
 {$push}
 {$m+}
 type TUSerializable = class (TURefClass)
@@ -1389,6 +1390,8 @@ protected
   var _TypeData: PTypeData;
   var _PropList: array of PPropInfo;
   var _FieldList: array of TField;
+  class function FindEnumName(const Names: ShortString; const Index: Int32): String;
+  class function FindEnumIndex(const Names: ShortString; const Value: String): Int32;
   function GetOrdSize(const OrdType: TOrdType): UInt32; inline;
   function VerifyProp(const Index: Int32; const PropType: TTypeKinds = tkAny): Boolean;
   function VerifyArrayProp(const Index, ArrayIndex: Int32; const PropType: TTypeKinds = tkAny): Boolean;
@@ -1404,6 +1407,8 @@ protected
   function GetArrayPropInfo(const Index: Int32): PTypeInfo; inline;
   function GetPropEnum(const Index: Int32): Int32; inline;
   procedure SetPropEnum(const Index: Int32; const Value: Int32); inline;
+  function GetPropEnumName(const Index:Int32): String; inline;
+  procedure SetPropEnumName(const Index: Int32; const Value: String); inline;
   function GetPropBool(const Index: Int32): Boolean; inline;
   procedure SetPropBool(const Index: Int32; const Value: Boolean); inline;
   function GetPropInt8(const Index: Int32): Int8; inline;
@@ -1469,6 +1474,7 @@ public
   property PropInfo[const Index: Int32]: PPropInfo read GetPropInfo;
   property PropArrayInfo[const Index: Int32]: PTypeInfo read GetArrayPropInfo;
   property PropEnum[const Index: Int32]: Int32 read GetPropEnum write SetPropEnum;
+  property PropEnumName[const Index: Int32]: String read GetPropEnumName write SetPropEnumName;
   property PropBool[const Index: Int32]: Boolean read GetPropBool write SetPropBool;
   property PropInt8[const Index: Int32]: Int8 read GetPropInt8 write SetPropInt8;
   property PropInt16[const Index: Int32]: Int16 read GetPropInt16 write SetPropInt16;
@@ -1507,8 +1513,10 @@ public
   procedure BeforeDestruction; override;
   procedure SerializeTo(const Stream: TStream); virtual; overload;
   procedure SerializeTo(const FileName: String); virtual; overload;
+  procedure SerializeTo(const Json: TUJson); virtual; overload;
   procedure SerializeFrom(const Stream: TStream); virtual; overload;
   procedure SerializeFrom(const FileName: String); virtual; overload;
+  procedure SerializeFrom(const Json: TUJson); virtual; overload;
   procedure Assign(const Serializable: TUSerializable); virtual;
   procedure Dump(const Offset: String = '');
 end;
@@ -1624,10 +1632,11 @@ end;
 type TUShortStringReader = object
 private
   var _Ptr: Pointer;
+  var _Pos: Int32;
 public
+  property Pos: Int32 read _Pos;
   procedure Setup(const Str: ShortString);
   function ReadShortString: String;
-  generic function Read<T>: T;
 end;
 
 generic TUMap<TKey, TValue> = record
@@ -7893,6 +7902,43 @@ end;
 // TUConstMemoryStream end
 
 // TUSerializable begin
+class function TUSerializable.FindEnumName(
+  const Names: ShortString;
+  const Index: Int32
+): String;
+  var r: TUShortStringReader;
+  var i, j, n: Int32;
+begin
+  r.Setup(Names);
+  for i := 0 to Index - 1 do
+  begin
+    r.ReadShortString;
+    if (r.Pos >= SizeOf(ShortString)) then
+    begin
+      Exit('');
+    end;
+  end;
+  if r.Pos >= SizeOf(ShortString) then Exit('');
+  Result := r.ReadShortString;
+end;
+
+class function TUSerializable.FindEnumIndex(
+  const Names: ShortString;
+  const Value: String
+): Int32;
+  var r: TUShortStringReader;
+  var i: Int32;
+begin
+  r.Setup(Names);
+  i := 0;
+  while r.Pos < SizeOf(ShortString) do
+  begin
+    if LowerCase(r.ReadShortString) = LowerCase(Value) then Exit(i);
+    Inc(i);
+  end;
+  Result := -1;
+end;
+
 function TUSerializable.GetOrdSize(const OrdType: TOrdType): UInt32;
   const Sizes: array[Ord(Low(TOrdType))..Ord(High(TOrdType))] of UInt32 = (
     1, 1, 2, 2, 4, 4, 8, 8
@@ -7997,6 +8043,25 @@ procedure TUSerializable.SetPropEnum(const Index: Int32; const Value: Int32);
 begin
   if not VerifyProp(Index, [tkEnumeration]) then Exit;
   SetOrdProp(Self, _PropList[Index], Value);
+end;
+
+function TUSerializable.GetPropEnumName(const Index: Int32): String;
+  var td: PTypeData;
+begin
+  if not VerifyProp(Index, [tkEnumeration]) then Exit('');
+  td := GetTypeData(_PropList[Index]^.PropType);
+  Result := FindEnumName(td^.NameList, GetPropEnum(Index));
+end;
+
+procedure TUSerializable.SetPropEnumName(const Index: Int32; const Value: String);
+  var td: PTypeData;
+  var i: Int32;
+begin
+  if not VerifyProp(Index, [tkEnumeration]) then Exit;
+  td := GetTypeData(_PropList[Index]^.PropType);
+  i := FindEnumIndex(td^.NameList, Value);
+  if i < 0 then Exit;
+  SetPropEnum(Index, i);
 end;
 
 function TUSerializable.GetPropBool(const Index: Int32): Boolean;
@@ -8472,7 +8537,8 @@ function TUSerializable.FindProp(const Name: String; const PropType: TTypeKinds)
 begin
   NameLC := LowerCase(Name);
   for i := 0 to High(_PropList) do
-  if (LowerCase(_PropList[i]^.Name) = NameLC) and (_PropList[i]^.PropType^.Kind in PropType) then
+  if (LowerCase(_PropList[i]^.Name) = NameLC)
+  and (_PropList[i]^.PropType^.Kind in PropType) then
   begin
     Exit(i);
   end;
@@ -8480,8 +8546,16 @@ begin
 end;
 
 function TUSerializable.FindField(const Name: String): Int32;
+  var i: Int32;
+  var NameLC: String;
 begin
-
+  NameLC := LowerCase(Name);
+  for i := 0 to High(_FieldList) do
+  if (LowerCase(_FieldList[i].Field^.Name) = NameLC) then
+  begin
+    Exit(i);
+  end;
+  Result := -1;
 end;
 
 procedure TUSerializable.AfterConstruction;
@@ -8656,7 +8730,7 @@ begin
                     if Assigned(Obj) then
                     begin
                       sh.WriteBool(True);
-                      TUSerializable(PropArrayClass[i, ai]).SerializeTo(Stream);
+                      TUSerializable(Obj).SerializeTo(Stream);
                     end
                     else
                     begin
@@ -8681,6 +8755,28 @@ begin
       sh.WriteInt32(s);
       sh.PosPop;
     end;
+    sh.WriteInt32(Length(_FieldList));
+    for i := 0 to High(_FieldList) do
+    begin
+      sh.WriteString(_FieldList[i].Field^.Name);
+      sp := sh.Position;
+      sh.WriteInt32(0);
+      Obj := FieldData[i];
+      if Assigned(Obj) and (Obj.InheritsFrom(TUSerializable)) then
+      begin
+        sh.WriteBool(True);
+        TUSerializable(Obj).SerializeTo(Stream);
+      end
+      else
+      begin
+        sh.WriteBool(False);
+      end;
+      s := sh.Position - sp;
+      sh.PosPush;
+      sh.Position := sp;
+      sh.WriteInt32(s);
+      sh.PosPop;
+    end;
   finally
     sh.Free;
   end;
@@ -8694,6 +8790,137 @@ begin
     SerializeTo(fs);
   finally
     fs.Free;
+  end;
+end;
+
+procedure TUSerializable.SerializeTo(const Json: TUJson);
+  var JsonProps, JsonFields, JsonProp, JsonObj, JsonArr: TUJson;
+  var pd, pde: PTypeData;
+  var pi: PTypeInfo;
+  var Obj: TObject;
+  var i, al, ai: Int32;
+begin
+  if Length(_PropList) > 0 then
+  begin
+    JsonProps := Json.AddArray('Props');
+    for i := 0 to High(_PropList) do
+    begin
+      JsonProp := JsonProps.AddObject();
+      JsonProp.AddValue('Name', _PropList[i]^.Name);
+      JsonProp.AddValue('Type', _PropList[i]^.PropType^.Name);
+      pd := GetTypeData(_PropList[i]^.PropType);
+      case _PropList[i]^.PropType^.Kind of
+        tkEnumeration:
+        begin
+          JsonProp.AddValue('Value', FindEnumName(pd^.NameList, PropEnum[i]));
+        end;
+        tkBool:
+        begin
+          JsonProp.AddValue('Value', PropBool[i]);
+        end;
+        tkInteger, tkInt64, tkQWord:
+        begin
+          JsonProp.AddValue('Value', PropInt64[i]);
+        end;
+        tkFloat:
+        begin
+          JsonProp.AddValue('Value', Format('%0:0.4f', [PropFloat[i]]));
+        end;
+        tkAString:
+        begin
+          JsonProp.AddValue('Value', PropString[i]);
+        end;
+        tkClass:
+        begin
+          JsonObj := JsonProp.AddObject('Value');
+          Obj := PropClass[i];
+          if Assigned(Obj)
+          and (Obj is TUSerializable) then
+          begin
+            TUSerializable(Obj).SerializeTo(JsonObj);
+          end;
+        end;
+        tkDynArray:
+        begin
+          JsonArr := JsonProp.AddArray('Value');
+          pi := pd^.ElType;
+          if not Assigned(pi) then pi := pd^.ElType2;
+          JsonProp.AddValue('SubType', pi^.Name);
+          pde := GetTypeData(pi);
+          al := PropArrayLength[i];
+          if al > 0 then
+          begin
+            case pi^.Kind of
+              tkEnumeration:
+              begin
+                for ai := 0 to al - 1 do
+                begin
+                  JsonArr.AddValue(FindEnumName(pde^.NameList, PropArrayEnum[i, ai]));
+                end;
+              end;
+              tkBool:
+              begin
+                for ai := 0 to al - 1 do
+                begin
+                  JsonArr.AddValue(PropArrayBool[i, ai]);
+                end;
+              end;
+              tkInteger, tkInt64, tkQWord:
+              begin
+                for ai := 0 to al - 1 do
+                begin
+                  JsonArr.AddValue(PropArrayInt64[i, ai]);
+                end;
+              end;
+              tkFloat:
+              begin
+                for ai := 0 to al - 1 do
+                begin
+                  JsonArr.AddValue(Format('%0:0.4f', [PropArrayFloat[i, ai]]));
+                end;
+              end;
+              tkAString:
+              begin
+                for ai := 0 to al - 1 do
+                begin
+                  JsonArr.AddValue(PropArrayString[i, ai]);
+                end;
+              end;
+              tkClass:
+              begin
+                if pde^.ClassType.InheritsFrom(TUSerializable) then
+                begin
+                  for ai := 0 to al - 1 do
+                  begin
+                    JsonObj := JsonArr.AddObject();
+                    Obj := PropArrayClass[i, ai];
+                    if Assigned(Obj) then
+                    begin
+                      TUSerializable(Obj).SerializeTo(JsonObj);
+                    end;
+                  end;
+                end;
+              end;
+            end;
+          end;
+        end;
+        else begin end;
+      end;
+    end;
+  end;
+  if Length(_FieldList) > 0 then
+  begin
+    JsonFields := Json.AddArray('Fields');
+    for i := 0 to High(_FieldList) do
+    begin
+      Obj := FieldData[i];
+      if not Assigned(Obj) then Continue;
+      if not Obj.InheritsFrom(TUSerializable) then Continue;
+      JsonObj := JsonFields.AddObject();
+      JsonObj.AddValue('Name', _FieldList[i].Field^.Name);
+      JsonObj.AddValue('Type', _FieldList[i].ClassInfo^.ClassName);
+      TUSerializable(Obj).SerializeTo(JsonObj);
+    end;
   end;
 end;
 
@@ -8829,6 +9056,29 @@ begin
         else begin end;
       end;
     end;
+    n := sh.ReadInt32;
+    for j := 0 to n - 1 do
+    begin
+      Name := sh.ReadString;
+      s := sh.ReadInt32;
+      i := FindField(Name);
+      if i = -1 then
+      begin
+        sh.Skip(s);
+        Continue;
+      end;
+      Obj := FieldData[i];
+      sh.PosPush;
+      if not sh.ReadBool
+      or not Obj.InheritsFrom(TUSerializable) then
+      begin
+        sh.PosPop;
+        sh.Skip(s);
+        Continue;
+      end;
+      sh.PosDiscard;
+      TUSerializable(Obj).SerializeFrom(Stream);
+    end;
   finally
     sh.Free;
   end;
@@ -8842,6 +9092,130 @@ begin
     SerializeFrom(fs);
   finally
     fs.Free;
+  end;
+end;
+
+procedure TUSerializable.SerializeFrom(const Json: TUJson);
+  var JsonProps, JsonProp, JsonFields, JsonField, JsonArr: TUJson;
+  var pi: PTypeInfo;
+  var pd, pde: PTypeData;
+  var Obj: TOBject;
+  var i, p, al, ai: Int32;
+begin
+  JsonProps := Json['Props'];
+  if JsonProps.IsValid then
+  for i := 0 to JsonProps.Count - 1 do
+  begin
+    JsonProp := JsonProps[i];
+    p := FindProp(JsonProp['Name'].Value);
+    if p = -1 then Continue;
+    if _PropList[p]^.PropType^.Name <> JsonProp['Type'].Value then Continue;
+    pd := GetTypeData(_PropList[p]^.PropType);
+    case _PropList[p]^.PropType^.Kind of
+      tkEnumeration:
+      begin
+        SetPropEnumName(p, JsonProp['Value'].Value);
+      end;
+      tkBool:
+      begin
+        SetPropBool(p, JsonProp['Value'].ValueAsBool);
+      end;
+      tkInteger, tkInt64, tkQWord:
+      begin
+        SetPropInt64(p, StrToInt64Def(JsonProp['Value'].Value, 0));
+      end;
+      tkFloat:
+      begin
+        SetPropFloat(p, JsonProp['Value'].ValueAsFloat);
+      end;
+      tkAString:
+      begin
+        SetPropString(p, JsonProp['Value'].Value);
+      end;
+      tkClass:
+      begin
+        Obj := PropClass[p];
+        if Assigned(Obj)
+        and (Obj is TUSerializable) then
+        begin
+          TUSerializable(Obj).SerializeFrom(JsonProp['Value'].Value);
+        end;
+      end;
+      tkDynArray:
+      begin
+        JsonArr := JsonProp['Value'];
+        pi := pd^.ElType;
+        if not Assigned(pi) then pi := pd^.ElType2;
+        if JsonProp['SubType'].Value <> pi^.Name then Continue;
+        pde := GetTypeData(pi);
+        if (pi^.Kind = tkClass)
+        and not pde^.ClassType.InheritsFrom(TUSerializable) then
+        begin
+          Continue;
+        end;
+        PropArrayLength[i] := JsonArr.Count;
+        al := JsonArr.Count;
+        case pi^.Kind of
+          tkEnumeration:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              SetPropArrayEnum(p, ai, FindEnumIndex(pde^.NameList, JsonArr[ai].Value));
+            end;
+          end;
+          tkBool:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              SetPropArrayBool(p, ai, JsonArr[ai].ValueAsBool);
+            end;
+          end;
+          tkInteger, tkInt64, tkQWord:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              SetPropArrayInt64(p, ai, StrToInt64Def(JsonArr[ai].Value, 0));
+            end;
+          end;
+          tkFloat:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              SetPropArrayFloat(p, ai, JsonArr[ai].ValueAsFloat);
+            end;
+          end;
+          tkAString:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              SetPropArrayString(p, ai, JsonArr[ai].Value);
+            end;
+          end;
+          tkClass:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              Obj := GetPropArrayClass(p, ai);
+              TUSerializable(Obj).SerializeFrom(JsonArr[ai]);
+            end;
+          end;
+        end;
+      end;
+      else begin end;
+    end;
+  end;
+  JsonFields := Json['Fields'];
+  if JsonFields.IsValid then
+  for i := 0 to JsonFields.Count - 1 do
+  begin
+    JsonField := JsonFields[i];
+    p := FindField(JsonField['Name'].Value);
+    if p = -1 then Continue;
+    if _FieldList[p].ClassInfo^.ClassName <> JsonField['Type'].Value then Continue;
+    Obj := GetFieldData(p);
+    if not Assigned(Obj) then Continue;
+    if not Obj.InheritsFrom(TUSerializable) then Continue;
+    TUSerializable(Obj).SerializeFrom(JsonField);
   end;
 end;
 
@@ -8943,26 +9317,12 @@ procedure TUSerializable.Dump(const Offset: String);
   var ss: String;
   var Obj: TObject;
   var nl: Boolean;
-  function FindEnumName(const Names: ShortString; const Index: Int32): ShortString;
-    var i, j, n: Int32;
-  begin
-    i := 0;
-    j := 0;
-    while (i < Index) and (j < SizeOf(ShortString)) do
-    begin
-      n := Ord(Names[j]);
-      Inc(j, n + 1);
-      Inc(i);
-    end;
-    if j < SizeOf(ShortString) then Exit(PShortString(@Names[j])^);
-    Result := '';
-  end;
 begin
   if Length(Offset) = 0 then
   begin
-    WriteLn('RTTI Dump for ' + _TypeInfo^.Name);
+    WriteLn(Offset, 'RTTI Dump for ' + _TypeInfo^.Name);
   end;
-  WriteLn('Props: ', Length(_PropList));
+  WriteLn(Offset, 'Props: ', Length(_PropList));
   for i := 0 to High(_PropList) do
   begin
     nl := True;
@@ -9097,11 +9457,17 @@ begin
     end;
     if nl then WriteLn(Offset);
   end;
-  WriteLn('Fields: ', Length(_FieldList));
+  WriteLn(Offset, 'Fields: ', Length(_FieldList));
   for i := 0 to High(_FieldList) do
   begin
     Write(Offset, _FieldList[i].Field^.Name, ': ');
     WriteLn(_FieldList[i].ClassInfo^.ClassName);
+    Obj := FieldData[i];
+    if Assigned(Obj)
+    and Obj.InheritsFrom(TUSerializable) then
+    begin
+      TUSerializable(Obj).Dump(Offset + '  ');
+    end;
   end;
 end;
 // TUSerializable end
@@ -9760,20 +10126,16 @@ end;
 procedure TUShortStringReader.Setup(const Str: ShortString);
 begin
   _Ptr := @Str[0];
+  _Pos := 0;
 end;
 
 function TUShortStringReader.ReadShortString: String;
 begin
   Result := '';
-  SetLength(Result, specialize Read<UInt8>());
+  SetLength(Result, _Ptr.ReadUInt8);
   UMove(Result[1], _Ptr^, Length(Result));
   Inc(_Ptr, Length(Result));
-end;
-
-generic function TUShortStringReader.Read<T>: T;
-begin
-  UMove(Result, _Ptr^, SizeOf(Result));
-  Inc(_Ptr, SizeOf(Result));
+  Inc(_Pos, Length(Result) + 1);
 end;
 // TUShortStringReader end
 
