@@ -12669,10 +12669,11 @@ generic function UEnumSetToStr<T>(const EnumSet: T): String;
   var i: Int32;
   var ti, eti: PTypeInfo;
   var td, etd: PTypeData;
+  var Num: UInt32 absolute EnumSet;
 begin
   ti := PTypeInfo(TypeInfo(EnumSet));
   case ti^.Kind of
-    tkEnumeration: Result := GetEnumName(ti, UInt32(EnumSet));
+    tkEnumeration: Result := GetEnumName(ti, Num);
     tkSet:
     begin
       td := GetTypeData(ti);
@@ -12682,7 +12683,7 @@ begin
       Result := '[';
       for i := etd^.MinValue to etd^.MaxValue do
       begin
-        if ((1 shl (i - etd^.MinValue)) and UInt32(EnumSet)) > 0 then
+        if ((1 shl (i - etd^.MinValue)) and Num) > 0 then
         begin
           if Length(Result) > 1 then Result += ', ';
           Result += GetEnumName(eti, i);
