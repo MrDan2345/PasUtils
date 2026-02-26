@@ -1379,18 +1379,29 @@ end;
 {$push}
 {$m+}
 type TUSerializable = class (TURefClass)
+public
+  type TField = record
+    var Field: PVmtFieldEntry;
+    var ClassInfo: PClass;
+  end;
 protected
   var _TypeInfo: PTypeInfo;
   var _TypeData: PTypeData;
   var _PropList: array of PPropInfo;
+  var _FieldList: array of TField;
+  function GetOrdSize(const OrdType: TOrdType): UInt32; inline;
   function VerifyProp(const Index: Int32; const PropType: TTypeKinds = tkAny): Boolean;
   function VerifyArrayProp(const Index, ArrayIndex: Int32; const PropType: TTypeKinds = tkAny): Boolean;
-  function GetArrayData(const Index: Int32): Pointer;
-  function GetOrdSize(const OrdType: TOrdType): UInt32; inline;
-  function GetArrayElementTypeInfo(const Index: Int32): PTypeInfo;
+  function GetArrayPropData(const Index: Int32): Pointer;
+  function GetArrayPropElementTypeInfo(const Index: Int32): PTypeInfo;
   function GetPropCount: Int32; inline;
+  function GetFieldCount: Int32; inline;
+  function GetFieldName(const Index: Int32): String; inline;
+  function GetFieldData(const Index: Int32): TObject; inline;
+  procedure SetFieldData(const Index: Int32; const Value: TObject); inline;
+  function GetFieldClass(const Index: Int32): PClass; inline;
   function GetPropInfo(const Index: Int32): PPropInfo; inline;
-  function GetPropArrayInfo(const Index: Int32): PTypeInfo; inline;
+  function GetArrayPropInfo(const Index: Int32): PTypeInfo; inline;
   function GetPropEnum(const Index: Int32): Int32; inline;
   procedure SetPropEnum(const Index: Int32; const Value: Int32); inline;
   function GetPropBool(const Index: Int32): Boolean; inline;
@@ -1456,7 +1467,7 @@ protected
 public
   property PropCount: Int32 read GetPropCount;
   property PropInfo[const Index: Int32]: PPropInfo read GetPropInfo;
-  property PropArrayInfo[const Index: Int32]: PTypeInfo read GetPropArrayInfo;
+  property PropArrayInfo[const Index: Int32]: PTypeInfo read GetArrayPropInfo;
   property PropEnum[const Index: Int32]: Int32 read GetPropEnum write SetPropEnum;
   property PropBool[const Index: Int32]: Boolean read GetPropBool write SetPropBool;
   property PropInt8[const Index: Int32]: Int8 read GetPropInt8 write SetPropInt8;
@@ -1486,7 +1497,12 @@ public
   property PropArrayString[const Index, ArrayIndex: Int32]: String read GetPropArrayString write SetPropArrayString;
   property PropArrayClass[const Index, ArrayIndex: Int32]: TObject read GetPropArrayClass write SetPropArrayClass;
   property PropArrayLength[const Index: Int32]: Int32 read GetPropArrayLength write SetPropArrayLength;
+  property FieldCount: Int32 read GetFieldCount;
+  property FieldName[const Index: Int32]: String read GetFieldName;
+  property FieldData[const Index: Int32]: TObject read GetFieldData write SetFieldData;
+  property FieldClass[const Index: Int32]: PClass read GetFieldClass;
   function FindProp(const Name: String; const PropType: TTypeKinds = tkAny): Int32;
+  function FindField(const Name: String): Int32;
   procedure AfterConstruction; override;
   procedure BeforeDestruction; override;
   procedure SerializeTo(const Stream: TStream); virtual; overload;
@@ -7877,7 +7893,18 @@ end;
 // TUConstMemoryStream end
 
 // TUSerializable begin
-function TUSerializable.VerifyProp(const Index: Int32; const PropType: TTypeKinds): Boolean;
+function TUSerializable.GetOrdSize(const OrdType: TOrdType): UInt32;
+  const Sizes: array[Ord(Low(TOrdType))..Ord(High(TOrdType))] of UInt32 = (
+    1, 1, 2, 2, 4, 4, 8, 8
+  );
+begin
+  Result := Sizes[Ord(OrdType)];
+end;
+
+function TUSerializable.VerifyProp(
+  const Index: Int32;
+  const PropType: TTypeKinds
+): Boolean;
 begin
   Result := (
     (Index >= 0) and (Index <= High(_PropList))
@@ -7889,7 +7916,7 @@ function TUSerializable.VerifyArrayProp(const Index, ArrayIndex: Int32; const Pr
   var td: PTypeData;
   var ti: PTypeInfo;
 begin
-  if not VerifyProp(Index, [tkDynArray]) then Exit;
+  if not VerifyProp(Index, [tkDynArray]) then Exit(False);
   td := GetTypeData(_PropList[Index]^.PropType);
   ti := td^.ElType;
   if not Assigned(ti) then ti := td^.ElType2;
@@ -7899,22 +7926,14 @@ begin
   );
 end;
 
-function TUSerializable.GetArrayData(const Index: Int32): Pointer;
+function TUSerializable.GetArrayPropData(const Index: Int32): Pointer;
   type TArr = array of Pointer;
 begin
   if GetPropArrayLength(Index) < 1 then Exit(nil);
   Result := @TArr(GetDynArrayProp(Self, _PropList[Index]))[0];
 end;
 
-function TUSerializable.GetOrdSize(const OrdType: TOrdType): UInt32;
-  const Sizes: array[Ord(Low(TOrdType))..Ord(High(TOrdType))] of UInt32 = (
-    1, 1, 2, 2, 4, 4, 8, 8
-  );
-begin
-  Result := Sizes[Ord(OrdType)];
-end;
-
-function TUSerializable.GetArrayElementTypeInfo(const Index: Int32): PTypeInfo;
+function TUSerializable.GetArrayPropElementTypeInfo(const Index: Int32): PTypeInfo;
   var td: PTypeData;
 begin
   td := GetTypeData(_PropList[Index]^.PropType);
@@ -7927,13 +7946,39 @@ begin
   Result := _TypeData^.PropCount;
 end;
 
+function TUSerializable.GetFieldCount: Int32;
+begin
+  Result := _TypeData^.TotalFieldCount;
+end;
+
+function TUSerializable.GetFieldName(const Index: Int32): String;
+begin
+  Result := _FieldList[Index].Field^.Name;
+end;
+
+function TUSerializable.GetFieldData(const Index: Int32): TObject;
+  type PObject = ^TObject;
+begin
+  Result := PObject(Pointer(Self) + _FieldList[Index].Field^.FieldOffset)^;
+end;
+
+procedure TUSerializable.SetFieldData(const Index: Int32; const Value: TObject);
+begin
+  PPointer(Pointer(Self) + _FieldList[Index].Field^.FieldOffset)^ := Value;
+end;
+
+function TUSerializable.GetFieldClass(const Index: Int32): PClass;
+begin
+  Result := _FieldList[Index].ClassInfo;
+end;
+
 function TUSerializable.GetPropInfo(const Index: Int32): PPropInfo;
 begin
   if not VerifyProp(Index) then Exit(nil);
   Result := _PropList[Index];
 end;
 
-function TUSerializable.GetPropArrayInfo(const Index: Int32): PTypeInfo;
+function TUSerializable.GetArrayPropInfo(const Index: Int32): PTypeInfo;
   var td: PTypeData;
 begin
   if not VerifyProp(Index, [tkDynArray]) then Exit(nil);
@@ -8201,7 +8246,7 @@ function TUSerializable.GetPropArrayEnum(const Index, ArrayIndex: Int32): Int32;
   var td: PTypeData;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkEnumeration]) then Exit(0);
-  td := GetTypeData(GetArrayElementTypeInfo(Index));
+  td := GetTypeData(GetArrayPropElementTypeInfo(Index));
   case td^.OrdType of
     otSByte: Result := specialize GetDynArrayElement<Int8>(Index, ArrayIndex);
     otSWord: Result := specialize GetDynArrayElement<Int16>(Index, ArrayIndex);
@@ -8219,7 +8264,7 @@ procedure TUSerializable.SetPropArrayEnum(const Index, ArrayIndex: Int32; const 
   var td: PTypeData;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkEnumeration]) then Exit;
-  td := GetTypeData(GetArrayElementTypeInfo(Index));
+  td := GetTypeData(GetArrayPropElementTypeInfo(Index));
   case td^.OrdType of
     otSByte: specialize SetDynArrayElement<Int8>(Index, ArrayIndex, Value);
     otSWord: specialize SetDynArrayElement<Int16>(Index, ArrayIndex, Value);
@@ -8434,8 +8479,15 @@ begin
   Result := -1;
 end;
 
+function TUSerializable.FindField(const Name: String): Int32;
+begin
+
+end;
+
 procedure TUSerializable.AfterConstruction;
   var td: PTypeData;
+  var vmt: PVmt;
+  var FieldTable: PVmtFieldTable;
   var i: Int32;
 begin
   inherited AfterConstruction;
@@ -8462,6 +8514,23 @@ begin
           SetFloatProp(Self, _PropList[i], 0);
         end;
         else begin end;
+      end;
+    end;
+  end;
+  if (_TypeData^.TotalFieldCount > 0) then
+  begin
+    vmt := PVmt(ClassType);
+    if Assigned(vmt^.vFieldTable) then
+    begin
+      FieldTable := PVmtFieldTable(vmt^.vFieldTable);
+      SetLength(_FieldList, FieldTable^.Count);
+      for i := 0 to High(_FieldList) do
+      begin
+        _FieldList[i].Field := FieldTable^.Field[i];
+        _FieldList[i].ClassInfo := (
+          FieldTable^.ClassTab^.ClassRef[FieldTable^.Field[i]^.TypeIndex - 1]
+        );
+        SetFieldData(i, _FieldList[i].ClassInfo^.ClassType.Create);
       end;
     end;
   end;
@@ -8600,7 +8669,7 @@ begin
                   sh.WriteBool(False);
                 end;
               end
-              else sh.WriteBuffer(GetArrayData(i), al * pd^.elSize);
+              else sh.WriteBuffer(GetArrayPropData(i), al * pd^.elSize);
             end;
           end;
         end;
@@ -8746,7 +8815,7 @@ begin
                     end;
                   end;
                 end
-                else sh.ReadBuffer(GetArrayData(i), al * aes);
+                else sh.ReadBuffer(GetArrayPropData(i), al * aes);
               end;
             end;
             sh.PosDiscard;
@@ -8893,6 +8962,7 @@ begin
   begin
     WriteLn('RTTI Dump for ' + _TypeInfo^.Name);
   end;
+  WriteLn('Props: ', Length(_PropList));
   for i := 0 to High(_PropList) do
   begin
     nl := True;
@@ -9026,6 +9096,12 @@ begin
       Write(Offset, ']');
     end;
     if nl then WriteLn(Offset);
+  end;
+  WriteLn('Fields: ', Length(_FieldList));
+  for i := 0 to High(_FieldList) do
+  begin
+    Write(Offset, _FieldList[i].Field^.Name, ': ');
+    WriteLn(_FieldList[i].ClassInfo^.ClassName);
   end;
 end;
 // TUSerializable end
