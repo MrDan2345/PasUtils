@@ -8608,21 +8608,18 @@ begin
       end;
     end;
   end;
-  if (_TypeData^.TotalFieldCount > 0) then
+  vmt := PVmt(ClassType);
+  if Assigned(vmt^.vFieldTable) then
   begin
-    vmt := PVmt(ClassType);
-    if Assigned(vmt^.vFieldTable) then
+    FieldTable := PVmtFieldTable(vmt^.vFieldTable);
+    SetLength(_FieldList, FieldTable^.Count);
+    for i := 0 to High(_FieldList) do
     begin
-      FieldTable := PVmtFieldTable(vmt^.vFieldTable);
-      SetLength(_FieldList, FieldTable^.Count);
-      for i := 0 to High(_FieldList) do
-      begin
-        _FieldList[i].Field := FieldTable^.Field[i];
-        _FieldList[i].ClassInfo := (
-          FieldTable^.ClassTab^.ClassRef[FieldTable^.Field[i]^.TypeIndex - 1]
-        );
-        SetFieldData(i, _FieldList[i].ClassInfo^.ClassType.Create);
-      end;
+      _FieldList[i].Field := FieldTable^.Field[i];
+      _FieldList[i].ClassInfo := (
+        FieldTable^.ClassTab^.ClassRef[FieldTable^.Field[i]^.TypeIndex - 1]
+      );
+      SetFieldData(i, _FieldList[i].ClassInfo^.ClassType.Create);
     end;
   end;
 end;
