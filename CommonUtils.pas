@@ -1381,15 +1381,18 @@ type TUJson = class;
 {$m+}
 type TUSerializable = class (TURefClass)
 public
+  type TProp = PPropInfo;
+  type TProps = array of TProp;
   type TField = record
     var Field: PVmtFieldEntry;
     var ClassInfo: PClass;
   end;
+  type TFields = array of TField;
 protected
   var _TypeInfo: PTypeInfo;
   var _TypeData: PTypeData;
-  var _PropList: array of PPropInfo;
-  var _FieldList: array of TField;
+  var _PropList: TProps;
+  var _FieldList: TFields;
   class function FindEnumName(const Names: ShortString; const Index: Int32): String;
   class function FindEnumIndex(const Names: ShortString; const Value: String): Int32;
   function GetOrdSize(const OrdType: TOrdType): UInt32; inline;
@@ -1397,12 +1400,14 @@ protected
   function VerifyArrayProp(const Index, ArrayIndex: Int32; const PropType: TTypeKinds = tkAny): Boolean;
   function GetArrayPropData(const Index: Int32): Pointer;
   function GetArrayPropElementTypeInfo(const Index: Int32): PTypeInfo;
+  function GetProp(const Index: Int32): TProp; inline;
   function GetPropCount: Int32; inline;
+  function GetField(const Index: Int32): TField; inline;
   function GetFieldCount: Int32; inline;
   function GetFieldName(const Index: Int32): String; inline;
   function GetFieldData(const Index: Int32): TObject; inline;
   procedure SetFieldData(const Index: Int32; const Value: TObject); inline;
-  function GetFieldClass(const Index: Int32): PClass; inline;
+  function GetFieldClass(const Index: Int32): TClass; inline;
   function GetPropInfo(const Index: Int32): PPropInfo; inline;
   function GetArrayPropInfo(const Index: Int32): PTypeInfo; inline;
   function GetPropEnum(const Index: Int32): Int32; inline;
@@ -1470,6 +1475,7 @@ protected
   generic function GetDynArrayElement<T>(const Index, ArrayIndex: Int32): T;
   generic procedure SetDynArrayElement<T>(const Index, ArrayIndex: Int32; const Value: T);
 public
+  property Prop[const Index: Int32]: PPropInfo read GetProp;
   property PropCount: Int32 read GetPropCount;
   property PropInfo[const Index: Int32]: PPropInfo read GetPropInfo;
   property PropArrayInfo[const Index: Int32]: PTypeInfo read GetArrayPropInfo;
@@ -1503,10 +1509,11 @@ public
   property PropArrayString[const Index, ArrayIndex: Int32]: String read GetPropArrayString write SetPropArrayString;
   property PropArrayClass[const Index, ArrayIndex: Int32]: TObject read GetPropArrayClass write SetPropArrayClass;
   property PropArrayLength[const Index: Int32]: Int32 read GetPropArrayLength write SetPropArrayLength;
+  property Field[const Index: Int32]: TField read GetField;
   property FieldCount: Int32 read GetFieldCount;
   property FieldName[const Index: Int32]: String read GetFieldName;
   property FieldData[const Index: Int32]: TObject read GetFieldData write SetFieldData;
-  property FieldClass[const Index: Int32]: PClass read GetFieldClass;
+  property FieldClass[const Index: Int32]: TClass read GetFieldClass;
   function FindProp(const Name: String; const PropType: TTypeKinds = tkAny): Int32;
   function FindField(const Name: String): Int32;
   procedure AfterConstruction; override;
@@ -7987,9 +7994,19 @@ begin
   if not Assigned(Result) then Result := td^.ElType2;
 end;
 
+function TUSerializable.GetProp(const Index: Int32): TProp;
+begin
+  Result := _PropList[Index];
+end;
+
 function TUSerializable.GetPropCount: Int32;
 begin
   Result := _TypeData^.PropCount;
+end;
+
+function TUSerializable.GetField(const Index: Int32): TField;
+begin
+  Result := _FieldList[Index];
 end;
 
 function TUSerializable.GetFieldCount: Int32;
@@ -8013,9 +8030,9 @@ begin
   PPointer(Pointer(Self) + _FieldList[Index].Field^.FieldOffset)^ := Value;
 end;
 
-function TUSerializable.GetFieldClass(const Index: Int32): PClass;
+function TUSerializable.GetFieldClass(const Index: Int32): TClass;
 begin
-  Result := _FieldList[Index].ClassInfo;
+  Result := _FieldList[Index].ClassInfo^.ClassType;
 end;
 
 function TUSerializable.GetPropInfo(const Index: Int32): PPropInfo;
@@ -8615,7 +8632,7 @@ procedure TUSerializable.BeforeDestruction;
   var td: PTypeData;
   var tie: PTypeInfo;
 begin
-  for i := 0 to _TypeData^.PropCount - 1 do
+  for i := 0 to High(_PropList) - 1 do
   begin
     if _PropList[i]^.PropType^.Kind = tkClass then
     begin
@@ -8631,6 +8648,10 @@ begin
         PropArrayLength[i] := 0;
       end;
     end;
+  end;
+  for i := 0 to High(_FieldList) do
+  begin
+    FieldData[i].Free;
   end;
   inherited BeforeDestruction;
 end;
