@@ -816,6 +816,7 @@ public
       class function Make(const Bytes: TUInt8Array): TSignature; static;
       function ToBytes: TUInt8Array;
       function ToHex: String;
+      function ToHexLC: String;
     end;
     type TCurve = record
       var p: TBigInt; // prime modulus
@@ -7371,6 +7372,11 @@ begin
 end;
 
 function TUECC.Edwards.TSignature.ToHex: String;
+begin
+  Result := UBytesToHex(ToBytes);
+end;
+
+function TUECC.Edwards.TSignature.ToHexLC: String;
 begin
   Result := UBytesToHexLC(ToBytes);
 end;
