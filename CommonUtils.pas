@@ -1652,6 +1652,7 @@ public
     Key: TKey;
     Value: TValue;
   end;
+  type TEqualValue = function (const a, b: TValue): Boolean;
 private
   var _Items: array of TItem;
   function GetValue(const Index: Int32): TValue; inline;
@@ -1661,10 +1662,10 @@ public
   function Add(const Key: TKey; const Value: TValue): Int32;
   function HasKey(const Key: TKey): Boolean;
   procedure RemoveByKey(const Key: TKey);
-  procedure RemoveByValue(const Value: TValue);
+  procedure RemoveByValue(const Value: TValue; const EqualFunc: TEqualValue);
   procedure RemoveByIndex(const Index: Int32);
   function FindIndexByKey(const Key: TKey): Int32;
-  function FindIndexByValue(const Value: TValue): Int32;
+  function FindIndexByValue(const Value: TValue; const EqualFunc: TEqualValue): Int32;
   function FindValueByKey(const Key: TKey): TValue;
   function FindValueByIndex(const Index: Int32): TValue;
   function Count: Int32; inline;
@@ -10222,10 +10223,13 @@ begin
   RemoveByIndex(i);
 end;
 
-procedure TUMap.RemoveByValue(const Value: TValue);
+procedure TUMap.RemoveByValue(
+  const Value: TValue;
+  const EqualFunc: TEqualValue
+);
   var i: Int32;
 begin
-  i := FindIndexByValue(Value);
+  i := FindIndexByValue(Value, EqualFunc);
   if i = -1 then Exit;
   RemoveByIndex(i);
 end;
@@ -10257,11 +10261,14 @@ begin
   Result := -1;
 end;
 
-function TUMap.FindIndexByValue(const Value: TValue): Int32;
+function TUMap.FindIndexByValue(
+  const Value: TValue;
+  const EqualFunc: TEqualValue
+): Int32;
   var i: Int32;
 begin
   for i := 0 to High(_Items) do
-  if _Items[i].Value = Value then Exit(i);
+  if EqualFunc(_Items[i].Value, Value) then Exit(i);
   Result := -1;
 end;
 
