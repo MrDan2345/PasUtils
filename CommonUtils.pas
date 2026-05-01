@@ -1827,6 +1827,18 @@ public
   class operator Finalize(var v: TSelf);
 end;
 
+type TUGuid = record
+  var Data1: UInt32;
+  var Data2: UInt16;
+  var Data3: UInt16;
+  var Data4: array[0..7] of UInt8;
+  class function Make: TUGuid;
+  class function Make(const GuidString: String): TUGuid;
+  class function Invalid: TUGuid;
+  function IsValid: Boolean;
+  function ToString: String;
+end;
+
 type TUDelegate = record
 public
   type TSelf = TUDelegate;
@@ -10725,6 +10737,41 @@ begin
   if _Current >= _End then Exit(False);
   Inc(_Current);
   Result := True;
+end;
+
+class function TUGuid.Make: TUGuid;
+  var RandomBytes: TUInt8Array;
+begin
+  RandomBytes := USysRandom(SizeOf(Result));
+  Move(RandomBytes[0], Result, SizeOf(Result));
+  Result.Data3 := (Result.Data3 and $0fff) or ($4000);
+  Result.Data4[0] := (Result.Data4[0] and $3f) or $80;
+end;
+
+class function TUGuid.Make(const GuidString: String): TUGuid;
+begin
+
+end;
+
+class function TUGuid.Invalid: TUGuid;
+begin
+  FillChar(Result, SizeOf(Result), $ff);
+end;
+
+function TUGuid.IsValid: Boolean;
+  var i: Int32;
+  var Bytes: array[0..3] of UInt32 absolute Self;
+begin
+  for i := 0 to High(Bytes) do
+  begin
+    if Bytes[i] <> $ffffffff then Exit(True);
+  end;
+  Result := False;
+end;
+
+function TUGuid.ToString: String;
+begin
+
 end;
 
 procedure TUDelegate.Initialize;
