@@ -1832,11 +1832,13 @@ type TUGuid = record
   var Data2: UInt16;
   var Data3: UInt16;
   var Data4: array[0..7] of UInt8;
-  class function Make: TUGuid;
-  class function Make(const GuidString: String): TUGuid;
-  class function Invalid: TUGuid;
+  class function Make: TUGuid; static;
+  class function Make(const GuidString: String): TUGuid; static;
+  class function Zero: TUGuid; static;
+  class function Invalid: TUGuid; static;
   function IsValid: Boolean;
   function ToString: String;
+  function ToStringLC: String;
 end;
 
 type TUDelegate = record
@@ -2405,6 +2407,8 @@ operator * (const f: TUFloat; const v: TUVec4): TUVec4;
 operator - (const v: TUVec4): TUVec4;
 operator := (const v: TUVec4): TUBounds2f;
 operator := (const v: TUBounds2f): TUVec4;
+operator = (const a, b: TUGuid): Boolean;
+operator < (const a, b: TUGuid): Boolean;
 operator + (const a, b: TUInt4096_Debug): TUInt4096_Debug;
 operator + (const a, b: TUMat): TUMat;
 operator - (const a, b: TUMat): TUMat;
@@ -10749,8 +10753,47 @@ begin
 end;
 
 class function TUGuid.Make(const GuidString: String): TUGuid;
+  function HexNum(const c: AnsiChar): UInt8;
+  begin
+    if c in ['a'..'f'] then Exit(10 + Ord(c) - Ord('a'));
+    if c in ['A'..'F'] then Exit(10 + Ord(c) - Ord('A'));
+    if c in ['0'..'9'] then Exit(Ord(c) - Ord('0'));
+    Result := 0;
+  end;
+  var p: Int32;
+  var i: Int32;
+  var c0, c1: AnsiChar;
+  var Remap: array[0..15] of UInt8 absolute Result;
 begin
+  if Length(GuidString) < 36 then Exit(Invalid);
+  Result := Zero;
+  p := 1;
+  if GuidString[p] = '{' then
+  begin
+    p += 2;
+    if Length(GuidString) < 38 then Exit(Invalid);
+    if GuidString[38] <> '}' then Exit(Invalid);
+  end;
+  for i := 0 to High(Remap) do
+  begin
+    if p + 1 > Length(GuidString) then Exit(Invalid);
+    if GuidString[p] = '-' then Inc(p);
+    c0 := GuidString[p]; Inc(p);
+    c1 := GuidString[p]; Inc(p);
+    if not (c0 in ['a'..'f', 'A'..'F', '0'..'9']) then Exit(Invalid);
+    if not (c1 in ['a'..'f', 'A'..'F', '0'..'9']) then Exit(Invalid);
+    Remap[i] := (HexNum(c0) shl 4) or HexNum(c1);
+  end;
+{$if defined(endian_little)}
+  Result.Data1 := UEndianSwap(Result.Data1);
+  Result.Data2 := UEndianSwap(Result.Data2);
+  Result.Data3 := UEndianSwap(Result.Data3);
+{$endif}
+end;
 
+class function TUGuid.Zero: TUGuid;
+begin
+  UClear(Result, SizeOf(Result));
 end;
 
 class function TUGuid.Invalid: TUGuid;
@@ -10771,7 +10814,18 @@ end;
 
 function TUGuid.ToString: String;
 begin
+  Result := Format(
+    '%.8X-%.4X-%.4X-%.2X%.2X-%.2X%.2X%.2X%.2X%.2X%.2X',
+    [
+      Data1, Data2, Data3, Data4[0], Data4[1],
+      Data4[2], Data4[3], Data4[4], Data4[5], Data4[6], Data4[7]
+    ]
+  );
+end;
 
+function TUGuid.ToStringLC: String;
+begin
+  Result := LowerCase(ToString);
 end;
 
 procedure TUDelegate.Initialize;
@@ -14920,6 +14974,29 @@ end;
 operator := (const v: TUBounds2f): TUVec4;
 begin
   Result := PUVec4(@v)^;
+end;
+
+operator = (const a, b: TUGuid): Boolean;
+begin
+  Result := (
+    (a.Data1 = b.Data1) and
+    (a.Data2 = b.Data2) and
+    (a.Data3 = b.Data3) and
+    (PUInt64(@a.Data4) = PUInt64(@b.Data4))
+  );
+end;
+
+operator < (const a, b: TUGuid): Boolean;
+  var i: Int32;
+begin
+  if a.Data1 <> b.Data1 then Exit(a.Data1 < b.Data1);
+  if a.Data2 <> b.Data2 then Exit(a.Data2 < b.Data2);
+  if a.Data3 <> b.Data3 then Exit(a.Data3 < b.Data3);
+  for i := 0 to High(a.Data4) do
+  begin
+    if a.Data4[i] <> b.Data4[i] then Exit(a.Data4[i] < b.Data4[i]);
+  end;
+  Result := False;
 end;
 
 operator + (const a, b: TUInt4096_Debug): TUInt4096_Debug;
