@@ -1834,11 +1834,13 @@ type TUGuid = record
   var Data4: array[0..7] of UInt8;
   class function Make: TUGuid; static;
   class function Make(const GuidString: String): TUGuid; static;
+  class function Make(const Bytes: TUInt8Array): TUGuid; static;
   class function Zero: TUGuid; static;
   class function Invalid: TUGuid; static;
   function IsValid: Boolean;
   function ToString: String;
   function ToStringLC: String;
+  function ToBytes: TUInt8Array;
 end;
 
 type TUDelegate = record
@@ -10791,6 +10793,12 @@ begin
 {$endif}
 end;
 
+class function TUGuid.Make(const Bytes: TUInt8Array): TUGuid;
+begin
+  if Length(Bytes) < SizeOf(Result) then Exit(Invalid);
+  UInit(Result, Bytes[0], SizeOf(Result));
+end;
+
 class function TUGuid.Zero: TUGuid;
 begin
   UClear(Result, SizeOf(Result));
@@ -10826,6 +10834,11 @@ end;
 function TUGuid.ToStringLC: String;
 begin
   Result := LowerCase(ToString);
+end;
+
+function TUGuid.ToBytes: TUInt8Array;
+begin
+  Result := TUInt8Array.Make(@Self, SizeOf(Self));
 end;
 
 procedure TUDelegate.Initialize;
@@ -14982,7 +14995,7 @@ begin
     (a.Data1 = b.Data1) and
     (a.Data2 = b.Data2) and
     (a.Data3 = b.Data3) and
-    (PUInt64(@a.Data4) = PUInt64(@b.Data4))
+    (PUInt64(@a.Data4)^ = PUInt64(@b.Data4)^)
   );
 end;
 
