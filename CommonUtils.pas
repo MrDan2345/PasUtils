@@ -1672,25 +1672,53 @@ public
   procedure Clear;
 end;
 
-generic TUArray<T> = array of T;
-generic TUArrayUtils<T> = class
-  type TItem = T;
-  type TArr = specialize TUArray<TItem>;
-  class function Add(var Arr: TArr; const Item: TItem): Int32;
-  class function Append(var Arr: TArr; const Other: TArr): Int32;
-  class procedure Insert(var Arr: TArr; const Item: TItem; const Position: Int32);
-  class procedure Delete(var Arr: TArr; const DelStart: Int32; const DelCount: Int32 = 1);
-  class procedure Remove(var Arr: TArr; const Item: TItem);
-  class function Pop(var Arr: TArr): TItem;
-  class function Find(const Arr: TArr; const Item: TItem): Int32;
-end;
-
-generic TUArrayObjUtils<T> = class (specialize TUArrayUtils<T>)
-  class procedure Clear(var Arr: TArr);
-end;
-
 generic TUPredicate<T> = function (const a, b: T): Boolean;
 generic TUPredicateObj<T> = function (const a, b: T): Boolean of object;
+
+generic TUArray<T> = record
+public
+  type TSelf = specialize TUArray<T>;
+  type TData = array of T;
+  type PData = ^TData;
+  type TPred = specialize TUPredicate<T>;
+  type TPredObj = specialize TUPredicateObj<T>;
+  type TEnumerator = class
+  private
+    var Data: PData;
+    var Index: Int32;
+    function GetCurrent: T; inline;
+  public
+    constructor Create(const ArrayData: PData);
+    function MoveNext: Boolean;
+    property Current: T read GetCurrent;
+  end;
+strict private
+  var _Data: TData;
+  function FixIndex(const Index: Int32): Int32; inline;
+  function GetItem(const Index: Int32): T; inline;
+  procedure SetItem(const Index: Int32; const Value: T); inline;
+public
+  property Data: TData read _Data;
+  property Items[const Index: Int32]: T read GetItem write SetItem; default;
+  function IsValidIndex(const Index: Int32; const FixedIndex: PInt32 = nil): Boolean;
+  function IsEmpty: Boolean; inline;
+  function LastIndex: Int32; inline;
+  function Count: Int32; inline;
+  function Find(const Item: T): Int32;
+  function Contains(const Item: T): Boolean;
+  function Add(const Item: T): Int32;
+  function Add(const ItemArray: array of T): Int32;
+  function AddUnique(const Item: T): Int32;
+  function Insert(const Item: T; const Index: Int32): Int32;
+  function Delete(const Index: Int32; const Num: Int32 = 1): Boolean;
+  function Remove(const Item: T): Boolean;
+  function RemoveAll(const Item: T): Int32;
+  procedure Sort(const Predicate: TPred); overload;
+  procedure Sort(const Predicate: TPredObj); overload;
+  procedure Sort; overload;
+  procedure Reverse;
+  function GetEnumerator: TEnumerator;
+end;
 
 generic TULinkedList<T> = record
 public
@@ -2343,16 +2371,16 @@ function UExec(
 generic procedure UArrSort<T>(var Arr: array of T); overload;
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>); overload;
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>); overload;
-generic function UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T): Int32; overload;
-generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Other: specialize TUArray<T>); overload;
-generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
-generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Int32; const DelCount: Int32 = 1);
-generic procedure UArrRemove<T>(var Arr: specialize TUArray<T>; const Item: T);
-generic function UArrPop<T>(var Arr: specialize TUArray<T>): T;
-generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
-generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
+generic function UArrAppend<T>(var Arr: specialize TArray<T>; const Item: T): Int32; overload;
+generic procedure UArrAppend<T>(var Arr: specialize TArray<T>; const Other: specialize TArray<T>); overload;
+generic procedure UArrInsert<T>(var Arr: specialize TArray<T>; const Item: T; const Position: Int32);
+generic procedure UArrDelete<T>(var Arr: specialize TArray<T>; const DelStart: Int32; const DelCount: Int32 = 1);
+generic procedure UArrRemove<T>(var Arr: specialize TArray<T>; const Item: T);
+generic function UArrPop<T>(var Arr: specialize TArray<T>): T;
+generic function UArrFind<T>(const Arr: specialize TArray<T>; const Item: T): Int32;
+generic procedure UArrClear<T>(var Arr: specialize TArray<T>);
 generic function UArrConcat<TArr>(const Arr: array of TArr): TArr;
-generic function UArrJoin<T>(const a, b: array of T): specialize TUArray<T>;
+generic function UArrJoin<T>(const a, b: array of T): specialize TArray<T>;
 generic function UArrCompare<T>(const a, b: array of T): Int8;
 
 operator + (const a, b: TUVec2): TUVec2;
@@ -10332,99 +10360,192 @@ begin
 end;
 // TUMap end
 
-//TUArrayUtils begin
-class function TUArrayUtils.Add(var Arr: TArr; const Item: TItem): Int32;
+// TUArray begin
+function TUArray.TEnumerator.GetCurrent: T;
 begin
-  Result := Length(Arr);
-  SetLength(Arr, Result + 1);
-  Arr[Result] := Item;
+  Result := Data^[Index];
 end;
 
-class function TUArrayUtils.Append(var Arr: TArr; const Other: TArr): Int32;
+constructor TUArray.TEnumerator.Create(const ArrayData: PData);
+begin
+  Data := ArrayData;
+  Index := -1;
+end;
+
+function TUArray.TEnumerator.MoveNext: Boolean;
+begin
+  if Index >= High(Data^) then Exit(False);
+  Inc(Index);
+  Result := True;
+end;
+
+function TUArray.FixIndex(const Index: Int32): Int32;
+begin
+  if Index >= 0 then Exit(Index);
+  Result := Count - (Abs(Index) mod Count);
+end;
+
+function TUArray.GetItem(const Index: Int32): T;
   var i: Int32;
 begin
-  Result := Length(Arr);
-  if Length(Other) = 0 then Exit;
-  SetLength(Arr, Result + Length(Other));
-  for i := 0 to High(Other) do Arr[Result + i] := Other[i];
-  Result += Length(Other);
+  if not IsValidIndex(Index, @i) then Exit(Default(T));
+  Result := _Data[i];
 end;
 
-class procedure TUArrayUtils.Insert(
-  var Arr: TArr; const Item: TItem; const Position: Int32
-);
-  var i, j: Int32;
+procedure TUArray.SetItem(const Index: Int32; const Value: T);
 begin
-  SetLength(Arr, Length(Arr) + 1);
-  if Position < 0 then i := 0
-  else if Position > High(Arr) then i := High(Arr)
-  else i := Position;
-  for j := i to High(Arr) - 1 do
-  begin
-    Arr[j + 1] := Arr[j];
-  end;
-  Arr[i] := Item;
+  if not IsValidIndex(Index) then Exit;
+  _Data[Index] := Value;
 end;
 
-class procedure TUArrayUtils.Delete(
-  var Arr: TArr; const DelStart: Int32; const DelCount: Int32
-);
-  var i, dc: Int32;
-begin
-  dc := DelCount;
-  if DelStart + dc > Length(Arr) then dc := Length(Arr) - DelStart;
-  if (dc < 1) or (DelStart < 0) then Exit;
-  for i := DelStart to High(Arr) - dc do
-  begin
-    Arr[i] := Arr[i + 1];
-  end;
-  SetLength(Arr, Length(Arr) - dc);
-end;
-
-class procedure TUArrayUtils.Remove(var Arr: TArr; const Item: TItem);
-  var i, j, n: Int32;
-begin
-  n := 0;
-  for i := High(Arr) downto 0 do
-  if Arr[i] = Item then
-  begin
-    for j := i to High(Arr) - 1 - n do
-    begin
-      Arr[j] := Arr[j + 1];
-    end;
-    Inc(n);
-  end;
-  SetLength(Arr, Length(Arr) - n);
-end;
-
-class function TUArrayUtils.Pop(var Arr: TArr): TItem;
-begin
-  if Length(Arr) = 0 then Exit(Default(T));
-  Result := Arr[High(Arr)];
-  SetLength(Arr, Length(Arr) - 1);
-end;
-
-class function TUArrayUtils.Find(const Arr: TArr; const Item: TItem): Int32;
+function TUArray.IsValidIndex(const Index: Int32; const FixedIndex: PInt32): Boolean;
   var i: Int32;
 begin
-  for i := 0 to High(Arr) do
+  i := FixIndex(Index);
+  Result := (i >= Low(_Data)) and (i <= High(_Data));
+  if Assigned(FixedIndex) then FixedIndex^ := i;
+end;
+
+function TUArray.IsEmpty: Boolean;
+begin
+  Result := Length(_Data) = 0;
+end;
+
+function TUArray.LastIndex: Int32;
+begin
+  Result := High(_Data);
+end;
+
+function TUArray.Count: Int32;
+begin
+  Result := Length(_Data);
+end;
+
+function TUArray.Find(const Item: T): Int32;
+  var i: Int32;
+begin
+  for i := 0 to High(_Data) do
   begin
-    if Arr[i] = Item then Exit(i);
+    if _Data[i] = Item then Exit(i);
   end;
   Result := -1;
 end;
-//TUArrayUtils end
 
-//TUArrayObjUtils begin
-class procedure TUArrayObjUtils.Clear(var Arr: TArr);
+function TUArray.Contains(const Item: T): Boolean;
+begin
+  Result := Find(Item) > -1;
+end;
+
+function TUArray.Add(const Item: T): Int32;
+begin
+  Result := Length(_Data);
+  SetLength(_Data, Length(_Data) + 1);
+  _Data[Result] := Item;
+end;
+
+function TUArray.Add(const ItemArray: array of T): Int32;
   var i: Int32;
 begin
-  for i := High(Arr) downto 0 do FreeAndNil(Arr[i]);
-  Arr := nil;
+  if Length(ItemArray) = 0 then Exit(-1);
+  Result := Length(_Data);
+  SetLength(_Data, Length(_Data) + Length(ItemArray));
+  for i := 0 to High(ItemArray) do
+  begin
+    _Data[Result + i] := ItemArray[i];
+  end;
 end;
-//TUArrayObjUtils end
 
-//TULinkedList begin
+function TUArray.AddUnique(const Item: T): Int32;
+  var i: Int32;
+begin
+  i := Find(Item);
+  if i > -1 then Exit(-1);
+  Result := Add(Item);
+end;
+
+function TUArray.Insert(const Item: T; const Index: Int32): Int32;
+  var i, j: Int32;
+begin
+  i := FixIndex(Index);
+  SetLength(_Data, Length(_Data) + 1);
+  if i > High(_Data) then i := High(_Data);
+  for j := i + 1 to High(_Data) do
+  begin
+    _Data[j - 1] := _Data[j];
+  end;
+  _Data[i] := Item;
+  Result := i;
+end;
+
+function TUArray.Delete(const Index: Int32; const Num: Int32): Boolean;
+  var i, j, n: Int32;
+begin
+  if not IsValidIndex(Index, @i) then Exit(False);
+  if Num < 1 then n := Count else n := UMin(Count - i, Num);
+  for j := i + n to High(_Data) do
+  begin
+    _Data[j - n] := _Data[j];
+  end;
+  SetLength(_Data, Length(_Data) - n);
+  Result := True;
+end;
+
+function TUArray.Remove(const Item: T): Boolean;
+  var i: Int32;
+begin
+  i := Find(Item);
+  if i < 0 then Exit(False);
+  Result := Delete(i);
+end;
+
+function TUArray.RemoveAll(const Item: T): Int32;
+  var i, j: Int32;
+begin
+  Result := 0;
+  for i := High(_Data) downto 0 do
+  begin
+    if _Data[i] <> Item then Continue;
+    for j := i + 1 to High(_Data) - Result do
+    begin
+      _Data[j - 1] := _Data[j];
+    end;
+    Inc(Result);
+  end;
+  SetLength(_Data, Length(_Data) - Result);
+end;
+
+procedure TUArray.Sort(const Predicate: TPred);
+begin
+  specialize UArrSort<T>(_Data, Predicate);
+end;
+
+procedure TUArray.Sort(const Predicate: TPredObj);
+begin
+  specialize UArrSort<T>(_Data, Predicate);
+end;
+
+procedure TUArray.Sort;
+begin
+  specialize UArrSort<T>(_Data);
+end;
+
+procedure TUArray.Reverse;
+  var i, h: Int32;
+begin
+  h := High(_Data);
+  for i := 0 to (Length(_Data) shr 1) - 1 do
+  begin
+    specialize USwap<T>(_Data[i], _Data[h - i]);
+  end;
+end;
+
+function TUArray.GetEnumerator: TEnumerator;
+begin
+  Result := TEnumerator.Create(@_Data);
+end;
+// TUArray end
+
+// TULinkedList begin
 function TULinkedList.TEnumerator.GetCurrent: T;
 begin
   Result := _Current.Data;
@@ -15874,14 +15995,14 @@ begin
   SortRange(Low(Arr), High(Arr));
 end;
 
-generic function UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T): Int32;
+generic function UArrAppend<T>(var Arr: specialize TArray<T>; const Item: T): Int32;
 begin
   SetLength(Arr, Length(Arr) + 1);
   Result := High(Arr);
   Arr[Result] := Item;
 end;
 
-generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Other: specialize TUArray<T>);
+generic procedure UArrAppend<T>(var Arr: specialize TArray<T>; const Other: specialize TArray<T>);
   var i, n: Int32;
 begin
   n := Length(Arr);
@@ -15892,7 +16013,7 @@ begin
   end;
 end;
 
-generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
+generic procedure UArrInsert<T>(var Arr: specialize TArray<T>; const Item: T; const Position: Int32);
   var i, j: Int32;
 begin
   SetLength(Arr, Length(Arr) + 1);
@@ -15906,7 +16027,7 @@ begin
   Arr[i] := Item;
 end;
 
-generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Int32; const DelCount: Int32);
+generic procedure UArrDelete<T>(var Arr: specialize TArray<T>; const DelStart: Int32; const DelCount: Int32);
   var i, dc: Int32;
 begin
   dc := DelCount;
@@ -15919,7 +16040,7 @@ begin
   SetLength(Arr, Length(Arr) - dc);
 end;
 
-generic procedure UArrRemove<T>(var Arr: specialize TUArray<T>; const Item: T);
+generic procedure UArrRemove<T>(var Arr: specialize TArray<T>; const Item: T);
   var i, j, n: Int32;
 begin
   n := 0;
@@ -15935,14 +16056,14 @@ begin
   SetLength(Arr, Length(Arr) - n);
 end;
 
-generic function UArrPop<T>(var Arr: specialize TUArray<T>): T;
+generic function UArrPop<T>(var Arr: specialize TArray<T>): T;
 begin
   if Length(Arr) < 1 then Exit(Default(T));
   Result := Arr[High(Arr)];
   SetLength(Arr, Length(Arr) - 1);
 end;
 
-generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
+generic function UArrFind<T>(const Arr: specialize TArray<T>; const Item: T): Int32;
   var i: Int32;
 begin
   for i := 0 to High(Arr) do
@@ -15952,7 +16073,7 @@ begin
   Result := -1;
 end;
 
-generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
+generic procedure UArrClear<T>(var Arr: specialize TArray<T>);
   var i: Int32;
 begin
   for i := High(Arr) downto 0 do FreeAndNil(Arr[i]);
@@ -15978,7 +16099,7 @@ begin
   end;
 end;
 
-generic function UArrJoin<T>(const a, b: array of T): specialize TUArray<T>;
+generic function UArrJoin<T>(const a, b: array of T): specialize TArray<T>;
   var n: Int32;
 begin
   Result := nil;
