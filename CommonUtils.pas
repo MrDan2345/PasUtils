@@ -1774,7 +1774,6 @@ public
   class operator Initialize(var v: TSelf);
   class operator Finalize(var v: TSelf);
 end;
-{$define TUFIFOList := TUQueue}
 
 generic TUFastList<T> = record
   //Unordered list with persistent index preservation
