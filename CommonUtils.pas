@@ -1718,6 +1718,7 @@ public
   procedure Sort(const Predicate: TPred); overload;
   procedure Sort(const Predicate: TPredObj); overload;
   procedure Sort; overload;
+  procedure Clear;
   procedure Reverse;
   function GetEnumerator: TEnumerator;
 end;
@@ -1878,22 +1879,33 @@ generic TUHeap<T> = record
 public
   type TSelf = specialize TUHeap<T>;
   type TData = specialize TUArray<T>;
-  type TPredicate = function (const a, b: T): Boolean of object;
+  type TPredicate = specialize TUPredicateObj<T>;
 strict private
   var _Data: TData;
   var _Pred: TPredicate;
+  var _MaxHeap: Boolean;
+  function PredicateMin(const a, b: T): Boolean;
+  function PredicateMax(const a, b: T): Boolean;
   function ParentIdx(const Idx: Int32): Int32;
   function LeftIdx(const Idx: Int32): Int32;
   function RightIdx(const Idx: Int32): Int32;
   procedure SiftUp(const Idx: Int32);
   procedure SiftDown(const Idx: Int32);
+  procedure Initialize;
+  procedure Finalize;
+  procedure SetMaxHeap(const Value: Boolean);
 public
+  property Predicate: TPredicate read _Pred write _Pred;
+  property MaxHeap: Boolean read _MaxHeap write SetMaxHeap;
   function IsEmpty: Boolean;
   procedure Push(const Value: T);
   procedure Push(const Values: array of T);
   function Pop: T;
   function Peek: T;
   function Count: Int32;
+  procedure Reorder;
+  class operator Initialize(var v: TSelf);
+  class operator Finalize(var v: TSelf);
 end;
 
 type TUGuid = record
@@ -10566,6 +10578,11 @@ begin
   specialize UArrSort<T>(_Data);
 end;
 
+procedure TUArray.Clear;
+begin
+  _Data := nil;
+end;
+
 procedure TUArray.Reverse;
   var i, h: Int32;
 begin
@@ -11093,6 +11110,16 @@ end;
 // TUStack end
 
 // TUHeap begin
+function TUHeap.PredicateMin(const a, b: T): Boolean;
+begin
+  Result := a < b;
+end;
+
+function TUHeap.PredicateMax(const a, b: T): Boolean;
+begin
+  Result := a > b;
+end;
+
 function TUHeap.ParentIdx(const Idx: Int32): Int32;
 begin
   Result := (Idx - 1) shr 1;
@@ -11115,27 +11142,53 @@ begin
   while i > 0 do
   begin
     p := ParentIdx(i);
-    if _Data[i] >= _Data[p] then Break;
+    if not _Pred(_Data[i], _Data[p]) then Break;
     USwap(_Data.Data[i], _Data.Data[p]);
     i := p;
   end;
 end;
 
 procedure TUHeap.SiftDown(const Idx: Int32);
-  var Smallest, i, l, r: Int32;
+  var Heap, i, l, r: Int32;
 begin
   i := Idx;
   while True do
   begin
-    Smallest := i;
+    Heap := i;
     l := LeftIdx(i);
     r := RightIdx(i);
-    if (l < _Data.Count) and (_Data[l] < _Data[Smallest]) then Smallest := l;
-    if (r < _Data.Count) and (_Data[r] < _Data[Smallest]) then Smallest := r;
-    if Smallest = i then Break;
-    USwap(_Data.Data[i], _Data.Data[Smallest]);
-    i := Smallest;
+    if (l < _Data.Count) and (_Pred(_Data[l], _Data[Heap])) then Heap := l;
+    if (r < _Data.Count) and (_Pred(_Data[r], _Data[Heap])) then Heap := r;
+    if Heap = i then Break;
+    USwap(_Data.Data[i], _Data.Data[Heap]);
+    i := Heap;
   end;
+end;
+
+procedure TUHeap.Initialize;
+begin
+  _Pred := @PredicateMin;
+  _MaxHeap := False;
+end;
+
+procedure TUHeap.Finalize;
+begin
+end;
+
+procedure TUHeap.SetMaxHeap(const Value: Boolean);
+begin
+  if Value = _MaxHeap then Exit;
+  _MaxHeap := Value;
+  if _MaxHeap then
+  begin
+    _Pred := @PredicateMax;
+  end
+  else
+  begin
+    _Pred := @PredicateMin;
+  end;
+  if _Data.Count <= 1 then Exit;
+  Reorder;
 end;
 
 function TUHeap.IsEmpty: Boolean;
@@ -11178,7 +11231,31 @@ function TUHeap.Count: Int32;
 begin
   Result := _Data.Count;
 end;
-// TUHeap end;
+
+procedure TUHeap.Reorder;
+  var Arr: array of T;
+  var i: Int32;
+begin
+  Arr := nil;
+  SetLength(Arr, _Data.Count);
+  for i := 0 to High(Arr) do
+  begin
+    Arr[i] := _Data.Data[i];
+  end;
+  _Data.Clear;
+  Push(Arr);
+end;
+
+class operator TUHeap.Initialize(var v: TSelf);
+begin
+  v.Initialize;
+end;
+
+class operator TUHeap.Finalize(var v: TSelf);
+begin
+  v.Finalize;
+end;
+// TUHeap end
 
 // TUGuid begin
 class function TUGuid.Make: TUGuid;
