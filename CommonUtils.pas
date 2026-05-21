@@ -1719,6 +1719,7 @@ public
   procedure Sort(const Predicate: TPredObj); overload;
   procedure Sort; overload;
   procedure Clear;
+  procedure Free;
   procedure Reverse;
   function GetEnumerator: TEnumerator;
 end;
@@ -1907,6 +1908,33 @@ public
   class operator Initialize(var v: TSelf);
   class operator Finalize(var v: TSelf);
 end;
+
+type TURadixTree = record
+public
+  type TNode = class
+    var Radix: String;
+    var Index: Int32;
+    var Subset: specialize TUArray<TNode>;
+    constructor Create(const ARadix: String; const AIndex: Int32);
+    destructor Destroy; override;
+  end;
+  type PNode = ^TNode;
+  type TNodeArray = specialize TUArray<TNode>;
+  type PNodeArray = ^TNodeArray;
+private
+  var _Root: specialize TUArray<TNode>;
+  var _Sorted: Boolean;
+  procedure Initialize;
+  procedure Finalize;
+public
+  procedure Add(const Key: String; const Index: Int32);
+  function Find(const Key: String): Int32;
+  procedure Sort;
+  procedure Dump;
+  class operator Initialize(var v: TURadixTree);
+  class operator Finalize(var v: TURadixTree);
+end;
+operator > (const a, b: TURadixTree.TNode): Boolean;
 
 type TUGuid = record
   var Data1: UInt32;
@@ -10583,6 +10611,17 @@ begin
   _Data := nil;
 end;
 
+procedure TUArray.Free;
+  type PObject = ^TObject;
+  var i: Int32;
+begin
+  for i := 0 to High(_Data) do
+  begin
+    PObject(@_Data[i])^.Free;
+  end;
+  _Data := nil;
+end;
+
 procedure TUArray.Reverse;
   var i, h: Int32;
 begin
@@ -11256,6 +11295,205 @@ begin
   v.Finalize;
 end;
 // TUHeap end
+
+// TURadixTree begin
+constructor TURadixTree.TNode.Create(const ARadix: String; const AIndex: Int32);
+begin
+  inherited Create;
+  Radix := ARadix;
+  Index := AIndex;
+end;
+
+destructor TURadixTree.TNode.Destroy;
+begin
+  Subset.Free;
+  inherited Destroy;
+end;
+
+operator > (const a, b: TURadixTree.TNode): Boolean;
+begin
+  Result := a.Radix > b.Radix;
+end;
+
+procedure TURadixTree.Initialize;
+begin
+  _Sorted := True;
+end;
+
+procedure TURadixTree.Finalize;
+begin
+  _Root.Free;
+end;
+
+procedure TURadixTree.Add(const Key: String; const Index: Int32);
+  var Radix: String;
+  function InsertNode(const Node: TNode; const Ref: PNode): Boolean;
+    var i, n: Int32;
+    var n0, n1: TNode;
+  begin
+    Result := Node.Radix[1] = Radix[1];
+    if not Result then Exit;
+    n := UMin(Length(Radix), Length(Node.Radix));
+    for i := 2 to n do
+    if Radix[i] <> Node.Radix[i] then
+    begin
+      n0 := TNode.Create(UStrSubStr(Radix, 1, i - 1), -1);
+      n0.Subset.Add(Node);
+      Ref^ := n0;
+      Node.Radix := UStrSubStr(Node.Radix, i, Length(Node.Radix) - i + 1);
+      n1 := TNode.Create(UStrSubStr(Radix, i, Length(Radix) - i + 1), Index);
+      n0.Subset.Add(n1);
+      Exit;
+    end;
+    if Length(Radix) = Length(Node.Radix) then
+    begin
+      Node.Index := Index;
+    end
+    else if Length(Radix) < Length(Node.Radix) then
+    begin
+      n0 := TNode.Create(Radix, Index);
+      n0.Subset.Add(Node);
+      Ref^ := n0;
+      Node.Radix := UStrSubStr(Node.Radix, Length(Radix) + 1, Length(Node.Radix) - Length(Radix));
+    end
+    else if Length(Radix) > Length(Node.Radix) then
+    begin
+      Radix := UStrSubStr(Radix, Length(Node.Radix) + 1, Length(Radix) - Length(Node.Radix));
+      for i := 0 to Node.Subset.LastIndex do
+      if InsertNode(Node.Subset[i], @Node.Subset.Data[i]) then
+      begin
+        Exit;
+      end;
+      n0 := TNode.Create(Radix, Index);
+      Node.Subset.Add(n0);
+    end;
+  end;
+  var i: Int32;
+begin
+  if Length(Key) = 0 then Exit;
+  _Sorted := False;
+  Radix := Key;
+  for i := 0 to _Root.LastIndex do
+  if InsertNode(_Root[i], @_Root.Data[i]) then
+  begin
+    Exit;
+  end;
+  _Root.Add(TNode.Create(Key, Index));
+end;
+
+function TURadixTree.Find(const Key: String): Int32;
+  var Offset: Int32;
+  function SearchSubset(constref Arr: TNodeArray): TNode;
+    var l, h, m, r, n: Int32;
+    var Node: TNode;
+  begin
+    l := 0;
+    h := Arr.LastIndex;
+    while (l <= h) do
+    begin
+      m := (l + h) shr 1;
+      Node := Arr[m];
+      r := Ord(Node.Radix[1]) - Ord(Key[Offset]);
+      if (r < 0) then
+      begin
+	l := m + 1;
+      end
+      else if r > 0 then
+      begin
+	h := m - 1;
+      end
+      else
+      begin
+	n := 2;
+        Inc(Offset);
+	while (
+	  (n <= Length(Node.Radix))
+	  and (Offset <= Length(Key))
+	  and (Arr[m].Radix[n] = Key[Offset])
+	) do
+        begin
+	  Inc(n);
+	  Inc(Offset);
+        end;
+	if (n = Length(Node.Radix) + 1) then
+        begin
+          if Offset > Length(Key) then
+          begin
+            Exit(Node)
+          end
+          else
+          begin
+            Exit(SearchSubset(Node.Subset));
+          end;
+        end;
+        Exit(nil);
+      end;
+    end;
+    Result := nil;
+  end;
+  var Node: TNode;
+begin
+  if Length(Key) = 0 then Exit(-1);
+  if _Root.IsEmpty then Exit(-1);
+  if not _Sorted then Sort;
+  Offset := 1;
+  Node := SearchSubset(_Root);
+  if Node = nil then Exit(-1);
+  if Offset = Length(Key) + 1 then Exit(Node.Index);
+  Result := -1;
+end;
+
+procedure TURadixTree.Sort;
+  procedure SortArr(var Arr: TNodeArray);
+    var i: Int32;
+  begin
+    Arr.Sort;
+    for i := 0 to Arr.LastIndex do
+    begin
+      SortArr(Arr.Data[i].Subset);
+    end;
+  end;
+begin
+  _Sorted := True;
+  if _Root.IsEmpty then Exit;
+  SortArr(_Root);
+end;
+
+procedure TURadixTree.Dump;
+  procedure DumpNode(const Node: TNode; const Depth: String = '');
+    var i: Int32;
+    var NewDepth: String;
+  begin
+    Write(Depth, '"', Node.Radix, '"', ':');
+    if Node.Index > -1 then WriteLn(' ', Node.Index) else WriteLn;
+    NewDepth := Depth;
+    if Length(NewDepth) > 0 then
+    begin
+      NewDepth[Length(NewDepth)] := ' ';
+    end;
+    for i := 0 to Node.Subset.LastIndex do
+    begin
+      DumpNode(Node.Subset[i], NewDepth + '|_');
+    end;
+  end;
+  var i: Int32;
+begin
+  for i := 0 to _Root.LastIndex do
+  begin
+    DumpNode(_Root[i]);
+  end;
+end;
+
+class operator TURadixTree.Initialize(var v: TURadixTree);
+begin
+  v.Initialize;
+end;
+
+class operator TURadixTree.Finalize(var v: TURadixTree);
+begin
+  v.Finalize;
+end;
+// TURadixTree end
 
 // TUGuid begin
 class function TUGuid.Make: TUGuid;
