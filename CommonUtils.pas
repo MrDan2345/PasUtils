@@ -1713,6 +1713,8 @@ public
   function Delete(const Index: Int32; const Num: Int32 = 1): Boolean;
   function Remove(const Item: T): Boolean;
   function RemoveAll(const Item: T): Int32;
+  function Pop: T;
+  function Last: T;
   procedure Sort(const Predicate: TPred); overload;
   procedure Sort(const Predicate: TPredObj); overload;
   procedure Sort; overload;
@@ -1870,6 +1872,28 @@ public
   function Count: Int32;
   class operator Initialize(var v: TSelf);
   class operator Finalize(var v: TSelf);
+end;
+
+generic TUHeap<T> = record
+public
+  type TSelf = specialize TUHeap<T>;
+  type TData = specialize TUArray<T>;
+  type TPredicate = function (const a, b: T): Boolean of object;
+strict private
+  var _Data: TData;
+  var _Pred: TPredicate;
+  function ParentIdx(const Idx: Int32): Int32;
+  function LeftIdx(const Idx: Int32): Int32;
+  function RightIdx(const Idx: Int32): Int32;
+  procedure SiftUp(const Idx: Int32);
+  procedure SiftDown(const Idx: Int32);
+public
+  function IsEmpty: Boolean;
+  procedure Push(const Value: T);
+  procedure Push(const Values: array of T);
+  function Pop: T;
+  function Peek: T;
+  function Count: Int32;
 end;
 
 type TUGuid = record
@@ -10469,9 +10493,9 @@ begin
   i := FixIndex(Index);
   SetLength(_Data, Length(_Data) + 1);
   if i > High(_Data) then i := High(_Data);
-  for j := i + 1 to High(_Data) do
+  for j := High(_Data) downto i + 1 do
   begin
-    _Data[j - 1] := _Data[j];
+    _Data[j] := _Data[j - 1];
   end;
   _Data[i] := Item;
   Result := i;
@@ -10512,6 +10536,19 @@ begin
     Inc(Result);
   end;
   SetLength(_Data, Length(_Data) - Result);
+end;
+
+function TUArray.Pop: T;
+begin
+  if IsEmpty then Exit(Default(T));
+  Result := _Data[High(_Data)];
+  SetLength(_Data, High(_Data));
+end;
+
+function TUArray.Last: T;
+begin
+  if IsEmpty then Exit(Default(T));
+  Result := _Data[High(_Data)];
 end;
 
 procedure TUArray.Sort(const Predicate: TPred);
@@ -11054,6 +11091,94 @@ begin
   v.Finalize;
 end;
 // TUStack end
+
+// TUHeap begin
+function TUHeap.ParentIdx(const Idx: Int32): Int32;
+begin
+  Result := (Idx - 1) shr 1;
+end;
+
+function TUHeap.LeftIdx(const Idx: Int32): Int32;
+begin
+  Result := 2 * Idx + 1;
+end;
+
+function TUHeap.RightIdx(const Idx: Int32): Int32;
+begin
+  Result := 2 * Idx + 2;
+end;
+
+procedure TUHeap.SiftUp(const Idx: Int32);
+  var i, p: Int32;
+begin
+  i := Idx;
+  while i > 0 do
+  begin
+    p := ParentIdx(i);
+    if _Data[i] >= _Data[p] then Break;
+    USwap(_Data.Data[i], _Data.Data[p]);
+    i := p;
+  end;
+end;
+
+procedure TUHeap.SiftDown(const Idx: Int32);
+  var Smallest, i, l, r: Int32;
+begin
+  i := Idx;
+  while True do
+  begin
+    Smallest := i;
+    l := LeftIdx(i);
+    r := RightIdx(i);
+    if (l < _Data.Count) and (_Data[l] < _Data[Smallest]) then Smallest := l;
+    if (r < _Data.Count) and (_Data[r] < _Data[Smallest]) then Smallest := r;
+    if Smallest = i then Break;
+    USwap(_Data.Data[i], _Data.Data[Smallest]);
+    i := Smallest;
+  end;
+end;
+
+function TUHeap.IsEmpty: Boolean;
+begin
+  Result := _Data.IsEmpty;
+end;
+
+procedure TUHeap.Push(const Value: T);
+begin
+  SiftUp(_Data.Add(Value));
+end;
+
+procedure TUHeap.Push(const Values: array of T);
+  var i: Int32;
+begin
+  for i := 0 to High(Values) do
+  begin
+    SiftUp(_Data.Add(Values[i]));
+  end;
+end;
+
+function TUHeap.Pop: T;
+  var Temp: T;
+begin
+  if _Data.IsEmpty then Exit(Default(T));
+  Result := _Data[0];
+  Temp := _Data.Pop;
+  if IsEmpty then Exit;
+  _Data[0] := Temp;
+  SiftDown(0);
+end;
+
+function TUHeap.Peek: T;
+begin
+  if _Data.IsEmpty then Exit(Default(T));
+  Result := _Data[0];
+end;
+
+function TUHeap.Count: Int32;
+begin
+  Result := _Data.Count;
+end;
+// TUHeap end;
 
 // TUGuid begin
 class function TUGuid.Make: TUGuid;
