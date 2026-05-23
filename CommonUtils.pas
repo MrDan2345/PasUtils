@@ -1256,7 +1256,7 @@ public
   class operator Initialize(var v: TSelf);
   class operator := (const Value: TPtr): TSelf; inline;
   class operator := (const Value: Pointer): TSelf; inline;
-  class operator = (v1, v2: TSelf): Boolean; inline;
+  class operator = (a, b: TSelf): Boolean; inline;
 end;
 
 type generic TUWeakRef<T> = record
@@ -1274,6 +1274,7 @@ public
   function AsShared: TShared; inline;
   class operator := (const Value: TPtr): TSelf; inline;
   class operator := (const Value: TShared): TSelf; inline;
+  class operator = (const a, b: TSelf): Boolean; inline;
 end;
 
 type TURefClass = class;
@@ -1715,9 +1716,6 @@ public
   function RemoveAll(const Item: T): Int32;
   function Pop: T;
   function Last: T;
-  procedure Sort(const Predicate: TPred); overload;
-  procedure Sort(const Predicate: TPredObj); overload;
-  procedure Sort; overload;
   procedure Clear;
   procedure Free;
   procedure Reverse;
@@ -2393,6 +2391,7 @@ function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
 function UIsCharTrimable(const c: AnsiChar): Boolean;
 function UStrExprMatch(const Str, Expr: String): TUExprMatch;
 function UStrExplode(const Str: String; const Separator: String; const AllowEmpty: Boolean = True): TUStrArray;
+function UStrReplace(const Str, Old, New: String): String;
 function UStrSubStr(const Str: String; const SubStrStart: Int32; const SubStrLength: Int32 = 0): String;
 function UStrSubPos(const Str, SubStr: String): Int32;
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boolean;
@@ -2432,6 +2431,13 @@ function UExec(
   const OnOutput: TUProcedureString = nil
 ): Int32;
 
+
+generic procedure USort<T>(var Arr: array of T); overload;
+generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>); overload;
+generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>); overload;
+generic procedure USort<T>(var Arr: specialize TUArray<T>); overload;
+generic procedure USort<T>(var Arr: specialize TUArray<T>; const Pred: specialize TUPredicate<T>); overload;
+generic procedure USort<T>(var Arr: specialize TUArray<T>; const Pred: specialize TUPredicateObj<T>); overload;
 generic procedure UArrSort<T>(var Arr: array of T); overload;
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>); overload;
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>); overload;
@@ -7624,9 +7630,9 @@ begin
   {$pop}
 end;
 
-class operator TUSharedRef.=(v1, v2: TSelf): Boolean;
+class operator TUSharedRef.=(a, b: TSelf): Boolean;
 begin
-  Result := v1._Ptr = v2._Ptr;
+  Result := a._Ptr = b._Ptr;
 end;
 // TUSharedRef end
 
@@ -7673,6 +7679,11 @@ end;
 class operator TUWeakRef.:= (const Value: TShared): TSelf;
 begin
   Result.Assign(Value.Ptr);
+end;
+
+class operator TUWeakRef.=(const a, b: TSelf): Boolean;
+begin
+  Result := a.Ptr = b.Ptr;
 end;
 // TUWeakRef end
 
@@ -10591,21 +10602,6 @@ begin
   Result := _Data[High(_Data)];
 end;
 
-procedure TUArray.Sort(const Predicate: TPred);
-begin
-  specialize UArrSort<T>(_Data, Predicate);
-end;
-
-procedure TUArray.Sort(const Predicate: TPredObj);
-begin
-  specialize UArrSort<T>(_Data, Predicate);
-end;
-
-procedure TUArray.Sort;
-begin
-  specialize UArrSort<T>(_Data);
-end;
-
 procedure TUArray.Clear;
 begin
   _Data := nil;
@@ -11447,7 +11443,7 @@ procedure TURadixTree.Sort;
   procedure SortArr(var Arr: TNodeArray);
     var i: Int32;
   begin
-    Arr.Sort;
+    specialize USort<TNode>(Arr);
     for i := 0 to Arr.LastIndex do
     begin
       SortArr(Arr.Data[i].Subset);
@@ -15347,6 +15343,11 @@ begin
   Result := a + DirectorySeparator + b;
 end;
 
+operator - (const a, b: String): String;
+begin
+  Result := StringReplace(a, b, '', [rfReplaceAll]);
+end;
+
 operator := (const v: TUVec2): TUVec2i;
 begin
   Result[0] := Trunc(v[0]);
@@ -15879,6 +15880,32 @@ begin
   SetLength(Result, CurElement);
 end;
 
+function UStrReplace(const Str, Old, New: String): String;
+  var i, j, p: Int32;
+  var Match: Boolean;
+begin
+  if Length(Old) = 0 then Exit(Str);
+  Result := '';
+  p := 1;
+  for i := 1 to Length(Str) do
+  begin
+    Match := True;
+    for j := 1 to Length(Old) do
+    begin
+      if Str[i + j] <> Old[j] then
+      begin
+        Match := False;
+        Break;
+      end;
+    end;
+    if not Match then Continue;
+    if i > p then Result += UStrSubStr(Str, p, i - p);
+    Result += New;
+    p := i + Length(Old);
+  end;
+  if p < Length(Str) then Result += UStrSubStr(Str, p, Length(Str) - p);
+end;
+
 function UStrSubStr(
   const Str: String;
   const SubStrStart: Int32;
@@ -16351,7 +16378,7 @@ begin
   end;
 end;
 
-generic procedure UArrSort<T>(var Arr: array of T);
+generic procedure USort<T>(var Arr: array of T);
   procedure SortRange(const RangeStart, RangeEnd: Int32); overload;
     var i, j: Int32;
     var tmp, pivot: T;
@@ -16379,7 +16406,7 @@ begin
   SortRange(Low(Arr), High(Arr));
 end;
 
-generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>);
+generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>);
   procedure SortRange(const RangeStart, RangeEnd: Int32); overload;
     var i, j: Int32;
     var tmp, pivot: T;
@@ -16407,7 +16434,7 @@ begin
   SortRange(Low(Arr), High(Arr));
 end;
 
-generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>);
+generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>);
   procedure SortRange(const RangeStart, RangeEnd: Int32); overload;
     var i, j: Int32;
     var tmp, pivot: T;
@@ -16433,6 +16460,36 @@ generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPred
   end;
 begin
   SortRange(Low(Arr), High(Arr));
+end;
+
+generic procedure USort<T>(var Arr: specialize TUArray<T>); overload;
+begin
+  specialize USort<T>(Arr.Data);
+end;
+
+generic procedure USort<T>(var Arr: specialize TUArray<T>; const Pred: specialize TUPredicate<T>); overload;
+begin
+  specialize USort<T>(Arr.Data, Pred);
+end;
+
+generic procedure USort<T>(var Arr: specialize TUArray<T>; const Pred: specialize TUPredicateObj<T>); overload;
+begin
+  specialize USort<T>(Arr.Data, Pred);
+end;
+
+generic procedure UArrSort<T>(var Arr: array of T);
+begin
+  specialize USort<T>(Arr);
+end;
+
+generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>);
+begin
+  specialize USort<T>(Arr, Pred);
+end;
+
+generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>);
+begin
+  specialize USort<T>(Arr, Pred);
 end;
 
 generic function UArrAppend<T>(var Arr: specialize TArray<T>; const Item: T): Int32;
