@@ -15881,29 +15881,42 @@ begin
 end;
 
 function UStrReplace(const Str, Old, New: String): String;
-  var i, j, p: Int32;
+  var i, j, n, p, StrLen, OldLen: Int32;
   var Match: Boolean;
 begin
-  if Length(Old) = 0 then Exit(Str);
+  OldLen := Length(Old);
+  if OldLen = 0 then Exit(Str);
+  StrLen := Length(Str);
   Result := '';
   p := 1;
-  for i := 1 to Length(Str) do
-  begin
+  i := 1;
+  while i <= Length(Str) do
+  try
     Match := True;
-    for j := 1 to Length(Old) do
+    for j := 1 to OldLen do
     begin
-      if Str[i + j] <> Old[j] then
+      n := i + j - 1;
+      if n > StrLen then
+      begin
+        i := Length(Str);
+        Match := False;
+        Break;
+      end;
+      if Str[n] <> Old[j] then
       begin
         Match := False;
         Break;
       end;
     end;
     if not Match then Continue;
-    if i > p then Result += UStrSubStr(Str, p, i - p);
+    if (i > p) then Result += UStrSubStr(Str, p, i - p);
     Result += New;
-    p := i + Length(Old);
+    p := i + OldLen;
+    i := p - 1;
+  finally
+    Inc(i);
   end;
-  if p < Length(Str) then Result += UStrSubStr(Str, p, Length(Str) - p);
+  if p < Length(Str) then Result += UStrSubStr(Str, p, StrLen - p + 1);
 end;
 
 function UStrSubStr(
