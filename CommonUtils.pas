@@ -15346,7 +15346,7 @@ end;
 
 operator - (const a, b: String): String;
 begin
-  Result := StringReplace(a, b, '', [rfReplaceAll]);
+  Result := UStrRemove(a, b);
 end;
 
 operator := (const v: TUVec2): TUVec2i;
