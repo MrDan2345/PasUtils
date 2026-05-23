@@ -2392,6 +2392,7 @@ function UIsCharTrimable(const c: AnsiChar): Boolean;
 function UStrExprMatch(const Str, Expr: String): TUExprMatch;
 function UStrExplode(const Str: String; const Separator: String; const AllowEmpty: Boolean = True): TUStrArray;
 function UStrReplace(const Str, Old, New: String): String;
+function UStrRemove(const Str, Pattern: String): String;
 function UStrSubStr(const Str: String; const SubStrStart: Int32; const SubStrLength: Int32 = 0): String;
 function UStrSubPos(const Str, SubStr: String): Int32;
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boolean;
@@ -15881,27 +15882,23 @@ begin
 end;
 
 function UStrReplace(const Str, Old, New: String): String;
-  var i, j, n, p, StrLen, OldLen: Int32;
+  var i, j, n, p, StrLen, OldLen, LastIndex: Int32;
   var Match: Boolean;
 begin
   OldLen := Length(Old);
   if OldLen = 0 then Exit(Str);
   StrLen := Length(Str);
+  if OldLen > StrLen then Exit(Str);
   Result := '';
   p := 1;
   i := 1;
-  while i <= Length(Str) do
+  LastIndex := StrLen - OldLen + 1;
+  while i <= LastIndex do
   try
     Match := True;
     for j := 1 to OldLen do
     begin
       n := i + j - 1;
-      if n > StrLen then
-      begin
-        i := Length(Str);
-        Match := False;
-        Break;
-      end;
       if Str[n] <> Old[j] then
       begin
         Match := False;
@@ -15916,7 +15913,49 @@ begin
   finally
     Inc(i);
   end;
-  if p < Length(Str) then Result += UStrSubStr(Str, p, StrLen - p + 1);
+  if p < StrLen then Result += UStrSubStr(Str, p, StrLen - p + 1);
+end;
+
+function UStrRemove(const Str, Pattern: String): String;
+  var i, j, s, d, StrLen, PatLen, LastIndex: Int32;
+  var Match: Boolean;
+begin
+  StrLen := Length(Str);
+  if StrLen = 0 then Exit(Str);
+  PatLen := Length(Pattern);
+  if StrLen < PatLen then Exit(Str);
+  SetLength(Result, StrLen);
+  s := 1;
+  i := 1;
+  d := 1;
+  LastIndex := StrLen - PatLen + 1;
+  while i <= LastIndex do
+  try
+    Match := True;
+    for j := 1 to PatLen do
+    begin
+      if Str[i + j - 1] <> Pattern[j] then
+      begin
+        Match := False;
+        Break;
+      end;
+    end;
+    if not Match then Continue;
+    if i > s then
+    begin
+      Move(Str[s], Result[d], i - s);
+      Inc(d, i - s);
+    end;
+    s := i + PatLen;
+  finally
+    Inc(i);
+  end;
+  if s < StrLen then
+  begin
+    Move(Str[s], Result[d], StrLen - s + 1);
+    Inc(d, StrLen - s + 1);
+  end;
+  if d - 1 < StrLen then SetLength(Result, d - 1);
 end;
 
 function UStrSubStr(
