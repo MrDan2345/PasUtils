@@ -1679,6 +1679,7 @@ generic TUPredicateObj<T> = function (const a, b: T): Boolean of object;
 generic TUArray<T> = record
 public
   type TSelf = specialize TUArray<T>;
+  type TPtr = ^T;
   type TData = array of T;
   type PData = ^TData;
   type TPred = specialize TUPredicate<T>;
@@ -1698,9 +1699,11 @@ strict private
   function FixIndex(const Index: Int32): Int32; inline;
   function GetItem(const Index: Int32): T; inline;
   procedure SetItem(const Index: Int32; const Value: T); inline;
+  function GetPtr(const Index: Int32): TPtr; inline;
 public
   property Data: TData read _Data;
-  property Items[const Index: Int32]: T read GetItem write SetItem; default;
+  property Items[const Index: Int32]: T read GetItem write SetItem;
+  property Ptr[const Index: Int32]: TPtr read GetPtr; default;
   function IsValidIndex(const Index: Int32; const FixedIndex: PInt32 = nil): Boolean;
   function IsEmpty: Boolean; inline;
   function LastIndex: Int32; inline;
@@ -10477,6 +10480,12 @@ begin
   _Data[Index] := Value;
 end;
 
+function TUArray.GetPtr(const Index: Int32): TPtr;
+begin
+  if not IsValidIndex(Index) then Exit(nil);
+  Result := @_Data[Index];
+end;
+
 function TUArray.IsValidIndex(const Index: Int32; const FixedIndex: PInt32): Boolean;
   var i: Int32;
 begin
@@ -11251,7 +11260,7 @@ begin
   Result := _Data[0];
   Temp := _Data.Pop;
   if IsEmpty then Exit;
-  _Data[0] := Temp;
+  _Data.Data[0] := Temp;
   SiftDown(0);
 end;
 
@@ -11355,7 +11364,7 @@ procedure TURadixTree.Add(const Key: String; const Index: Int32);
     begin
       Radix := UStrSubStr(Radix, Length(Node.Radix) + 1, Length(Radix) - Length(Node.Radix));
       for i := 0 to Node.Subset.LastIndex do
-      if InsertNode(Node.Subset[i], @Node.Subset.Data[i]) then
+      if InsertNode(Node.Subset.Data[i], Node.Subset[i]) then
       begin
         Exit;
       end;
@@ -11369,7 +11378,7 @@ begin
   _Sorted := False;
   Radix := Key;
   for i := 0 to _Root.LastIndex do
-  if InsertNode(_Root[i], @_Root.Data[i]) then
+  if InsertNode(_Root.Data[i], _Root[i]) then
   begin
     Exit;
   end;
@@ -11387,7 +11396,7 @@ function TURadixTree.Find(const Key: String): Int32;
     while (l <= h) do
     begin
       m := (l + h) shr 1;
-      Node := Arr[m];
+      Node := Arr.Data[m];
       r := Ord(Node.Radix[1]) - Ord(Key[Offset]);
       if (r < 0) then
       begin
@@ -11404,7 +11413,7 @@ function TURadixTree.Find(const Key: String): Int32;
 	while (
 	  (n <= Length(Node.Radix))
 	  and (Offset <= Length(Key))
-	  and (Arr[m].Radix[n] = Key[Offset])
+	  and (Arr.Data[m].Radix[n] = Key[Offset])
 	) do
         begin
 	  Inc(n);
@@ -11468,14 +11477,14 @@ procedure TURadixTree.Dump;
     end;
     for i := 0 to Node.Subset.LastIndex do
     begin
-      DumpNode(Node.Subset[i], NewDepth + '|_');
+      DumpNode(Node.Subset.Data[i], NewDepth + '|_');
     end;
   end;
   var i: Int32;
 begin
   for i := 0 to _Root.LastIndex do
   begin
-    DumpNode(_Root[i]);
+    DumpNode(_Root.Data[i]);
   end;
 end;
 
