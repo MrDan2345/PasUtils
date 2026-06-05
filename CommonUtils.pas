@@ -15889,38 +15889,57 @@ begin
 end;
 
 function UStrReplace(const Str, Old, New: String): String;
-  var i, j, n, p, StrLen, OldLen, LastIndex: Int32;
+  var MatchArr: array of Int32;
+  var LenStr, LenOld, LenNew, LastIndex, MatchCount, i, j, p, n: Int32;
   var Match: Boolean;
 begin
-  OldLen := Length(Old);
-  if OldLen = 0 then Exit(Str);
-  StrLen := Length(Str);
-  if OldLen > StrLen then Exit(Str);
-  Result := '';
-  p := 1;
+  LenStr := Length(Str);
+  if LenStr = 0 then Exit(Str);
+  LenOld := Length(Old);
+  if LenOld = 0 then Exit(Str);
+  if LenOld > LenStr then Exit(Str);
+  LenNew := Length(New);
+  if LenNew = 0 then Exit(UStrRemove(Str, Old));
+  LastIndex := LenStr - LenOld + 1;
+  MatchCount := 0;
+  MatchArr := nil;
+  SetLength(MatchArr, LenStr div LenOld);
   i := 1;
-  LastIndex := StrLen - OldLen + 1;
   while i <= LastIndex do
-  try
+  begin
     Match := True;
-    for j := 1 to OldLen do
+    for j := 1 to LenOld do
+    if Str[i + j - 1] <> Old[j] then
     begin
-      n := i + j - 1;
-      if Str[n] <> Old[j] then
-      begin
-        Match := False;
-        Break;
-      end;
+      Match := False;
+      Break;
     end;
-    if not Match then Continue;
-    if (i > p) then Result += UStrSubStr(Str, p, i - p);
-    Result += New;
-    p := i + OldLen;
-    i := p - 1;
-  finally
-    Inc(i);
+    if not Match then
+    begin
+      Inc(i);
+      Continue;
+    end;
+    MatchArr[MatchCount] := i;
+    Inc(MatchCount);
+    Inc(i, LenOld);
   end;
-  if p < StrLen then Result += UStrSubStr(Str, p, StrLen - p + 1);
+  if MatchCount = 0 then Exit(Str);
+  SetLength(Result, LenStr + (LenNew - LenOld) * MatchCount);
+  j := 1;
+  p := 1;
+  for i := 0 to MatchCount - 1 do
+  begin
+    n := MatchArr[i] - j;
+    if n > 0 then
+    begin
+      Move(Str[j], Result[p], n);
+      Inc(p, n);
+    end;
+    Move(New[1], Result[p], LenNew);
+    Inc(p, LenNew);
+    j := MatchArr[i] + LenOld;
+  end;
+  if LenStr >= j then Move(Str[j], Result[p], LenStr - j + 1);
 end;
 
 function UStrRemove(const Str, Pattern: String): String;
