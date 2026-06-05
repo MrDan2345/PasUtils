@@ -2,6 +2,7 @@
 {$modeswitch advancedrecords}
 {$modeswitch nestedprocvars}
 {$modeswitch typehelpers}
+{$modeswitch implicitfunctionspecialization}
 {$optimization autoinline}
 {$asmmode intel}
 {$macro on}
