@@ -1696,10 +1696,10 @@ public
   end;
 strict private
   var _Data: TData;
-  function FixIndex(const Index: Int32): Int32; inline;
-  function GetItem(const Index: Int32): T; inline;
-  procedure SetItem(const Index: Int32; const Value: T); inline;
-  function GetPtr(const Index: Int32): TPtr; inline;
+  function FixIndex(const Index: Int32): Int32;
+  function GetItem(const Index: Int32): T;
+  procedure SetItem(const Index: Int32; const Value: T);
+  function GetPtr(const Index: Int32): TPtr;
 public
   property Data: TData read _Data;
   property Items[const Index: Int32]: T read GetItem write SetItem;
@@ -2435,7 +2435,6 @@ function UExec(
   const OnOutput: TUProcedureString = nil
 ): Int32;
 
-
 generic procedure USort<T>(var Arr: array of T); overload;
 generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>); overload;
 generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>); overload;
@@ -2452,9 +2451,9 @@ generic procedure UArrDelete<T>(var Arr: specialize TArray<T>; const DelStart: I
 generic procedure UArrRemove<T>(var Arr: specialize TArray<T>; const Item: T);
 generic function UArrPop<T>(var Arr: specialize TArray<T>): T;
 generic function UArrFind<T>(const Arr: specialize TArray<T>; const Item: T): Int32; overload;
-generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32; overload;
+generic function UArrayFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32; overload;
 generic function UArrContains<T>(const Arr: specialize TArray<T>; const Item: T): Boolean; overload;
-generic function UArrContains<T>(const Arr: specialize TUArray<T>; const Item: T): Boolean; overload;
+generic function UArrayContains<T>(const Arr: specialize TUArray<T>; const Item: T): Boolean; overload;
 generic procedure UArrClear<T>(var Arr: specialize TArray<T>);
 generic function UArrConcat<TArr>(const Arr: array of TArr): TArr;
 generic function UArrJoin<T>(const a, b: array of T): specialize TArray<T>;
@@ -16648,7 +16647,7 @@ begin
   Result := -1;
 end;
 
-generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
+generic function UArrayFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
 begin
   Result := specialize UArrFind<T>(Arr.Data, Item);
 end;
@@ -16658,9 +16657,9 @@ begin
   Result := specialize UArrFind<T>(Arr, Item) > -1;
 end;
 
-generic function UArrContains<T>(const Arr: specialize TUArray<T>; const Item: T): Boolean;
+generic function UArrayContains<T>(const Arr: specialize TUArray<T>; const Item: T): Boolean;
 begin
-  Result := specialize UArrFind<T>(Arr, Item) > -1;
+  Result := specialize UArrayFind<T>(Arr, Item) > -1;
 end;
 
 generic procedure UArrClear<T>(var Arr: specialize TArray<T>);
