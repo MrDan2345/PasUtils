@@ -3058,10 +3058,10 @@ end;
 operator := (const v: TUVec4): TUColor;
 begin
   Result := TUColor.Make(
-    Round(v.x) * $ff,
-    Round(v.y) * $ff,
-    Round(v.z) * $ff,
-    Round(v.w) * $ff
+    Round(v.x * $ff),
+    Round(v.y * $ff),
+    Round(v.z * $ff),
+    Round(v.w * $ff)
   );
 end;
 
