@@ -206,6 +206,7 @@ public
   function SubArray(const Start: UInt32; const Size: UInt32 = 0): TUInt8Array;
   function ToString: String;
   function ToHex: String;
+  function ToHexLC: String;
   function ToBase64: String;
   function Append(const Bytes: array of UInt8): TUInt8Array;
   function Append(const Bytes: array of TUInt8Array): TUInt8Array;
@@ -2769,6 +2770,11 @@ end;
 function TUInt8ArrayImpl.ToHex: String;
 begin
   Result := UBytesToHex(Self);
+end;
+
+function TUInt8ArrayImpl.ToHexLC: String;
+begin
+  Result := LowerCase(ToHex);
 end;
 
 function TUInt8ArrayImpl.ToBase64: String;

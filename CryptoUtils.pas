@@ -9,14 +9,20 @@ uses
   Classes,
   CommonUtils;
 
-type TUDigestMD5 = array[0..15] of UInt8;
-type TUDigestSHA1 = array[0..19] of UInt8;
-type TUDigestSHA2_256 = array[0..31] of UInt8;
-type TUDigestSHA2_512 = array[0..63] of UInt8;
-type TUDigestSHA3_224 = array[0..27] of UInt8;
-type TUDigestSHA3_256 = array[0..31] of UInt8;
-type TUDigestSHA3_384 = array[0..47] of UInt8;
-type TUDigestSHA3_512 = array[0..63] of UInt8;
+type TUDigest_128 = array[0..15] of UInt8;
+type TUDigest_160 = array[0..19] of UInt8;
+type TUDigest_224 = array[0..27] of UInt8;
+type TUDigest_256 = array[0..31] of UInt8;
+type TUDigest_384 = array[0..47] of UInt8;
+type TUDigest_512 = array[0..63] of UInt8;
+type TUDigestMD5 = TUDigest_128;
+type TUDigestSHA1 = TUDigest_160;
+type TUDigestSHA2_256 = TUDigest_256;
+type TUDigestSHA2_512 = TUDigest_512;
+type TUDigestSHA3_224 = TUDigest_224;
+type TUDigestSHA3_256 = TUDigest_256;
+type TUDigestSHA3_384 = TUDigest_384;
+type TUDigestSHA3_512 = TUDigest_512;
 type TUFuncDigest = function (const Data: TUInt8Array): TUInt8Array;
 type TUFuncMAC = function (const Key, Data: TUInt8Array): TUInt8Array;
 
@@ -1036,7 +1042,15 @@ public
   type TState = array[0..4, 0..4] of UInt64;
 private
   type TStateArr = array[0..24] of UInt64;
+  var _State: TState;
+  var _Rate: UInt32;
+  var _Pos: UInt32;
+  var _Domain: UInt8;
 public
+  procedure Init(const ARate: UInt32; const ADomain: UInt8 = 1);
+  procedure Absorb(const Data: Pointer; const Size: UInt32);
+  procedure Finalize;
+  function Squeeze(const OutSize: UInt32): TUInt8Array;
   class procedure PermuteF1600(var State: TState); static;
   class function Init: TState; static;
   class procedure Init(out State: TState); static;
@@ -1684,6 +1698,9 @@ function USharedKey_ECDH(
   const PublicKey: TUECC.Weierstrass.TPoint;
   const PrivateKey: TUECC.TBigInt
 ): TUECC.TBigInt;
+
+function UDigestHashRate(const DigestSize: UInt32): UInt32;
+function UDigestHashRate(const Digest: array of UInt8): UInt32;
 
 implementation
 
@@ -4208,7 +4225,7 @@ begin
       end;
     end;
   end;
-  Move(Digest, Result[0], DigestSize);
+  UMove(Result[0], Digest, DigestSize);
 end;
 
 function USHA3_224(const Data: Pointer; const DataSize: UInt32): TUDigestSHA3_224;
@@ -8358,9 +8375,34 @@ begin
   Result.s := VecFromBytes(Data);
 end;
 
+procedure TUKeccak.Init(const ARate: UInt32; const ADomain: UInt8);
+begin
+  _State := Init;
+  _Rate := ARate;
+  _Pos := 0;
+  _Domain := ADomain;
+end;
+
+procedure TUKeccak.Absorb(const Data: Pointer; const Size: UInt32);
+begin
+  _Pos := Absorb(_State, _Pos, _Rate, Data, Size);
+end;
+
+procedure TUKeccak.Finalize;
+begin
+  Finalize(_State, _Pos, _Rate, _Domain);
+  _Pos := 0;
+end;
+
+function TUKeccak.Squeeze(const OutSize: UInt32): TUInt8Array;
+begin
+  _Pos := Squeeze(_State, _Pos, _Rate, OutSize, Result);
+end;
+
 class procedure TUKeccak.PermuteF1600(var State: TState);
   function ROTL64(const x: UInt64; const n: UInt8): UInt64;
   begin
+    if n = 0 then Exit(x);
     Result := (x shl n) or (x shr (64 - n));
   end;
   const NROUNDS = 24;
@@ -8388,7 +8430,7 @@ begin
   begin
     for x := 0 to 4 do
     begin
-      C[x] := State[x, 0] xor State[x, 1] xor State[x, 2] xor State[x, 3] xor State[x, 4];
+      C[x] := State[0, x] xor State[1, x] xor State[2, x] xor State[3, x] xor State[4, x];
     end;
     for x := 0 to 4 do
     begin
@@ -8397,17 +8439,17 @@ begin
     for x := 0 to 4 do
     for y := 0 to 4 do
     begin
-      State[x, y] := State[x, y] xor D[x];
+      State[y, x] := State[y, x] xor D[x];
     end;
     for x := 0 to 4 do
     for y := 0 to 4 do
     begin
-      B[y, (2 * x + 3 * y) mod 5] := ROTL64(State[x, y], RotationOffsets[x, y]);
+      B[(2 * x + 3 * y) mod 5, y] := ROTL64(State[y, x], RotationOffsets[x, y]);
     end;
     for x := 0 to 4 do
     for y := 0 to 4 do
     begin
-      State[x, y] := B[x, y] xor ((not B[(x + 1) mod 5, y]) and B[(x + 2) mod 5, y]);
+      State[y, x] := B[y, x] xor ((not B[y, (x + 1) mod 5]) and B[y, (x + 2) mod 5]);
     end;
     State[0, 0] := State[0, 0] xor RoundConstants[r];
   end;
@@ -8431,7 +8473,7 @@ class function TUKeccak.Absorb(
   const Size: UInt32
 ): UInt32;
   var StateArr: TStateArr absolute State;
-  var i, j, InLen, CurPos: UInt32;
+  var i, j, InLen, CurPos: Int64;
   var InByte: PUInt8;
 begin
   InByte := PUInt8(Data);
@@ -8442,7 +8484,7 @@ begin
     for i := CurPos to Rate - 1 do
     begin
       j := i shr 3;
-      StateArr[j] := StateArr[j] xor UInt64(InByte^) shl 8 * (i mod 8);
+      StateArr[j] := StateArr[j] xor UInt64(InByte^) shl (8 * (i mod 8));
       Inc(InByte);
     end;
     InLen -= Rate - CurPos;
@@ -8450,10 +8492,10 @@ begin
     CurPos := 0;
   end;
   Result := CurPos + InLen;
-  for i := CurPos to Result do
+  for i := CurPos to Int64(Result) - 1 do
   begin
     j := i shr 3;
-    StateArr[j] := StateArr[j] xor UInt64(InByte^) shl 8 * (i mod 8);
+    StateArr[j] := StateArr[j] xor UInt64(InByte^) shl (8 * (i mod 8));
     Inc(InByte);
   end;
 end;
@@ -8468,9 +8510,10 @@ class procedure TUKeccak.Finalize(
   var i: Int32;
 begin
   i := Pos shr 3;
-  StateArr[i] := StateArr[i] xor UInt64(Domain) shl 8 * (Pos mod 8);
+  StateArr[i] := StateArr[i] xor UInt64(Domain) shl (8 * (Pos mod 8));
   i := Rate div 8 - 1;
-  StateArr[i] := StateArr[i] xor 1 shl 63;
+  StateArr[i] := StateArr[i] xor UInt64(1) shl 63;
+  PermuteF1600(State);
 end;
 
 class function TUKeccak.Squeeze(
@@ -8501,11 +8544,11 @@ begin
     i := CurPos;
     while (i < Rate) and (i < CurPos + OutLen) do
     begin
-      OutByte^ := StateArr[i shr 3] shr 8 * (i mod 8);
+      OutByte^ := StateArr[i shr 3] shr (8 * (i mod 8));
       Inc(OutByte);
       Inc(i);
     end;
-    OutLen -= i - pos;
+    OutLen -= i - CurPos;
     CurPos := i;
   end;
   Result := CurPos;
@@ -9260,6 +9303,16 @@ begin
     PublicKey,
     PrivateKey
   );
+end;
+
+function UDigestHashRate(const DigestSize: UInt32): UInt32;
+begin
+  Result := 200 - (2 * DigestSize);
+end;
+
+function UDigestHashRate(const Digest: array of UInt8): UInt32;
+begin
+  Result := UDigestHashRate(Length(Digest));
 end;
 
 end.
