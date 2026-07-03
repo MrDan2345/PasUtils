@@ -1849,6 +1849,7 @@ public
   property Slack: Int32 read _Slack write _Slack;
   property LastIndex: Int32 read GetLastIndex;
   property OnItemDelete: TOnItemDelete read _OnItemDelete write _OnItemDelete;
+  function IsEmpty: Boolean;
   function Contains(const Index: Int32): Boolean;
   procedure Reserve(const ItemCount: UInt32);
   procedure Shrink;
@@ -11010,6 +11011,11 @@ end;
 procedure TUFastList.Finalize;
 begin
   Clear;
+end;
+
+function TUFastList.IsEmpty: Boolean;
+begin
+  Result := _Count = 0;
 end;
 
 function TUFastList.Contains(const Index: Int32): Boolean;
