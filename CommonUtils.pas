@@ -206,6 +206,7 @@ public
   function SubArray(const Start: UInt32; const Size: UInt32 = 0): TUInt8Array;
   function ToString: String;
   function ToHex: String;
+  function ToHexLC: String;
   function ToBase64: String;
   function Append(const Bytes: array of UInt8): TUInt8Array;
   function Append(const Bytes: array of TUInt8Array): TUInt8Array;
@@ -1849,6 +1850,7 @@ public
   property Slack: Int32 read _Slack write _Slack;
   property LastIndex: Int32 read GetLastIndex;
   property OnItemDelete: TOnItemDelete read _OnItemDelete write _OnItemDelete;
+  function IsEmpty: Boolean;
   function Contains(const Index: Int32): Boolean;
   procedure Reserve(const ItemCount: UInt32);
   procedure Shrink;
@@ -2770,6 +2772,11 @@ end;
 function TUInt8ArrayImpl.ToHex: String;
 begin
   Result := UBytesToHex(Self);
+end;
+
+function TUInt8ArrayImpl.ToHexLC: String;
+begin
+  Result := LowerCase(ToHex);
 end;
 
 function TUInt8ArrayImpl.ToBase64: String;
@@ -11010,6 +11017,11 @@ end;
 procedure TUFastList.Finalize;
 begin
   Clear;
+end;
+
+function TUFastList.IsEmpty: Boolean;
+begin
+  Result := _Count = 0;
 end;
 
 function TUFastList.Contains(const Index: Int32): Boolean;
