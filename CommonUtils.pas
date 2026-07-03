@@ -2162,6 +2162,7 @@ procedure UInit(out Dest; const Src; const Size: UInt32);
 procedure UMove(out Dest; const Src; const Size: UInt32);
 function UMemCompare(const MemA, MemB: Pointer; const Size: UInt32): Int8;
 function UIntToPtr(const i: PtrUInt): Pointer;
+function UPtrToInt(const p: Pointer): PtrUInt;
 function UCopyVarRec(constref src: TVarRec): TVarRec;
 function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArray;
 procedure UFinalizeVarRec(var vr: TVarRec);
@@ -3068,9 +3069,9 @@ end;
 operator := (const v: TUColor): TUVec4;
 begin
   Result := TUVec4.Make(
-    v.r * URcp255,
-    v.g * URcp255,
     v.b * URcp255,
+    v.g * URcp255,
+    v.r * URcp255,
     v.a * URcp255
   );
 end;
@@ -12684,6 +12685,12 @@ end;
 function UIntToPtr(const i: PtrUInt): Pointer;
 begin
   Result := nil; Result += i;
+end;
+
+function UPtrToInt(const p: Pointer): PtrUInt;
+  var n: PtrUInt absolute p;
+begin
+  Result := n;
 end;
 
 function UCopyVarRec(constref src: TVarRec): TVarRec;
