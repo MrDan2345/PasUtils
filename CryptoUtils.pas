@@ -1089,6 +1089,8 @@ private
 public
   procedure Init(const ARate: UInt32);
   procedure Absorb(const Data: Pointer; const Size: UInt32);
+  procedure Absorb(const Data: TUInt8Array);
+  procedure Absorb(const Data: String);
   procedure Finalize;
   function Squeeze(const OutSize: UInt32): TUInt8Array;
   class function Hash(
@@ -7976,19 +7978,38 @@ class function TUKyber768.SampleUniform(
   const Seed: array of UInt8;
   const Nonce1, Nonce2: UInt8
 ): TPoly;
-  var i, j, Val: Int32;
+  var i, j: Int32;
+  var Val0, Val1: UInt16;
   var Buf: TUInt8Array;
+  var Shake: TUSHAKE;
+  var Rate: UInt32;
 begin
-  Buf := USHAKE_128(UBytesConcat([Seed, [Nonce1, Nonce2]]), N * 3);
+  Rate := UDigestHashRate(SizeOf(TUDigest_128));
+  Shake.Init(Rate);
+  Shake.Absorb(UBytesConcat([Seed, [Nonce1, Nonce2]]));
+  Shake.Finalize;
+  Buf := Shake.Squeeze(Rate);
   j := 0;
   i := 0;
   while i < N do
   begin
-    Val := Buf[j] + (Buf[j + 1] shl 8);
-    Inc(j, 2);
-    if Val < Q then
+    if j + 3 > Length(Buf) then
     begin
-      Result[i] := Val;
+      Buf := Shake.Squeeze(Rate);
+      j := 0;
+    end;
+    Val0 := (UInt16(Buf[j]) or (UInt16(Buf[j + 1]) shl 8)) and $fff;
+    Val1 := (UInt16(Buf[j + 1]) shr 4) or (UInt16(Buf[j + 2]) shl 4);
+    Val1 := Val1 and $fff;
+    Inc(j, 3);
+    if (Val0 < Q) and (i < N) then
+    begin
+      Result[i] := Val0;
+      Inc(i);
+    end;
+    if (Val1 < Q) and (i < N) then
+    begin
+      Result[i] := Val1;
       Inc(i);
     end;
   end;
@@ -8478,6 +8499,16 @@ end;
 procedure TUSHAKE.Absorb(const Data: Pointer; const Size: UInt32);
 begin
   _Keccak.Absorb(Data, Size);
+end;
+
+procedure TUSHAKE.Absorb(const Data: TUInt8Array);
+begin
+  _Keccak.Absorb(@Data[0], Length(Data));
+end;
+
+procedure TUSHAKE.Absorb(const Data: String);
+begin
+  _Keccak.Absorb(@Data[1], Length(Data));
 end;
 
 procedure TUSHAKE.Finalize;
