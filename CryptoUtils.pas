@@ -4638,7 +4638,7 @@ function KMAC(
   var Rate: UInt32;
   var Input, PaddedKey, EncOutputSize: TUInt8Array;
 begin
-  Rate := 200 - (2 * SecLevel);
+  Rate := UDigestHashRate(SecLevel);
   PaddedKey := BytePad(EncodeString(Key), Rate);
   EncOutputSize := RightEncode(UInt64(OutputSize) * 8);
   Input := UBytesConcat([
@@ -4646,10 +4646,10 @@ begin
     UBytesMake(Data, DataSize),
     EncOutputSize
   ]);
-  Result := cSHAKE(
-    @Input[0], Length(Input),
-    OutputSize, SecLevel,
-    UStrToBytes('KMAC'), Customization
+  Result := TUcSHAKE.Hash(
+    Rate, @Input[0], Length(Input),
+    UStrToBytes('KMAC'), Customization,
+    OutputSize
   );
 end;
 
