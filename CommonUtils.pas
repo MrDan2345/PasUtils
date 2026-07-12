@@ -2447,7 +2447,8 @@ generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPred
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>); overload;
 generic function UArrAppend<T>(var Arr: specialize TArray<T>; const Item: T): Int32; overload;
 generic procedure UArrAppend<T>(var Arr: specialize TArray<T>; const Other: specialize TArray<T>); overload;
-generic procedure UArrInsert<T>(var Arr: specialize TArray<T>; const Item: T; const Position: Int32);
+generic procedure UArrInsert<T>(var Arr: specialize TArray<T>; const Item: T; const Position: Int32); overload;
+generic procedure UArrInsert<T>(var Arr: specialize TArray<T>; const Other: specialize TArray<T>; const Position: Int32); overload;
 generic procedure UArrDelete<T>(var Arr: specialize TArray<T>; const DelStart: Int32; const DelCount: Int32 = 1);
 generic procedure UArrRemove<T>(var Arr: specialize TArray<T>; const Item: T);
 generic function UArrPop<T>(var Arr: specialize TArray<T>): T;
@@ -16581,6 +16582,23 @@ begin
     Arr[j + 1] := Arr[j];
   end;
   Arr[i] := Item;
+end;
+
+generic procedure UArrInsert<T>(var Arr: specialize TArray<T>; const Other: specialize TArray<T>; const Position: Int32);
+  var i, j, n, d: Int32;
+begin
+  n := Length(Other);
+  if n = 0 then Exit;
+  if Position < 0 then i := 0
+  else if Position > High(Arr) then i := Length(Arr)
+  else i := Position;
+  d := High(Arr) - i;
+  SetLength(Arr, Length(Arr) + n);
+  for j := 0 to n - 1 do
+  begin
+    Arr[i + j + d] := Arr[i + j];
+    Arr[i + j] := Other[j];
+  end;
 end;
 
 generic procedure UArrDelete<T>(var Arr: specialize TArray<T>; const DelStart: Int32; const DelCount: Int32);
