@@ -206,6 +206,7 @@ public
   function SubArray(const Start: UInt32; const Size: UInt32 = 0): TUInt8Array;
   function ToString: String;
   function ToHex: String;
+  function ToHexLC: String;
   function ToBase64: String;
   function Append(const Bytes: array of UInt8): TUInt8Array;
   function Append(const Bytes: array of TUInt8Array): TUInt8Array;
@@ -1696,10 +1697,10 @@ public
   end;
 strict private
   var _Data: TData;
-  function FixIndex(const Index: Int32): Int32; inline;
-  function GetItem(const Index: Int32): T; inline;
-  procedure SetItem(const Index: Int32; const Value: T); inline;
-  function GetPtr(const Index: Int32): TPtr; inline;
+  function FixIndex(const Index: Int32): Int32;
+  function GetItem(const Index: Int32): T;
+  procedure SetItem(const Index: Int32; const Value: T);
+  function GetPtr(const Index: Int32): TPtr;
 public
   property Data: TData read _Data;
   property Items[const Index: Int32]: T read GetItem write SetItem;
@@ -1849,6 +1850,7 @@ public
   property Slack: Int32 read _Slack write _Slack;
   property LastIndex: Int32 read GetLastIndex;
   property OnItemDelete: TOnItemDelete read _OnItemDelete write _OnItemDelete;
+  function IsEmpty: Boolean;
   function Contains(const Index: Int32): Boolean;
   procedure Reserve(const ItemCount: UInt32);
   procedure Shrink;
@@ -2162,6 +2164,7 @@ procedure UInit(out Dest; const Src; const Size: UInt32);
 procedure UMove(out Dest; const Src; const Size: UInt32);
 function UMemCompare(const MemA, MemB: Pointer; const Size: UInt32): Int8;
 function UIntToPtr(const i: PtrUInt): Pointer;
+function UPtrToInt(const p: Pointer): PtrUInt;
 function UCopyVarRec(constref src: TVarRec): TVarRec;
 function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArray;
 procedure UFinalizeVarRec(var vr: TVarRec);
@@ -2435,7 +2438,6 @@ function UExec(
   const OnOutput: TUProcedureString = nil
 ): Int32;
 
-
 generic procedure USort<T>(var Arr: array of T); overload;
 generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>); overload;
 generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>); overload;
@@ -2453,9 +2455,9 @@ generic procedure UArrDelete<T>(var Arr: specialize TArray<T>; const DelStart: I
 generic procedure UArrRemove<T>(var Arr: specialize TArray<T>; const Item: T);
 generic function UArrPop<T>(var Arr: specialize TArray<T>): T;
 generic function UArrFind<T>(const Arr: specialize TArray<T>; const Item: T): Int32; overload;
-generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32; overload;
+generic function UArrayFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32; overload;
 generic function UArrContains<T>(const Arr: specialize TArray<T>; const Item: T): Boolean; overload;
-generic function UArrContains<T>(const Arr: specialize TUArray<T>; const Item: T): Boolean; overload;
+generic function UArrayContains<T>(const Arr: specialize TUArray<T>; const Item: T): Boolean; overload;
 generic procedure UArrClear<T>(var Arr: specialize TArray<T>);
 generic function UArrConcat<TArr>(const Arr: array of TArr): TArr;
 generic function UArrJoin<T>(const a, b: array of T): specialize TArray<T>;
@@ -2773,6 +2775,11 @@ begin
   Result := UBytesToHex(Self);
 end;
 
+function TUInt8ArrayImpl.ToHexLC: String;
+begin
+  Result := LowerCase(ToHex);
+end;
+
 function TUInt8ArrayImpl.ToBase64: String;
 begin
   Result := UBytesToBase64(Self);
@@ -3060,19 +3067,19 @@ end;
 operator := (const v: TUVec4): TUColor;
 begin
   Result := TUColor.Make(
-    Round(v.x) * $ff,
-    Round(v.y) * $ff,
-    Round(v.z) * $ff,
-    Round(v.w) * $ff
+    Round(v.x * $ff),
+    Round(v.y * $ff),
+    Round(v.z * $ff),
+    Round(v.w * $ff)
   );
 end;
 
 operator := (const v: TUColor): TUVec4;
 begin
   Result := TUVec4.Make(
-    v.r * URcp255,
-    v.g * URcp255,
     v.b * URcp255,
+    v.g * URcp255,
+    v.r * URcp255,
     v.a * URcp255
   );
 end;
@@ -11013,6 +11020,11 @@ begin
   Clear;
 end;
 
+function TUFastList.IsEmpty: Boolean;
+begin
+  Result := _Count = 0;
+end;
+
 function TUFastList.Contains(const Index: Int32): Boolean;
 begin
   if Index < 0 then Exit(False);
@@ -12686,6 +12698,12 @@ end;
 function UIntToPtr(const i: PtrUInt): Pointer;
 begin
   Result := nil; Result += i;
+end;
+
+function UPtrToInt(const p: Pointer): PtrUInt;
+  var n: PtrUInt absolute p;
+begin
+  Result := n;
 end;
 
 function UCopyVarRec(constref src: TVarRec): TVarRec;
@@ -15890,38 +15908,57 @@ begin
 end;
 
 function UStrReplace(const Str, Old, New: String): String;
-  var i, j, n, p, StrLen, OldLen, LastIndex: Int32;
+  var MatchArr: array of Int32;
+  var LenStr, LenOld, LenNew, LastIndex, MatchCount, i, j, p, n: Int32;
   var Match: Boolean;
 begin
-  OldLen := Length(Old);
-  if OldLen = 0 then Exit(Str);
-  StrLen := Length(Str);
-  if OldLen > StrLen then Exit(Str);
-  Result := '';
-  p := 1;
+  LenStr := Length(Str);
+  if LenStr = 0 then Exit(Str);
+  LenOld := Length(Old);
+  if LenOld = 0 then Exit(Str);
+  if LenOld > LenStr then Exit(Str);
+  LenNew := Length(New);
+  if LenNew = 0 then Exit(UStrRemove(Str, Old));
+  LastIndex := LenStr - LenOld + 1;
+  MatchCount := 0;
+  MatchArr := nil;
+  SetLength(MatchArr, LenStr div LenOld);
   i := 1;
-  LastIndex := StrLen - OldLen + 1;
   while i <= LastIndex do
-  try
+  begin
     Match := True;
-    for j := 1 to OldLen do
+    for j := 1 to LenOld do
+    if Str[i + j - 1] <> Old[j] then
     begin
-      n := i + j - 1;
-      if Str[n] <> Old[j] then
-      begin
-        Match := False;
-        Break;
-      end;
+      Match := False;
+      Break;
     end;
-    if not Match then Continue;
-    if (i > p) then Result += UStrSubStr(Str, p, i - p);
-    Result += New;
-    p := i + OldLen;
-    i := p - 1;
-  finally
-    Inc(i);
+    if not Match then
+    begin
+      Inc(i);
+      Continue;
+    end;
+    MatchArr[MatchCount] := i;
+    Inc(MatchCount);
+    Inc(i, LenOld);
   end;
-  if p < StrLen then Result += UStrSubStr(Str, p, StrLen - p + 1);
+  if MatchCount = 0 then Exit(Str);
+  SetLength(Result, LenStr + (LenNew - LenOld) * MatchCount);
+  j := 1;
+  p := 1;
+  for i := 0 to MatchCount - 1 do
+  begin
+    n := MatchArr[i] - j;
+    if n > 0 then
+    begin
+      Move(Str[j], Result[p], n);
+      Inc(p, n);
+    end;
+    Move(New[1], Result[p], LenNew);
+    Inc(p, LenNew);
+    j := MatchArr[i] + LenOld;
+  end;
+  if LenStr >= j then Move(Str[j], Result[p], LenStr - j + 1);
 end;
 
 function UStrRemove(const Str, Pattern: String): String;
@@ -16647,7 +16684,7 @@ begin
   Result := -1;
 end;
 
-generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
+generic function UArrayFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
 begin
   Result := specialize UArrFind<T>(Arr.Data, Item);
 end;
@@ -16657,9 +16694,9 @@ begin
   Result := specialize UArrFind<T>(Arr, Item) > -1;
 end;
 
-generic function UArrContains<T>(const Arr: specialize TUArray<T>; const Item: T): Boolean;
+generic function UArrayContains<T>(const Arr: specialize TUArray<T>; const Item: T): Boolean;
 begin
-  Result := specialize UArrFind<T>(Arr, Item) > -1;
+  Result := specialize UArrayFind<T>(Arr, Item) > -1;
 end;
 
 generic procedure UArrClear<T>(var Arr: specialize TArray<T>);

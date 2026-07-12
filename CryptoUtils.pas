@@ -9,14 +9,20 @@ uses
   Classes,
   CommonUtils;
 
-type TUDigestMD5 = array[0..15] of UInt8;
-type TUDigestSHA1 = array[0..19] of UInt8;
-type TUDigestSHA2_256 = array[0..31] of UInt8;
-type TUDigestSHA2_512 = array[0..63] of UInt8;
-type TUDigestSHA3_224 = array[0..27] of UInt8;
-type TUDigestSHA3_256 = array[0..31] of UInt8;
-type TUDigestSHA3_384 = array[0..47] of UInt8;
-type TUDigestSHA3_512 = array[0..63] of UInt8;
+type TUDigest_128 = array[0..15] of UInt8;
+type TUDigest_160 = array[0..19] of UInt8;
+type TUDigest_224 = array[0..27] of UInt8;
+type TUDigest_256 = array[0..31] of UInt8;
+type TUDigest_384 = array[0..47] of UInt8;
+type TUDigest_512 = array[0..63] of UInt8;
+type TUDigestMD5 = TUDigest_128;
+type TUDigestSHA1 = TUDigest_160;
+type TUDigestSHA2_256 = TUDigest_256;
+type TUDigestSHA2_512 = TUDigest_512;
+type TUDigestSHA3_224 = TUDigest_224;
+type TUDigestSHA3_256 = TUDigest_256;
+type TUDigestSHA3_384 = TUDigest_384;
+type TUDigestSHA3_512 = TUDigest_512;
 type TUFuncDigest = function (const Data: TUInt8Array): TUInt8Array;
 type TUFuncMAC = function (const Key, Data: TUInt8Array): TUInt8Array;
 
@@ -1036,7 +1042,15 @@ public
   type TState = array[0..4, 0..4] of UInt64;
 private
   type TStateArr = array[0..24] of UInt64;
+  var _State: TState;
+  var _Rate: UInt32;
+  var _Pos: UInt32;
+  var _Domain: UInt8;
 public
+  procedure Init(const ARate: UInt32; const ADomain: UInt8 = 1);
+  procedure Absorb(const Data: Pointer; const Size: UInt32);
+  procedure Finalize;
+  function Squeeze(const OutSize: UInt32): TUInt8Array;
   class procedure PermuteF1600(var State: TState); static;
   class function Init: TState; static;
   class procedure Init(out State: TState); static;
@@ -1060,6 +1074,74 @@ public
     const OutSize: UInt32;
     out Output: TUInt8Array
   ): UInt32; static;
+  class function Hash(
+    const Rate: UInt32;
+    const Domain: UInt8;
+    const Data: Pointer;
+    const DataSize: UInt32;
+    const OutSize: UInt32
+  ): TUInt8Array; static;
+end;
+
+type TUSHAKE = record
+private
+  var _Keccak: TUKeccak;
+public
+  procedure Init(const ARate: UInt32);
+  procedure Absorb(const Data: Pointer; const Size: UInt32);
+  procedure Absorb(const Data: TUInt8Array);
+  procedure Absorb(const Data: String);
+  procedure Finalize;
+  function Squeeze(const OutSize: UInt32): TUInt8Array;
+  class function Hash(
+    const Rate: UInt32;
+    const Data: Pointer;
+    const DataSize: UInt32;
+    const OutSize: UInt32
+  ): TUInt8Array; static;
+end;
+
+type TUcSHAKE = record
+private
+  var _Keccak: TUKeccak;
+public
+  procedure Init(
+    const ARate: UInt32;
+    const FunctionName: TUInt8Array;
+    const Customization: TUInt8Array
+  );
+  procedure Init(
+    const ARate: UInt32;
+    const FunctionName: String;
+    const Customization: String
+  );
+  procedure Absorb(const Data: Pointer; const Size: UInt32);
+  procedure Absorb(const Data: TUInt8Array);
+  procedure Absorb(const Data: String);
+  procedure Finalize;
+  function Squeeze(const OutSize: UInt32): TUInt8Array;
+  class function Hash(
+    const Rate: UInt32;
+    const Data: Pointer;
+    const DataSize: UInt32;
+    const FunctionName: TUInt8Array;
+    const Customization: TUInt8Array;
+    const OutSize: UInt32
+  ): TUInt8Array; static;
+  class function Hash(
+    const Rate: UInt32;
+    const Data: TUInt8Array;
+    const FunctionName: TUInt8Array;
+    const Customization: TUInt8Array;
+    const OutSize: UInt32
+  ): TUInt8Array; static;
+  class function Hash(
+    const Rate: UInt32;
+    const Data: String;
+    const FunctionName: String;
+    const Customization: String;
+    const OutSize: UInt32
+  ): TUInt8Array; static;
 end;
 
 type TUBLAKE3 = record
@@ -1684,6 +1766,9 @@ function USharedKey_ECDH(
   const PublicKey: TUECC.Weierstrass.TPoint;
   const PrivateKey: TUECC.TBigInt
 ): TUECC.TBigInt;
+
+function UDigestHashRate(const DigestSize: UInt32): UInt32;
+function UDigestHashRate(const Digest: array of UInt8): UInt32;
 
 implementation
 
@@ -4094,121 +4179,17 @@ begin
   Result := USHA2_512(@Data[1], Length(Data));
 end;
 
-type TKeccakState = array[0..4, 0..4] of UInt64;
-procedure KeccakF1600(var State: TKeccakState);
-  function ROTL64(const x: UInt64; const n: UInt8): UInt64;
-  begin
-    Result := (x shl n) or (x shr (64 - n));
-  end;
-  const RoundConstants: array[0..23] of UInt64 = (
-    UInt64($0000000000000001), UInt64($0000000000008082), UInt64($800000000000808A), UInt64($8000000080008000),
-    UInt64($000000000000808B), UInt64($0000000080000001), UInt64($8000000080008081), UInt64($8000000000008009),
-    UInt64($000000000000008A), UInt64($0000000000000088), UInt64($0000000080008009), UInt64($000000008000000A),
-    UInt64($000000008000808B), UInt64($800000000000008B), UInt64($8000000000008089), UInt64($8000000000008003),
-    UInt64($8000000000008002), UInt64($8000000000000080), UInt64($000000000000800A), UInt64($800000008000000A),
-    UInt64($8000000080008081), UInt64($8000000000008080), UInt64($0000000080000001), UInt64($8000000080008008)
-  );
-  RotationOffsets: array[0..4, 0..4] of UInt8 = (
-    (0, 36, 3, 41, 18),
-    (1, 44, 10, 45, 2),
-    (62, 6, 43, 15, 61),
-    (28, 55, 25, 21, 56),
-    (27, 20, 39, 8, 14)
-  );
-  var r: Int32;
-  var x, y: Int32;
-  var C, D: array[0..4] of UInt64;
-  var B: TKeccakState;
-begin
-  for r := 0 to 23 do
-  begin
-    for x := 0 to 4 do
-    begin
-      C[x] := State[x, 0] xor State[x, 1] xor State[x, 2] xor State[x, 3] xor State[x, 4];
-    end;
-    for x := 0 to 4 do
-    begin
-      D[x] := C[(x + 4) mod 5] xor ROTL64(C[(x + 1) mod 5], 1);
-    end;
-    for x := 0 to 4 do
-    for y := 0 to 4 do
-    begin
-      State[x, y] := State[x, y] xor D[x];
-    end;
-    for x := 0 to 4 do
-    for y := 0 to 4 do
-    begin
-      B[y, (2 * x + 3 * y) mod 5] := ROTL64(State[x, y], RotationOffsets[x, y]);
-    end;
-    for x := 0 to 4 do
-    for y := 0 to 4 do
-    begin
-      State[x, y] := B[x, y] xor ((not B[(x + 1) mod 5, y]) and B[(x + 2) mod 5, y]);
-    end;
-    State[0, 0] := State[0, 0] xor RoundConstants[r];
-  end;
-end;
-
 function SHA3(const Data: Pointer; const DataSize: UInt32; const DigestSize: UInt32): TUInt8Array;
+  var Keccak: TUKeccak;
   var Rate: UInt32;
-  var State: TKeccakState;
-  var PaddedData: TUInt8Array;
-  var Digest: array[0..200 - 1] of UInt8;
-  var PadLen, x, y, i, j, n, BlockPos: Int32;
-  var w: UInt64;
 begin
   Result := nil;
   SetLength(Result, DigestSize);
-  Rate := 200 - (2 * DigestSize);
-  UClear(State, SizeOf(State));
-  PadLen := Rate - (DataSize mod Rate);
-  if PadLen = 0 then PadLen := Rate;
-  PaddedData := nil;
-  SetLength(PaddedData, DataSize + PadLen);
-  if DataSize > 0 then
-  begin
-    Move(Data^, PaddedData[0], DataSize);
-  end;
-  PaddedData[DataSize] := $06;
-  for i := DataSize + 1 to DataSize + PadLen - 2 do
-  begin
-    PaddedData[i] := $00;
-  end;
-  i := High(PaddedData);
-  PaddedData[i] := PaddedData[i] or $80;
-  for i := 0 to (Length(PaddedData) div Rate) - 1 do
-  begin
-    BlockPos := i * Rate;
-    for y := 0 to 4 do
-    for x := 0 to 4 do
-    begin
-      if (x + 5 * y) * 8 < Rate then
-      begin
-        w := 0;
-        for j := 0 to 7 do
-        begin
-          w := w or (UInt64(PaddedData[BlockPos + (x + 5 * y) * 8 + j]) shl (j * 8));
-        end;
-        State[x, y] := State[x, y] xor w;
-      end;
-    end;
-    KeccakF1600(State);
-  end;
-  n := 0;
-  while n < DigestSize do
-  begin
-    for y := 0 to 4 do
-    for x := 0 to 4 do
-    begin
-      if (x + 5 * y) * 8 < Rate then
-      for j := 0 to 7 do
-      begin
-        Digest[n] := Byte((State[x, y] shr (j * 8)) and $ff);
-        Inc(n);
-      end;
-    end;
-  end;
-  Move(Digest, Result[0], DigestSize);
+  Rate := UDigestHashRate(DigestSize);
+  Keccak.Init(Rate, 6);
+  Keccak.Absorb(Data, DataSize);
+  Keccak.Finalize;
+  Result := Keccak.Squeeze(DigestSize);
 end;
 
 function USHA3_224(const Data: Pointer; const DataSize: UInt32): TUDigestSHA3_224;
@@ -4279,67 +4260,6 @@ begin
   Result := USHA3_512(@Data[1], Length(Data));
 end;
 
-function KeccakSponge(
-  const Data: Pointer;
-  const DataSize: UInt32;
-  const OutputSize: Int32;
-  const SecLevel: UInt32;
-  const PaddingByte: UInt8 = $1f
-): TUInt8Array;
-  var Rate: UInt32;
-  var State: TKeccakState;
-  var PaddedData: TUInt8Array;
-  var i, j, BlockPos, SqueezedBytes: Int32;
-  var BlockCount, LastBlockLen, x, y: Int32;
-  var w: UInt64;
-begin
-  UClear(State, SizeOf(State));
-  Rate := 200 - (2 * SecLevel);
-  BlockCount := (DataSize * 8 + 2 + (Rate * 8 - 1)) div (Rate * 8);
-  LastBlockLen := (DataSize * 8 + 2) mod (Rate * 8);
-  if LastBlockLen = 0 then LastBlockLen := Rate * 8;
-  PaddedData := nil;
-  SetLength(PaddedData, BlockCount * Rate);
-  if DataSize > 0 then Move(Data^, PaddedData[0], DataSize);
-  PaddedData[DataSize] := PaddingByte;
-  for i := DataSize + 1 to High(PaddedData) do PaddedData[i] := $00;
-  PaddedData[High(PaddedData)] := PaddedData[High(PaddedData)] or $80;
-  for i := 0 to (Length(PaddedData) div Rate) - 1 do
-  begin
-    BlockPos := i * Rate;
-    for y := 0 to 4 do
-    for x := 0 to 4 do
-    if (x + 5 * y) * 8 < Rate then
-    begin
-      w := 0;
-      for j := 0 to 7 do
-      begin
-        w := w or (UInt64(PaddedData[BlockPos + (x + 5 * y) * 8 + j]) shl (j * 8));
-      end;
-      State[x, y] := State[x, y] xor w;
-    end;
-    KeccakF1600(State);
-  end;
-  Result := nil;
-  SetLength(Result, OutputSize);
-  SqueezedBytes := 0;
-  while SqueezedBytes < OutputSize do
-  begin
-    for y := 0 to 4 do
-    for x := 0 to 4 do
-    begin
-      if (x + 5 * y) * 8 < Rate then
-      for j := 0 to 7 do
-      begin
-        Result[SqueezedBytes] := UInt8((State[x, y] shr (j * 8)) and $ff);
-        Inc(SqueezedBytes);
-        if SqueezedBytes >= OutputSize then Exit;
-      end;
-    end;
-    KeccakF1600(State);
-  end;
-end;
-
 function SHAKE(
   const Data: Pointer;
   const DataSize: UInt32;
@@ -4347,7 +4267,7 @@ function SHAKE(
   const SecLevel: UInt32
 ): TUInt8Array;
 begin
-  Result := KeccakSponge(Data, DataSize, OutputSize, SecLevel, $1f);
+  Result := TUKeccak.Hash(UDigestHashRate(SecLevel), $1f, Data, DataSize, OutputSize);
 end;
 
 function USHAKE_128(const Data: Pointer; const DataSize: UInt32; const OutputSize: Int32): TUInt8Array;
@@ -4460,44 +4380,18 @@ begin
   end;
 end;
 
-function cSHAKE(
-  const Data: Pointer;
-  const DataSize: UInt32;
-  const OutputSize: UInt32;
-  const SecLevel: UInt32;
-  const FunctionName: TUInt8Array;
-  const Customization: TUInt8Array
-): TUInt8Array;
-  var Rate: UInt32;
-  var EncName, EncCustom, Prefix, Input: TUInt8Array;
-begin
-  if (Length(FunctionName) = 0)
-  and (Length(Customization) = 0) then
-  begin
-    Exit(SHAKE(Data, DataSize, OutputSize, SecLevel));
-  end;
-  Rate := 200 - (2 * SecLevel);
-  EncName := EncodeString(FunctionName);
-  EncCustom := EncodeString(Customization);
-  Prefix := UBytesJoin(EncName, EncCustom);
-  Prefix := BytePad(Prefix, Rate);
-  Input := nil;
-  SetLength(Input, Length(Prefix) + DataSize);
-  Move(Prefix[0], Input[0], Length(Prefix));
-  if DataSize > 0 then
-  begin
-    Move(Data^, Input[Length(Prefix)], DataSize);
-  end;
-  Result := KeccakSponge(@Input[0], Length(Input), OutputSize, SecLevel, $04);
-end;
-
 function UcSHAKE_128(
   const Data: Pointer;
   const DataSize, OutputSize: UInt32;
   const FunctionName, Customization: TUInt8Array
 ): TUInt8Array;
 begin
-  Result := cSHAKE(Data, DataSize, OutputSize, 16, FunctionName, Customization);
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_128)),
+    Data, DataSize,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UcSHAKE_128(
@@ -4506,7 +4400,12 @@ function UcSHAKE_128(
   const FunctionName, Customization: TUInt8Array
 ): TUInt8Array;
 begin
-  Result := cSHAKE(@Data[0], Length(Data), OutputSize, 16, FunctionName, Customization);
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_128)),
+    Data,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UcSHAKE_128(
@@ -4515,7 +4414,12 @@ function UcSHAKE_128(
   const FunctionName, Customization: String
 ): TUInt8Array;
 begin
-  Result := cSHAKE(@Data[1], Length(Data), OutputSize, 16, UStrToBytes(FunctionName), UStrToBytes(Customization));
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_128)),
+    Data,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UcSHAKE_256(
@@ -4524,7 +4428,12 @@ function UcSHAKE_256(
   const FunctionName, Customization: TUInt8Array
 ): TUInt8Array;
 begin
-  Result := cSHAKE(Data, DataSize, OutputSize, 32, FunctionName, Customization);
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_256)),
+    Data, DataSize,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UcSHAKE_256(
@@ -4533,7 +4442,12 @@ function UcSHAKE_256(
   const FunctionName, Customization: TUInt8Array
 ): TUInt8Array;
 begin
-  Result := cSHAKE(@Data[0], Length(Data), OutputSize, 32, FunctionName, Customization);
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_256)),
+    Data,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UcSHAKE_256(
@@ -4542,7 +4456,12 @@ function UcSHAKE_256(
   const FunctionName, Customization: String
 ): TUInt8Array;
 begin
-  Result := cSHAKE(@Data[1], Length(Data), OutputSize, 32, UStrToBytes(FunctionName), UStrToBytes(Customization));
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_256)),
+    Data,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UBLAKE3_Hash(const Data: TUInt8Array; const OutputSize: UInt32): TUInt8Array;
@@ -4721,7 +4640,7 @@ function KMAC(
   var Rate: UInt32;
   var Input, PaddedKey, EncOutputSize: TUInt8Array;
 begin
-  Rate := 200 - (2 * SecLevel);
+  Rate := UDigestHashRate(SecLevel);
   PaddedKey := BytePad(EncodeString(Key), Rate);
   EncOutputSize := RightEncode(UInt64(OutputSize) * 8);
   Input := UBytesConcat([
@@ -4729,10 +4648,10 @@ begin
     UBytesMake(Data, DataSize),
     EncOutputSize
   ]);
-  Result := cSHAKE(
-    @Input[0], Length(Input),
-    OutputSize, SecLevel,
-    UStrToBytes('KMAC'), Customization
+  Result := TUcSHAKE.Hash(
+    Rate, @Input[0], Length(Input),
+    UStrToBytes('KMAC'), Customization,
+    OutputSize
   );
 end;
 
@@ -8059,19 +7978,38 @@ class function TUKyber768.SampleUniform(
   const Seed: array of UInt8;
   const Nonce1, Nonce2: UInt8
 ): TPoly;
-  var i, j, Val: Int32;
+  var i, j: Int32;
+  var Val0, Val1: UInt16;
   var Buf: TUInt8Array;
+  var Shake: TUSHAKE;
+  var Rate: UInt32;
 begin
-  Buf := USHAKE_128(UBytesConcat([Seed, [Nonce1, Nonce2]]), N * 3);
+  Rate := UDigestHashRate(SizeOf(TUDigest_128));
+  Shake.Init(Rate);
+  Shake.Absorb(UBytesConcat([Seed, [Nonce1, Nonce2]]));
+  Shake.Finalize;
+  Buf := Shake.Squeeze(Rate);
   j := 0;
   i := 0;
   while i < N do
   begin
-    Val := Buf[j] + (Buf[j + 1] shl 8);
-    Inc(j, 2);
-    if Val < Q then
+    if j + 3 > Length(Buf) then
     begin
-      Result[i] := Val;
+      Buf := Shake.Squeeze(Rate);
+      j := 0;
+    end;
+    Val0 := (UInt16(Buf[j]) or (UInt16(Buf[j + 1]) shl 8)) and $fff;
+    Val1 := (UInt16(Buf[j + 1]) shr 4) or (UInt16(Buf[j + 2]) shl 4);
+    Val1 := Val1 and $fff;
+    Inc(j, 3);
+    if (Val0 < Q) and (i < N) then
+    begin
+      Result[i] := Val0;
+      Inc(i);
+    end;
+    if (Val1 < Q) and (i < N) then
+    begin
+      Result[i] := Val1;
       Inc(i);
     end;
   end;
@@ -8358,9 +8296,34 @@ begin
   Result.s := VecFromBytes(Data);
 end;
 
+procedure TUKeccak.Init(const ARate: UInt32; const ADomain: UInt8);
+begin
+  _State := Init;
+  _Rate := ARate;
+  _Pos := 0;
+  _Domain := ADomain;
+end;
+
+procedure TUKeccak.Absorb(const Data: Pointer; const Size: UInt32);
+begin
+  _Pos := Absorb(_State, _Pos, _Rate, Data, Size);
+end;
+
+procedure TUKeccak.Finalize;
+begin
+  Finalize(_State, _Pos, _Rate, _Domain);
+  _Pos := 0;
+end;
+
+function TUKeccak.Squeeze(const OutSize: UInt32): TUInt8Array;
+begin
+  _Pos := Squeeze(_State, _Pos, _Rate, OutSize, Result);
+end;
+
 class procedure TUKeccak.PermuteF1600(var State: TState);
   function ROTL64(const x: UInt64; const n: UInt8): UInt64;
   begin
+    if n = 0 then Exit(x);
     Result := (x shl n) or (x shr (64 - n));
   end;
   const NROUNDS = 24;
@@ -8388,7 +8351,7 @@ begin
   begin
     for x := 0 to 4 do
     begin
-      C[x] := State[x, 0] xor State[x, 1] xor State[x, 2] xor State[x, 3] xor State[x, 4];
+      C[x] := State[0, x] xor State[1, x] xor State[2, x] xor State[3, x] xor State[4, x];
     end;
     for x := 0 to 4 do
     begin
@@ -8397,17 +8360,17 @@ begin
     for x := 0 to 4 do
     for y := 0 to 4 do
     begin
-      State[x, y] := State[x, y] xor D[x];
+      State[y, x] := State[y, x] xor D[x];
     end;
     for x := 0 to 4 do
     for y := 0 to 4 do
     begin
-      B[y, (2 * x + 3 * y) mod 5] := ROTL64(State[x, y], RotationOffsets[x, y]);
+      B[(2 * x + 3 * y) mod 5, y] := ROTL64(State[y, x], RotationOffsets[x, y]);
     end;
     for x := 0 to 4 do
     for y := 0 to 4 do
     begin
-      State[x, y] := B[x, y] xor ((not B[(x + 1) mod 5, y]) and B[(x + 2) mod 5, y]);
+      State[y, x] := B[y, x] xor ((not B[y, (x + 1) mod 5]) and B[y, (x + 2) mod 5]);
     end;
     State[0, 0] := State[0, 0] xor RoundConstants[r];
   end;
@@ -8431,7 +8394,7 @@ class function TUKeccak.Absorb(
   const Size: UInt32
 ): UInt32;
   var StateArr: TStateArr absolute State;
-  var i, j, InLen, CurPos: UInt32;
+  var i, j, InLen, CurPos: Int64;
   var InByte: PUInt8;
 begin
   InByte := PUInt8(Data);
@@ -8442,7 +8405,7 @@ begin
     for i := CurPos to Rate - 1 do
     begin
       j := i shr 3;
-      StateArr[j] := StateArr[j] xor UInt64(InByte^) shl 8 * (i mod 8);
+      StateArr[j] := StateArr[j] xor UInt64(InByte^) shl (8 * (i mod 8));
       Inc(InByte);
     end;
     InLen -= Rate - CurPos;
@@ -8450,10 +8413,10 @@ begin
     CurPos := 0;
   end;
   Result := CurPos + InLen;
-  for i := CurPos to Result do
+  for i := CurPos to Int64(Result) - 1 do
   begin
     j := i shr 3;
-    StateArr[j] := StateArr[j] xor UInt64(InByte^) shl 8 * (i mod 8);
+    StateArr[j] := StateArr[j] xor UInt64(InByte^) shl (8 * (i mod 8));
     Inc(InByte);
   end;
 end;
@@ -8468,9 +8431,10 @@ class procedure TUKeccak.Finalize(
   var i: Int32;
 begin
   i := Pos shr 3;
-  StateArr[i] := StateArr[i] xor UInt64(Domain) shl 8 * (Pos mod 8);
+  StateArr[i] := StateArr[i] xor UInt64(Domain) shl (8 * (Pos mod 8));
   i := Rate div 8 - 1;
-  StateArr[i] := StateArr[i] xor 1 shl 63;
+  StateArr[i] := StateArr[i] xor UInt64(1) shl 63;
+  PermuteF1600(State);
 end;
 
 class function TUKeccak.Squeeze(
@@ -8501,16 +8465,181 @@ begin
     i := CurPos;
     while (i < Rate) and (i < CurPos + OutLen) do
     begin
-      OutByte^ := StateArr[i shr 3] shr 8 * (i mod 8);
+      OutByte^ := StateArr[i shr 3] shr (8 * (i mod 8));
       Inc(OutByte);
       Inc(i);
     end;
-    OutLen -= i - pos;
+    OutLen -= i - CurPos;
     CurPos := i;
   end;
   Result := CurPos;
 end;
 
+class function TUKeccak.Hash(
+  const Rate: UInt32;
+  const Domain: UInt8;
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutSize: UInt32
+): TUInt8Array;
+  var Keccak: TUKeccak;
+begin
+  Keccak.Init(Rate, Domain);
+  Keccak.Absorb(Data, DataSize);
+  Keccak.Finalize;
+  Result := Keccak.Squeeze(OutSize);
+end;
+
+// TUSHAKE begin
+procedure TUSHAKE.Init(const ARate: UInt32);
+begin
+  _Keccak.Init(ARate, $1f);
+end;
+
+procedure TUSHAKE.Absorb(const Data: Pointer; const Size: UInt32);
+begin
+  _Keccak.Absorb(Data, Size);
+end;
+
+procedure TUSHAKE.Absorb(const Data: TUInt8Array);
+begin
+  _Keccak.Absorb(@Data[0], Length(Data));
+end;
+
+procedure TUSHAKE.Absorb(const Data: String);
+begin
+  _Keccak.Absorb(@Data[1], Length(Data));
+end;
+
+procedure TUSHAKE.Finalize;
+begin
+  _Keccak.Finalize;
+end;
+
+function TUSHAKE.Squeeze(const OutSize: UInt32): TUInt8Array;
+begin
+  Result := _Keccak.Squeeze(OutSize);
+end;
+
+class function TUSHAKE.Hash(
+  const Rate: UInt32;
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutSize: UInt32
+): TUInt8Array;
+  var Shake: TUSHAKE;
+begin
+  Shake.Init(Rate);
+  Shake.Absorb(Data, DataSize);
+  Shake.Finalize;
+  Result := Shake.Squeeze(OutSize);
+end;
+// TUSHAKE end
+
+// TUcSHAKE begin
+procedure TUcSHAKE.Init(
+  const ARate: UInt32;
+  const FunctionName: TUInt8Array;
+  const Customization: TUInt8Array
+);
+  var Prefix: TUInt8Array;
+begin
+  if (Length(FunctionName) = 0)
+  and (Length(Customization) = 0) then
+  begin
+    _Keccak.Init(ARate, $1f);
+  end
+  else
+  begin
+    _Keccak.Init(ARate, $04);
+    Prefix := UBytesJoin(EncodeString(FunctionName), EncodeString(Customization));
+    Prefix := BytePad(Prefix, ARate);
+    _Keccak.Absorb(@Prefix[0], Length(Prefix));
+  end;
+end;
+
+procedure TUcSHAKE.Init(
+  const ARate: UInt32;
+  const FunctionName: String;
+  const Customization: String
+);
+begin
+  Init(ARate, UStrToBytes(FunctionName), UStrToBytes(Customization));
+end;
+
+procedure TUcSHAKE.Absorb(const Data: Pointer; const Size: UInt32);
+begin
+  _Keccak.Absorb(Data, Size);
+end;
+
+procedure TUcSHAKE.Absorb(const Data: TUInt8Array);
+begin
+  _Keccak.Absorb(@Data[0], Length(Data));
+end;
+
+procedure TUcSHAKE.Absorb(const Data: String);
+begin
+  _Keccak.Absorb(@Data[1], Length(Data));
+end;
+
+procedure TUcSHAKE.Finalize;
+begin
+  _Keccak.Finalize;
+end;
+
+function TUcSHAKE.Squeeze(const OutSize: UInt32): TUInt8Array;
+begin
+  Result := _Keccak.Squeeze(OutSize);
+end;
+
+class function TUcSHAKE.Hash(
+  const Rate: UInt32;
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const FunctionName: TUInt8Array;
+  const Customization: TUInt8Array;
+  const OutSize: UInt32
+): TUInt8Array;
+  var cShake: TUcSHAKE;
+begin
+  cShake.Init(Rate, FunctionName, Customization);
+  cShake.Absorb(Data, DataSize);
+  cShake.Finalize;
+  Result := cShake.Squeeze(OutSize);
+end;
+
+class function TUcSHAKE.Hash(
+  const Rate: UInt32;
+  const Data: TUInt8Array;
+  const FunctionName: TUInt8Array;
+  const Customization: TUInt8Array;
+  const OutSize: UInt32
+): TUInt8Array;
+begin
+  Result := Hash(
+    Rate, @Data[0], Length(Data),
+    FunctionName, Customization,
+    OutSize
+  );
+end;
+
+class function TUcSHAKE.Hash(
+  const Rate: UInt32;
+  const Data: String;
+  const FunctionName: String;
+  const Customization: String;
+  const OutSize: UInt32
+): TUInt8Array;
+begin
+  Result := Hash(
+    Rate, @Data[1], Length(Data),
+    UStrToBytes(FunctionName), UStrToBytes(Customization),
+    OutSize
+  );
+end;
+// TUcSHAKE end
+
+// TUBLAKE3 begin
 class function TUBLAKE3.KeyFromHex(const Hex: String): TKey;
   var ByteCount: Int32;
   var i, j: Int32;
@@ -8878,6 +9007,7 @@ begin
   end;
   PushStack(NewCV);
 end;
+// TUBLAKE3 end
 
 function UEncrypt_AES_PKCS7_ECB_128(
   const Data: TUInt8Array;
@@ -9260,6 +9390,16 @@ begin
     PublicKey,
     PrivateKey
   );
+end;
+
+function UDigestHashRate(const DigestSize: UInt32): UInt32;
+begin
+  Result := 200 - (2 * DigestSize);
+end;
+
+function UDigestHashRate(const Digest: array of UInt8): UInt32;
+begin
+  Result := UDigestHashRate(Length(Digest));
 end;
 
 end.
