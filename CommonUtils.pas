@@ -16622,19 +16622,23 @@ begin
 end;
 
 generic procedure UArrInsert<T>(var Arr: specialize TArray<T>; const Other: specialize TArray<T>; const Position: Int32);
-  var i, j, n, d: Int32;
+  var p, i, j, n, d: Int32;
 begin
   n := Length(Other);
   if n = 0 then Exit;
-  if Position < 0 then i := 0
-  else if Position > High(Arr) then i := Length(Arr)
-  else i := Position;
-  d := High(Arr) - i;
+  if Position < 0 then p := 0
+  else if Position > High(Arr) then p := Length(Arr)
+  else p := Position;
+  d := High(Arr) - p;
   SetLength(Arr, Length(Arr) + n);
+  for j := 0 to d do
+  begin
+    i := High(Arr) - j;
+    Arr[i] := Arr[i - n];
+  end;
   for j := 0 to n - 1 do
   begin
-    Arr[i + j + d] := Arr[i + j];
-    Arr[i + j] := Other[j];
+    Arr[p + j] := Other[j];
   end;
 end;
 
