@@ -61,6 +61,7 @@ type TInt64Arr = array[UInt32] of TInt64;
 type PInt64Arr = ^TInt64Arr;
 type TInt64Array = array of TInt64;
 
+type TUVersion = type UInt16; // TUVersionImpl
 type TUColor = UInt32;
 type PUColor = ^TUColor;
 type TUColorArr = array[UInt32] of TUColor;
@@ -286,6 +287,20 @@ public
   property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
   function ToBool: Boolean; inline;
+end;
+
+type TUVersionImpl = type helper for TUVersion
+private
+  function GetMajor: UInt8;
+  procedure SetMajor(const Value: UInt8);
+  function GetMinor: UInt8;
+  procedure SetMinor(const Value: UInt8);
+public
+  property Major: UInt8 read GetMajor write SetMajor;
+  property Minor: UInt8 read GetMinor write SetMinor;
+  function ToString: String;
+  class function Make(const AMajor, AMinor: UInt8): TUVersion; static;
+  class function FromString(const Value: String): TUVersion; static;
 end;
 
 type TUColorImpl = type helper for TUColor
@@ -2995,6 +3010,49 @@ begin
   Result := Self <> 0;
 end;
 // TInt64Impl end
+
+// TUVersionImpl begin
+function TUVersionImpl.GetMajor: UInt8;
+begin
+  Result := (Self shr 8) and $ff;
+end;
+
+procedure TUVersionImpl.SetMajor(const Value: UInt8);
+begin
+  Self := (Self and $ff) or (Value shl 8);
+end;
+
+function TUVersionImpl.GetMinor: UInt8;
+begin
+  Result := Self and $ff;
+end;
+
+procedure TUVersionImpl.SetMinor(const Value: UInt8);
+begin
+  Self := (Self and $ff00) or Value;
+end;
+
+function TUVersionImpl.ToString: String;
+begin
+  Result := IntToStr(Major) + '.' + IntToStr(Minor);
+end;
+
+class function TUVersionImpl.Make(const AMajor, AMinor: UInt8): TUVersion;
+begin
+  Result := AMinor or (AMajor shl 8);
+end;
+
+class function TUVersionImpl.FromString(const Value: String): TUVersion;
+  var VerArr: TUStrArray;
+begin
+  Result := 0;
+  VerArr := UStrExplode(Value, '.', False);
+  if Length(VerArr) < 1 then Exit;
+  Result.Major := StrToIntDef(VerArr[0], 0);
+  if Length(VerArr) < 2 then Exit;
+  Result.Minor := StrToIntDef(VerArr[1], 0);
+end;
+// TUVersionImpl end
 
 // TUColorImpl begin
 function TUColorImpl.GetChannel(const Index: UInt8): UInt8;
