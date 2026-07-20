@@ -124,7 +124,7 @@ type PUSphere = ^TUSphere;
 type TUSphereArr = array[UInt32] of TUFloat;
 type PUSphereArr = ^TUSphereArr;
 type TUSpgereArray = array of TUSphere;
-type TURot2 = array[0..1] of TUFloat; // TURot2Impl
+type TURot2 = type TUVec2; // TURot2Impl
 type PURot2 = ^TURot2;
 type TURot2Arr = array[UInt32] of TURot2;
 type PURot2Arr = ^TURot2;
@@ -141,6 +141,16 @@ type TUBounds2i = array[0..1] of TUVec2i; // TUBounds2iImpl
 type PUBounds2i = ^TUBounds2i;
 type TUBounds3i = array[0..1] of TUVec3i; // TUBounds3iImpl
 type PUBounds3i = ^TUBounds3i;
+type TUQuad2f = array[0..3] of TUVec2;
+type TUQuad2i = array[0..3] of TUVec2i;
+type TUCuboid3f = array[0..7] of TUVec3;
+type TUCuboid3i = array[0..7] of TUVec3i;
+type TURectf = array[0..3] of TUFloat; // TURectfImpl
+type PURectf = ^TURectf;
+type TURecti = array[0..3] of Int32; // TURectiImpl
+type PURecti = ^TURecti;
+type TURect = TURecti;
+type PURect = PURecti;
 type TUInt4096_Debug = array[0..128] of UInt32; // TUInt4096_DebugImpl
 type TUInt4096_DebugArray = array of TUInt4096_Debug;
 
@@ -734,13 +744,15 @@ strict private
   procedure SetSize(const Value: TUFloat);
 public
   const Zero: TUBounds1f = (0, 0);
-  class function Make(const AMin, AMax: TUFLoat): TUBounds1f; static; overload;
-  class function Make(const ACenter: TUFLoat): TUBounds1f; static; overload;
-  class function Overlap(const a, b: TUBounds1f): Boolean; static; inline;
   property Min: TUFloat read GetMin write SetMin;
   property Max: TUFloat read GetMax write SetMax;
   property Size: TUFloat read GetSize write SetSize;
-  function Overlap(const Other: TUBounds1f): Boolean;
+  class function Make(const AMin, AMax: TUFLoat): TUBounds1f; static; overload;
+  class function Make(const ACenter: TUFLoat): TUBounds1f; static; overload;
+  class function Overlap(const a, b: TUBounds1f): Boolean; static;
+  class function Contains(const a, b: TUBounds1f): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds1f): Boolean;
+  function Contains(const Other: TUBounds1f): Boolean; overload;
   procedure Add(const v: TUFloat);
 end;
 
@@ -752,16 +764,27 @@ strict private
   procedure SetMax(const Value: TUVec2);
   function GetSize: TUVec2;
   procedure SetSize(const Value: TUVec2);
+  function GetTopLeft: TUVec2;
+  function GetTopRight: TUVec2;
+  function GetBottomLeft: TUVec2;
+  function GetBottomRight: TUVec2;
 public
   const Zero: TUBounds2f = ((0, 0), (0, 0));
   property Min: TUVec2 read GetMin write SetMin;
   property Max: TUVec2 read GetMax write SetMax;
   property Size: TUVec2 read GetSize write SetSize;
+  property TopLeft: TUVec2 read GetTopLeft;
+  property TopRight: TUVec2 read GetTopRight;
+  property BottomLeft: TUVec2 read GetBottomLeft;
+  property BottomRight: TUVec2 read GetBottomRight;
   class function Make(const AMin, AMax: TUVec2): TUBounds2f; static; overload;
   class function Make(const ACenter: TUVec2): TUBounds2f; static; overload;
-  class function Overlap(const a, b: TUBounds2f): Boolean; static; inline;
-  function Overlap(const Other: TUBounds2f): Boolean;
-  function GetPoints: TUVec2Array;
+  class function Overlap(const a, b: TUBounds2f): Boolean; static;
+  class function Contains(const a, b: TUBounds2f): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds2f): Boolean;
+  function Contains(const Other: TUBounds2f): Boolean; overload;
+  function GetPoints: TUQuad2f;
+  function ToRect: TURectf;
 end;
 
 type TUBounds3fImpl = type helper for TUBounds3f
@@ -786,9 +809,11 @@ public
   class function Make(const AMin, AMax: TUVec3): TUBounds3f; static; overload;
   class function Make(const ACenter: TUVec3): TUBounds3f; static; overload;
   class function Make(const AVertices: TUVec3Array): TUBounds3f; static; overload;
-  class function Overlap(const a, b: TUBounds3f): Boolean; static; inline;
-  function Overlap(const Other: TUBounds3f): Boolean;
-  function GetPoints: TUVec3Array;
+  class function Overlap(const a, b: TUBounds3f): Boolean; static;
+  class function Contains(const a, b: TUBounds3f): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds3f): Boolean;
+  function Contains(const Other: TUBounds3f): Boolean; overload;
+  function GetPoints: TUCuboid3f;
 end;
 
 type TUBounds1iImpl = type helper for TUBounds1i
@@ -806,8 +831,10 @@ public
   property Size: Int32 read GetSize write SetSize;
   class function Make(const AMin, AMax: Int32): TUBounds1i; static; overload;
   class function Make(const ACenter: Int32): TUBounds1i; static; overload;
-  class function Overlap(const a, b: TUBounds1i): Boolean; static; inline;
-  function Overlap(const Other: TUBounds1i): Boolean;
+  class function Overlap(const a, b: TUBounds1i): Boolean; static;
+  class function Contains(const a, b: TUBounds1i): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds1i): Boolean;
+  function Contains(const Other: TUBounds1i): Boolean; overload;
   procedure Add(const v: Int32);
 end;
 
@@ -819,15 +846,27 @@ strict private
   procedure SetMax(const Value: TUVec2i);
   function GetSize: TUVec2i;
   procedure SetSize(const Value: TUVec2i);
+  function GetTopLeft: TUVec2i;
+  function GetTopRight: TUVec2i;
+  function GetBottomLeft: TUVec2i;
+  function GetBottomRight: TUVec2i;
 public
   const Zero: TUBounds2i = ((0, 0), (0, 0));
   property Min: TUVec2i read GetMin write SetMin;
   property Max: TUVec2i read GetMax write SetMax;
   property Size: TUVec2i read GetSize write SetSize;
+  property TopLeft: TUVec2i read GetTopLeft;
+  property TopRight: TUVec2i read GetTopRight;
+  property BottomLeft: TUVec2i read GetBottomLeft;
+  property BottomRight: TUVec2i read GetBottomRight;
   class function Make(const AMin, AMax: TUVec2i): TUBounds2i; static; overload;
   class function Make(const ACenter: TUVec2i): TUBounds2i; static; overload;
-  class function Overlap(const a, b: TUBounds2i): Boolean; static; inline;
-  function Overlap(const Other: TUBounds2i): Boolean;
+  class function Overlap(const a, b: TUBounds2i): Boolean; static;
+  class function Contains(const a, b: TUBounds2i): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds2i): Boolean;
+  function Contains(const Other: TUBounds2i): Boolean; overload;
+  function GetPoints: TUQuad2i;
+  function ToRect: TURecti;
 end;
 
 type TUBounds3iImpl = type helper for TUBounds3i
@@ -852,8 +891,97 @@ public
   class function Make(const AMin, AMax: TUVec3i): TUBounds3i; static; overload;
   class function Make(const ACenter: TUVec3i): TUBounds3i; static; overload;
   class function Make(const AVertices: TUVec3iArray): TUBounds3i; static; overload;
-  class function Overlap(const a, b: TUBounds3i): Boolean; static; inline;
-  function Overlap(const Other: TUBounds3i): Boolean;
+  class function Overlap(const a, b: TUBounds3i): Boolean; static;
+  class function Contains(const a, b: TUBounds3i): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds3i): Boolean;
+  function Contains(const Other: TUBounds3i): Boolean; overload;
+  function GetPoints: TUCuboid3i;
+end;
+
+type TURectfImpl = type helper for TURectf
+strict private
+  function GetX: TUFloat;
+  procedure SetX(const Value: TUFloat);
+  function GetY: TUFloat;
+  procedure SetY(const Value: TUFloat);
+  function GetW: TUFloat;
+  procedure SetW(const Value: TUFloat);
+  function GetH: TUFloat;
+  procedure SetH(const Value: TUFloat);
+  function GetR: TUFloat;
+  procedure SetR(const Value: TUFloat);
+  function GetB: TUFloat;
+  procedure SetB(const Value: TUFloat);
+  function GetTL: TUVec2;
+  function GetTR: TUVec2;
+  function GetBL: TUVec2;
+  function GetBR: TUVec2;
+public
+  const Zero: TURectf = (0, 0, 0, 0);
+  property x: TUFloat read GetX write SetX;
+  property y: TUFloat read GetY write SetY;
+  property w: TUFloat read GetW write SetW;
+  property h: TUFloat read GetH write SetH;
+  property r: TUFloat read GetR write SetR;
+  property b: TUFloat read GetB write SetB;
+  property Left: TUFloat read GetX write SetX;
+  property Top: TUFloat read GetY write SetY;
+  property Width: TUFloat read GetW write SetW;
+  property Height: TUFloat read GetH write SetH;
+  property Right: TUFloat read GetR write SetR;
+  property Bottom: TUFloat read GetB write SetB;
+  property TopLeft: TUVec2 read GetTL;
+  property TopRight: TUVec2 read GetTR;
+  property BottomLeft: TUVec2 read GetBL;
+  property BottomRight: TUVec2 read GetBR;
+  class function Make(const Ax, Ay, Aw, Ah: TUFloat): TURectf; static;
+  class function Overlap(const r0, r1: TURectf): Boolean; static;
+  class function Contains(const r0, r1: TURectf): Boolean; static;
+  function Overlaps(const Other: TURectf): Boolean;
+  function Contains(const Other: TURectf): Boolean;
+end;
+
+type TURectiImpl = type helper for TURecti
+strict private
+  function GetX: Int32;
+  procedure SetX(const Value: Int32);
+  function GetY: Int32;
+  procedure SetY(const Value: Int32);
+  function GetW: Int32;
+  procedure SetW(const Value: Int32);
+  function GetH: Int32;
+  procedure SetH(const Value: Int32);
+  function GetR: Int32;
+  procedure SetR(const Value: Int32);
+  function GetB: Int32;
+  procedure SetB(const Value: Int32);
+  function GetTL: TUVec2i;
+  function GetTR: TUVec2i;
+  function GetBL: TUVec2i;
+  function GetBR: TUVec2i;
+public
+  const Zero: TURecti = (0, 0, 0, 0);
+  property x: Int32 read GetX write SetX;
+  property y: Int32 read GetY write SetY;
+  property w: Int32 read GetW write SetW;
+  property h: Int32 read GetH write SetH;
+  property r: Int32 read GetR write SetR;
+  property b: Int32 read GetB write SetB;
+  property Left: Int32 read GetX write SetX;
+  property Top: Int32 read GetY write SetY;
+  property Width: Int32 read GetW write SetW;
+  property Height: Int32 read GetH write SetH;
+  property Right: Int32 read GetR write SetR;
+  property Bottom: Int32 read GetB write SetB;
+  property TopLeft: TUVec2i read GetTL;
+  property TopRight: TUVec2i read GetTR;
+  property BottomLeft: TUVec2i read GetBL;
+  property BottomRight: TUVec2i read GetBR;
+  class function Make(const Ax, Ay, Aw, Ah: Int32): TURecti; static;
+  class function Overlap(const r0, r1: TURecti): Boolean; static;
+  class function Contains(const r0, r1: TURecti): Boolean; static;
+  function Overlaps(const Other: TURecti): Boolean;
+  function Contains(const Other: TURecti): Boolean;
 end;
 
 type generic TUBigInt<Size32> = record
@@ -2471,6 +2599,8 @@ operator / (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const f: TUFloat; const v: TUVec2): TUVec2;
 operator - (const v: TUVec2): TUVec2;
+operator * (const v: TUVec2; const r: TURot2): TUVec2;
+operator * (const r: TURot2; const v: TUVec2): TUVec2;
 operator + (const a, b: TUVec2i): TUVec2i;
 operator - (const a, b: TUVec2i): TUVec2i;
 operator * (const a, b: TUVec2i): TUVec2i;
@@ -2498,7 +2628,7 @@ operator / (const a, b: String): String;
 operator := (const v: TUVec2): TUVec2i;
 operator := (const v: UInt64): TUInt4096_Debug;
 operator := (const v: String): TUInt4096_Debug;
-operator := (const v: TUint8Array): TUInt4096_Debug;
+operator := (const v: TUInt8Array): TUInt4096_Debug;
 operator := (const v: TUVec2i): TUVec2;
 operator := (const i: Int32): TUVec2i;
 operator := (const f: TUFloat): TUVec2;
@@ -4773,7 +4903,17 @@ begin
   Result := (a.Min <= b.Max) and (b.Min <= a.Max);
 end;
 
-function TUBounds1fImpl.Overlap(const Other: TUBounds1f): Boolean;
+class function TUBounds1fImpl.Contains(const a, b: TUBounds1f): Boolean;
+begin
+  Result := (a.Min <= b.Min) and (b.Max >= b.Max);
+end;
+
+function TUBounds1fImpl.Overlaps(const Other: TUBounds1f): Boolean;
+begin
+  Result := Overlap(Self, Other);
+end;
+
+function TUBounds1fImpl.Contains(const Other: TUBounds1f): Boolean;
 begin
   Result := Overlap(Self, Other);
 end;
@@ -4783,7 +4923,6 @@ begin
   if v < Self[0] then Self[0] := v
   else if v > Self[1] then Self[1] := v;
 end;
-
 // TUBounds1f end
 
 // TUBounds2f begin
@@ -4817,6 +4956,26 @@ begin
   Self[1] := Self[0] + Value;
 end;
 
+function TUBounds2fImpl.GetTopLeft: TUVec2;
+begin
+  Result := Self[0];
+end;
+
+function TUBounds2fImpl.GetTopRight: TUVec2;
+begin
+  Result := [Self[1].x, Self[0].y];
+end;
+
+function TUBounds2fImpl.GetBottomLeft: TUVec2;
+begin
+  Result := [Self[0].x, Self[1].y];
+end;
+
+function TUBounds2fImpl.GetBottomRight: TUVec2;
+begin
+  Result := Self[1];
+end;
+
 class function TUBounds2fImpl.Make(const AMin, AMax: TUVec2): TUBounds2f;
 begin
   Result[0] := UMin(AMin, AMax);
@@ -4832,26 +4991,44 @@ end;
 class function TUBounds2fImpl.Overlap(const a, b: TUBounds2f): Boolean;
 begin
   Result := (
-    (a.Min.x <= b.Max.x)
-    and (a.Min.y <= b.Max.y)
-    and (b.Min.x <= a.Max.x)
-    and (b.Min.y <= a.Max.y)
+    (a.Min.x <= b.Max.x) and
+    (a.Min.y <= b.Max.y) and
+    (b.Min.x <= a.Max.x) and
+    (b.Min.y <= a.Max.y)
   );
 end;
 
-function TUBounds2fImpl.Overlap(const Other: TUBounds2f): Boolean;
+class function TUBounds2fImpl.Contains(const a, b: TUBounds2f): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Min.x) and
+    (a.Min.y <= b.Min.y) and
+    (a.Max.x >= b.Max.x) and
+    (a.Max.y >= b.Max.y)
+  );
+end;
+
+function TUBounds2fImpl.Overlaps(const Other: TUBounds2f): Boolean;
 begin
   Result := Overlap(Self, Other);
 end;
 
-function TUBounds2fImpl.GetPoints: TUVec2Array;
+function TUBounds2fImpl.Contains(const Other: TUBounds2f): Boolean;
 begin
-  Result := nil;
-  SetLength(Result, 4);
+  Result := Contains(Self, Other);
+end;
+
+function TUBounds2fImpl.GetPoints: TUQuad2f;
+begin
   Result[0] := Self[0];
   Result[1] := TUVec2.Make(Self[0].x, Self[1].y);
   Result[2] := TUVec2.Make(Self[1].x, Self[0].y);
-  Result[3] := Max;
+  Result[3] := Self[1];
+end;
+
+function TUBounds2fImpl.ToRect: TURectf;
+begin
+  Result := [Min.x, Min.y, Size.x, Size.y];
 end;
 // TUBounds2f end
 
@@ -4942,24 +5119,39 @@ end;
 class function TUBounds3fImpl.Overlap(const a, b: TUBounds3f): Boolean;
 begin
   Result := (
-    (a.Min.x <= b.Max.x)
-    and (a.Min.y <= b.Max.y)
-    and (a.Min.z <= b.Max.z)
-    and (b.Min.x <= a.Max.x)
-    and (b.Min.y <= a.Max.y)
-    and (b.Min.z <= a.Max.z)
+    (a.Min.x <= b.Max.x) and
+    (a.Min.y <= b.Max.y) and
+    (a.Min.z <= b.Max.z) and
+    (b.Min.x <= a.Max.x) and
+    (b.Min.y <= a.Max.y) and
+    (b.Min.z <= a.Max.z)
   );
 end;
 
-function TUBounds3fImpl.Overlap(const Other: TUBounds3f): Boolean;
+class function TUBounds3fImpl.Contains(const a, b: TUBounds3f): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Min.x) and
+    (a.Min.y <= b.Min.y) and
+    (a.Min.z <= b.Min.z) and
+    (a.Max.x >= b.Max.x) and
+    (a.Max.y >= b.Max.y) and
+    (a.Max.z >= b.Max.z)
+  );
+end;
+
+function TUBounds3fImpl.Overlaps(const Other: TUBounds3f): Boolean;
 begin
   Result := Overlap(Self, Other);
 end;
 
-function TUBounds3fImpl.GetPoints: TUVec3Array;
+function TUBounds3fImpl.Contains(const Other: TUBounds3f): Boolean;
 begin
-  Result := nil;
-  SetLength(Result, 8);
+  Result := Contains(Self, Other);
+end;
+
+function TUBounds3fImpl.GetPoints: TUCuboid3f;
+begin
   Result[0] := Self[0];
   Result[1] := TUVec3.Make(Self[0].x, Self[0].y, Self[1].z);
   Result[2] := TUVec3.Make(Self[0].x, Self[1].y, Self[0].z);
@@ -5019,9 +5211,19 @@ begin
   Result := (a.Min <= b.Max) and (b.Min <= a.Max);
 end;
 
-function TUBounds1iImpl.Overlap(const Other: TUBounds1i): Boolean;
+class function TUBounds1iImpl.Contains(const a, b: TUBounds1i): Boolean;
+begin
+  Result := (a.Min <= b.Min) and (b.Max >= b.Max);
+end;
+
+function TUBounds1iImpl.Overlaps(const Other: TUBounds1i): Boolean;
 begin
   Result := Overlap(Self, Other);
+end;
+
+function TUBounds1iImpl.Contains(const Other: TUBounds1i): Boolean;
+begin
+  Result := Contains(Self, Other);
 end;
 
 procedure TUBounds1iImpl.Add(const v: Int32);
@@ -5063,6 +5265,26 @@ begin
   Self[1] := Self[0] + Value;
 end;
 
+function TUBounds2iImpl.GetTopLeft: TUVec2i;
+begin
+  Result := Self[0];
+end;
+
+function TUBounds2iImpl.GetTopRight: TUVec2i;
+begin
+  Result := [Self[1].x, Self[0].y];
+end;
+
+function TUBounds2iImpl.GetBottomLeft: TUVec2i;
+begin
+  Result := [Self[0].x, Self[1].y];
+end;
+
+function TUBounds2iImpl.GetBottomRight: TUVec2i;
+begin
+  Result := Self[1];
+end;
+
 class function TUBounds2iImpl.Make(const AMin, AMax: TUVec2i): TUBounds2i;
 begin
   Result[0] := UMin(AMin, AMax);
@@ -5078,16 +5300,44 @@ end;
 class function TUBounds2iImpl.Overlap(const a, b: TUBounds2i): Boolean;
 begin
   Result := (
-    (a.Min.x <= b.Max.x)
-    and (a.Min.y <= b.Max.y)
-    and (b.Min.x <= a.Max.x)
-    and (b.Min.y <= a.Max.y)
+    (a.Min.x <= b.Max.x) and
+    (a.Min.y <= b.Max.y) and
+    (b.Min.x <= a.Max.x) and
+    (b.Min.y <= a.Max.y)
   );
 end;
 
-function TUBounds2iImpl.Overlap(const Other: TUBounds2i): Boolean;
+class function TUBounds2iImpl.Contains(const a, b: TUBounds2i): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Min.x) and
+    (a.Min.y <= b.Min.y) and
+    (a.Max.x >= b.Max.x) and
+    (a.Max.y >= b.Max.y)
+  );
+end;
+
+function TUBounds2iImpl.Overlaps(const Other: TUBounds2i): Boolean;
 begin
   Result := Overlap(Self, Other);
+end;
+
+function TUBounds2iImpl.Contains(const Other: TUBounds2i): Boolean;
+begin
+  Result := Contains(Self, Other);
+end;
+
+function TUBounds2iImpl.GetPoints: TUQuad2i;
+begin
+  Result[0] := Self[0];
+  Result[1] := TUVec2.Make(Self[0].x, Self[1].y);
+  Result[2] := TUVec2.Make(Self[1].x, Self[0].y);
+  Result[3] := Self[1];
+end;
+
+function TUBounds2iImpl.ToRect: TURecti;
+begin
+  Result := [Min.x, Min.y, Size.x, Size.y];
 end;
 // TUBounds2i end
 
@@ -5178,20 +5428,283 @@ end;
 class function TUBounds3iImpl.Overlap(const a, b: TUBounds3i): Boolean;
 begin
   Result := (
-    (a.Min.x <= b.Max.x)
-    and (a.Min.y <= b.Max.y)
-    and (a.Min.z <= b.Max.z)
-    and (b.Min.x <= a.Max.x)
-    and (b.Min.y <= a.Max.y)
-    and (b.Min.z <= a.Max.z)
+    (a.Min.x <= b.Max.x) and
+    (a.Min.y <= b.Max.y) and
+    (a.Min.z <= b.Max.z) and
+    (b.Min.x <= a.Max.x) and
+    (b.Min.y <= a.Max.y) and
+    (b.Min.z <= a.Max.z)
   );
 end;
 
-function TUBounds3iImpl.Overlap(const Other: TUBounds3i): Boolean;
+class function TUBounds3iImpl.Contains(const a, b: TUBounds3i): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Min.x) and
+    (a.Min.y <= b.Min.y) and
+    (a.Min.z <= b.Min.z) and
+    (a.Max.x >= b.Max.x) and
+    (a.Max.y >= b.Max.y) and
+    (a.Max.z >= b.Max.z)
+  );
+end;
+
+function TUBounds3iImpl.Overlaps(const Other: TUBounds3i): Boolean;
 begin
   Result := Overlap(Self, Other);
 end;
+
+function TUBounds3iImpl.Contains(const Other: TUBounds3i): Boolean;
+begin
+  Result := Contains(Self, Other);
+end;
+
+function TUBounds3iImpl.GetPoints: TUCuboid3i;
+begin
+  Result[0] := Self[0];
+  Result[1] := [Self[0].x, Self[0].y, Self[1].z];
+  Result[2] := [Self[0].x, Self[1].y, Self[0].z];
+  Result[3] := [Self[0].x, Self[1].y, Self[1].z];
+  Result[4] := [Self[1].x, Self[0].y, Self[0].z];
+  Result[5] := [Self[1].x, Self[0].y, Self[1].z];
+  Result[6] := [Self[1].x, Self[1].y, Self[0].z];
+  Result[7] := Self[1];
+end;
 // TUBounds3i end
+
+// TURectf begin
+function TURectfImpl.GetX: TUFloat;
+begin
+  Result := Self[0];
+end;
+
+procedure TURectfImpl.SetX(const Value: TUFloat);
+begin
+  Self[0] := Value;
+end;
+
+function TURectfImpl.GetY: TUFloat;
+begin
+  Result := Self[1];
+end;
+
+procedure TURectfImpl.SetY(const Value: TUFloat);
+begin
+  Self[1] := Value;
+end;
+
+function TURectfImpl.GetW: TUFloat;
+begin
+  Result := Self[2];
+end;
+
+procedure TURectfImpl.SetW(const Value: TUFloat);
+begin
+  Self[2] := Value;
+end;
+
+function TURectfImpl.GetH: TUFloat;
+begin
+  Result := Self[3];
+end;
+
+procedure TURectfImpl.SetH(const Value: TUFloat);
+begin
+  Self[3] := Value;
+end;
+
+function TURectfImpl.GetR: TUFloat;
+begin
+  Result := Self[0] + Self[1];
+end;
+
+procedure TURectfImpl.SetR(const Value: TUFloat);
+begin
+  Self[0] := Value - Self[2]
+end;
+
+function TURectfImpl.GetB: TUFloat;
+begin
+  Result := Self[1] + Self[3];
+end;
+
+procedure TURectfImpl.SetB(const Value: TUFloat);
+begin
+  Self[1] := Value - Self[3];
+end;
+
+function TURectfImpl.GetTL: TUVec2;
+begin
+  Result := [x, y];
+end;
+
+function TURectfImpl.GetTR: TUVec2;
+begin
+  Result := [r, y];
+end;
+
+function TURectfImpl.GetBL: TUVec2;
+begin
+  Result := [x, b];
+end;
+
+function TURectfImpl.GetBR: TUVec2;
+begin
+  Result := [r, b];
+end;
+
+class function TURectfImpl.Make(const Ax, Ay, Aw, Ah: TUFloat): TURectf;
+begin
+  Result := [Ax, Ay, Aw, Ah];
+end;
+
+class function TURectfImpl.Overlap(const r0, r1: TURectf): Boolean;
+begin
+  Result := (
+    (r0.x <= r1.r) and
+    (r0.y <= r1.b) and
+    (r1.x <= r0.r) and
+    (r1.y <= r0.b)
+  );
+end;
+
+class function TURectfImpl.Contains(const r0, r1: TURectf): Boolean;
+begin
+  Result := (
+    (r0.x <= r1.x) and
+    (r0.y <= r1.y) and
+    (r0.r >= r1.r) and
+    (r0.b >= r1.b)
+  );
+end;
+
+function TURectfImpl.Overlaps(const Other: TURectf): Boolean;
+begin
+  Result := Overlap(Self, Other);
+end;
+
+function TURectfImpl.Contains(const Other: TURectf): Boolean;
+begin
+  Result := Contains(Self, Other);
+end;
+// TURectf end
+
+// TURecti begin
+function TURectiImpl.GetX: Int32;
+begin
+  Result := Self[0];
+end;
+
+procedure TURectiImpl.SetX(const Value: Int32);
+begin
+  Self[0] := Value;
+end;
+
+function TURectiImpl.GetY: Int32;
+begin
+  Result := Self[1];
+end;
+
+procedure TURectiImpl.SetY(const Value: Int32);
+begin
+  Self[1] := Value;
+end;
+
+function TURectiImpl.GetW: Int32;
+begin
+  Result := Self[2];
+end;
+
+procedure TURectiImpl.SetW(const Value: Int32);
+begin
+  Self[2] := Value;
+end;
+
+function TURectiImpl.GetH: Int32;
+begin
+  Result := Self[3];
+end;
+
+procedure TURectiImpl.SetH(const Value: Int32);
+begin
+  Self[3] := Value;
+end;
+
+function TURectiImpl.GetR: Int32;
+begin
+  Result := Self[0] + Self[2];
+end;
+
+procedure TURectiImpl.SetR(const Value: Int32);
+begin
+  Self[0] := Value - Self[2];
+end;
+
+function TURectiImpl.GetB: Int32;
+begin
+  Result := Self[1] + Self[3];
+end;
+
+procedure TURectiImpl.SetB(const Value: Int32);
+begin
+  Self[1] := Value - Self[3];
+end;
+
+function TURectiImpl.GetTL: TUVec2i;
+begin
+  Result := [Self[0], Self[1]];
+end;
+
+function TURectiImpl.GetTR: TUVec2i;
+begin
+  Result := [Self[0] + Self[2], Self[1]];
+end;
+
+function TURectiImpl.GetBL: TUVec2i;
+begin
+  Result := [Self[0], Self[1] + Self[3]];
+end;
+
+function TURectiImpl.GetBR: TUVec2i;
+begin
+  Result := [Self[0] + Self[2], Self[1] + Self[3]];
+end;
+
+class function TURectiImpl.Make(const Ax, Ay, Aw, Ah: Int32): TURecti;
+begin
+  Result := [Ax, Ay, Aw, Ah];
+end;
+
+class function TURectiImpl.Overlap(const r0, r1: TURecti): Boolean;
+begin
+  Result := (
+    (r0.x <= r1.r) and
+    (r0.y <= r1.b) and
+    (r1.x <= r0.r) and
+    (r1.y <= r0.b)
+  );
+end;
+
+class function TURectiImpl.Contains(const r0, r1: TURecti): Boolean;
+begin
+  Result := (
+    (r0.x <= r1.x) and
+    (r0.y <= r1.y) and
+    (r0.r >= r1.r) and
+    (r0.b >= r1.b)
+  );
+end;
+
+function TURectiImpl.Overlaps(const Other: TURecti): Boolean;
+begin
+  Result := Overlap(Self, Other);
+end;
+
+function TURectiImpl.Contains(const Other: TURecti): Boolean;
+begin
+  Result := Contains(Self, Other);
+end;
+// TURecti end
 
 // TUBigInt begin
 class function TUBigInt.MaxItem: Int32;
@@ -15163,7 +15676,7 @@ begin
 end;
 
 function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
-  var Pts: TUVec3Array;
+  var Pts: TUCuboid3f;
   var i: Int32;
   var d: TUFloat;
 begin
@@ -15229,6 +15742,16 @@ operator - (const v: TUVec2): TUVec2;
 begin
   Result[0] := -v[0];
   Result[1] := -v[1];
+end;
+
+operator * (const v: TUVec2; const r: TURot2): TUVec2;
+begin
+  Result := r.Transform(v);
+end;
+
+operator * (const r: TURot2; const v: TUVec2): TUVec2;
+begin
+  Result := r.TransformInv(v);
 end;
 
 operator + (const a, b: TUVec2i): TUVec2i;

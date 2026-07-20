@@ -193,11 +193,7 @@ public
     Advance: UInt16;
     Contours: array of TContour;
   end;
-  type
-
-  { TCharMap }
-
- TCharMap = record
+  type TCharMap = record
     CharId: UInt32;
     GlyphId: UInt32;
     class operator > (const a, b: TCharMap): Boolean;
