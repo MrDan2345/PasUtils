@@ -843,7 +843,7 @@ function UNetShutDown(
 ): Int32; call_decl; external SockLib name 'shutdown';
 function UNetGetSockName(
     Sock: Int32; Name: PUSockAddr; NameLen: PUSockLen
-): Int32; call_decl; external SockLib name 'sockname';
+): Int32; call_decl; external SockLib name 'getsockname';
 function UNetGetPeerName(
     Sock: Int32; Name: PUSockAddr; NameLen: PUSockLen
 ): Int32; call_decl; external SockLib name 'peername';

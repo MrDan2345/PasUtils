@@ -7,7 +7,8 @@ interface
 uses
   SysUtils, Classes, TypInfo, Process;
 
-type TUProcedure = procedure of object;
+type TUProcedure = procedure (const Args: array of const);
+type TUProcedureObj = procedure (const Args: array of const) of object;
 type TUFunction = function: Boolean of object;
 type TUProcedureString = procedure (const Value: String) of object;
 
@@ -60,12 +61,15 @@ type TInt64Arr = array[UInt32] of TInt64;
 type PInt64Arr = ^TInt64Arr;
 type TInt64Array = array of TInt64;
 
+type TUVersion = type UInt16; // TUVersionImpl
 type TUColor = UInt32;
 type PUColor = ^TUColor;
 type TUColorArr = array[UInt32] of TUColor;
 type PUColorArr = ^TUColorArr;
 type TUColorArray = array of TUColor;
+{$push}{$align 16}
 type TUMat = array[0..3, 0..3] of TUFloat; // TUMatImpl
+{$pop}
 type PUMat = ^TUMat;
 type TUMatArr = array[UInt32] of TUMat;
 type PUMatArr = ^TUMatArr;
@@ -85,7 +89,9 @@ type PUVec3 = ^TUVec3;
 type TUVec3Arr = array[UInt32] of TUVec3;
 type PUVec3Arr = ^TUVec3Arr;
 type TUVec3Array = array of TUVec3;
+{$push}{$align 16}
 type TUVec4 = array[0..3] of TUFloat; // TUVec4Impl
+{$pop}
 type PUVec4 = ^TUVec4;
 type TUVec4Arr = array[UInt32] of TUVec4;
 type PUVec4Arr = ^TUVec4Arr;
@@ -119,7 +125,7 @@ type PUSphere = ^TUSphere;
 type TUSphereArr = array[UInt32] of TUFloat;
 type PUSphereArr = ^TUSphereArr;
 type TUSpgereArray = array of TUSphere;
-type TURot2 = array[0..1] of TUFloat; // TURot2Impl
+type TURot2 = type TUVec2; // TURot2Impl
 type PURot2 = ^TURot2;
 type TURot2Arr = array[UInt32] of TURot2;
 type PURot2Arr = ^TURot2;
@@ -136,6 +142,16 @@ type TUBounds2i = array[0..1] of TUVec2i; // TUBounds2iImpl
 type PUBounds2i = ^TUBounds2i;
 type TUBounds3i = array[0..1] of TUVec3i; // TUBounds3iImpl
 type PUBounds3i = ^TUBounds3i;
+type TUQuad2f = array[0..3] of TUVec2;
+type TUQuad2i = array[0..3] of TUVec2i;
+type TUCuboid3f = array[0..7] of TUVec3;
+type TUCuboid3i = array[0..7] of TUVec3i;
+type TURectf = array[0..3] of TUFloat; // TURectfImpl
+type PURectf = ^TURectf;
+type TURecti = array[0..3] of Int32; // TURectiImpl
+type PURecti = ^TURecti;
+type TURect = TURecti;
+type PURect = PURecti;
 type TUInt4096_Debug = array[0..128] of UInt32; // TUInt4096_DebugImpl
 type TUInt4096_DebugArray = array of TUInt4096_Debug;
 
@@ -198,8 +214,10 @@ public
   class function Make(const Arr: array of UInt16): TUInt8Array; static;
   class function Make(const Arr: array of UInt32): TUInt8Array; static;
   class function Make(const Arr: array of UInt64): TUInt8Array; static;
+  function SubArray(const Start: UInt32; const Size: UInt32 = 0): TUInt8Array;
   function ToString: String;
   function ToHex: String;
+  function ToHexLC: String;
   function ToBase64: String;
   function Append(const Bytes: array of UInt8): TUInt8Array;
   function Append(const Bytes: array of TUInt8Array): TUInt8Array;
@@ -208,6 +226,7 @@ public
   function Append(const Num: UInt16): TUInt8Array;
   function Append(const Num: UInt32): TUInt8Array;
   function IsEmpty: Boolean;
+  function Size: UInt32;
 end;
 
 type TUInt16Impl = type helper for TUInt16
@@ -278,6 +297,20 @@ public
   property Bit[const Index: TUInt8]: TUInt8 read GetBit write SetBit; default;
   function ToString: String; inline;
   function ToBool: Boolean; inline;
+end;
+
+type TUVersionImpl = type helper for TUVersion
+private
+  function GetMajor: UInt8;
+  procedure SetMajor(const Value: UInt8);
+  function GetMinor: UInt8;
+  procedure SetMinor(const Value: UInt8);
+public
+  property Major: UInt8 read GetMajor write SetMajor;
+  property Minor: UInt8 read GetMinor write SetMinor;
+  function ToString: String;
+  class function Make(const AMajor, AMinor: UInt8): TUVersion; static;
+  class function FromString(const Value: String): TUVersion; static;
 end;
 
 type TUColorImpl = type helper for TUColor
@@ -726,13 +759,15 @@ strict private
   procedure SetSize(const Value: TUFloat);
 public
   const Zero: TUBounds1f = (0, 0);
-  class function Make(const AMin, AMax: TUFLoat): TUBounds1f; static; overload;
-  class function Make(const ACenter: TUFLoat): TUBounds1f; static; overload;
-  class function Overlap(const a, b: TUBounds1f): Boolean; static; inline;
   property Min: TUFloat read GetMin write SetMin;
   property Max: TUFloat read GetMax write SetMax;
   property Size: TUFloat read GetSize write SetSize;
-  function Overlap(const Other: TUBounds1f): Boolean;
+  class function Make(const AMin, AMax: TUFLoat): TUBounds1f; static; overload;
+  class function Make(const ACenter: TUFLoat): TUBounds1f; static; overload;
+  class function Overlap(const a, b: TUBounds1f): Boolean; static;
+  class function Contains(const a, b: TUBounds1f): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds1f): Boolean;
+  function Contains(const Other: TUBounds1f): Boolean; overload;
   procedure Add(const v: TUFloat);
 end;
 
@@ -744,16 +779,27 @@ strict private
   procedure SetMax(const Value: TUVec2);
   function GetSize: TUVec2;
   procedure SetSize(const Value: TUVec2);
+  function GetTopLeft: TUVec2;
+  function GetTopRight: TUVec2;
+  function GetBottomLeft: TUVec2;
+  function GetBottomRight: TUVec2;
 public
   const Zero: TUBounds2f = ((0, 0), (0, 0));
   property Min: TUVec2 read GetMin write SetMin;
   property Max: TUVec2 read GetMax write SetMax;
   property Size: TUVec2 read GetSize write SetSize;
+  property TopLeft: TUVec2 read GetTopLeft;
+  property TopRight: TUVec2 read GetTopRight;
+  property BottomLeft: TUVec2 read GetBottomLeft;
+  property BottomRight: TUVec2 read GetBottomRight;
   class function Make(const AMin, AMax: TUVec2): TUBounds2f; static; overload;
   class function Make(const ACenter: TUVec2): TUBounds2f; static; overload;
-  class function Overlap(const a, b: TUBounds2f): Boolean; static; inline;
-  function Overlap(const Other: TUBounds2f): Boolean;
-  function GetPoints: TUVec2Array;
+  class function Overlap(const a, b: TUBounds2f): Boolean; static;
+  class function Contains(const a, b: TUBounds2f): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds2f): Boolean;
+  function Contains(const Other: TUBounds2f): Boolean; overload;
+  function GetPoints: TUQuad2f;
+  function ToRect: TURectf;
 end;
 
 type TUBounds3fImpl = type helper for TUBounds3f
@@ -778,9 +824,11 @@ public
   class function Make(const AMin, AMax: TUVec3): TUBounds3f; static; overload;
   class function Make(const ACenter: TUVec3): TUBounds3f; static; overload;
   class function Make(const AVertices: TUVec3Array): TUBounds3f; static; overload;
-  class function Overlap(const a, b: TUBounds3f): Boolean; static; inline;
-  function Overlap(const Other: TUBounds3f): Boolean;
-  function GetPoints: TUVec3Array;
+  class function Overlap(const a, b: TUBounds3f): Boolean; static;
+  class function Contains(const a, b: TUBounds3f): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds3f): Boolean;
+  function Contains(const Other: TUBounds3f): Boolean; overload;
+  function GetPoints: TUCuboid3f;
 end;
 
 type TUBounds1iImpl = type helper for TUBounds1i
@@ -798,8 +846,10 @@ public
   property Size: Int32 read GetSize write SetSize;
   class function Make(const AMin, AMax: Int32): TUBounds1i; static; overload;
   class function Make(const ACenter: Int32): TUBounds1i; static; overload;
-  class function Overlap(const a, b: TUBounds1i): Boolean; static; inline;
-  function Overlap(const Other: TUBounds1i): Boolean;
+  class function Overlap(const a, b: TUBounds1i): Boolean; static;
+  class function Contains(const a, b: TUBounds1i): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds1i): Boolean;
+  function Contains(const Other: TUBounds1i): Boolean; overload;
   procedure Add(const v: Int32);
 end;
 
@@ -811,15 +861,27 @@ strict private
   procedure SetMax(const Value: TUVec2i);
   function GetSize: TUVec2i;
   procedure SetSize(const Value: TUVec2i);
+  function GetTopLeft: TUVec2i;
+  function GetTopRight: TUVec2i;
+  function GetBottomLeft: TUVec2i;
+  function GetBottomRight: TUVec2i;
 public
   const Zero: TUBounds2i = ((0, 0), (0, 0));
   property Min: TUVec2i read GetMin write SetMin;
   property Max: TUVec2i read GetMax write SetMax;
   property Size: TUVec2i read GetSize write SetSize;
+  property TopLeft: TUVec2i read GetTopLeft;
+  property TopRight: TUVec2i read GetTopRight;
+  property BottomLeft: TUVec2i read GetBottomLeft;
+  property BottomRight: TUVec2i read GetBottomRight;
   class function Make(const AMin, AMax: TUVec2i): TUBounds2i; static; overload;
   class function Make(const ACenter: TUVec2i): TUBounds2i; static; overload;
-  class function Overlap(const a, b: TUBounds2i): Boolean; static; inline;
-  function Overlap(const Other: TUBounds2i): Boolean;
+  class function Overlap(const a, b: TUBounds2i): Boolean; static;
+  class function Contains(const a, b: TUBounds2i): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds2i): Boolean;
+  function Contains(const Other: TUBounds2i): Boolean; overload;
+  function GetPoints: TUQuad2i;
+  function ToRect: TURecti;
 end;
 
 type TUBounds3iImpl = type helper for TUBounds3i
@@ -844,8 +906,97 @@ public
   class function Make(const AMin, AMax: TUVec3i): TUBounds3i; static; overload;
   class function Make(const ACenter: TUVec3i): TUBounds3i; static; overload;
   class function Make(const AVertices: TUVec3iArray): TUBounds3i; static; overload;
-  class function Overlap(const a, b: TUBounds3i): Boolean; static; inline;
-  function Overlap(const Other: TUBounds3i): Boolean;
+  class function Overlap(const a, b: TUBounds3i): Boolean; static;
+  class function Contains(const a, b: TUBounds3i): Boolean; static; overload;
+  function Overlaps(const Other: TUBounds3i): Boolean;
+  function Contains(const Other: TUBounds3i): Boolean; overload;
+  function GetPoints: TUCuboid3i;
+end;
+
+type TURectfImpl = type helper for TURectf
+strict private
+  function GetX: TUFloat;
+  procedure SetX(const Value: TUFloat);
+  function GetY: TUFloat;
+  procedure SetY(const Value: TUFloat);
+  function GetW: TUFloat;
+  procedure SetW(const Value: TUFloat);
+  function GetH: TUFloat;
+  procedure SetH(const Value: TUFloat);
+  function GetR: TUFloat;
+  procedure SetR(const Value: TUFloat);
+  function GetB: TUFloat;
+  procedure SetB(const Value: TUFloat);
+  function GetTL: TUVec2;
+  function GetTR: TUVec2;
+  function GetBL: TUVec2;
+  function GetBR: TUVec2;
+public
+  const Zero: TURectf = (0, 0, 0, 0);
+  property x: TUFloat read GetX write SetX;
+  property y: TUFloat read GetY write SetY;
+  property w: TUFloat read GetW write SetW;
+  property h: TUFloat read GetH write SetH;
+  property r: TUFloat read GetR write SetR;
+  property b: TUFloat read GetB write SetB;
+  property Left: TUFloat read GetX write SetX;
+  property Top: TUFloat read GetY write SetY;
+  property Width: TUFloat read GetW write SetW;
+  property Height: TUFloat read GetH write SetH;
+  property Right: TUFloat read GetR write SetR;
+  property Bottom: TUFloat read GetB write SetB;
+  property TopLeft: TUVec2 read GetTL;
+  property TopRight: TUVec2 read GetTR;
+  property BottomLeft: TUVec2 read GetBL;
+  property BottomRight: TUVec2 read GetBR;
+  class function Make(const Ax, Ay, Aw, Ah: TUFloat): TURectf; static;
+  class function Overlap(const r0, r1: TURectf): Boolean; static;
+  class function Contains(const r0, r1: TURectf): Boolean; static;
+  function Overlaps(const Other: TURectf): Boolean;
+  function Contains(const Other: TURectf): Boolean;
+end;
+
+type TURectiImpl = type helper for TURecti
+strict private
+  function GetX: Int32;
+  procedure SetX(const Value: Int32);
+  function GetY: Int32;
+  procedure SetY(const Value: Int32);
+  function GetW: Int32;
+  procedure SetW(const Value: Int32);
+  function GetH: Int32;
+  procedure SetH(const Value: Int32);
+  function GetR: Int32;
+  procedure SetR(const Value: Int32);
+  function GetB: Int32;
+  procedure SetB(const Value: Int32);
+  function GetTL: TUVec2i;
+  function GetTR: TUVec2i;
+  function GetBL: TUVec2i;
+  function GetBR: TUVec2i;
+public
+  const Zero: TURecti = (0, 0, 0, 0);
+  property x: Int32 read GetX write SetX;
+  property y: Int32 read GetY write SetY;
+  property w: Int32 read GetW write SetW;
+  property h: Int32 read GetH write SetH;
+  property r: Int32 read GetR write SetR;
+  property b: Int32 read GetB write SetB;
+  property Left: Int32 read GetX write SetX;
+  property Top: Int32 read GetY write SetY;
+  property Width: Int32 read GetW write SetW;
+  property Height: Int32 read GetH write SetH;
+  property Right: Int32 read GetR write SetR;
+  property Bottom: Int32 read GetB write SetB;
+  property TopLeft: TUVec2i read GetTL;
+  property TopRight: TUVec2i read GetTR;
+  property BottomLeft: TUVec2i read GetBL;
+  property BottomRight: TUVec2i read GetBR;
+  class function Make(const Ax, Ay, Aw, Ah: Int32): TURecti; static;
+  class function Overlap(const r0, r1: TURecti): Boolean; static;
+  class function Contains(const r0, r1: TURecti): Boolean; static;
+  function Overlaps(const Other: TURecti): Boolean;
+  function Contains(const Other: TURecti): Boolean;
 end;
 
 type generic TUBigInt<Size32> = record
@@ -912,6 +1063,8 @@ public
   class function Modulo(const a, b: TSelf): TSelf; static;
   class function ModPow(const Base, Exp, Modulus: TSelf): TSelf; static;
   class function ModInv(const Exp, Phi: TSelf): TSelf; static;
+  class function ModAdd(const a, b, Modulus: TSelf): TSelf; static;
+  class function ModSub(const a, b, Modulus: TSelf): TSelf; static;
   class function Compare(const a, b: TSelf): Int8; static;
   class function ShrOne(const Number: TSelf): TSelf; static;
   class function ShlOne(const Number: TSelf): TSelf; static;
@@ -1196,18 +1349,18 @@ public
 strict private
   type TTaskThread = class (TThread)
   private
-    var _StartTime: QWord;
+    var _StartTime: UInt64;
   public
-    var Ref: Integer;
+    var Ref: Int32;
     var Proc: TFunc;
     var Args: array of TVarRec;
     var Res: TRes;
     procedure AfterConstruction; override;
     procedure Execute; override;
-    function TimeRunning: QWord;
-    function RefInc: Integer;
-    function RefDec: Integer;
-    function RefDecKillThread: Integer;
+    function TimeRunning: UInt64;
+    function RefInc: Int32;
+    function RefDec: Int32;
+    function RefDecKillThread: Int32;
   end;
   var _Thread: TTaskThread;
   procedure Initialize; inline;
@@ -1230,7 +1383,7 @@ public
 end;
 type TUTaskString = specialize TUTask<String>;
 type TUTaskBool = specialize TUTask<Boolean>;
-type TUTaskInt = specialize TUTask<Integer>;
+type TUTaskInt = specialize TUTask<Int32>;
 
 type generic TUSharedRef<T> = record
 public
@@ -1247,7 +1400,7 @@ public
   class operator Initialize(var v: TSelf);
   class operator := (const Value: TPtr): TSelf; inline;
   class operator := (const Value: Pointer): TSelf; inline;
-  class operator = (v1, v2: TSelf): Boolean; inline;
+  class operator = (a, b: TSelf): Boolean; inline;
 end;
 
 type generic TUWeakRef<T> = record
@@ -1265,6 +1418,7 @@ public
   function AsShared: TShared; inline;
   class operator := (const Value: TPtr): TSelf; inline;
   class operator := (const Value: TShared): TSelf; inline;
+  class operator = (const a, b: TSelf): Boolean; inline;
 end;
 
 type TURefClass = class;
@@ -1367,123 +1521,154 @@ public
   constructor Create(const Buffer: Pointer; const BufferSize: UInt32);
 end;
 
+type TUJson = class;
 {$push}
 {$m+}
 type TUSerializable = class (TURefClass)
+public
+  type TProp = PPropInfo;
+  type TProps = array of TProp;
+  type TField = record
+    var Field: PVmtFieldEntry;
+    var ClassInfo: PClass;
+  end;
+  type TFields = array of TField;
 protected
   var _TypeInfo: PTypeInfo;
   var _TypeData: PTypeData;
-  var _PropList: array of PPropInfo;
-  function VerifyProp(const Index: Integer; const PropType: TTypeKinds = tkAny): Boolean;
-  function VerifyArrayProp(const Index, ArrayIndex: Integer; const PropType: TTypeKinds = tkAny): Boolean;
-  function GetArrayData(const Index: Integer): Pointer;
+  var _PropList: TProps;
+  var _FieldList: TFields;
+  class function FindEnumName(const Names: ShortString; const Index: Int32): String;
+  class function FindEnumIndex(const Names: ShortString; const Value: String): Int32;
   function GetOrdSize(const OrdType: TOrdType): UInt32; inline;
-  function GetArrayElementTypeInfo(const Index: Integer): PTypeInfo;
-  function GetPropCount: Integer; inline;
-  function GetPropInfo(const Index: Integer): PPropInfo; inline;
-  function GetPropArrayInfo(const Index: Integer): PTypeInfo; inline;
-  function GetPropEnum(const Index: Integer): Int32; inline;
-  procedure SetPropEnum(const Index: Integer; const Value: Int32); inline;
-  function GetPropBool(const Index: Integer): Boolean; inline;
-  procedure SetPropBool(const Index: Integer; const Value: Boolean); inline;
-  function GetPropInt8(const Index: Integer): Int8; inline;
-  procedure SetPropInt8(const Index: Integer; const Value: Int8); inline;
-  function GetPropInt16(const Index: Integer): Int16; inline;
-  procedure SetPropInt16(const Index: Integer; const Value: Int16); inline;
-  function GetPropInt32(const Index: Integer): Int32; inline;
-  procedure SetPropInt32(const Index: Integer; const Value: Int32); inline;
-  function GetPropInt64(const Index: Integer): Int64; inline;
-  procedure SetPropInt64(const Index: Integer; const Value: Int64); inline;
-  function GetPropUInt8(const Index: Integer): UInt8; inline;
-  procedure SetPropUInt8(const Index: Integer; const Value: UInt8); inline;
-  function GetPropUInt16(const Index: Integer): UInt16; inline;
-  procedure SetPropUInt16(const Index: Integer; const Value: UInt16); inline;
-  function GetPropUInt32(const Index: Integer): UInt32; inline;
-  procedure SetPropUInt32(const Index: Integer; const Value: UInt32); inline;
-  function GetPropUInt64(const Index: Integer): UInt64; inline;
-  procedure SetPropUInt64(const Index: Integer; const Value: UInt64); inline;
-  function GetPropFloat(const Index: Integer): Single; inline;
-  procedure SetPropFloat(const Index: Integer; const Value: Single); inline;
-  function GetPropDouble(const Index: Integer): Double; inline;
-  procedure SetPropDouble(const Index: Integer; const Value: Double); inline;
-  function GetPropString(const Index: Integer): String; inline;
-  procedure SetPropString(const Index: Integer; const Value: String); inline;
-  function GetPropClass(const Index: Integer): TObject; inline;
-  procedure SetPropClass(const Index: Integer; const Value: TObject); inline;
-  function GetPropArrayLength(const Index: Integer): Integer; inline;
-  procedure SetPropArrayLength(const Index: Integer; const Value: Integer);
-  function GetPropArrayEnum(const Index, ArrayIndex: Integer): Int32; inline;
-  procedure SetPropArrayEnum(const Index, ArrayIndex: Integer; const Value: Int32); inline;
-  function GetPropArrayBool(const Index, ArrayIndex: Integer): Boolean; inline;
-  procedure SetPropArrayBool(const Index, ArrayIndex: Integer; const Value: Boolean); inline;
-  function GetPropArrayInt8(const Index, ArrayIndex: Integer): Int8; inline;
-  procedure SetPropArrayInt8(const Index, ArrayIndex: Integer; const Value: Int8); inline;
-  function GetPropArrayInt16(const Index, ArrayIndex: Integer): Int16; inline;
-  procedure SetPropArrayInt16(const Index, ArrayIndex: Integer; const Value: Int16); inline;
-  function GetPropArrayInt32(const Index, ArrayIndex: Integer): Int32; inline;
-  procedure SetPropArrayInt32(const Index, ArrayIndex: Integer; const Value: Int32); inline;
-  function GetPropArrayInt64(const Index, ArrayIndex: Integer): Int64; inline;
-  procedure SetPropArrayInt64(const Index, ArrayIndex: Integer; const Value: Int64); inline;
-  function GetPropArrayUInt8(const Index, ArrayIndex: Integer): UInt8; inline;
-  procedure SetPropArrayUInt8(const Index, ArrayIndex: Integer; const Value: UInt8); inline;
-  function GetPropArrayUInt16(const Index, ArrayIndex: Integer): UInt16; inline;
-  procedure SetPropArrayUInt16(const Index, ArrayIndex: Integer; const Value: UInt16); inline;
-  function GetPropArrayUInt32(const Index, ArrayIndex: Integer): UInt32; inline;
-  procedure SetPropArrayUInt32(const Index, ArrayIndex: Integer; const Value: UInt32); inline;
-  function GetPropArrayUInt64(const Index, ArrayIndex: Integer): UInt64; inline;
-  procedure SetPropArrayUInt64(const Index, ArrayIndex: Integer; const Value: UInt64); inline;
-  function GetPropArrayFloat(const Index, ArrayIndex: Integer): Single; inline;
-  procedure SetPropArrayFloat(const Index, ArrayIndex: Integer; const Value: Single); inline;
-  function GetPropArrayDouble(const Index, ArrayIndex: Integer): Double; inline;
-  procedure SetPropArrayDouble(const Index, ArrayIndex: Integer; const Value: Double); inline;
-  function GetPropArrayString(const Index, ArrayIndex: Integer): String; inline;
-  procedure SetPropArrayString(const Index, ArrayIndex: Integer; const Value: String); inline;
-  function GetPropArrayClass(const Index, ArrayIndex: Integer): TObject; inline;
-  procedure SetPropArrayClass(const Index, ArrayIndex: Integer; const Value: TObject); inline;
-  generic function GetDynArrayLength<T>(const Index: Integer): Integer;
-  generic procedure SetDynArrayLength<T>(const Index: Integer; const Value: Integer);
-  generic function GetDynArrayElement<T>(const Index, ArrayIndex: Integer): T;
-  generic procedure SetDynArrayElement<T>(const Index, ArrayIndex: Integer; const Value: T);
+  function VerifyProp(const Index: Int32; const PropType: TTypeKinds = tkAny): Boolean;
+  function VerifyArrayProp(const Index, ArrayIndex: Int32; const PropType: TTypeKinds = tkAny): Boolean;
+  function GetArrayPropData(const Index: Int32): Pointer;
+  function GetArrayPropElementTypeInfo(const Index: Int32): PTypeInfo;
+  function GetProp(const Index: Int32): TProp; inline;
+  function GetPropCount: Int32; inline;
+  function GetField(const Index: Int32): TField; inline;
+  function GetFieldCount: Int32; inline;
+  function GetFieldName(const Index: Int32): String; inline;
+  function GetFieldData(const Index: Int32): TObject; inline;
+  procedure SetFieldData(const Index: Int32; const Value: TObject); inline;
+  function GetFieldClass(const Index: Int32): TClass; inline;
+  function GetPropInfo(const Index: Int32): PPropInfo; inline;
+  function GetArrayPropInfo(const Index: Int32): PTypeInfo; inline;
+  function GetPropEnum(const Index: Int32): Int32; inline;
+  procedure SetPropEnum(const Index: Int32; const Value: Int32); inline;
+  function GetPropEnumName(const Index:Int32): String; inline;
+  procedure SetPropEnumName(const Index: Int32; const Value: String); inline;
+  function GetPropBool(const Index: Int32): Boolean; inline;
+  procedure SetPropBool(const Index: Int32; const Value: Boolean); inline;
+  function GetPropInt8(const Index: Int32): Int8; inline;
+  procedure SetPropInt8(const Index: Int32; const Value: Int8); inline;
+  function GetPropInt16(const Index: Int32): Int16; inline;
+  procedure SetPropInt16(const Index: Int32; const Value: Int16); inline;
+  function GetPropInt32(const Index: Int32): Int32; inline;
+  procedure SetPropInt32(const Index: Int32; const Value: Int32); inline;
+  function GetPropInt64(const Index: Int32): Int64; inline;
+  procedure SetPropInt64(const Index: Int32; const Value: Int64); inline;
+  function GetPropUInt8(const Index: Int32): UInt8; inline;
+  procedure SetPropUInt8(const Index: Int32; const Value: UInt8); inline;
+  function GetPropUInt16(const Index: Int32): UInt16; inline;
+  procedure SetPropUInt16(const Index: Int32; const Value: UInt16); inline;
+  function GetPropUInt32(const Index: Int32): UInt32; inline;
+  procedure SetPropUInt32(const Index: Int32; const Value: UInt32); inline;
+  function GetPropUInt64(const Index: Int32): UInt64; inline;
+  procedure SetPropUInt64(const Index: Int32; const Value: UInt64); inline;
+  function GetPropFloat(const Index: Int32): Single; inline;
+  procedure SetPropFloat(const Index: Int32; const Value: Single); inline;
+  function GetPropDouble(const Index: Int32): Double; inline;
+  procedure SetPropDouble(const Index: Int32; const Value: Double); inline;
+  function GetPropString(const Index: Int32): String; inline;
+  procedure SetPropString(const Index: Int32; const Value: String); inline;
+  function GetPropClass(const Index: Int32): TObject; inline;
+  procedure SetPropClass(const Index: Int32; const Value: TObject); inline;
+  function GetPropArrayLength(const Index: Int32): Int32; inline;
+  procedure SetPropArrayLength(const Index: Int32; const Value: Int32);
+  function GetPropArrayEnum(const Index, ArrayIndex: Int32): Int32; inline;
+  procedure SetPropArrayEnum(const Index, ArrayIndex: Int32; const Value: Int32); inline;
+  function GetPropArrayBool(const Index, ArrayIndex: Int32): Boolean; inline;
+  procedure SetPropArrayBool(const Index, ArrayIndex: Int32; const Value: Boolean); inline;
+  function GetPropArrayInt8(const Index, ArrayIndex: Int32): Int8; inline;
+  procedure SetPropArrayInt8(const Index, ArrayIndex: Int32; const Value: Int8); inline;
+  function GetPropArrayInt16(const Index, ArrayIndex: Int32): Int16; inline;
+  procedure SetPropArrayInt16(const Index, ArrayIndex: Int32; const Value: Int16); inline;
+  function GetPropArrayInt32(const Index, ArrayIndex: Int32): Int32; inline;
+  procedure SetPropArrayInt32(const Index, ArrayIndex: Int32; const Value: Int32); inline;
+  function GetPropArrayInt64(const Index, ArrayIndex: Int32): Int64; inline;
+  procedure SetPropArrayInt64(const Index, ArrayIndex: Int32; const Value: Int64); inline;
+  function GetPropArrayUInt8(const Index, ArrayIndex: Int32): UInt8; inline;
+  procedure SetPropArrayUInt8(const Index, ArrayIndex: Int32; const Value: UInt8); inline;
+  function GetPropArrayUInt16(const Index, ArrayIndex: Int32): UInt16; inline;
+  procedure SetPropArrayUInt16(const Index, ArrayIndex: Int32; const Value: UInt16); inline;
+  function GetPropArrayUInt32(const Index, ArrayIndex: Int32): UInt32; inline;
+  procedure SetPropArrayUInt32(const Index, ArrayIndex: Int32; const Value: UInt32); inline;
+  function GetPropArrayUInt64(const Index, ArrayIndex: Int32): UInt64; inline;
+  procedure SetPropArrayUInt64(const Index, ArrayIndex: Int32; const Value: UInt64); inline;
+  function GetPropArrayFloat(const Index, ArrayIndex: Int32): Single; inline;
+  procedure SetPropArrayFloat(const Index, ArrayIndex: Int32; const Value: Single); inline;
+  function GetPropArrayDouble(const Index, ArrayIndex: Int32): Double; inline;
+  procedure SetPropArrayDouble(const Index, ArrayIndex: Int32; const Value: Double); inline;
+  function GetPropArrayString(const Index, ArrayIndex: Int32): String; inline;
+  procedure SetPropArrayString(const Index, ArrayIndex: Int32; const Value: String); inline;
+  function GetPropArrayClass(const Index, ArrayIndex: Int32): TObject; inline;
+  procedure SetPropArrayClass(const Index, ArrayIndex: Int32; const Value: TObject); inline;
+  generic function GetDynArrayLength<T>(const Index: Int32): Int32;
+  generic procedure SetDynArrayLength<T>(const Index: Int32; const Value: Int32);
+  generic function GetDynArrayElement<T>(const Index, ArrayIndex: Int32): T;
+  generic procedure SetDynArrayElement<T>(const Index, ArrayIndex: Int32; const Value: T);
 public
-  property PropCount: Integer read GetPropCount;
-  property PropInfo[const Index: Integer]: PPropInfo read GetPropInfo;
-  property PropArrayInfo[const Index: Integer]: PTypeInfo read GetPropArrayInfo;
-  property PropEnum[const Index: Integer]: Int32 read GetPropEnum write SetPropEnum;
-  property PropBool[const Index: Integer]: Boolean read GetPropBool write SetPropBool;
-  property PropInt8[const Index: Integer]: Int8 read GetPropInt8 write SetPropInt8;
-  property PropInt16[const Index: Integer]: Int16 read GetPropInt16 write SetPropInt16;
-  property PropInt32[const Index: Integer]: Int32 read GetPropInt32 write SetPropInt32;
-  property PropInt64[const Index: Integer]: Int64 read GetPropInt64 write SetPropInt64;
-  property PropUInt8[const Index: Integer]: UInt8 read GetPropUInt8 write SetPropUInt8;
-  property PropUInt16[const Index: Integer]: UInt16 read GetPropUInt16 write SetPropUInt16;
-  property PropUInt32[const Index: Integer]: UInt32 read GetPropUInt32 write SetPropUInt32;
-  property PropUInt64[const Index: Integer]: UInt64 read GetPropUInt64 write SetPropUInt64;
-  property PropFloat[const Index: Integer]: Single read GetPropFloat write SetPropFloat;
-  property PropDouble[const Index: Integer]: Double read GetPropDouble write SetPropDouble;
-  property PropString[const Index: Integer]: String read GetPropString write SetPropString;
-  property PropClass[const Index: Integer]: TObject read GetPropClass write SetPropClass;
-  property PropArrayEnum[const Index, ArrayIndex: Integer]: Int32 read GetPropArrayEnum write SetPropArrayEnum;
-  property PropArrayBool[const Index, ArrayIndex: Integer]: Boolean read GetPropArrayBool write SetPropArrayBool;
-  property PropArrayInt8[const Index, ArrayIndex: Integer]: Int8 read GetPropArrayInt8 write SetPropArrayInt8;
-  property PropArrayInt16[const Index, ArrayIndex: Integer]: Int16 read GetPropArrayInt16 write SetPropArrayInt16;
-  property PropArrayInt32[const Index, ArrayIndex: Integer]: Int32 read GetPropArrayInt32 write SetPropArrayInt32;
-  property PropArrayInt64[const Index, ArrayIndex: Integer]: Int64 read GetPropArrayInt64 write SetPropArrayInt64;
-  property PropArrayUInt8[const Index, ArrayIndex: Integer]: UInt8 read GetPropArrayUInt8 write SetPropArrayUInt8;
-  property PropArrayUInt16[const Index, ArrayIndex: Integer]: UInt16 read GetPropArrayUInt16 write SetPropArrayUInt16;
-  property PropArrayUInt32[const Index, ArrayIndex: Integer]: UInt32 read GetPropArrayUInt32 write SetPropArrayUInt32;
-  property PropArrayUInt64[const Index, ArrayIndex: Integer]: UInt64 read GetPropArrayUInt64 write SetPropArrayUInt64;
-  property PropArrayFloat[const Index, ArrayIndex: Integer]: Single read GetPropArrayFloat write SetPropArrayFloat;
-  property PropArrayDouble[const Index, ArrayIndex: Integer]: Double read GetPropArrayDouble write SetPropArrayDouble;
-  property PropArrayString[const Index, ArrayIndex: Integer]: String read GetPropArrayString write SetPropArrayString;
-  property PropArrayClass[const Index, ArrayIndex: Integer]: TObject read GetPropArrayClass write SetPropArrayClass;
-  property PropArrayLength[const Index: Integer]: Integer read GetPropArrayLength write SetPropArrayLength;
-  function FindProp(const Name: String; const PropType: TTypeKinds = tkAny): Integer;
+  property Prop[const Index: Int32]: PPropInfo read GetProp;
+  property PropCount: Int32 read GetPropCount;
+  property PropInfo[const Index: Int32]: PPropInfo read GetPropInfo;
+  property PropArrayInfo[const Index: Int32]: PTypeInfo read GetArrayPropInfo;
+  property PropEnum[const Index: Int32]: Int32 read GetPropEnum write SetPropEnum;
+  property PropEnumName[const Index: Int32]: String read GetPropEnumName write SetPropEnumName;
+  property PropBool[const Index: Int32]: Boolean read GetPropBool write SetPropBool;
+  property PropInt8[const Index: Int32]: Int8 read GetPropInt8 write SetPropInt8;
+  property PropInt16[const Index: Int32]: Int16 read GetPropInt16 write SetPropInt16;
+  property PropInt32[const Index: Int32]: Int32 read GetPropInt32 write SetPropInt32;
+  property PropInt64[const Index: Int32]: Int64 read GetPropInt64 write SetPropInt64;
+  property PropUInt8[const Index: Int32]: UInt8 read GetPropUInt8 write SetPropUInt8;
+  property PropUInt16[const Index: Int32]: UInt16 read GetPropUInt16 write SetPropUInt16;
+  property PropUInt32[const Index: Int32]: UInt32 read GetPropUInt32 write SetPropUInt32;
+  property PropUInt64[const Index: Int32]: UInt64 read GetPropUInt64 write SetPropUInt64;
+  property PropFloat[const Index: Int32]: Single read GetPropFloat write SetPropFloat;
+  property PropDouble[const Index: Int32]: Double read GetPropDouble write SetPropDouble;
+  property PropString[const Index: Int32]: String read GetPropString write SetPropString;
+  property PropClass[const Index: Int32]: TObject read GetPropClass write SetPropClass;
+  property PropArrayEnum[const Index, ArrayIndex: Int32]: Int32 read GetPropArrayEnum write SetPropArrayEnum;
+  property PropArrayBool[const Index, ArrayIndex: Int32]: Boolean read GetPropArrayBool write SetPropArrayBool;
+  property PropArrayInt8[const Index, ArrayIndex: Int32]: Int8 read GetPropArrayInt8 write SetPropArrayInt8;
+  property PropArrayInt16[const Index, ArrayIndex: Int32]: Int16 read GetPropArrayInt16 write SetPropArrayInt16;
+  property PropArrayInt32[const Index, ArrayIndex: Int32]: Int32 read GetPropArrayInt32 write SetPropArrayInt32;
+  property PropArrayInt64[const Index, ArrayIndex: Int32]: Int64 read GetPropArrayInt64 write SetPropArrayInt64;
+  property PropArrayUInt8[const Index, ArrayIndex: Int32]: UInt8 read GetPropArrayUInt8 write SetPropArrayUInt8;
+  property PropArrayUInt16[const Index, ArrayIndex: Int32]: UInt16 read GetPropArrayUInt16 write SetPropArrayUInt16;
+  property PropArrayUInt32[const Index, ArrayIndex: Int32]: UInt32 read GetPropArrayUInt32 write SetPropArrayUInt32;
+  property PropArrayUInt64[const Index, ArrayIndex: Int32]: UInt64 read GetPropArrayUInt64 write SetPropArrayUInt64;
+  property PropArrayFloat[const Index, ArrayIndex: Int32]: Single read GetPropArrayFloat write SetPropArrayFloat;
+  property PropArrayDouble[const Index, ArrayIndex: Int32]: Double read GetPropArrayDouble write SetPropArrayDouble;
+  property PropArrayString[const Index, ArrayIndex: Int32]: String read GetPropArrayString write SetPropArrayString;
+  property PropArrayClass[const Index, ArrayIndex: Int32]: TObject read GetPropArrayClass write SetPropArrayClass;
+  property PropArrayLength[const Index: Int32]: Int32 read GetPropArrayLength write SetPropArrayLength;
+  property Field[const Index: Int32]: TField read GetField;
+  property FieldCount: Int32 read GetFieldCount;
+  property FieldName[const Index: Int32]: String read GetFieldName;
+  property FieldData[const Index: Int32]: TObject read GetFieldData write SetFieldData;
+  property FieldClass[const Index: Int32]: TClass read GetFieldClass;
+  function FindProp(const Name: String; const PropType: TTypeKinds = tkAny): Int32;
+  function FindField(const Name: String): Int32;
   procedure AfterConstruction; override;
   procedure BeforeDestruction; override;
   procedure SerializeTo(const Stream: TStream); virtual; overload;
   procedure SerializeTo(const FileName: String); virtual; overload;
+  procedure SerializeTo(const Json: TUJson); virtual; overload;
   procedure SerializeFrom(const Stream: TStream); virtual; overload;
   procedure SerializeFrom(const FileName: String); virtual; overload;
+  procedure SerializeFrom(const Json: TUJson); virtual; overload;
   procedure Assign(const Serializable: TUSerializable); virtual;
   procedure Dump(const Offset: String = '');
 end;
@@ -1599,10 +1784,11 @@ end;
 type TUShortStringReader = object
 private
   var _Ptr: Pointer;
+  var _Pos: Int32;
 public
+  property Pos: Int32 read _Pos;
   procedure Setup(const Str: ShortString);
   function ReadShortString: String;
-  generic function Read<T>: T;
 end;
 
 generic TUMap<TKey, TValue> = record
@@ -1611,6 +1797,7 @@ public
     Key: TKey;
     Value: TValue;
   end;
+  type TEqualValue = function (const a, b: TValue): Boolean;
 private
   var _Items: array of TItem;
   function GetValue(const Index: Int32): TValue; inline;
@@ -1620,35 +1807,67 @@ public
   function Add(const Key: TKey; const Value: TValue): Int32;
   function HasKey(const Key: TKey): Boolean;
   procedure RemoveByKey(const Key: TKey);
-  procedure RemoveByValue(const Value: TValue);
+  procedure RemoveByValue(const Value: TValue; const EqualFunc: TEqualValue);
   procedure RemoveByIndex(const Index: Int32);
   function FindIndexByKey(const Key: TKey): Int32;
-  function FindIndexByValue(const Value: TValue): Int32;
+  function FindIndexByValue(const Value: TValue; const EqualFunc: TEqualValue): Int32;
   function FindValueByKey(const Key: TKey): TValue;
   function FindValueByIndex(const Index: Int32): TValue;
   function Count: Int32; inline;
   procedure Clear;
 end;
 
-generic TUArray<T> = array of T;
-generic TUArrayUtils<T> = class
-  type TItem = T;
-  type TArr = specialize TUArray<TItem>;
-  class function Add(var Arr: TArr; const Item: TItem): Int32;
-  class function Append(var Arr: TArr; const Other: TArr): Int32;
-  class procedure Insert(var Arr: TArr; const Item: TItem; const Position: Int32);
-  class procedure Delete(var Arr: TArr; const DelStart: Int32; const DelCount: Int32 = 1);
-  class procedure Remove(var Arr: TArr; const Item: TItem);
-  class function Pop(var Arr: TArr): TItem;
-  class function Find(const Arr: TArr; const Item: TItem): Int32;
-end;
-
-generic TUArrayObjUtils<T> = class (specialize TUArrayUtils<T>)
-  class procedure Clear(var Arr: TArr);
-end;
-
 generic TUPredicate<T> = function (const a, b: T): Boolean;
 generic TUPredicateObj<T> = function (const a, b: T): Boolean of object;
+
+generic TUArray<T> = record
+public
+  type TSelf = specialize TUArray<T>;
+  type TPtr = ^T;
+  type TData = array of T;
+  type PData = ^TData;
+  type TPred = specialize TUPredicate<T>;
+  type TPredObj = specialize TUPredicateObj<T>;
+  type TEnumerator = class
+  private
+    var Data: PData;
+    var Index: Int32;
+    function GetCurrent: T; inline;
+  public
+    constructor Create(const ArrayData: PData);
+    function MoveNext: Boolean;
+    property Current: T read GetCurrent;
+  end;
+strict private
+  var _Data: TData;
+  function FixIndex(const Index: Int32): Int32;
+  function GetItem(const Index: Int32): T;
+  procedure SetItem(const Index: Int32; const Value: T);
+  function GetPtr(const Index: Int32): TPtr;
+public
+  property Data: TData read _Data;
+  property Items[const Index: Int32]: T read GetItem write SetItem;
+  property Ptr[const Index: Int32]: TPtr read GetPtr; default;
+  function IsValidIndex(const Index: Int32; const FixedIndex: PInt32 = nil): Boolean;
+  function IsEmpty: Boolean; inline;
+  function LastIndex: Int32; inline;
+  function Count: Int32; inline;
+  function Contains(const Item: T): Boolean;
+  function Find(const Item: T): Int32;
+  function Add(const Item: T): Int32;
+  function Add(const ItemArray: array of T): Int32;
+  function AddUnique(const Item: T): Int32;
+  function Insert(const Item: T; const Index: Int32): Int32;
+  function Delete(const Index: Int32; const Num: Int32 = 1): Boolean;
+  function Remove(const Item: T): Boolean;
+  function RemoveAll(const Item: T): Int32;
+  function Pop: T;
+  function Last: T;
+  procedure Clear;
+  procedure Free;
+  procedure Reverse;
+  function GetEnumerator: TEnumerator;
+end;
 
 generic TULinkedList<T> = record
 public
@@ -1657,6 +1876,16 @@ public
     var Data: T;
     var Prev: TItem;
     var Next: TItem;
+  end;
+  type TEnumerator = class
+  private
+    var _Current: TItem;
+    var _List: TItem;
+    function GetCurrent: T; inline;
+  public
+    constructor Create(const List: TItem);
+    function MoveNext: Boolean;
+    property Current: T read GetCurrent;
   end;
 strict private
   var _Cache: TItem;
@@ -1677,8 +1906,281 @@ public
   function Pop: T;
   procedure FreeItem(var Item: TItem);
   procedure Clear;
+  function GetEnumerator: TEnumerator;
   class operator Initialize(var v: TSelf);
   class operator Finalize(var v: TSelf);
+end;
+
+generic TUQueue<T> = record
+  type TSelf = specialize TUQueue<T>;
+  type TItem = class
+    var Data: T;
+    var Next: TItem;
+  end;
+  type TDataArray = array of T;
+  type TEnumerator = class
+  private
+    var _Current: TItem;
+    var _List: TItem;
+    function GetCurrent: T; inline;
+  public
+    constructor Create(const List: TItem);
+    function MoveNext: Boolean;
+    property Current: T read GetCurrent;
+  end;
+strict private
+  var _Cached: Boolean;
+  var _Cache: TItem;
+  var _First: TItem;
+  var _Last: TItem;
+  var _Count: UInt32;
+  procedure SetCached(const Value: Boolean);
+  procedure ClearCache;
+  procedure FreeItem(var Item: TItem);
+  procedure Initialize;
+  procedure Finalize;
+public
+  property Cached: Boolean read _Cached write SetCached;
+  property Count: UInt32 read _Count;
+  procedure Enqueue(const Data: T);
+  function Dequeue: T;
+  function DequeueAll: TDataArray;
+  procedure Clear;
+  function IsEmpty: Boolean;
+  function GetEnumerator: TEnumerator;
+  class operator Initialize(var v: TSelf);
+  class operator Finalize(var v: TSelf);
+end;
+
+generic TUFastList<T> = record
+  //Unordered list with persistent index preservation
+  type TSelf = specialize TUFastList<T>;
+  type TPtr = ^T;
+  type TOnItemDelete = procedure (const Item: T) of object;
+  type TEnumerator = class
+  private
+    var _Current: TPtr;
+    var _End: TPtr;
+    function GetCurrent: T; inline;
+  public
+    constructor Create(const AItem: TPtr; const Count: Int32);
+    function MoveNext: Boolean;
+    property Current: T read GetCurrent;
+  end;
+strict private
+  type TIndex = record
+    var Data: Int32;
+    var Id: Int32;
+  end;
+  type TIndices = array of TIndex;
+  type TData = array of T;
+  var _Ind: TIndices;
+  var _Data: TData;
+  var _Count: Int32;
+  var _Slack: Int32;
+  var _OnItemDelete: TOnItemDelete;
+  function GetLastIndex: Int32; inline;
+  function GetData(const Index: Int32): T;
+  procedure SetData(const Index: Int32; const Value: T);
+  function GetId(const Index: Int32): Int32;
+  procedure Initialize;
+  procedure Finalize;
+public
+  property Data[const Index: Int32]: T read GetData write SetData; default;
+  property DataRaw: TData read _Data;
+  property Id[const Index: Int32]: Int32 read GetId;
+  property Count: Int32 read _Count;
+  property Slack: Int32 read _Slack write _Slack;
+  property LastIndex: Int32 read GetLastIndex;
+  property OnItemDelete: TOnItemDelete read _OnItemDelete write _OnItemDelete;
+  function IsEmpty: Boolean;
+  function Contains(const Index: Int32): Boolean;
+  procedure Reserve(const ItemCount: UInt32);
+  procedure Shrink;
+  function Add(const Item: T): Int32;
+  procedure Delete(const Index: Int32);
+  procedure Clear;
+  function GetEnumerator: TEnumerator;
+  class operator Initialize(var v: TSelf);
+  class operator Finalize(var v: TSelf);
+end;
+
+generic TUStack<T> = record
+public
+  type TSelf = specialize TUStack<T>;
+private
+  var _Items: array of T;
+  var _ItemIndex: Int32;
+  procedure Initialize;
+  procedure Finalize;
+public
+  procedure Push(const Item: T);
+  function Pop: T;
+  function IsEmpty: Boolean;
+  function Count: Int32;
+  class operator Initialize(var v: TSelf);
+  class operator Finalize(var v: TSelf);
+end;
+
+generic TUHeap<T> = record
+public
+  type TSelf = specialize TUHeap<T>;
+  type TData = specialize TUArray<T>;
+  type TPredicate = specialize TUPredicateObj<T>;
+strict private
+  var _Data: TData;
+  var _Pred: TPredicate;
+  var _MaxHeap: Boolean;
+  function PredicateMin(const a, b: T): Boolean;
+  function PredicateMax(const a, b: T): Boolean;
+  function ParentIdx(const Idx: Int32): Int32;
+  function LeftIdx(const Idx: Int32): Int32;
+  function RightIdx(const Idx: Int32): Int32;
+  procedure SiftUp(const Idx: Int32);
+  procedure SiftDown(const Idx: Int32);
+  procedure Initialize;
+  procedure Finalize;
+  procedure SetMaxHeap(const Value: Boolean);
+public
+  property Predicate: TPredicate read _Pred write _Pred;
+  property MaxHeap: Boolean read _MaxHeap write SetMaxHeap;
+  function IsEmpty: Boolean;
+  procedure Push(const Value: T);
+  procedure Push(const Values: array of T);
+  function Pop: T;
+  function Peek: T;
+  function Count: Int32;
+  procedure Reorder;
+  class operator Initialize(var v: TSelf);
+  class operator Finalize(var v: TSelf);
+end;
+
+type TURadixTree = record
+public
+  type TNode = class
+    var Radix: String;
+    var Index: Int32;
+    var Subset: specialize TUArray<TNode>;
+    constructor Create(const ARadix: String; const AIndex: Int32);
+    destructor Destroy; override;
+  end;
+  type PNode = ^TNode;
+  type TNodeArray = specialize TUArray<TNode>;
+  type PNodeArray = ^TNodeArray;
+private
+  var _Root: specialize TUArray<TNode>;
+  var _Sorted: Boolean;
+  procedure Initialize;
+  procedure Finalize;
+public
+  procedure Add(const Key: String; const Index: Int32);
+  function Find(const Key: String): Int32;
+  procedure Sort;
+  procedure Dump;
+  class operator Initialize(var v: TURadixTree);
+  class operator Finalize(var v: TURadixTree);
+end;
+operator > (const a, b: TURadixTree.TNode): Boolean;
+
+type TUAtlasQuick = record
+private
+  type TRectArray = specialize TArray<TURect>;
+  var FreeRects: TRectArray;
+public
+  procedure Setup(const AWidth, AHeight: UInt32);
+  function Allocate(
+    const Width, Height: UInt32;
+    out Placement: TUBounds2i
+  ): Boolean;
+end;
+
+type TUAtlasPacked = record
+public
+  type THeuristic = (
+    ph_short_side_fit,
+    ph_long_side_fit,
+    ph_area_fit,
+    ph_bottom_left
+  );
+private
+  type TRectArray = specialize TArray<TURect>;
+  var FreeRects: TRectArray;
+  class function Fits(
+    const rw, rh: Int32; const fr: TURect;
+    const h: THeuristic; out Score1, Score2: Int32
+  ): Boolean; static;
+  procedure SplitAndPrune(const Placed: TURect);
+  class procedure RemoveContained(var Rects: TRectArray); static;
+  class function Overlaps(const a, b: TURect): Boolean; static;
+public
+  procedure Setup(const AWidth, AHeight: UInt32);
+  function Allocate(
+    const Width, Height: UInt32;
+    out Placement: TUBounds2i;
+    const Heuristic: THeuristic = ph_short_side_fit;
+    const Rotated: PBoolean = nil
+  ): Boolean;
+end;
+
+type TUGuid = record
+  var Data1: UInt32;
+  var Data2: UInt16;
+  var Data3: UInt16;
+  var Data4: array[0..7] of UInt8;
+  class function Make: TUGuid; static;
+  class function Make(const GuidString: String): TUGuid; static;
+  class function Make(const Bytes: TUInt8Array): TUGuid; static;
+  class function Zero: TUGuid; static;
+  class function Invalid: TUGuid; static;
+  function IsValid: Boolean;
+  function ToString: String;
+  function ToStringLC: String;
+  function ToBytes: TUInt8Array;
+end;
+
+type TUDelegate = record
+public
+  type TSelf = TUDelegate;
+private
+  var _Proc: array of TUProcedureObj;
+  procedure Initialize;
+  procedure Finalize;
+public
+  procedure Add(const Proc: TUProcedureObj);
+  procedure Add(const Proc: TUProcedure);
+  procedure Remove(const Proc: TUProcedureObj);
+  procedure Remove(const Proc: TUProcedure);
+  procedure Broadcast(Args: array of const);
+  class operator Initialize(var v: TSelf);
+  class operator Finalize(var v: TSelf);
+end;
+
+type TUPtrHelper = type helper for Pointer
+public
+  procedure Read(out Output; const Size: UInt32); inline;
+  procedure Write(const Data; const Size: UInt32); inline;
+  function ReadBool: Boolean; inline;
+  function ReadUInt8: UInt8; inline;
+  function ReadUInt16: UInt16; inline;
+  function ReadUInt32: UInt32; inline;
+  function ReadUInt64: UInt64; inline;
+  function ReadInt8: Int8; inline;
+  function ReadInt16: Int16; inline;
+  function ReadInt32: Int32; inline;
+  function ReadInt64: Int64; inline;
+  function ReadFloat: Single; inline;
+  function ReadDouble: Double; inline;
+  procedure WriteBool(const Value: Boolean); inline;
+  procedure WriteUInt8(const Value: UInt8); inline;
+  procedure WriteUInt16(const Value: UInt16); inline;
+  procedure WriteUInt32(const Value: UInt32); inline;
+  procedure WriteUInt64(const Value: UInt64); inline;
+  procedure WriteInt8(const Value: Int8); inline;
+  procedure WriteInt16(const Value: Int16); inline;
+  procedure WriteInt32(const Value: Int32); inline;
+  procedure WriteInt64(const Value: Int64); inline;
+  procedure WriteFloat(const Value: Single); inline;
+  procedure WriteDouble(const Value: Double); inline;
 end;
 
 type TUXML = class (TURefClass)
@@ -1709,20 +2211,20 @@ private
   function ReadXML(const p: TUParser): Boolean;
   function WriteXML(const Offset: String = ''): String;
   function GetContent: String;
-  function GetAttribute(const Index: Integer): TAttribute; inline;
+  function GetAttribute(const Index: Int32): TAttribute; inline;
   function GetAttributeValue(const AttName: String): String;
-  function GetAttributeCount: Integer; inline;
-  function GetChild(const Index: Integer): TUXML;
-  function GetChildCount: Integer;
+  function GetAttributeCount: Int32; inline;
+  function GetChild(const Index: Int32): TUXML;
+  function GetChildCount: Int32;
   function GetChildContent(const NodeName: String): String; inline;
 public
   property Name: String read _Name;
   property Content: String read GetContent write _Content;
-  property Attributes[const Index: Integer]: TAttribute read GetAttribute;
+  property Attributes[const Index: Int32]: TAttribute read GetAttribute;
   property AttributeValue[const AttName: String]: String read GetAttributeValue;
-  property AttributeCount: Integer read GetAttributeCount;
-  property Children[const Index: Integer]: TUXML read GetChild; default;
-  property ChildCount: Integer read GetChildCount;
+  property AttributeCount: Int32 read GetAttributeCount;
+  property Children[const Index: Int32]: TUXML read GetChild; default;
+  property ChildCount: Int32 read GetChildCount;
   property ChildContent[const NodeName: String]: String read GetChildContent;
   function GetEnumerator: TEnumerator;
   class constructor CreateClass;
@@ -1843,13 +2345,15 @@ end;
 procedure UClear(out x; const Size: UInt32);
 procedure UInit(out Dest; const Src; const Size: UInt32);
 procedure UMove(out Dest; const Src; const Size: UInt32);
+function UMemCompare(const MemA, MemB: Pointer; const Size: UInt32): Int8;
 function UIntToPtr(const i: PtrUInt): Pointer;
+function UPtrToInt(const p: Pointer): PtrUInt;
 function UCopyVarRec(constref src: TVarRec): TVarRec;
 function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArray;
 procedure UFinalizeVarRec(var vr: TVarRec);
 procedure UFinalizeVarRecArr(var arr: array of TVarRec);
-function UIntToBool(const i: Integer): Boolean;
-function UBoolToInt(const b: Boolean): Integer;
+function UIntToBool(const i: Int32): Boolean;
+function UBoolToInt(const b: Boolean): Int32;
 function UBoolToStr(const b: Boolean): String;
 function UBoolToStr(const b: Boolean; const IfTrue, IfFalse: String): String;
 function UBytesToHex(const Bytes: array of UInt8): String;
@@ -1863,7 +2367,7 @@ function UBytesMake(const Data: Pointer; const DataSize: UInt32): TUInt8Array;
 function UBytesReverse(const Bytes: array of UInt8): TUInt8Array;
 function UBytesJoin(const a, b: array of UInt8): TUInt8Array;
 function UBytesConcat(const Bytes: array of TUInt8Array): TUInt8Array;
-function UBytesCompare(const a, b: array of UInt8): Int8; inline;
+function UBytesCompare(const a, b: array of UInt8): Int8;
 function UBytesEqual(const a, b: array of UInt8): Boolean;
 function UMatToQuat(const m: TUMat): TUQuat;
 function UQuatToMat(const q: TUQuat): TUMat;
@@ -1983,6 +2487,7 @@ procedure USwap(var a: TUVec2; var b: TUVec2); inline; overload;
 procedure USwap(var a: TUVec3; var b: TUVec3); inline; overload;
 procedure USwap(var a: TUVec4; var b: TUVec4); inline; overload;
 procedure USwap(var a: TUMat; var b: TUMat); inline; overload;
+function UIsInRange(const Value: Int32; const RangeMin, RangeMax: Int32): Boolean;
 function UMaxValue(out v: TUInt8): TUInt8; inline; overload;
 function UMaxValue(out v: TUInt16): TUInt16; inline; overload;
 function UMaxValue(out v: TUInt32): TUInt32; inline; overload;
@@ -2017,6 +2522,16 @@ function UArcTan2(const y, x: TUFloat): TUFloat;
 function UPow(const b, e: TUFloat): TUFloat;
 function UPoT(const x: UInt64): UInt64;
 function UTopSetBit(const x: UInt64): UInt8;
+generic function URoL<T>(const Value: T; const Bits: T): T; inline; overload;
+function URoL(const Value: UInt8; const Bits: UInt8): UInt8; overload;
+function URoL(const Value: UInt16; const Bits: UInt16): UInt16; overload;
+function URoL(const Value: UInt32; const Bits: UInt32): UInt32; overload;
+function URoL(const Value: UInt64; const Bits: UInt64): UInt64; overload;
+generic function URoR<T>(const Value: T; const Bits: T): T; inline; overload;
+function URoR(const Value: UInt8; const Bits: UInt8): UInt8; overload;
+function URoR(const Value: UInt16; const Bits: UInt16): UInt16; overload;
+function URoR(const Value: UInt32; const Bits: UInt32): UInt32; overload;
+function URoR(const Value: UInt64; const Bits: UInt64): UInt64; overload;
 function URandomPi: TUFloat;
 function URandom2Pi: TUFloat;
 function UThreadRandomize: UInt32;
@@ -2024,20 +2539,21 @@ function UThreadRandom(const Size: UInt32): UInt32;
 function URandom(var RandomSeed: UInt32; const Size: UInt32): UInt32;
 function URandomBytes(const Size: UInt32): TUInt8Array;
 function USysRandom(const Size: UInt32): TUInt8Array;
-function UAddMat(const m0, m1: TUMat): TUMat;
-function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
-function USubMat(const m0, m1: TUMat): TUMat;
-function USubMatFloat(const m: TUMat; const s: TUFloat): TUMat;
-function UMulMat(const m0, m1: TUMat): TUMat;
-function UMulMatFloat(const m: TUMat; const s: TUFloat): TUMat;
+function UAddMat(const m0, m1: TUMat): TUMat; inline;
+function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat; inline;
+function USubMat(const m0, m1: TUMat): TUMat; inline;
+function USubMatFloat(const m: TUMat; const s: TUFloat): TUMat; inline;
+function UMulMat(const m0, m1: TUMat): TUMat; inline;
+function UMulMatFloat(const m: TUMat; const s: TUFloat): TUMat; inline;
 function UMulVec2Mat3x3(const v: TUVec2; const m: TUMat): TUVec2;
 function UMulVec2Mat4x3(const v: TUVec2; const m: TUMat): TUVec2;
 function UMulVec2Mat4x4(const v: TUVec2; const m: TUMat): TUVec2;
-function UMulVec3Mat3x3(const v: TUVec3; const m: TUMat): TUVec3;
-function UMulVec3Mat4x3(const v: TUVec3; const m: TUMat): TUVec3;
-function UMulVec3Mat4x4(const v: TUVec3; const m: TUMat): TUVec3;
+function UMulVec3Mat3x3(const v: TUVec3; const m: TUMat): TUVec3; inline;
+function UMulVec3Mat4x3(const v: TUVec3; const m: TUMat): TUVec3; inline;
+function UMulVec3Mat4x4(const v: TUVec3; const m: TUMat): TUVec3; inline;
 function UMulVec3Quat(const v: TUVec3; const q: TUQuat): TUVec3;
-function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4;
+function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4; inline;
+function UMatInverse(const m: TUMat): TUMat;
 function UMulQuat(const a, b: TUQuat): TUQuat;
 
 function UTriangleNormal(const v0, v1, v2: TUVec3): TUVec3;
@@ -2061,12 +2577,18 @@ function UProj3DPointToBounds(const b: TUBounds3f; const v: TUVec3): TUVec3;
 function UDist3DPointToPlane(const v: TUVec3; const p: TUPlane): TUFloat;
 function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
 
+function UIsCharTrimable(const c: AnsiChar): Boolean;
 function UStrExprMatch(const Str, Expr: String): TUExprMatch;
 function UStrExplode(const Str: String; const Separator: String; const AllowEmpty: Boolean = True): TUStrArray;
+function UStrReplace(const Str, Old, New: String): String;
+function UStrRemove(const Str, Pattern: String): String;
 function UStrSubStr(const Str: String; const SubStrStart: Int32; const SubStrLength: Int32 = 0): String;
 function UStrSubPos(const Str, SubStr: String): Int32;
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean = False): Boolean;
 function UStrExtractNumber(const Str: String; const Offset: Int32 = 1): Int32;
+function UStrTrimLeft(const Str: String): String;
+function UStrTrimRight(const Str: String): String;
+function UStrTrim(const Str: String): String;
 function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
 function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32 = 1): UInt32;
@@ -2080,6 +2602,13 @@ procedure UCopyFileCleanup;
 procedure UCopyFile(const SrcFile, DstFile: String);
 procedure UCopyDir(const SrcDir, DstDir: String; const LogProc: TUProcedureString = nil);
 function UAppPath: String;
+function UConfigPath: String;
+function UDataPath: String;
+function UArgsString(
+  const Args: array of const;
+  const Index: Int32;
+  out Value: String
+): Boolean;
 procedure ULog(const Text: String; const Offset: Int32 = 0);
 procedure ULogOffset(const Offset: Int32);
 function UExec(
@@ -2092,19 +2621,29 @@ function UExec(
   const OnOutput: TUProcedureString = nil
 ): Int32;
 
+generic procedure USort<T>(var Arr: array of T); overload;
+generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>); overload;
+generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>); overload;
+generic procedure USort<T>(var Arr: specialize TUArray<T>); overload;
+generic procedure USort<T>(var Arr: specialize TUArray<T>; const Pred: specialize TUPredicate<T>); overload;
+generic procedure USort<T>(var Arr: specialize TUArray<T>; const Pred: specialize TUPredicateObj<T>); overload;
 generic procedure UArrSort<T>(var Arr: array of T); overload;
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>); overload;
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>); overload;
-generic function UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T): Int32; overload;
-generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Other: specialize TUArray<T>); overload;
-generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
-generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Int32; const DelCount: Int32 = 1);
-generic procedure UArrRemove<T>(var Arr: specialize TUArray<T>; const Item: T);
-generic function UArrPop<T>(var Arr: specialize TUArray<T>): T;
-generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
-generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
+generic function UArrAppend<T>(var Arr: specialize TArray<T>; const Item: T): Int32; overload;
+generic procedure UArrAppend<T>(var Arr: specialize TArray<T>; const Other: specialize TArray<T>); overload;
+generic procedure UArrInsert<T>(var Arr: specialize TArray<T>; const Item: T; const Position: Int32); overload;
+generic procedure UArrInsert<T>(var Arr: specialize TArray<T>; const Other: specialize TArray<T>; const Position: Int32); overload;
+generic procedure UArrDelete<T>(var Arr: specialize TArray<T>; const DelStart: Int32; const DelCount: Int32 = 1);
+generic procedure UArrRemove<T>(var Arr: specialize TArray<T>; const Item: T);
+generic function UArrPop<T>(var Arr: specialize TArray<T>): T;
+generic function UArrFind<T>(const Arr: specialize TArray<T>; const Item: T): Int32; overload;
+generic function UArrayFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32; overload;
+generic function UArrContains<T>(const Arr: specialize TArray<T>; const Item: T): Boolean; overload;
+generic function UArrayContains<T>(const Arr: specialize TUArray<T>; const Item: T): Boolean; overload;
+generic procedure UArrClear<T>(var Arr: specialize TArray<T>);
 generic function UArrConcat<TArr>(const Arr: array of TArr): TArr;
-generic function UArrJoin<T>(const a, b: array of T): specialize TUArray<T>;
+generic function UArrJoin<T>(const a, b: array of T): specialize TArray<T>;
 generic function UArrCompare<T>(const a, b: array of T): Int8;
 
 operator + (const a, b: TUVec2): TUVec2;
@@ -2116,6 +2655,8 @@ operator / (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const f: TUFloat; const v: TUVec2): TUVec2;
 operator - (const v: TUVec2): TUVec2;
+operator * (const v: TUVec2; const r: TURot2): TUVec2;
+operator * (const r: TURot2; const v: TUVec2): TUVec2;
 operator + (const a, b: TUVec2i): TUVec2i;
 operator - (const a, b: TUVec2i): TUVec2i;
 operator * (const a, b: TUVec2i): TUVec2i;
@@ -2139,10 +2680,11 @@ operator := (const Bytes: array of UInt16): TUInt8Array;
 operator := (const Bytes: array of UInt32): TUInt8Array;
 operator := (const Bytes: array of UInt64): TUInt8Array;
 operator := (const Str: String): TUInt8Array;
+operator / (const a, b: String): String;
 operator := (const v: TUVec2): TUVec2i;
 operator := (const v: UInt64): TUInt4096_Debug;
 operator := (const v: String): TUInt4096_Debug;
-operator := (const v: TUint8Array): TUInt4096_Debug;
+operator := (const v: TUInt8Array): TUInt4096_Debug;
 operator := (const v: TUVec2i): TUVec2;
 operator := (const i: Int32): TUVec2i;
 operator := (const f: TUFloat): TUVec2;
@@ -2177,6 +2719,8 @@ operator * (const f: TUFloat; const v: TUVec4): TUVec4;
 operator - (const v: TUVec4): TUVec4;
 operator := (const v: TUVec4): TUBounds2f;
 operator := (const v: TUBounds2f): TUVec4;
+operator = (const a, b: TUGuid): Boolean;
+operator < (const a, b: TUGuid): Boolean;
 operator + (const a, b: TUInt4096_Debug): TUInt4096_Debug;
 operator + (const a, b: TUMat): TUMat;
 operator - (const a, b: TUMat): TUMat;
@@ -2212,6 +2756,26 @@ const URcp255 = 1 / 255;
 const UEps = 1E-5;
 const UDegToRad = UPi / 180;
 const URadToDeg = 180 / UPi;
+const UMaxValueUInt8 = $ff;
+const UMaxValueUInt16 = $ffff;
+const UMaxValueUInt32 = $ffffffff;
+const UMaxValueUInt64 = $ffffffffffffffff;
+const UMaxValueInt8 = $7f;
+const UMaxValueInt16 = $7fff;
+const UMaxValueInt32 = $7fffffff;
+const UMaxValueInt64 = $7fffffffffffffff;
+const UMaxValueFloat = 3.4E38;
+const UMaxValueDouble = 1.7E308;
+const UMinValueUInt8 = 0;
+const UMinValueUInt16 = 0;
+const UMinValueUInt32 = 0;
+const UMinValueUInt64 = 0;
+const UMinValueInt8 = -$80;
+const UMinValueInt16 = -$8000;
+const UMinValueInt32 = -$80000000;
+const UMinValueInt64 = -$8000000000000000;
+const UMinValueFloat = -3.4E38;
+const UMinValueDouble = -1.7E308;
 
 threadvar UThreadRandomSeed: UInt32;
 
@@ -2374,6 +2938,18 @@ begin
   Move(Arr[0], Result[0], Length(Arr) * SizeOf(Arr[0]));
 end;
 
+function TUInt8ArrayImpl.SubArray(const Start: UInt32; const Size: UInt32): TUInt8Array;
+  var Len: UInt32;
+begin
+  if Start > High(Self) then Exit(nil);
+  Len := Length(Self) - Start;
+  if Size > 0 then
+  begin
+    Len := UMin(Len, Size);
+  end;
+  Result := TUInt8Array.Make(@Self[Start], Len);
+end;
+
 function TUInt8ArrayImpl.ToString: String;
 begin
   Result := UBytesToString(Self);
@@ -2382,6 +2958,11 @@ end;
 function TUInt8ArrayImpl.ToHex: String;
 begin
   Result := UBytesToHex(Self);
+end;
+
+function TUInt8ArrayImpl.ToHexLC: String;
+begin
+  Result := LowerCase(ToHex);
 end;
 
 function TUInt8ArrayImpl.ToBase64: String;
@@ -2424,6 +3005,11 @@ end;
 function TUInt8ArrayImpl.IsEmpty: Boolean;
 begin
   Result := Length(Self) = 0;
+end;
+
+function TUInt8ArrayImpl.Size: UInt32;
+begin
+  Result := Length(Self);
 end;
 // TUInt8ArrayImpl end
 
@@ -2595,6 +3181,49 @@ begin
 end;
 // TInt64Impl end
 
+// TUVersionImpl begin
+function TUVersionImpl.GetMajor: UInt8;
+begin
+  Result := (Self shr 8) and $ff;
+end;
+
+procedure TUVersionImpl.SetMajor(const Value: UInt8);
+begin
+  Self := (Self and $ff) or (Value shl 8);
+end;
+
+function TUVersionImpl.GetMinor: UInt8;
+begin
+  Result := Self and $ff;
+end;
+
+procedure TUVersionImpl.SetMinor(const Value: UInt8);
+begin
+  Self := (Self and $ff00) or Value;
+end;
+
+function TUVersionImpl.ToString: String;
+begin
+  Result := IntToStr(Major) + '.' + IntToStr(Minor);
+end;
+
+class function TUVersionImpl.Make(const AMajor, AMinor: UInt8): TUVersion;
+begin
+  Result := AMinor or (AMajor shl 8);
+end;
+
+class function TUVersionImpl.FromString(const Value: String): TUVersion;
+  var VerArr: TUStrArray;
+begin
+  Result := 0;
+  VerArr := UStrExplode(Value, '.', False);
+  if Length(VerArr) < 1 then Exit;
+  Result.Major := StrToIntDef(VerArr[0], 0);
+  if Length(VerArr) < 2 then Exit;
+  Result.Minor := StrToIntDef(VerArr[1], 0);
+end;
+// TUVersionImpl end
+
 // TUColorImpl begin
 function TUColorImpl.GetChannel(const Index: UInt8): UInt8;
   var Arr: array[0..3] of UInt8 absolute Self;
@@ -2666,19 +3295,19 @@ end;
 operator := (const v: TUVec4): TUColor;
 begin
   Result := TUColor.Make(
-    Round(v.x) * $ff,
-    Round(v.y) * $ff,
-    Round(v.z) * $ff,
-    Round(v.w) * $ff
+    Round(v.x * $ff),
+    Round(v.y * $ff),
+    Round(v.z * $ff),
+    Round(v.w * $ff)
   );
 end;
 
 operator := (const v: TUColor): TUVec4;
 begin
   Result := TUVec4.Make(
-    v.r * URcp255,
-    v.g * URcp255,
     v.b * URcp255,
+    v.g * URcp255,
+    v.r * URcp255,
     v.a * URcp255
   );
 end;
@@ -2984,22 +3613,22 @@ begin
   - (m[0, 1] * m[1, 2] * m[2, 3] * m[3, 0]) - (m[0, 2] * m[1, 3] * m[2, 1] * m[3, 0]) - (m[0, 3] * m[1, 1] * m[2, 2] * m[3, 0])
   + (m[0, 3] * m[1, 2] * m[2, 1] * m[3, 0]) + (m[0, 2] * m[1, 1] * m[2, 3] * m[3, 0]) + (m[0, 1] * m[1, 3] * m[2, 2] * m[3, 0]);
   Det := 1 / Det;
-  Result[0, 0] := (m[1,1]*m[2,2]*m[3,3] + m[1,2]*m[2,3]*m[3,1] + m[1,3]*m[2,1]*m[3,2] - m[1,3]*m[2,2]*m[3,1] - m[1,2]*m[2,1]*m[3,3] - m[1,1]*m[2,3]*m[3,2]) * det;
-  Result[0, 1] := (-m[0,1]*m[2,2]*m[3,3] - m[0,2]*m[2,3]*m[3,1] - m[0,3]*m[2,1]*m[3,2] + m[0,3]*m[2,2]*m[3,1] + m[0,2]*m[2,1]*m[3,3] + m[0,1]*m[2,3]*m[3,2]) * det;
-  Result[0, 2] := (m[0,1]*m[1,2]*m[3,3] + m[0,2]*m[1,3]*m[3,1] + m[0,3]*m[1,1]*m[3,2] - m[0,3]*m[1,2]*m[3,1] - m[0,2]*m[1,1]*m[3,3] - m[0,1]*m[1,3]*m[3,2]) * det;
-  Result[0, 3] := (-m[0,1]*m[1,2]*m[2,3] - m[0,2]*m[1,3]*m[2,1] - m[0,3]*m[1,1]*m[2,2] + m[0,3]*m[1,2]*m[2,1] + m[0,2]*m[1,1]*m[2,3] + m[0,1]*m[1,3]*m[2,2]) * det;
-  Result[1, 0] := (-m[1,0]*m[2,2]*m[3,3] - m[1,2]*m[2,3]*m[3,0] - m[1,3]*m[2,0]*m[3,2] + m[1,3]*m[2,2]*m[3,0] + m[1,2]*m[2,0]*m[3,3] + m[1,0]*m[2,3]*m[3,2]) * det;
-  Result[1, 1] := (m[0,0]*m[2,2]*m[3,3] + m[0,2]*m[2,3]*m[3,0] + m[0,3]*m[2,0]*m[3,2] - m[0,3]*m[2,2]*m[3,0] - m[0,2]*m[2,0]*m[3,3] - m[0,0]*m[2,3]*m[3,2]) * det;
-  Result[1, 2] := (-m[0,0]*m[1,2]*m[3,3] - m[0,2]*m[1,3]*m[3,0] - m[0,3]*m[1,0]*m[3,2] + m[0,3]*m[1,2]*m[3,0] + m[0,2]*m[1,0]*m[3,3] + m[0,0]*m[1,3]*m[3,2]) * det;
-  Result[1, 3] := (m[0,0]*m[1,2]*m[2,3] + m[0,2]*m[1,3]*m[2,0] + m[0,3]*m[1,0]*m[2,2] - m[0,3]*m[1,2]*m[2,0] - m[0,2]*m[1,0]*m[2,3] - m[0,0]*m[1,3]*m[2,2]) * det;
-  Result[2, 0] := (m[1,0]*m[2,1]*m[3,3] + m[1,1]*m[2,3]*m[3,0] + m[1,3]*m[2,0]*m[3,1] - m[1,3]*m[2,1]*m[3,0] - m[1,1]*m[2,0]*m[3,3] - m[1,0]*m[2,3]*m[3,1]) * det;
-  Result[2, 1] := (-m[0,0]*m[2,1]*m[3,3] - m[0,1]*m[2,3]*m[3,0] - m[0,3]*m[2,0]*m[3,1] + m[0,3]*m[2,1]*m[3,0] + m[0,1]*m[2,0]*m[3,3] + m[0,0]*m[2,3]*m[3,1]) * det;
-  Result[2, 2] := (m[0,0]*m[1,1]*m[3,3] + m[0,1]*m[1,3]*m[3,0] + m[0,3]*m[1,0]*m[3,1] - m[0,3]*m[1,1]*m[3,0] - m[0,1]*m[1,0]*m[3,3] - m[0,0]*m[1,3]*m[3,1]) * det;
-  Result[2, 3] := (-m[0,0]*m[1,1]*m[2,3] - m[0,1]*m[1,3]*m[2,0] - m[0,3]*m[1,0]*m[2,1] + m[0,3]*m[1,1]*m[2,0] + m[0,1]*m[1,0]*m[2,3] + m[0,0]*m[1,3]*m[2,1]) * det;
-  Result[3, 0] := (-m[1,0]*m[2,1]*m[3,2] - m[1,1]*m[2,2]*m[3,0] - m[1,2]*m[2,0]*m[3,1] + m[1,2]*m[2,1]*m[3,0] + m[1,1]*m[2,0]*m[3,2] + m[1,0]*m[2,2]*m[3,1]) * det;
-  Result[3, 1] := (m[0,0]*m[2,1]*m[3,2] + m[0,1]*m[2,2]*m[3,0] + m[0,2]*m[2,0]*m[3,1] - m[0,2]*m[2,1]*m[3,0] - m[0,1]*m[2,0]*m[3,2] - m[0,0]*m[2,2]*m[3,1]) * det;
-  Result[3, 2] := (-m[0,0]*m[1,1]*m[3,2] - m[0,1]*m[1,2]*m[3,0] - m[0,2]*m[1,0]*m[3,1] + m[0,2]*m[1,1]*m[3,0] + m[0,1]*m[1,0]*m[3,2] + m[0,0]*m[1,2]*m[3,1]) * det;
-  Result[3, 3] := (m[0,0]*m[1,1]*m[2,2] + m[0,1]*m[1,2]*m[2,0] + m[0,2]*m[1,0]*m[2,1] - m[0,2]*m[1,1]*m[2,0] - m[0,1]*m[1,0]*m[2,2] - m[0,0]*m[1,2]*m[2,1]) * det;
+  Result[0, 0] := (m[1,1]*m[2,2]*m[3,3] + m[1,2]*m[2,3]*m[3,1] + m[1,3]*m[2,1]*m[3,2] - m[1,3]*m[2,2]*m[3,1] - m[1,2]*m[2,1]*m[3,3] - m[1,1]*m[2,3]*m[3,2]) * Det;
+  Result[0, 1] := (-m[0,1]*m[2,2]*m[3,3] - m[0,2]*m[2,3]*m[3,1] - m[0,3]*m[2,1]*m[3,2] + m[0,3]*m[2,2]*m[3,1] + m[0,2]*m[2,1]*m[3,3] + m[0,1]*m[2,3]*m[3,2]) * Det;
+  Result[0, 2] := (m[0,1]*m[1,2]*m[3,3] + m[0,2]*m[1,3]*m[3,1] + m[0,3]*m[1,1]*m[3,2] - m[0,3]*m[1,2]*m[3,1] - m[0,2]*m[1,1]*m[3,3] - m[0,1]*m[1,3]*m[3,2]) * Det;
+  Result[0, 3] := (-m[0,1]*m[1,2]*m[2,3] - m[0,2]*m[1,3]*m[2,1] - m[0,3]*m[1,1]*m[2,2] + m[0,3]*m[1,2]*m[2,1] + m[0,2]*m[1,1]*m[2,3] + m[0,1]*m[1,3]*m[2,2]) * Det;
+  Result[1, 0] := (-m[1,0]*m[2,2]*m[3,3] - m[1,2]*m[2,3]*m[3,0] - m[1,3]*m[2,0]*m[3,2] + m[1,3]*m[2,2]*m[3,0] + m[1,2]*m[2,0]*m[3,3] + m[1,0]*m[2,3]*m[3,2]) * Det;
+  Result[1, 1] := (m[0,0]*m[2,2]*m[3,3] + m[0,2]*m[2,3]*m[3,0] + m[0,3]*m[2,0]*m[3,2] - m[0,3]*m[2,2]*m[3,0] - m[0,2]*m[2,0]*m[3,3] - m[0,0]*m[2,3]*m[3,2]) * Det;
+  Result[1, 2] := (-m[0,0]*m[1,2]*m[3,3] - m[0,2]*m[1,3]*m[3,0] - m[0,3]*m[1,0]*m[3,2] + m[0,3]*m[1,2]*m[3,0] + m[0,2]*m[1,0]*m[3,3] + m[0,0]*m[1,3]*m[3,2]) * Det;
+  Result[1, 3] := (m[0,0]*m[1,2]*m[2,3] + m[0,2]*m[1,3]*m[2,0] + m[0,3]*m[1,0]*m[2,2] - m[0,3]*m[1,2]*m[2,0] - m[0,2]*m[1,0]*m[2,3] - m[0,0]*m[1,3]*m[2,2]) * Det;
+  Result[2, 0] := (m[1,0]*m[2,1]*m[3,3] + m[1,1]*m[2,3]*m[3,0] + m[1,3]*m[2,0]*m[3,1] - m[1,3]*m[2,1]*m[3,0] - m[1,1]*m[2,0]*m[3,3] - m[1,0]*m[2,3]*m[3,1]) * Det;
+  Result[2, 1] := (-m[0,0]*m[2,1]*m[3,3] - m[0,1]*m[2,3]*m[3,0] - m[0,3]*m[2,0]*m[3,1] + m[0,3]*m[2,1]*m[3,0] + m[0,1]*m[2,0]*m[3,3] + m[0,0]*m[2,3]*m[3,1]) * Det;
+  Result[2, 2] := (m[0,0]*m[1,1]*m[3,3] + m[0,1]*m[1,3]*m[3,0] + m[0,3]*m[1,0]*m[3,1] - m[0,3]*m[1,1]*m[3,0] - m[0,1]*m[1,0]*m[3,3] - m[0,0]*m[1,3]*m[3,1]) * Det;
+  Result[2, 3] := (-m[0,0]*m[1,1]*m[2,3] - m[0,1]*m[1,3]*m[2,0] - m[0,3]*m[1,0]*m[2,1] + m[0,3]*m[1,1]*m[2,0] + m[0,1]*m[1,0]*m[2,3] + m[0,0]*m[1,3]*m[2,1]) * Det;
+  Result[3, 0] := (-m[1,0]*m[2,1]*m[3,2] - m[1,1]*m[2,2]*m[3,0] - m[1,2]*m[2,0]*m[3,1] + m[1,2]*m[2,1]*m[3,0] + m[1,1]*m[2,0]*m[3,2] + m[1,0]*m[2,2]*m[3,1]) * Det;
+  Result[3, 1] := (m[0,0]*m[2,1]*m[3,2] + m[0,1]*m[2,2]*m[3,0] + m[0,2]*m[2,0]*m[3,1] - m[0,2]*m[2,1]*m[3,0] - m[0,1]*m[2,0]*m[3,2] - m[0,0]*m[2,2]*m[3,1]) * Det;
+  Result[3, 2] := (-m[0,0]*m[1,1]*m[3,2] - m[0,1]*m[1,2]*m[3,0] - m[0,2]*m[1,0]*m[3,1] + m[0,2]*m[1,1]*m[3,0] + m[0,1]*m[1,0]*m[3,2] + m[0,0]*m[1,2]*m[3,1]) * Det;
+  Result[3, 3] := (m[0,0]*m[1,1]*m[2,2] + m[0,1]*m[1,2]*m[2,0] + m[0,2]*m[1,0]*m[2,1] - m[0,2]*m[1,1]*m[2,0] - m[0,1]*m[1,0]*m[2,2] - m[0,0]*m[1,2]*m[2,1]) * Det;
 end;
 
 class function TUMatImpl.Transpose(const m: TUMat): TUMat;
@@ -4373,7 +5002,17 @@ begin
   Result := (a.Min <= b.Max) and (b.Min <= a.Max);
 end;
 
-function TUBounds1fImpl.Overlap(const Other: TUBounds1f): Boolean;
+class function TUBounds1fImpl.Contains(const a, b: TUBounds1f): Boolean;
+begin
+  Result := (a.Min <= b.Min) and (b.Max >= b.Max);
+end;
+
+function TUBounds1fImpl.Overlaps(const Other: TUBounds1f): Boolean;
+begin
+  Result := Overlap(Self, Other);
+end;
+
+function TUBounds1fImpl.Contains(const Other: TUBounds1f): Boolean;
 begin
   Result := Overlap(Self, Other);
 end;
@@ -4383,7 +5022,6 @@ begin
   if v < Self[0] then Self[0] := v
   else if v > Self[1] then Self[1] := v;
 end;
-
 // TUBounds1f end
 
 // TUBounds2f begin
@@ -4417,6 +5055,26 @@ begin
   Self[1] := Self[0] + Value;
 end;
 
+function TUBounds2fImpl.GetTopLeft: TUVec2;
+begin
+  Result := Self[0];
+end;
+
+function TUBounds2fImpl.GetTopRight: TUVec2;
+begin
+  Result := [Self[1].x, Self[0].y];
+end;
+
+function TUBounds2fImpl.GetBottomLeft: TUVec2;
+begin
+  Result := [Self[0].x, Self[1].y];
+end;
+
+function TUBounds2fImpl.GetBottomRight: TUVec2;
+begin
+  Result := Self[1];
+end;
+
 class function TUBounds2fImpl.Make(const AMin, AMax: TUVec2): TUBounds2f;
 begin
   Result[0] := UMin(AMin, AMax);
@@ -4432,26 +5090,44 @@ end;
 class function TUBounds2fImpl.Overlap(const a, b: TUBounds2f): Boolean;
 begin
   Result := (
-    (a.Min.x <= b.Max.x)
-    and (a.Min.y <= b.Max.y)
-    and (b.Min.x <= a.Max.x)
-    and (b.Min.y <= a.Max.y)
+    (a.Min.x <= b.Max.x) and
+    (a.Min.y <= b.Max.y) and
+    (b.Min.x <= a.Max.x) and
+    (b.Min.y <= a.Max.y)
   );
 end;
 
-function TUBounds2fImpl.Overlap(const Other: TUBounds2f): Boolean;
+class function TUBounds2fImpl.Contains(const a, b: TUBounds2f): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Min.x) and
+    (a.Min.y <= b.Min.y) and
+    (a.Max.x >= b.Max.x) and
+    (a.Max.y >= b.Max.y)
+  );
+end;
+
+function TUBounds2fImpl.Overlaps(const Other: TUBounds2f): Boolean;
 begin
   Result := Overlap(Self, Other);
 end;
 
-function TUBounds2fImpl.GetPoints: TUVec2Array;
+function TUBounds2fImpl.Contains(const Other: TUBounds2f): Boolean;
 begin
-  Result := nil;
-  SetLength(Result, 4);
+  Result := Contains(Self, Other);
+end;
+
+function TUBounds2fImpl.GetPoints: TUQuad2f;
+begin
   Result[0] := Self[0];
   Result[1] := TUVec2.Make(Self[0].x, Self[1].y);
   Result[2] := TUVec2.Make(Self[1].x, Self[0].y);
-  Result[3] := Max;
+  Result[3] := Self[1];
+end;
+
+function TUBounds2fImpl.ToRect: TURectf;
+begin
+  Result := [Min.x, Min.y, Size.x, Size.y];
 end;
 // TUBounds2f end
 
@@ -4542,24 +5218,39 @@ end;
 class function TUBounds3fImpl.Overlap(const a, b: TUBounds3f): Boolean;
 begin
   Result := (
-    (a.Min.x <= b.Max.x)
-    and (a.Min.y <= b.Max.y)
-    and (a.Min.z <= b.Max.z)
-    and (b.Min.x <= a.Max.x)
-    and (b.Min.y <= a.Max.y)
-    and (b.Min.z <= a.Max.z)
+    (a.Min.x <= b.Max.x) and
+    (a.Min.y <= b.Max.y) and
+    (a.Min.z <= b.Max.z) and
+    (b.Min.x <= a.Max.x) and
+    (b.Min.y <= a.Max.y) and
+    (b.Min.z <= a.Max.z)
   );
 end;
 
-function TUBounds3fImpl.Overlap(const Other: TUBounds3f): Boolean;
+class function TUBounds3fImpl.Contains(const a, b: TUBounds3f): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Min.x) and
+    (a.Min.y <= b.Min.y) and
+    (a.Min.z <= b.Min.z) and
+    (a.Max.x >= b.Max.x) and
+    (a.Max.y >= b.Max.y) and
+    (a.Max.z >= b.Max.z)
+  );
+end;
+
+function TUBounds3fImpl.Overlaps(const Other: TUBounds3f): Boolean;
 begin
   Result := Overlap(Self, Other);
 end;
 
-function TUBounds3fImpl.GetPoints: TUVec3Array;
+function TUBounds3fImpl.Contains(const Other: TUBounds3f): Boolean;
 begin
-  Result := nil;
-  SetLength(Result, 8);
+  Result := Contains(Self, Other);
+end;
+
+function TUBounds3fImpl.GetPoints: TUCuboid3f;
+begin
   Result[0] := Self[0];
   Result[1] := TUVec3.Make(Self[0].x, Self[0].y, Self[1].z);
   Result[2] := TUVec3.Make(Self[0].x, Self[1].y, Self[0].z);
@@ -4619,9 +5310,19 @@ begin
   Result := (a.Min <= b.Max) and (b.Min <= a.Max);
 end;
 
-function TUBounds1iImpl.Overlap(const Other: TUBounds1i): Boolean;
+class function TUBounds1iImpl.Contains(const a, b: TUBounds1i): Boolean;
+begin
+  Result := (a.Min <= b.Min) and (b.Max >= b.Max);
+end;
+
+function TUBounds1iImpl.Overlaps(const Other: TUBounds1i): Boolean;
 begin
   Result := Overlap(Self, Other);
+end;
+
+function TUBounds1iImpl.Contains(const Other: TUBounds1i): Boolean;
+begin
+  Result := Contains(Self, Other);
 end;
 
 procedure TUBounds1iImpl.Add(const v: Int32);
@@ -4663,6 +5364,26 @@ begin
   Self[1] := Self[0] + Value;
 end;
 
+function TUBounds2iImpl.GetTopLeft: TUVec2i;
+begin
+  Result := Self[0];
+end;
+
+function TUBounds2iImpl.GetTopRight: TUVec2i;
+begin
+  Result := [Self[1].x, Self[0].y];
+end;
+
+function TUBounds2iImpl.GetBottomLeft: TUVec2i;
+begin
+  Result := [Self[0].x, Self[1].y];
+end;
+
+function TUBounds2iImpl.GetBottomRight: TUVec2i;
+begin
+  Result := Self[1];
+end;
+
 class function TUBounds2iImpl.Make(const AMin, AMax: TUVec2i): TUBounds2i;
 begin
   Result[0] := UMin(AMin, AMax);
@@ -4678,16 +5399,44 @@ end;
 class function TUBounds2iImpl.Overlap(const a, b: TUBounds2i): Boolean;
 begin
   Result := (
-    (a.Min.x <= b.Max.x)
-    and (a.Min.y <= b.Max.y)
-    and (b.Min.x <= a.Max.x)
-    and (b.Min.y <= a.Max.y)
+    (a.Min.x <= b.Max.x) and
+    (a.Min.y <= b.Max.y) and
+    (b.Min.x <= a.Max.x) and
+    (b.Min.y <= a.Max.y)
   );
 end;
 
-function TUBounds2iImpl.Overlap(const Other: TUBounds2i): Boolean;
+class function TUBounds2iImpl.Contains(const a, b: TUBounds2i): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Min.x) and
+    (a.Min.y <= b.Min.y) and
+    (a.Max.x >= b.Max.x) and
+    (a.Max.y >= b.Max.y)
+  );
+end;
+
+function TUBounds2iImpl.Overlaps(const Other: TUBounds2i): Boolean;
 begin
   Result := Overlap(Self, Other);
+end;
+
+function TUBounds2iImpl.Contains(const Other: TUBounds2i): Boolean;
+begin
+  Result := Contains(Self, Other);
+end;
+
+function TUBounds2iImpl.GetPoints: TUQuad2i;
+begin
+  Result[0] := Self[0];
+  Result[1] := TUVec2.Make(Self[0].x, Self[1].y);
+  Result[2] := TUVec2.Make(Self[1].x, Self[0].y);
+  Result[3] := Self[1];
+end;
+
+function TUBounds2iImpl.ToRect: TURecti;
+begin
+  Result := [Min.x, Min.y, Size.x, Size.y];
 end;
 // TUBounds2i end
 
@@ -4778,20 +5527,283 @@ end;
 class function TUBounds3iImpl.Overlap(const a, b: TUBounds3i): Boolean;
 begin
   Result := (
-    (a.Min.x <= b.Max.x)
-    and (a.Min.y <= b.Max.y)
-    and (a.Min.z <= b.Max.z)
-    and (b.Min.x <= a.Max.x)
-    and (b.Min.y <= a.Max.y)
-    and (b.Min.z <= a.Max.z)
+    (a.Min.x <= b.Max.x) and
+    (a.Min.y <= b.Max.y) and
+    (a.Min.z <= b.Max.z) and
+    (b.Min.x <= a.Max.x) and
+    (b.Min.y <= a.Max.y) and
+    (b.Min.z <= a.Max.z)
   );
 end;
 
-function TUBounds3iImpl.Overlap(const Other: TUBounds3i): Boolean;
+class function TUBounds3iImpl.Contains(const a, b: TUBounds3i): Boolean;
+begin
+  Result := (
+    (a.Min.x <= b.Min.x) and
+    (a.Min.y <= b.Min.y) and
+    (a.Min.z <= b.Min.z) and
+    (a.Max.x >= b.Max.x) and
+    (a.Max.y >= b.Max.y) and
+    (a.Max.z >= b.Max.z)
+  );
+end;
+
+function TUBounds3iImpl.Overlaps(const Other: TUBounds3i): Boolean;
 begin
   Result := Overlap(Self, Other);
 end;
+
+function TUBounds3iImpl.Contains(const Other: TUBounds3i): Boolean;
+begin
+  Result := Contains(Self, Other);
+end;
+
+function TUBounds3iImpl.GetPoints: TUCuboid3i;
+begin
+  Result[0] := Self[0];
+  Result[1] := [Self[0].x, Self[0].y, Self[1].z];
+  Result[2] := [Self[0].x, Self[1].y, Self[0].z];
+  Result[3] := [Self[0].x, Self[1].y, Self[1].z];
+  Result[4] := [Self[1].x, Self[0].y, Self[0].z];
+  Result[5] := [Self[1].x, Self[0].y, Self[1].z];
+  Result[6] := [Self[1].x, Self[1].y, Self[0].z];
+  Result[7] := Self[1];
+end;
 // TUBounds3i end
+
+// TURectf begin
+function TURectfImpl.GetX: TUFloat;
+begin
+  Result := Self[0];
+end;
+
+procedure TURectfImpl.SetX(const Value: TUFloat);
+begin
+  Self[0] := Value;
+end;
+
+function TURectfImpl.GetY: TUFloat;
+begin
+  Result := Self[1];
+end;
+
+procedure TURectfImpl.SetY(const Value: TUFloat);
+begin
+  Self[1] := Value;
+end;
+
+function TURectfImpl.GetW: TUFloat;
+begin
+  Result := Self[2];
+end;
+
+procedure TURectfImpl.SetW(const Value: TUFloat);
+begin
+  Self[2] := Value;
+end;
+
+function TURectfImpl.GetH: TUFloat;
+begin
+  Result := Self[3];
+end;
+
+procedure TURectfImpl.SetH(const Value: TUFloat);
+begin
+  Self[3] := Value;
+end;
+
+function TURectfImpl.GetR: TUFloat;
+begin
+  Result := Self[0] + Self[1];
+end;
+
+procedure TURectfImpl.SetR(const Value: TUFloat);
+begin
+  Self[0] := Value - Self[2]
+end;
+
+function TURectfImpl.GetB: TUFloat;
+begin
+  Result := Self[1] + Self[3];
+end;
+
+procedure TURectfImpl.SetB(const Value: TUFloat);
+begin
+  Self[1] := Value - Self[3];
+end;
+
+function TURectfImpl.GetTL: TUVec2;
+begin
+  Result := [x, y];
+end;
+
+function TURectfImpl.GetTR: TUVec2;
+begin
+  Result := [r, y];
+end;
+
+function TURectfImpl.GetBL: TUVec2;
+begin
+  Result := [x, b];
+end;
+
+function TURectfImpl.GetBR: TUVec2;
+begin
+  Result := [r, b];
+end;
+
+class function TURectfImpl.Make(const Ax, Ay, Aw, Ah: TUFloat): TURectf;
+begin
+  Result := [Ax, Ay, Aw, Ah];
+end;
+
+class function TURectfImpl.Overlap(const r0, r1: TURectf): Boolean;
+begin
+  Result := (
+    (r0.x <= r1.r) and
+    (r0.y <= r1.b) and
+    (r1.x <= r0.r) and
+    (r1.y <= r0.b)
+  );
+end;
+
+class function TURectfImpl.Contains(const r0, r1: TURectf): Boolean;
+begin
+  Result := (
+    (r0.x <= r1.x) and
+    (r0.y <= r1.y) and
+    (r0.r >= r1.r) and
+    (r0.b >= r1.b)
+  );
+end;
+
+function TURectfImpl.Overlaps(const Other: TURectf): Boolean;
+begin
+  Result := Overlap(Self, Other);
+end;
+
+function TURectfImpl.Contains(const Other: TURectf): Boolean;
+begin
+  Result := Contains(Self, Other);
+end;
+// TURectf end
+
+// TURecti begin
+function TURectiImpl.GetX: Int32;
+begin
+  Result := Self[0];
+end;
+
+procedure TURectiImpl.SetX(const Value: Int32);
+begin
+  Self[0] := Value;
+end;
+
+function TURectiImpl.GetY: Int32;
+begin
+  Result := Self[1];
+end;
+
+procedure TURectiImpl.SetY(const Value: Int32);
+begin
+  Self[1] := Value;
+end;
+
+function TURectiImpl.GetW: Int32;
+begin
+  Result := Self[2];
+end;
+
+procedure TURectiImpl.SetW(const Value: Int32);
+begin
+  Self[2] := Value;
+end;
+
+function TURectiImpl.GetH: Int32;
+begin
+  Result := Self[3];
+end;
+
+procedure TURectiImpl.SetH(const Value: Int32);
+begin
+  Self[3] := Value;
+end;
+
+function TURectiImpl.GetR: Int32;
+begin
+  Result := Self[0] + Self[2];
+end;
+
+procedure TURectiImpl.SetR(const Value: Int32);
+begin
+  Self[0] := Value - Self[2];
+end;
+
+function TURectiImpl.GetB: Int32;
+begin
+  Result := Self[1] + Self[3];
+end;
+
+procedure TURectiImpl.SetB(const Value: Int32);
+begin
+  Self[1] := Value - Self[3];
+end;
+
+function TURectiImpl.GetTL: TUVec2i;
+begin
+  Result := [Self[0], Self[1]];
+end;
+
+function TURectiImpl.GetTR: TUVec2i;
+begin
+  Result := [Self[0] + Self[2], Self[1]];
+end;
+
+function TURectiImpl.GetBL: TUVec2i;
+begin
+  Result := [Self[0], Self[1] + Self[3]];
+end;
+
+function TURectiImpl.GetBR: TUVec2i;
+begin
+  Result := [Self[0] + Self[2], Self[1] + Self[3]];
+end;
+
+class function TURectiImpl.Make(const Ax, Ay, Aw, Ah: Int32): TURecti;
+begin
+  Result := [Ax, Ay, Aw, Ah];
+end;
+
+class function TURectiImpl.Overlap(const r0, r1: TURecti): Boolean;
+begin
+  Result := (
+    (r0.x <= r1.r) and
+    (r0.y <= r1.b) and
+    (r1.x <= r0.r) and
+    (r1.y <= r0.b)
+  );
+end;
+
+class function TURectiImpl.Contains(const r0, r1: TURecti): Boolean;
+begin
+  Result := (
+    (r0.x <= r1.x) and
+    (r0.y <= r1.y) and
+    (r0.r >= r1.r) and
+    (r0.b >= r1.b)
+  );
+end;
+
+function TURectiImpl.Overlaps(const Other: TURecti): Boolean;
+begin
+  Result := Overlap(Self, Other);
+end;
+
+function TURectiImpl.Contains(const Other: TURecti): Boolean;
+begin
+  Result := Contains(Self, Other);
+end;
+// TURecti end
 
 // TUBigInt begin
 class function TUBigInt.MaxItem: Int32;
@@ -5535,6 +6547,18 @@ begin
   Result := x1;
 end;
 
+class function TUBigInt.ModAdd(const a, b, Modulus: TSelf): TSelf;
+begin
+  Result := (a + b) mod Modulus;
+end;
+
+class function TUBigInt.ModSub(const a, b, Modulus: TSelf): TSelf;
+begin
+  Result := a - b;
+  while Result < 0 do Result += Modulus;
+  Result := Result mod Modulus;
+end;
+
 class function TUBigInt.Compare(const a, b: TSelf): Int8;
 begin
   if a.IsPositive = b.IsPositive then
@@ -5996,7 +7020,7 @@ end;
 
 class function TUInt4096_DebugImpl.MagDiv(const a, b: TUInt4096_Debug; out r: TUInt4096_Debug): TUInt4096_Debug;
   const NumItems = MaxItem + 1;
-  function CountLeadingZeros(const Value: UInt32): Integer;
+  function CountLeadingZeros(const Value: UInt32): Int32;
     var TmpValue: UInt32;
   begin
     if Value = 0 then Exit(32);
@@ -6008,7 +7032,7 @@ class function TUInt4096_DebugImpl.MagDiv(const a, b: TUInt4096_Debug; out r: TU
     if TmpValue <= $3fffffff then begin Result += 2; TmpValue := TmpValue shl 2; end;
     if TmpValue <= $7fffffff then begin Result += 1; end;
   end;
-  function MultiplyByWord(const A: TUInt4096_Debug; const Word: UInt32; const NumWords: Integer): TUInt4096_Debug;
+  function MultiplyByWord(const A: TUInt4096_Debug; const Word: UInt32; const NumWords: Int32): TUInt4096_Debug;
     var i: Int32;
     var Carry: UInt64;
     var Product: UInt64;
@@ -7055,13 +8079,13 @@ begin
   Result := GetTickCount64 - _StartTime;
 end;
 
-function TUTask.TTaskThread.RefInc: Integer;
+function TUTask.TTaskThread.RefInc: Int32;
 begin
   Inc(Ref);
   Result := Ref;
 end;
 
-function TUTask.TTaskThread.RefDec: Integer;
+function TUTask.TTaskThread.RefDec: Int32;
 begin
   Dec(Ref);
   Result := Ref;
@@ -7072,7 +8096,7 @@ begin
   end;
 end;
 
-function TUTask.TTaskThread.RefDecKillThread: Integer;
+function TUTask.TTaskThread.RefDecKillThread: Int32;
 begin
   Dec(Ref);
   Result := Ref;
@@ -7232,9 +8256,9 @@ begin
   {$pop}
 end;
 
-class operator TUSharedRef.=(v1, v2: TSelf): Boolean;
+class operator TUSharedRef.=(a, b: TSelf): Boolean;
 begin
-  Result := v1._Ptr = v2._Ptr;
+  Result := a._Ptr = b._Ptr;
 end;
 // TUSharedRef end
 
@@ -7282,6 +8306,11 @@ class operator TUWeakRef.:= (const Value: TShared): TSelf;
 begin
   Result.Assign(Value.Ptr);
 end;
+
+class operator TUWeakRef.=(const a, b: TSelf): Boolean;
+begin
+  Result := a.Ptr = b.Ptr;
+end;
 // TUWeakRef end
 
 // TUWeakCounter begin
@@ -7326,7 +8355,7 @@ begin
 end;
 
 procedure TURefClass.AddReference(const Obj: TURefClass);
-  var i: Integer;
+  var i: Int32;
 begin
   for i := 0 to High(_References) do
   begin
@@ -7338,7 +8367,7 @@ begin
 end;
 
 procedure TURefClass.RemoveReference(const Obj: TURefClass);
-  var i, j: Integer;
+  var i, j: Int32;
 begin
   for i := 0 to High(_References) do
   if _References[i].Ptr = Obj then
@@ -7645,33 +8674,41 @@ end;
 // TUConstMemoryStream end
 
 // TUSerializable begin
-function TUSerializable.VerifyProp(const Index: Integer; const PropType: TTypeKinds): Boolean;
+class function TUSerializable.FindEnumName(
+  const Names: ShortString;
+  const Index: Int32
+): String;
+  var r: TUShortStringReader;
+  var i, j, n: Int32;
 begin
-  Result := (
-    (Index >= 0) and (Index <= High(_PropList))
-    and (_PropList[Index]^.PropType^.Kind in PropType)
-  );
+  r.Setup(Names);
+  for i := 0 to Index - 1 do
+  begin
+    r.ReadShortString;
+    if (r.Pos >= SizeOf(ShortString)) then
+    begin
+      Exit('');
+    end;
+  end;
+  if r.Pos >= SizeOf(ShortString) then Exit('');
+  Result := r.ReadShortString;
 end;
 
-function TUSerializable.VerifyArrayProp(const Index, ArrayIndex: Integer; const PropType: TTypeKinds = tkAny): Boolean;
-  var td: PTypeData;
-  var ti: PTypeInfo;
+class function TUSerializable.FindEnumIndex(
+  const Names: ShortString;
+  const Value: String
+): Int32;
+  var r: TUShortStringReader;
+  var i: Int32;
 begin
-  if not VerifyProp(Index, [tkDynArray]) then Exit;
-  td := GetTypeData(_PropList[Index]^.PropType);
-  ti := td^.ElType;
-  if not Assigned(ti) then ti := td^.ElType2;
-  Result := (
-    Assigned(ti) and (ti^.Kind in PropType)
-    and (ArrayIndex >= 0) and (ArrayIndex < GetPropArrayLength(Index))
-  );
-end;
-
-function TUSerializable.GetArrayData(const Index: Integer): Pointer;
-  type TArr = array of Pointer;
-begin
-  if GetPropArrayLength(Index) < 1 then Exit(nil);
-  Result := @TArr(GetDynArrayProp(Self, _PropList[Index]))[0];
+  r.Setup(Names);
+  i := 0;
+  while r.Pos < SizeOf(ShortString) do
+  begin
+    if LowerCase(r.ReadShortString) = LowerCase(Value) then Exit(i);
+    Inc(i);
+  end;
+  Result := -1;
 end;
 
 function TUSerializable.GetOrdSize(const OrdType: TOrdType): UInt32;
@@ -7682,7 +8719,39 @@ begin
   Result := Sizes[Ord(OrdType)];
 end;
 
-function TUSerializable.GetArrayElementTypeInfo(const Index: Integer): PTypeInfo;
+function TUSerializable.VerifyProp(
+  const Index: Int32;
+  const PropType: TTypeKinds
+): Boolean;
+begin
+  Result := (
+    (Index >= 0) and (Index <= High(_PropList))
+    and (_PropList[Index]^.PropType^.Kind in PropType)
+  );
+end;
+
+function TUSerializable.VerifyArrayProp(const Index, ArrayIndex: Int32; const PropType: TTypeKinds = tkAny): Boolean;
+  var td: PTypeData;
+  var ti: PTypeInfo;
+begin
+  if not VerifyProp(Index, [tkDynArray]) then Exit(False);
+  td := GetTypeData(_PropList[Index]^.PropType);
+  ti := td^.ElType;
+  if not Assigned(ti) then ti := td^.ElType2;
+  Result := (
+    Assigned(ti) and (ti^.Kind in PropType)
+    and (ArrayIndex >= 0) and (ArrayIndex < GetPropArrayLength(Index))
+  );
+end;
+
+function TUSerializable.GetArrayPropData(const Index: Int32): Pointer;
+  type TArr = array of Pointer;
+begin
+  if GetPropArrayLength(Index) < 1 then Exit(nil);
+  Result := @TArr(GetDynArrayProp(Self, _PropList[Index]))[0];
+end;
+
+function TUSerializable.GetArrayPropElementTypeInfo(const Index: Int32): PTypeInfo;
   var td: PTypeData;
 begin
   td := GetTypeData(_PropList[Index]^.PropType);
@@ -7690,18 +8759,54 @@ begin
   if not Assigned(Result) then Result := td^.ElType2;
 end;
 
-function TUSerializable.GetPropCount: Integer;
+function TUSerializable.GetProp(const Index: Int32): TProp;
+begin
+  Result := _PropList[Index];
+end;
+
+function TUSerializable.GetPropCount: Int32;
 begin
   Result := _TypeData^.PropCount;
 end;
 
-function TUSerializable.GetPropInfo(const Index: Integer): PPropInfo;
+function TUSerializable.GetField(const Index: Int32): TField;
+begin
+  Result := _FieldList[Index];
+end;
+
+function TUSerializable.GetFieldCount: Int32;
+begin
+  Result := _TypeData^.TotalFieldCount;
+end;
+
+function TUSerializable.GetFieldName(const Index: Int32): String;
+begin
+  Result := _FieldList[Index].Field^.Name;
+end;
+
+function TUSerializable.GetFieldData(const Index: Int32): TObject;
+  type PObject = ^TObject;
+begin
+  Result := PObject(Pointer(Self) + _FieldList[Index].Field^.FieldOffset)^;
+end;
+
+procedure TUSerializable.SetFieldData(const Index: Int32; const Value: TObject);
+begin
+  PPointer(Pointer(Self) + _FieldList[Index].Field^.FieldOffset)^ := Value;
+end;
+
+function TUSerializable.GetFieldClass(const Index: Int32): TClass;
+begin
+  Result := _FieldList[Index].ClassInfo^.ClassType;
+end;
+
+function TUSerializable.GetPropInfo(const Index: Int32): PPropInfo;
 begin
   if not VerifyProp(Index) then Exit(nil);
   Result := _PropList[Index];
 end;
 
-function TUSerializable.GetPropArrayInfo(const Index: Integer): PTypeInfo;
+function TUSerializable.GetArrayPropInfo(const Index: Int32): PTypeInfo;
   var td: PTypeData;
 begin
   if not VerifyProp(Index, [tkDynArray]) then Exit(nil);
@@ -7710,175 +8815,194 @@ begin
   if not Assigned(Result) then Result := td^.ElType2;
 end;
 
-function TUSerializable.GetPropEnum(const Index: Integer): Int32;
+function TUSerializable.GetPropEnum(const Index: Int32): Int32;
 begin
   if not VerifyProp(Index, [tkEnumeration]) then Exit(0);
   Result := GetOrdProp(Self, _PropList[Index]);
 end;
 
-procedure TUSerializable.SetPropEnum(const Index: Integer; const Value: Int32);
+procedure TUSerializable.SetPropEnum(const Index: Int32; const Value: Int32);
 begin
   if not VerifyProp(Index, [tkEnumeration]) then Exit;
   SetOrdProp(Self, _PropList[Index], Value);
 end;
 
-function TUSerializable.GetPropBool(const Index: Integer): Boolean;
+function TUSerializable.GetPropEnumName(const Index: Int32): String;
+  var td: PTypeData;
+begin
+  if not VerifyProp(Index, [tkEnumeration]) then Exit('');
+  td := GetTypeData(_PropList[Index]^.PropType);
+  Result := FindEnumName(td^.NameList, GetPropEnum(Index));
+end;
+
+procedure TUSerializable.SetPropEnumName(const Index: Int32; const Value: String);
+  var td: PTypeData;
+  var i: Int32;
+begin
+  if not VerifyProp(Index, [tkEnumeration]) then Exit;
+  td := GetTypeData(_PropList[Index]^.PropType);
+  i := FindEnumIndex(td^.NameList, Value);
+  if i < 0 then Exit;
+  SetPropEnum(Index, i);
+end;
+
+function TUSerializable.GetPropBool(const Index: Int32): Boolean;
 begin
   if not VerifyProp(Index, [tkBool]) then Exit(False);
   Result := UIntToBool(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropBool(const Index: Integer; const Value: Boolean);
+procedure TUSerializable.SetPropBool(const Index: Int32; const Value: Boolean);
 begin
   if not VerifyProp(Index, [tkBool]) then Exit;
   SetOrdProp(Self, _PropList[Index], UBoolToInt(Value));
 end;
 
-function TUSerializable.GetPropInt8(const Index: Integer): Int8;
+function TUSerializable.GetPropInt8(const Index: Int32): Int8;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := Int8(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropInt8(const Index: Integer; const Value: Int8);
+procedure TUSerializable.SetPropInt8(const Index: Int32; const Value: Int8);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropInt16(const Index: Integer): Int16;
+function TUSerializable.GetPropInt16(const Index: Int32): Int16;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := Int16(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropInt16(const Index: Integer; const Value: Int16);
+procedure TUSerializable.SetPropInt16(const Index: Int32; const Value: Int16);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropInt32(const Index: Integer): Int32;
+function TUSerializable.GetPropInt32(const Index: Int32): Int32;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := Int32(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropInt32(const Index: Integer; const Value: Int32);
+procedure TUSerializable.SetPropInt32(const Index: Int32; const Value: Int32);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropInt64(const Index: Integer): Int64;
+function TUSerializable.GetPropInt64(const Index: Int32): Int64;
 begin
   if not VerifyProp(Index, [tkInteger, tkInt64]) then Exit(0);
   Result := Int64(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropInt64(const Index: Integer; const Value: Int64);
+procedure TUSerializable.SetPropInt64(const Index: Int32; const Value: Int64);
 begin
   if not VerifyProp(Index, [tkInteger, tkInt64]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropUInt8(const Index: Integer): UInt8;
+function TUSerializable.GetPropUInt8(const Index: Int32): UInt8;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := UInt8(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropUInt8(const Index: Integer; const Value: UInt8);
+procedure TUSerializable.SetPropUInt8(const Index: Int32; const Value: UInt8);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropUInt16(const Index: Integer): UInt16;
+function TUSerializable.GetPropUInt16(const Index: Int32): UInt16;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := UInt16(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropUInt16(const Index: Integer; const Value: UInt16);
+procedure TUSerializable.SetPropUInt16(const Index: Int32; const Value: UInt16);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropUInt32(const Index: Integer): UInt32;
+function TUSerializable.GetPropUInt32(const Index: Int32): UInt32;
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit(0);
   Result := UInt32(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropUInt32(const Index: Integer; const Value: UInt32);
+procedure TUSerializable.SetPropUInt32(const Index: Int32; const Value: UInt32);
 begin
   if not VerifyProp(Index, [tkInteger]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropUInt64(const Index: Integer): UInt64;
+function TUSerializable.GetPropUInt64(const Index: Int32): UInt64;
 begin
   if not VerifyProp(Index, [tkInteger, tkQWord]) then Exit(0);
   Result := UInt64(GetOrdProp(Self, _PropList[Index]));
 end;
 
-procedure TUSerializable.SetPropUInt64(const Index: Integer; const Value: UInt64);
+procedure TUSerializable.SetPropUInt64(const Index: Int32; const Value: UInt64);
 begin
   if not VerifyProp(Index, [tkInteger, tkQWord]) then Exit;
   SetOrdProp(Self, _PropList[Index], Int64(Value));
 end;
 
-function TUSerializable.GetPropFloat(const Index: Integer): Single;
+function TUSerializable.GetPropFloat(const Index: Int32): Single;
 begin
   if not VerifyProp(Index, [tkFloat]) then Exit(0);
   Result := GetFloatProp(Self, _PropList[Index]);
 end;
 
-procedure TUSerializable.SetPropFloat(const Index: Integer; const Value: Single);
+procedure TUSerializable.SetPropFloat(const Index: Int32; const Value: Single);
 begin
   if not VerifyProp(Index, [tkFloat]) then Exit;
   SetFloatProp(Self, _PropList[Index], Value);
 end;
 
-function TUSerializable.GetPropDouble(const Index: Integer): Double;
+function TUSerializable.GetPropDouble(const Index: Int32): Double;
 begin
   if not VerifyProp(Index, [tkFloat]) then Exit(0);
   Result := GetFloatProp(Self, _PropList[Index]);
 end;
 
-procedure TUSerializable.SetPropDouble(const Index: Integer; const Value: Double);
+procedure TUSerializable.SetPropDouble(const Index: Int32; const Value: Double);
 begin
   if not VerifyProp(Index, [tkFloat]) then Exit;
   SetFloatProp(Self, _PropList[Index], Value);
 end;
 
-function TUSerializable.GetPropString(const Index: Integer): String;
+function TUSerializable.GetPropString(const Index: Int32): String;
 begin
   if not VerifyProp(Index, [tkAString]) then Exit;
   Result := GetStrProp(Self, _PropList[Index]);
 end;
 
-procedure TUSerializable.SetPropString(const Index: Integer; const Value: String);
+procedure TUSerializable.SetPropString(const Index: Int32; const Value: String);
 begin
   if not VerifyProp(Index, [tkAString]) then Exit;
   SetStrProp(Self, _PropList[Index], Value);
 end;
 
-function TUSerializable.GetPropClass(const Index: Integer): TObject;
+function TUSerializable.GetPropClass(const Index: Int32): TObject;
 begin
   if not VerifyProp(Index, [tkClass]) then Exit(nil);
   Result := GetObjectProp(Self, _PropList[Index]);
 end;
 
-procedure TUSerializable.SetPropClass(const Index: Integer; const Value: TObject);
+procedure TUSerializable.SetPropClass(const Index: Int32; const Value: TObject);
 begin
   if not VerifyProp(Index, [tkClass]) then Exit;
   SetObjectProp(Self, _PropList[Index], Value);
 end;
 
-function TUSerializable.GetPropArrayLength(const Index: Integer): Integer;
+function TUSerializable.GetPropArrayLength(const Index: Int32): Int32;
   var td: PTypeData;
   var ti: PTypeInfo;
 begin
@@ -7914,10 +9038,10 @@ begin
   end;
 end;
 
-procedure TUSerializable.SetPropArrayLength(const Index: Integer; const Value: Integer);
+procedure TUSerializable.SetPropArrayLength(const Index: Int32; const Value: Int32);
   var td, tde: PTypeData;
   var tie: PTypeInfo;
-  var i, OldSize: Integer;
+  var i, OldSize: Int32;
 begin
   if not VerifyProp(Index, [tkDynArray]) then Exit;
   td := GetTypeData(_PropList[Index]^.PropType);
@@ -7965,11 +9089,11 @@ begin
   end;
 end;
 
-function TUSerializable.GetPropArrayEnum(const Index, ArrayIndex: Integer): Int32;
+function TUSerializable.GetPropArrayEnum(const Index, ArrayIndex: Int32): Int32;
   var td: PTypeData;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkEnumeration]) then Exit(0);
-  td := GetTypeData(GetArrayElementTypeInfo(Index));
+  td := GetTypeData(GetArrayPropElementTypeInfo(Index));
   case td^.OrdType of
     otSByte: Result := specialize GetDynArrayElement<Int8>(Index, ArrayIndex);
     otSWord: Result := specialize GetDynArrayElement<Int16>(Index, ArrayIndex);
@@ -7983,11 +9107,11 @@ begin
   end;
 end;
 
-procedure TUSerializable.SetPropArrayEnum(const Index, ArrayIndex: Integer; const Value: Int32);
+procedure TUSerializable.SetPropArrayEnum(const Index, ArrayIndex: Int32; const Value: Int32);
   var td: PTypeData;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkEnumeration]) then Exit;
-  td := GetTypeData(GetArrayElementTypeInfo(Index));
+  td := GetTypeData(GetArrayPropElementTypeInfo(Index));
   case td^.OrdType of
     otSByte: specialize SetDynArrayElement<Int8>(Index, ArrayIndex, Value);
     otSWord: specialize SetDynArrayElement<Int16>(Index, ArrayIndex, Value);
@@ -8000,163 +9124,163 @@ begin
   end;
 end;
 
-function TUSerializable.GetPropArrayBool(const Index, ArrayIndex: Integer): Boolean;
+function TUSerializable.GetPropArrayBool(const Index, ArrayIndex: Int32): Boolean;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkBool]) then Exit(False);
   Result := specialize GetDynArrayElement<Boolean>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayBool(const Index, ArrayIndex: Integer; const Value: Boolean);
+procedure TUSerializable.SetPropArrayBool(const Index, ArrayIndex: Int32; const Value: Boolean);
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkBool]) then Exit;
   specialize SetDynArrayElement<Boolean>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayInt8(const Index, ArrayIndex: Integer): Int8;
+function TUSerializable.GetPropArrayInt8(const Index, ArrayIndex: Int32): Int8;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<Int8>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayInt8(const Index, ArrayIndex: Integer; const Value: Int8);  
+procedure TUSerializable.SetPropArrayInt8(const Index, ArrayIndex: Int32; const Value: Int8);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<Int8>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayInt16(const Index, ArrayIndex: Integer): Int16;     
+function TUSerializable.GetPropArrayInt16(const Index, ArrayIndex: Int32): Int16;     
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<Int16>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayInt16(const Index, ArrayIndex: Integer; const Value: Int16);  
+procedure TUSerializable.SetPropArrayInt16(const Index, ArrayIndex: Int32; const Value: Int16);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<Int16>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayInt32(const Index, ArrayIndex: Integer): Int32;     
+function TUSerializable.GetPropArrayInt32(const Index, ArrayIndex: Int32): Int32;     
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<Int32>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayInt32(const Index, ArrayIndex: Integer; const Value: Int32);  
+procedure TUSerializable.SetPropArrayInt32(const Index, ArrayIndex: Int32; const Value: Int32);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<Int32>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayInt64(const Index, ArrayIndex: Integer): Int64;          
+function TUSerializable.GetPropArrayInt64(const Index, ArrayIndex: Int32): Int64;          
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<Int64>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayInt64(const Index, ArrayIndex: Integer; const Value: Int64); 
+procedure TUSerializable.SetPropArrayInt64(const Index, ArrayIndex: Int32; const Value: Int64); 
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<Int64>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayUInt8(const Index, ArrayIndex: Integer): UInt8;    
+function TUSerializable.GetPropArrayUInt8(const Index, ArrayIndex: Int32): UInt8;    
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<UInt8>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayUInt8(const Index, ArrayIndex: Integer; const Value: UInt8);  
+procedure TUSerializable.SetPropArrayUInt8(const Index, ArrayIndex: Int32; const Value: UInt8);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<UInt8>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayUInt16(const Index, ArrayIndex: Integer): UInt16;        
+function TUSerializable.GetPropArrayUInt16(const Index, ArrayIndex: Int32): UInt16;        
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<UInt16>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayUInt16(const Index, ArrayIndex: Integer; const Value: UInt16);  
+procedure TUSerializable.SetPropArrayUInt16(const Index, ArrayIndex: Int32; const Value: UInt16);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<UInt16>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayUInt32(const Index, ArrayIndex: Integer): UInt32;    
+function TUSerializable.GetPropArrayUInt32(const Index, ArrayIndex: Int32): UInt32;    
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<UInt32>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayUInt32(const Index, ArrayIndex: Integer; const Value: UInt32); 
+procedure TUSerializable.SetPropArrayUInt32(const Index, ArrayIndex: Int32; const Value: UInt32); 
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<UInt32>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayUInt64(const Index, ArrayIndex: Integer): UInt64;        
+function TUSerializable.GetPropArrayUInt64(const Index, ArrayIndex: Int32): UInt64;        
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit(0);
   Result := specialize GetDynArrayElement<UInt64>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayUInt64(const Index, ArrayIndex: Integer; const Value: UInt64); 
+procedure TUSerializable.SetPropArrayUInt64(const Index, ArrayIndex: Int32; const Value: UInt64); 
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkInteger, tkInt64, tkQWord]) then Exit;
   specialize SetDynArrayElement<UInt64>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayFloat(const Index, ArrayIndex: Integer): Single;
+function TUSerializable.GetPropArrayFloat(const Index, ArrayIndex: Int32): Single;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkFloat]) then Exit(0);
   Result := specialize GetDynArrayElement<Single>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayFloat(const Index, ArrayIndex: Integer; const Value: Single);   
+procedure TUSerializable.SetPropArrayFloat(const Index, ArrayIndex: Int32; const Value: Single);   
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkFloat]) then Exit;
   specialize SetDynArrayElement<Single>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayDouble(const Index, ArrayIndex: Integer): Double;           
+function TUSerializable.GetPropArrayDouble(const Index, ArrayIndex: Int32): Double;           
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkFloat]) then Exit(0);
   Result := specialize GetDynArrayElement<Double>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayDouble(const Index, ArrayIndex: Integer; const Value: Double);  
+procedure TUSerializable.SetPropArrayDouble(const Index, ArrayIndex: Int32; const Value: Double);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkFloat]) then Exit;
   specialize SetDynArrayElement<Double>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayString(const Index, ArrayIndex: Integer): String;         
+function TUSerializable.GetPropArrayString(const Index, ArrayIndex: Int32): String;         
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkAString]) then Exit('');
   Result := specialize GetDynArrayElement<String>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayString(const Index, ArrayIndex: Integer; const Value: String);  
+procedure TUSerializable.SetPropArrayString(const Index, ArrayIndex: Int32; const Value: String);  
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkAString]) then Exit;
   specialize SetDynArrayElement<String>(Index, ArrayIndex, Value);
 end;
 
-function TUSerializable.GetPropArrayClass(const Index, ArrayIndex: Integer): TObject;
+function TUSerializable.GetPropArrayClass(const Index, ArrayIndex: Int32): TObject;
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkClass]) then Exit(nil);
   Result := specialize GetDynArrayElement<TObject>(Index, ArrayIndex);
 end;
 
-procedure TUSerializable.SetPropArrayClass(const Index, ArrayIndex: Integer; const Value: TObject);
+procedure TUSerializable.SetPropArrayClass(const Index, ArrayIndex: Int32; const Value: TObject);
 begin
   if not VerifyArrayProp(Index, ArrayIndex, [tkClass]) then Exit;
   specialize SetDynArrayElement<TObject>(Index, ArrayIndex, Value);
 end;
 
-generic function TUSerializable.GetDynArrayLength<T>(const Index: Integer): Integer;
+generic function TUSerializable.GetDynArrayLength<T>(const Index: Int32): Int32;
   type TArrType = array of T;
   var Ptr: Pointer;
 begin
@@ -8165,7 +9289,7 @@ begin
   Result := Length(TArrType(Ptr));
 end;
 
-generic procedure TUSerializable.SetDynArrayLength<T>(const Index: Integer; const Value: Integer);
+generic procedure TUSerializable.SetDynArrayLength<T>(const Index: Int32; const Value: Int32);
   type TArrType = array of T;
   var Arr: TArrType;
   var Old: Pointer;
@@ -8177,25 +9301,39 @@ begin
   SetDynArrayProp(Self, _PropList[Index], Pointer(Arr));
 end;
 
-generic function TUSerializable.GetDynArrayElement<T>(const Index, ArrayIndex: Integer): T;
+generic function TUSerializable.GetDynArrayElement<T>(const Index, ArrayIndex: Int32): T;
   type TArrType = array of T;
 begin
   Result := TArrType(GetDynArrayProp(Self, _PropList[Index]))[ArrayIndex];
 end;
 
-generic procedure TUSerializable.SetDynArrayElement<T>(const Index, ArrayIndex: Integer; const Value: T);
+generic procedure TUSerializable.SetDynArrayElement<T>(const Index, ArrayIndex: Int32; const Value: T);
   type TArrType = array of T;
 begin
   TArrType(GetDynArrayProp(Self, _PropList[Index]))[ArrayIndex] := Value;
 end;
 
-function TUSerializable.FindProp(const Name: String; const PropType: TTypeKinds): Integer;
-  var i: Integer;
+function TUSerializable.FindProp(const Name: String; const PropType: TTypeKinds): Int32;
+  var i: Int32;
   var NameLC: String;
 begin
   NameLC := LowerCase(Name);
   for i := 0 to High(_PropList) do
-  if (LowerCase(_PropList[i]^.Name) = NameLC) and (_PropList[i]^.PropType^.Kind in PropType) then
+  if (LowerCase(_PropList[i]^.Name) = NameLC)
+  and (_PropList[i]^.PropType^.Kind in PropType) then
+  begin
+    Exit(i);
+  end;
+  Result := -1;
+end;
+
+function TUSerializable.FindField(const Name: String): Int32;
+  var i: Int32;
+  var NameLC: String;
+begin
+  NameLC := LowerCase(Name);
+  for i := 0 to High(_FieldList) do
+  if (LowerCase(_FieldList[i].Field^.Name) = NameLC) then
   begin
     Exit(i);
   end;
@@ -8204,7 +9342,9 @@ end;
 
 procedure TUSerializable.AfterConstruction;
   var td: PTypeData;
-  var i: Integer;
+  var vmt: PVmt;
+  var FieldTable: PVmtFieldTable;
+  var i: Int32;
 begin
   inherited AfterConstruction;
   _TypeInfo := PTypeInfo(Self.ClassType.ClassInfo);
@@ -8233,14 +9373,28 @@ begin
       end;
     end;
   end;
+  vmt := PVmt(ClassType);
+  if Assigned(vmt^.vFieldTable) then
+  begin
+    FieldTable := PVmtFieldTable(vmt^.vFieldTable);
+    SetLength(_FieldList, FieldTable^.Count);
+    for i := 0 to High(_FieldList) do
+    begin
+      _FieldList[i].Field := FieldTable^.Field[i];
+      _FieldList[i].ClassInfo := (
+        FieldTable^.ClassTab^.ClassRef[FieldTable^.Field[i]^.TypeIndex - 1]
+      );
+      SetFieldData(i, _FieldList[i].ClassInfo^.ClassType.Create);
+    end;
+  end;
 end;
 
 procedure TUSerializable.BeforeDestruction;
-  var i: Integer;
+  var i: Int32;
   var td: PTypeData;
   var tie: PTypeInfo;
 begin
-  for i := 0 to _TypeData^.PropCount - 1 do
+  for i := 0 to High(_PropList) - 1 do
   begin
     if _PropList[i]^.PropType^.Kind = tkClass then
     begin
@@ -8256,6 +9410,10 @@ begin
         PropArrayLength[i] := 0;
       end;
     end;
+  end;
+  for i := 0 to High(_FieldList) do
+  begin
+    FieldData[i].Free;
   end;
   inherited BeforeDestruction;
 end;
@@ -8355,7 +9513,7 @@ begin
                     if Assigned(Obj) then
                     begin
                       sh.WriteBool(True);
-                      TUSerializable(PropArrayClass[i, ai]).SerializeTo(Stream);
+                      TUSerializable(Obj).SerializeTo(Stream);
                     end
                     else
                     begin
@@ -8368,11 +9526,33 @@ begin
                   sh.WriteBool(False);
                 end;
               end
-              else sh.WriteBuffer(GetArrayData(i), al * pd^.elSize);
+              else sh.WriteBuffer(GetArrayPropData(i), al * pd^.elSize);
             end;
           end;
         end;
         else begin end;
+      end;
+      s := sh.Position - sp;
+      sh.PosPush;
+      sh.Position := sp;
+      sh.WriteInt32(s);
+      sh.PosPop;
+    end;
+    sh.WriteInt32(Length(_FieldList));
+    for i := 0 to High(_FieldList) do
+    begin
+      sh.WriteString(_FieldList[i].Field^.Name);
+      sp := sh.Position;
+      sh.WriteInt32(0);
+      Obj := FieldData[i];
+      if Assigned(Obj) and (Obj.InheritsFrom(TUSerializable)) then
+      begin
+        sh.WriteBool(True);
+        TUSerializable(Obj).SerializeTo(Stream);
+      end
+      else
+      begin
+        sh.WriteBool(False);
       end;
       s := sh.Position - sp;
       sh.PosPush;
@@ -8396,9 +9576,140 @@ begin
   end;
 end;
 
+procedure TUSerializable.SerializeTo(const Json: TUJson);
+  var JsonProps, JsonFields, JsonProp, JsonObj, JsonArr: TUJson;
+  var pd, pde: PTypeData;
+  var pi: PTypeInfo;
+  var Obj: TObject;
+  var i, al, ai: Int32;
+begin
+  if Length(_PropList) > 0 then
+  begin
+    JsonProps := Json.AddArray('Props');
+    for i := 0 to High(_PropList) do
+    begin
+      JsonProp := JsonProps.AddObject();
+      JsonProp.AddValue('Name', _PropList[i]^.Name);
+      JsonProp.AddValue('Type', _PropList[i]^.PropType^.Name);
+      pd := GetTypeData(_PropList[i]^.PropType);
+      case _PropList[i]^.PropType^.Kind of
+        tkEnumeration:
+        begin
+          JsonProp.AddValue('Value', FindEnumName(pd^.NameList, PropEnum[i]));
+        end;
+        tkBool:
+        begin
+          JsonProp.AddValue('Value', PropBool[i]);
+        end;
+        tkInteger, tkInt64, tkQWord:
+        begin
+          JsonProp.AddValue('Value', PropInt64[i]);
+        end;
+        tkFloat:
+        begin
+          JsonProp.AddValue('Value', Format('%0:0.4f', [PropFloat[i]]));
+        end;
+        tkAString:
+        begin
+          JsonProp.AddValue('Value', PropString[i]);
+        end;
+        tkClass:
+        begin
+          JsonObj := JsonProp.AddObject('Value');
+          Obj := PropClass[i];
+          if Assigned(Obj)
+          and (Obj is TUSerializable) then
+          begin
+            TUSerializable(Obj).SerializeTo(JsonObj);
+          end;
+        end;
+        tkDynArray:
+        begin
+          JsonArr := JsonProp.AddArray('Value');
+          pi := pd^.ElType;
+          if not Assigned(pi) then pi := pd^.ElType2;
+          JsonProp.AddValue('SubType', pi^.Name);
+          pde := GetTypeData(pi);
+          al := PropArrayLength[i];
+          if al > 0 then
+          begin
+            case pi^.Kind of
+              tkEnumeration:
+              begin
+                for ai := 0 to al - 1 do
+                begin
+                  JsonArr.AddValue(FindEnumName(pde^.NameList, PropArrayEnum[i, ai]));
+                end;
+              end;
+              tkBool:
+              begin
+                for ai := 0 to al - 1 do
+                begin
+                  JsonArr.AddValue(PropArrayBool[i, ai]);
+                end;
+              end;
+              tkInteger, tkInt64, tkQWord:
+              begin
+                for ai := 0 to al - 1 do
+                begin
+                  JsonArr.AddValue(PropArrayInt64[i, ai]);
+                end;
+              end;
+              tkFloat:
+              begin
+                for ai := 0 to al - 1 do
+                begin
+                  JsonArr.AddValue(Format('%0:0.4f', [PropArrayFloat[i, ai]]));
+                end;
+              end;
+              tkAString:
+              begin
+                for ai := 0 to al - 1 do
+                begin
+                  JsonArr.AddValue(PropArrayString[i, ai]);
+                end;
+              end;
+              tkClass:
+              begin
+                if pde^.ClassType.InheritsFrom(TUSerializable) then
+                begin
+                  for ai := 0 to al - 1 do
+                  begin
+                    JsonObj := JsonArr.AddObject();
+                    Obj := PropArrayClass[i, ai];
+                    if Assigned(Obj) then
+                    begin
+                      TUSerializable(Obj).SerializeTo(JsonObj);
+                    end;
+                  end;
+                end;
+              end;
+            end;
+          end;
+        end;
+        else begin end;
+      end;
+    end;
+  end;
+  if Length(_FieldList) > 0 then
+  begin
+    JsonFields := Json.AddArray('Fields');
+    for i := 0 to High(_FieldList) do
+    begin
+      Obj := FieldData[i];
+      if not Assigned(Obj) then Continue;
+      if not Obj.InheritsFrom(TUSerializable) then Continue;
+      JsonObj := JsonFields.AddObject();
+      JsonObj.AddValue('Name', _FieldList[i].Field^.Name);
+      JsonObj.AddValue('Type', _FieldList[i].ClassInfo^.ClassName);
+      TUSerializable(Obj).SerializeTo(JsonObj);
+    end;
+  end;
+end;
+
 procedure TUSerializable.SerializeFrom(const Stream: TStream);
   var sh: TUStreamHelper;
-  var i, n, s, j, al, aes, ai: Integer;
+  var i, n, s, j, al, aes, ai: Int32;
   var Name: String;
   var Kind, ArrKind: TTypeKind;
   var OrdType: TOrdType;
@@ -8514,7 +9825,7 @@ begin
                     end;
                   end;
                 end
-                else sh.ReadBuffer(GetArrayData(i), al * aes);
+                else sh.ReadBuffer(GetArrayPropData(i), al * aes);
               end;
             end;
             sh.PosDiscard;
@@ -8527,6 +9838,29 @@ begin
         end;
         else begin end;
       end;
+    end;
+    n := sh.ReadInt32;
+    for j := 0 to n - 1 do
+    begin
+      Name := sh.ReadString;
+      s := sh.ReadInt32;
+      i := FindField(Name);
+      if i = -1 then
+      begin
+        sh.Skip(s);
+        Continue;
+      end;
+      Obj := FieldData[i];
+      sh.PosPush;
+      if not sh.ReadBool
+      or not Obj.InheritsFrom(TUSerializable) then
+      begin
+        sh.PosPop;
+        sh.Skip(s);
+        Continue;
+      end;
+      sh.PosDiscard;
+      TUSerializable(Obj).SerializeFrom(Stream);
     end;
   finally
     sh.Free;
@@ -8544,8 +9878,132 @@ begin
   end;
 end;
 
+procedure TUSerializable.SerializeFrom(const Json: TUJson);
+  var JsonProps, JsonProp, JsonFields, JsonField, JsonArr: TUJson;
+  var pi: PTypeInfo;
+  var pd, pde: PTypeData;
+  var Obj: TOBject;
+  var i, p, al, ai: Int32;
+begin
+  JsonProps := Json['Props'];
+  if JsonProps.IsValid then
+  for i := 0 to JsonProps.Count - 1 do
+  begin
+    JsonProp := JsonProps[i];
+    p := FindProp(JsonProp['Name'].Value);
+    if p = -1 then Continue;
+    if _PropList[p]^.PropType^.Name <> JsonProp['Type'].Value then Continue;
+    pd := GetTypeData(_PropList[p]^.PropType);
+    case _PropList[p]^.PropType^.Kind of
+      tkEnumeration:
+      begin
+        SetPropEnumName(p, JsonProp['Value'].Value);
+      end;
+      tkBool:
+      begin
+        SetPropBool(p, JsonProp['Value'].ValueAsBool);
+      end;
+      tkInteger, tkInt64, tkQWord:
+      begin
+        SetPropInt64(p, StrToInt64Def(JsonProp['Value'].Value, 0));
+      end;
+      tkFloat:
+      begin
+        SetPropFloat(p, JsonProp['Value'].ValueAsFloat);
+      end;
+      tkAString:
+      begin
+        SetPropString(p, JsonProp['Value'].Value);
+      end;
+      tkClass:
+      begin
+        Obj := PropClass[p];
+        if Assigned(Obj)
+        and (Obj is TUSerializable) then
+        begin
+          TUSerializable(Obj).SerializeFrom(JsonProp['Value'].Value);
+        end;
+      end;
+      tkDynArray:
+      begin
+        JsonArr := JsonProp['Value'];
+        pi := pd^.ElType;
+        if not Assigned(pi) then pi := pd^.ElType2;
+        if JsonProp['SubType'].Value <> pi^.Name then Continue;
+        pde := GetTypeData(pi);
+        if (pi^.Kind = tkClass)
+        and not pde^.ClassType.InheritsFrom(TUSerializable) then
+        begin
+          Continue;
+        end;
+        PropArrayLength[i] := JsonArr.Count;
+        al := JsonArr.Count;
+        case pi^.Kind of
+          tkEnumeration:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              SetPropArrayEnum(p, ai, FindEnumIndex(pde^.NameList, JsonArr[ai].Value));
+            end;
+          end;
+          tkBool:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              SetPropArrayBool(p, ai, JsonArr[ai].ValueAsBool);
+            end;
+          end;
+          tkInteger, tkInt64, tkQWord:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              SetPropArrayInt64(p, ai, StrToInt64Def(JsonArr[ai].Value, 0));
+            end;
+          end;
+          tkFloat:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              SetPropArrayFloat(p, ai, JsonArr[ai].ValueAsFloat);
+            end;
+          end;
+          tkAString:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              SetPropArrayString(p, ai, JsonArr[ai].Value);
+            end;
+          end;
+          tkClass:
+          begin
+            for ai := 0 to al - 1 do
+            begin
+              Obj := GetPropArrayClass(p, ai);
+              TUSerializable(Obj).SerializeFrom(JsonArr[ai]);
+            end;
+          end;
+        end;
+      end;
+      else begin end;
+    end;
+  end;
+  JsonFields := Json['Fields'];
+  if JsonFields.IsValid then
+  for i := 0 to JsonFields.Count - 1 do
+  begin
+    JsonField := JsonFields[i];
+    p := FindField(JsonField['Name'].Value);
+    if p = -1 then Continue;
+    if _FieldList[p].ClassInfo^.ClassName <> JsonField['Type'].Value then Continue;
+    Obj := GetFieldData(p);
+    if not Assigned(Obj) then Continue;
+    if not Obj.InheritsFrom(TUSerializable) then Continue;
+    TUSerializable(Obj).SerializeFrom(JsonField);
+  end;
+end;
+
 procedure TUSerializable.Assign(const Serializable: TUSerializable);
-  var i, j, n, a: Integer;
+  var i, j, n, a: Int32;
   var pi, pj: PPropInfo;
   var tedj: PTypeData;
   var tei, tej: PTypeInfo;
@@ -8636,31 +10094,18 @@ begin
 end;
 
 procedure TUSerializable.Dump(const Offset: String);
-  var i, j: Integer;
+  var i, j: Int32;
   var td, tde: PTypeData;
   var tie: PTypeInfo;
   var ss: String;
   var Obj: TObject;
   var nl: Boolean;
-  function FindEnumName(const Names: ShortString; const Index: Integer): ShortString;
-    var i, j, n: Integer;
-  begin
-    i := 0;
-    j := 0;
-    while (i < Index) and (j < SizeOf(ShortString)) do
-    begin
-      n := Ord(Names[j]);
-      Inc(j, n + 1);
-      Inc(i);
-    end;
-    if j < SizeOf(ShortString) then Exit(PShortString(@Names[j])^);
-    Result := '';
-  end;
 begin
   if Length(Offset) = 0 then
   begin
-    WriteLn('RTTI Dump for ' + _TypeInfo^.Name);
+    WriteLn(Offset, 'RTTI Dump for ' + _TypeInfo^.Name);
   end;
+  WriteLn(Offset, 'Props: ', Length(_PropList));
   for i := 0 to High(_PropList) do
   begin
     nl := True;
@@ -8795,6 +10240,18 @@ begin
     end;
     if nl then WriteLn(Offset);
   end;
+  WriteLn(Offset, 'Fields: ', Length(_FieldList));
+  for i := 0 to High(_FieldList) do
+  begin
+    Write(Offset, _FieldList[i].Field^.Name, ': ');
+    WriteLn(_FieldList[i].ClassInfo^.ClassName);
+    Obj := FieldData[i];
+    if Assigned(Obj)
+    and Obj.InheritsFrom(TUSerializable) then
+    begin
+      TUSerializable(Obj).Dump(Offset + '  ');
+    end;
+  end;
 end;
 // TUSerializable end
 
@@ -8805,7 +10262,7 @@ begin
 end;
 
 class operator TUParserToken.in (a: TUParserToken; b: array of TUParserToken): Boolean;
-  var i: Integer;
+  var i: Int32;
 begin
   for i := 0 to High(b) do if a = b[i] then Exit(True);
   Result := False;
@@ -8817,7 +10274,7 @@ begin
 end;
 
 class operator TUParserToken.= (a: TUParserToken; b: array of String): Boolean;
-  var i: Integer;
+  var i: Int32;
 begin
   for i := 0 to High(b) do if a.Value = b[i] then Exit(True);
   Result := False;
@@ -9267,9 +10724,9 @@ begin
 end;
 
 function TUParser.NextToken(out TokenType: TUTokenType): String;
-  var IndArr: array[0..4 * 2 - 1] of Integer;
-  function FilterIndex(const Size: Integer): Boolean;
-    var i: Integer;
+  var IndArr: array[0..4 * 2 - 1] of Int32;
+  function FilterIndex(const Size: Int32): Boolean;
+    var i: Int32;
   begin
     for i := 0 to Length(IndArr) div 2 - 1 do
     if IndArr[i * 2 + 1] < Size then
@@ -9283,12 +10740,11 @@ function TUParser.NextToken(out TokenType: TUTokenType): String;
     end;
     Result := True;
   end;
-  var IndComment: Integer absolute IndArr[0 * 2];
-  var IndCommentLine: Integer absolute IndArr[1 * 2];
-  var IndString: Integer absolute IndArr[2 * 2];
-  var IndSymbol: Integer absolute IndArr[3 * 2];
+  var IndComment: Int32 absolute IndArr[0 * 2];
+  var IndCommentLine: Int32 absolute IndArr[1 * 2];
+  var IndString: Int32 absolute IndArr[2 * 2];
+  var IndSymbol: Int32 absolute IndArr[3 * 2];
   var i, j: Int32;
-  var b: Boolean;
 begin
   while True do
   begin
@@ -9318,7 +10774,7 @@ begin
       if FilterIndex(j) then
       begin
         IndCommentLine := i;
-        PIntegerArray(@IndCommentLine)^[1] := j;
+        PInt32Arr(@IndCommentLine)^[1] := j;
       end;
     end;
     i := IsAtString;
@@ -9328,7 +10784,7 @@ begin
       if FilterIndex(j) then
       begin
         IndString := i;
-        PIntegerArray(@IndString)^[1] := j;
+        PInt32Arr(@IndString)^[1] := j;
       end;
     end;
     i := IsAtSymbol;
@@ -9338,7 +10794,7 @@ begin
       if FilterIndex(j) then
       begin
         IndSymbol := i;
-        PIntegerArray(@IndSymbol)^[1] := j;
+        PInt32Arr(@IndSymbol)^[1] := j;
       end;
     end;
     //Comment
@@ -9392,25 +10848,17 @@ begin
       Inc(_Position, Length(_Syntax^.Symbols[i]));
       Exit;
     end;
-    b := True;
-    while b do
+    while True do
     begin
       Result := Result + _Text[_Position];
       Inc(_Position);
-      if _Position >= Length(_Text) then b := False;
-      if b and (
-        (_Text[_Position] = ' ')
-        or (_Text[_Position] = #$D)
-        or (_Text[_Position] = #$A)
-      ) then b := False;
-      if b then
-      begin
-        b := (
-          b and (IsAtSymbol = -1)
-          and (IsAtCommentStart = -1)
-          and (IsAtCommentLine = -1)
-        );
-      end;
+      if _Position >= Length(_Text) then Break;
+      if UIsCharTrimable(_Text[_Position]) then Break;
+      if not (
+        (IsAtSymbol = -1)
+        and (IsAtCommentStart = -1)
+        and (IsAtCommentLine = -1)
+      ) then Break;
     end;
     if Length(Result) > 0 then
     begin
@@ -9461,20 +10909,16 @@ end;
 procedure TUShortStringReader.Setup(const Str: ShortString);
 begin
   _Ptr := @Str[0];
+  _Pos := 0;
 end;
 
 function TUShortStringReader.ReadShortString: String;
 begin
   Result := '';
-  SetLength(Result, specialize Read<UInt8>());
+  SetLength(Result, _Ptr.ReadUInt8);
   UMove(Result[1], _Ptr^, Length(Result));
   Inc(_Ptr, Length(Result));
-end;
-
-generic function TUShortStringReader.Read<T>: T;
-begin
-  UMove(Result, _Ptr^, SizeOf(Result));
-  Inc(_Ptr, SizeOf(Result));
+  Inc(_Pos, Length(Result) + 1);
 end;
 // TUShortStringReader end
 
@@ -9543,10 +10987,13 @@ begin
   RemoveByIndex(i);
 end;
 
-procedure TUMap.RemoveByValue(const Value: TValue);
+procedure TUMap.RemoveByValue(
+  const Value: TValue;
+  const EqualFunc: TEqualValue
+);
   var i: Int32;
 begin
-  i := FindIndexByValue(Value);
+  i := FindIndexByValue(Value, EqualFunc);
   if i = -1 then Exit;
   RemoveByIndex(i);
 end;
@@ -9578,11 +11025,14 @@ begin
   Result := -1;
 end;
 
-function TUMap.FindIndexByValue(const Value: TValue): Int32;
+function TUMap.FindIndexByValue(
+  const Value: TValue;
+  const EqualFunc: TEqualValue
+): Int32;
   var i: Int32;
 begin
   for i := 0 to High(_Items) do
-  if _Items[i].Value = Value then Exit(i);
+  if EqualFunc(_Items[i].Value, Value) then Exit(i);
   Result := -1;
 end;
 
@@ -9611,99 +11061,233 @@ begin
 end;
 // TUMap end
 
-//TUArrayUtils begin
-class function TUArrayUtils.Add(var Arr: TArr; const Item: TItem): Int32;
+// TUArray begin
+function TUArray.TEnumerator.GetCurrent: T;
 begin
-  Result := Length(Arr);
-  SetLength(Arr, Result + 1);
-  Arr[Result] := Item;
+  Result := Data^[Index];
 end;
 
-class function TUArrayUtils.Append(var Arr: TArr; const Other: TArr): Int32;
+constructor TUArray.TEnumerator.Create(const ArrayData: PData);
+begin
+  Data := ArrayData;
+  Index := -1;
+end;
+
+function TUArray.TEnumerator.MoveNext: Boolean;
+begin
+  if Index >= High(Data^) then Exit(False);
+  Inc(Index);
+  Result := True;
+end;
+
+function TUArray.FixIndex(const Index: Int32): Int32;
+begin
+  if Index >= 0 then Exit(Index);
+  Result := Count - (Abs(Index) mod Count);
+end;
+
+function TUArray.GetItem(const Index: Int32): T;
   var i: Int32;
 begin
-  Result := Length(Arr);
-  if Length(Other) = 0 then Exit;
-  SetLength(Arr, Result + Length(Other));
-  for i := 0 to High(Other) do Arr[Result + i] := Other[i];
-  Result += Length(Other);
+  if not IsValidIndex(Index, @i) then Exit(Default(T));
+  Result := _Data[i];
 end;
 
-class procedure TUArrayUtils.Insert(
-  var Arr: TArr; const Item: TItem; const Position: Int32
-);
+procedure TUArray.SetItem(const Index: Int32; const Value: T);
+begin
+  if not IsValidIndex(Index) then Exit;
+  _Data[Index] := Value;
+end;
+
+function TUArray.GetPtr(const Index: Int32): TPtr;
+begin
+  if not IsValidIndex(Index) then Exit(nil);
+  Result := @_Data[Index];
+end;
+
+function TUArray.IsValidIndex(const Index: Int32; const FixedIndex: PInt32): Boolean;
+  var i: Int32;
+begin
+  i := FixIndex(Index);
+  Result := (i >= Low(_Data)) and (i <= High(_Data));
+  if Assigned(FixedIndex) then FixedIndex^ := i;
+end;
+
+function TUArray.IsEmpty: Boolean;
+begin
+  Result := Length(_Data) = 0;
+end;
+
+function TUArray.LastIndex: Int32;
+begin
+  Result := High(_Data);
+end;
+
+function TUArray.Count: Int32;
+begin
+  Result := Length(_Data);
+end;
+
+function TUArray.Contains(const Item: T): Boolean;
+begin
+  Result := Find(Item) > -1;
+end;
+
+function TUArray.Find(const Item: T): Int32;
+begin
+  Result := specialize UArrFind<T>(_Data, Item);
+end;
+
+function TUArray.Add(const Item: T): Int32;
+begin
+  Result := Length(_Data);
+  SetLength(_Data, Length(_Data) + 1);
+  _Data[Result] := Item;
+end;
+
+function TUArray.Add(const ItemArray: array of T): Int32;
+  var i: Int32;
+begin
+  if Length(ItemArray) = 0 then Exit(-1);
+  Result := Length(_Data);
+  SetLength(_Data, Length(_Data) + Length(ItemArray));
+  for i := 0 to High(ItemArray) do
+  begin
+    _Data[Result + i] := ItemArray[i];
+  end;
+end;
+
+function TUArray.AddUnique(const Item: T): Int32;
+  var i: Int32;
+begin
+  i := Find(Item);
+  if i > -1 then Exit(-1);
+  Result := Add(Item);
+end;
+
+function TUArray.Insert(const Item: T; const Index: Int32): Int32;
   var i, j: Int32;
 begin
-  SetLength(Arr, Length(Arr) + 1);
-  if Position < 0 then i := 0
-  else if Position > High(Arr) then i := High(Arr)
-  else i := Position;
-  for j := i to High(Arr) - 1 do
+  i := FixIndex(Index);
+  SetLength(_Data, Length(_Data) + 1);
+  if i > High(_Data) then i := High(_Data);
+  for j := High(_Data) downto i + 1 do
   begin
-    Arr[j + 1] := Arr[j];
+    _Data[j] := _Data[j - 1];
   end;
-  Arr[i] := Item;
+  _Data[i] := Item;
+  Result := i;
 end;
 
-class procedure TUArrayUtils.Delete(
-  var Arr: TArr; const DelStart: Int32; const DelCount: Int32
-);
-  var i, dc: Int32;
-begin
-  dc := DelCount;
-  if DelStart + dc > Length(Arr) then dc := Length(Arr) - DelStart;
-  if (dc < 1) or (DelStart < 0) then Exit;
-  for i := DelStart to High(Arr) - dc do
-  begin
-    Arr[i] := Arr[i + 1];
-  end;
-  SetLength(Arr, Length(Arr) - dc);
-end;
-
-class procedure TUArrayUtils.Remove(var Arr: TArr; const Item: TItem);
+function TUArray.Delete(const Index: Int32; const Num: Int32): Boolean;
   var i, j, n: Int32;
 begin
-  n := 0;
-  for i := High(Arr) downto 0 do
-  if Arr[i] = Item then
+  if not IsValidIndex(Index, @i) then Exit(False);
+  if Num < 1 then n := Count else n := UMin(Count - i, Num);
+  for j := i + n to High(_Data) do
   begin
-    for j := i to High(Arr) - 1 - n do
+    _Data[j - n] := _Data[j];
+  end;
+  SetLength(_Data, Length(_Data) - n);
+  Result := True;
+end;
+
+function TUArray.Remove(const Item: T): Boolean;
+  var i: Int32;
+begin
+  i := Find(Item);
+  if i < 0 then Exit(False);
+  Result := Delete(i);
+end;
+
+function TUArray.RemoveAll(const Item: T): Int32;
+  var i, j: Int32;
+begin
+  Result := 0;
+  for i := High(_Data) downto 0 do
+  begin
+    if _Data[i] <> Item then Continue;
+    for j := i + 1 to High(_Data) - Result do
     begin
-      Arr[j] := Arr[j + 1];
+      _Data[j - 1] := _Data[j];
     end;
-    Inc(n);
+    Inc(Result);
   end;
-  SetLength(Arr, Length(Arr) - n);
+  SetLength(_Data, Length(_Data) - Result);
 end;
 
-class function TUArrayUtils.Pop(var Arr: TArr): TItem;
+function TUArray.Pop: T;
 begin
-  if Length(Arr) = 0 then Exit(Default(T));
-  Result := Arr[High(Arr)];
-  SetLength(Arr, Length(Arr) - 1);
+  if IsEmpty then Exit(Default(T));
+  Result := _Data[High(_Data)];
+  SetLength(_Data, High(_Data));
 end;
 
-class function TUArrayUtils.Find(const Arr: TArr; const Item: TItem): Int32;
+function TUArray.Last: T;
+begin
+  if IsEmpty then Exit(Default(T));
+  Result := _Data[High(_Data)];
+end;
+
+procedure TUArray.Clear;
+begin
+  _Data := nil;
+end;
+
+procedure TUArray.Free;
+  type PObject = ^TObject;
   var i: Int32;
 begin
-  for i := 0 to High(Arr) do
+  for i := 0 to High(_Data) do
   begin
-    if Arr[i] = Item then Exit(i);
+    PObject(@_Data[i])^.Free;
   end;
-  Result := -1;
+  _Data := nil;
 end;
-//TUArrayUtils end
 
-//TUArrayObjUtils begin
-class procedure TUArrayObjUtils.Clear(var Arr: TArr);
-  var i: Int32;
+procedure TUArray.Reverse;
+  var i, h: Int32;
 begin
-  for i := High(Arr) downto 0 do FreeAndNil(Arr[i]);
-  Arr := nil;
+  h := High(_Data);
+  for i := 0 to (Length(_Data) shr 1) - 1 do
+  begin
+    specialize USwap<T>(_Data[i], _Data[h - i]);
+  end;
 end;
-//TUArrayObjUtils end
 
-//TULinkedList begin
+function TUArray.GetEnumerator: TEnumerator;
+begin
+  Result := TEnumerator.Create(@_Data);
+end;
+// TUArray end
+
+// TULinkedList begin
+function TULinkedList.TEnumerator.GetCurrent: T;
+begin
+  Result := _Current.Data;
+end;
+
+constructor TULinkedList.TEnumerator.Create(const List: TItem);
+begin
+  _Current := nil;
+  _List := List;
+end;
+
+function TULinkedList.TEnumerator.MoveNext: Boolean;
+begin
+  if not Assigned(_List) then Exit(False);
+  if Assigned(_Current) then
+  begin
+    if not Assigned(_Current.Next) then Exit(False);
+    _Current := _Current.Next;
+  end
+  else
+  begin
+    _Current := _List;
+  end;
+  Result := True;
+end;
+
 function TULinkedList.GetIsEmpty: Boolean;
 begin
   Result := _List = nil;
@@ -9802,6 +11386,11 @@ begin
   end;
 end;
 
+function TULinkedList.GetEnumerator: TEnumerator;
+begin
+  Result := TEnumerator.Create(_List);
+end;
+
 class operator TULinkedList.Initialize(var v: TSelf);
 begin
   v.Initialize;
@@ -9812,6 +11401,1257 @@ begin
   v.Finalize;
 end;
 // TULinkedList end
+
+// TUQueue begin
+function TUQueue.TEnumerator.GetCurrent: T;
+begin
+  Result := _Current.Data;
+end;
+
+constructor TUQueue.TEnumerator.Create(const List: TItem);
+begin
+  _Current := nil;
+  _List := List;
+end;
+
+function TUQueue.TEnumerator.MoveNext: Boolean;
+begin
+  if not Assigned(_List) then Exit(False);
+  if Assigned(_Current) then
+  begin
+    if not Assigned(_Current.Next) then Exit(False);
+    _Current := _Current.Next;
+  end
+  else
+  begin
+    _Current := _List;
+  end;
+  Result := True;
+end;
+
+procedure TUQueue.SetCached(const Value: Boolean);
+begin
+  if _Cached = Value then Exit;
+  _Cached := Value;
+  if not _Cached then ClearCache;
+end;
+
+procedure TUQueue.ClearCache;
+  var Temp: TItem;
+begin
+  while Assigned(_Cache) do
+  begin
+    Temp := _Cache;
+    _Cache := _Cache.Next;
+    FreeAndNil(Temp);
+  end;
+end;
+
+procedure TUQueue.FreeItem(var Item: TItem);
+begin
+  if _Cached then
+  begin
+    Item.Next := _Cache;
+    _Cache := Item;
+  end
+  else
+  begin
+    Item.Free;
+  end;
+  Item := nil;
+end;
+
+procedure TUQueue.Initialize;
+begin
+  _First := nil;
+  _Last := nil;
+  _Cache := nil;
+  _Cached := False;
+end;
+
+procedure TUQueue.Finalize;
+begin
+  if _Cached then ClearCache;
+  Clear;
+end;
+
+procedure TUQueue.Enqueue(const Data: T);
+  var Item: TItem;
+begin
+  if Assigned(_Cache) then
+  begin
+    Item := _Cache;
+    _Cache := _Cache.Next;
+  end
+  else
+  begin
+    Item := TItem.Create;
+  end;
+  Item.Next := nil;
+  Item.Data := Data;
+  if not Assigned(_Last) then
+  begin
+    _First := Item;
+    _Last := Item;
+  end
+  else
+  begin
+    _Last.Next := Item;
+    _Last := Item;
+  end;
+  Inc(_Count);
+end;
+
+function TUQueue.Dequeue: T;
+  var Temp: TItem;
+begin
+  if IsEmpty then Exit(Default(T));
+  Result := _First.Data;
+  Temp := _First;
+  _First := Temp.Next;
+  FreeItem(Temp);
+  Dec(_Count);
+  if Assigned(_First) then Exit;
+  _Last := nil;
+end;
+
+function TUQueue.DequeueAll: TDataArray;
+  var i: UInt32;
+  var Temp: TItem;
+begin
+  Result := nil;
+  if IsEmpty then Exit;
+  SetLength(Result, _Count);
+  i := 0;
+  while Assigned(_First) do
+  begin
+    Temp := _First;
+    _First := _First.Next;
+    Result[i] := Temp.Data;
+    FreeItem(Temp);
+    Inc(i);
+  end;
+  _Last := nil;
+  _Count := 0;
+end;
+
+procedure TUQueue.Clear;
+  var Temp: TItem;
+begin
+  while Assigned(_First) do
+  begin
+    Temp := _First;
+    _First := _First.Next;
+    FreeAndNil(Temp);
+  end;
+  _Last := nil;
+  _Count := 0;
+end;
+
+function TUQueue.IsEmpty: Boolean;
+begin
+  Result := not Assigned(_First);
+end;
+
+function TUQueue.GetEnumerator: TEnumerator;
+begin
+  Result := TEnumerator.Create(_First);
+end;
+
+class operator TUQueue.Initialize(var v: TSelf);
+begin
+  v.Initialize;
+end;
+
+class operator TUQueue.Finalize(var v: TSelf);
+begin
+  v.Finalize;
+end;
+// TUQueue end
+
+// TUFastList begin
+function TUFastList.TEnumerator.GetCurrent: T;
+begin
+  Result := _Current^;
+end;
+
+constructor TUFastList.TEnumerator.Create(
+  const AItem: TPtr;
+  const Count: Int32
+);
+begin
+  if Assigned(AItem) then
+  begin
+    _Current := AItem - 1;
+    _End := _Current + Count;
+  end
+  else
+  begin
+    _Current := nil;
+    _End := nil;
+  end;
+end;
+
+function TUFastList.TEnumerator.MoveNext: Boolean;
+begin
+  if _Current >= _End then Exit(False);
+  Inc(_Current);
+  Result := True;
+end;
+
+function TUFastList.GetLastIndex: Int32;
+begin
+  Result := _Count - 1;
+end;
+
+function TUFastList.GetData(const Index: Int32): T;
+begin
+  Result := _Data[_Ind[Index].Data];
+end;
+
+procedure TUFastList.SetData(const Index: Int32; const Value: T);
+begin
+  _Data[_Ind[Index].Data] := Value;
+end;
+
+function TUFastList.GetId(const Index: Int32): Int32;
+begin
+  Result := _Ind[Index].Id;
+end;
+
+procedure TUFastList.Initialize;
+begin
+  _Count := 0;
+  _Slack := 31;
+  _OnItemDelete := nil;
+end;
+
+procedure TUFastList.Finalize;
+begin
+  Clear;
+end;
+
+function TUFastList.IsEmpty: Boolean;
+begin
+  Result := _Count = 0;
+end;
+
+function TUFastList.Contains(const Index: Int32): Boolean;
+begin
+  if Index < 0 then Exit(False);
+  if Index > High(_Ind) then Exit(False);
+  if _Ind[Index].Data > LastIndex then Exit(False);
+  Result := True;
+end;
+
+procedure TUFastList.Reserve(const ItemCount: UInt32);
+  var i, n: Int32;
+begin
+  if Length(_Data) >= ItemCount then Exit;
+  SetLength(_Data, ItemCount + _Slack);
+  if Length(_Ind) >= ItemCount then Exit;
+  n := Length(_Ind);
+  SetLength(_Ind, ItemCount + _Slack);
+  for i := n to High(_Ind) do
+  begin
+    _Ind[i].Id := i;
+  end;
+end;
+
+procedure TUFastList.Shrink;
+begin
+  if _Count >= Length(_Data) then Exit;
+  SetLength(_Data, _Count);
+  if _Count > 0 then Exit;
+  _Ind := nil;
+end;
+
+function TUFastList.Add(const Item: T): Int32;
+begin
+  Reserve(_Count + 1);
+  Result := _Ind[_Count].Id;
+  _Ind[Result].Data := _Count;
+  _Data[_Count] := Item;
+  Inc(_Count);
+end;
+
+procedure TUFastList.Delete(const Index: Int32);
+  var DataInd, LastInd: Int32;
+begin
+  DataInd := _Ind[Index].Data;
+  if Assigned(_OnItemDelete) then
+  begin
+    _OnItemDelete(_Data[DataInd]);
+  end;
+  LastInd := LastIndex;
+  if DataInd <> LastInd then
+  begin
+    _Data[DataInd] := _Data[LastInd];
+    USwap(_Ind[DataInd].Id, _Ind[LastInd].Id);
+    _Ind[_Ind[DataInd].Id].Data := DataInd;
+    _Ind[_Ind[LastIndex].Id].Data := LastInd;
+  end;
+  Dec(_Count);
+end;
+
+procedure TUFastList.Clear;
+  var i: Int32;
+begin
+  if Assigned(_OnItemDelete) then
+  for i := 0 to _Count - 1 do
+  begin
+    _OnItemDelete(_Data[i]);
+  end;
+  _Count := 0;
+end;
+
+function TUFastList.GetEnumerator: TEnumerator;
+begin
+  if Length(_Data) > 0 then
+  begin
+    Result := TEnumerator.Create(@_Data[0], _Count);
+  end
+  else
+  begin
+    Result := TEnumerator.Create(nil, 0);
+  end;
+end;
+
+class operator TUFastList.Initialize(var v: TSelf);
+begin
+  v.Initialize;
+end;
+
+class operator TUFastList.Finalize(var v: TSelf);
+begin
+  v.Finalize;
+end;
+// TUFastList end
+
+// TUStack begin
+procedure TUStack.Initialize;
+begin
+  _ItemIndex := -1;
+end;
+
+procedure TUStack.Finalize;
+begin
+end;
+
+procedure TUStack.Push(const Item: T);
+begin
+  Inc(_ItemIndex);
+  if _ItemIndex > High(_Items) then
+  begin
+    SetLength(_Items, Length(_Items) + 1);
+  end;
+  _Items[_ItemIndex] := Item;
+end;
+
+function TUStack.Pop: T;
+begin
+  if IsEmpty then Exit(Default(T));
+  Result := _Items[_ItemIndex];
+  Dec(_ItemIndex);
+end;
+
+function TUStack.IsEmpty: Boolean;
+begin
+  Result := _ItemIndex < 0;
+end;
+
+function TUStack.Count: Int32;
+begin
+  Result := _ItemIndex + 1;
+end;
+
+class operator TUStack.Initialize(var v: TSelf);
+begin
+  v.Initialize;
+end;
+
+class operator TUStack.Finalize(var v: TSelf);
+begin
+  v.Finalize;
+end;
+// TUStack end
+
+// TUHeap begin
+function TUHeap.PredicateMin(const a, b: T): Boolean;
+begin
+  Result := a < b;
+end;
+
+function TUHeap.PredicateMax(const a, b: T): Boolean;
+begin
+  Result := a > b;
+end;
+
+function TUHeap.ParentIdx(const Idx: Int32): Int32;
+begin
+  Result := (Idx - 1) shr 1;
+end;
+
+function TUHeap.LeftIdx(const Idx: Int32): Int32;
+begin
+  Result := 2 * Idx + 1;
+end;
+
+function TUHeap.RightIdx(const Idx: Int32): Int32;
+begin
+  Result := 2 * Idx + 2;
+end;
+
+procedure TUHeap.SiftUp(const Idx: Int32);
+  var i, p: Int32;
+begin
+  i := Idx;
+  while i > 0 do
+  begin
+    p := ParentIdx(i);
+    if not _Pred(_Data[i], _Data[p]) then Break;
+    USwap(_Data.Data[i], _Data.Data[p]);
+    i := p;
+  end;
+end;
+
+procedure TUHeap.SiftDown(const Idx: Int32);
+  var Heap, i, l, r: Int32;
+begin
+  i := Idx;
+  while True do
+  begin
+    Heap := i;
+    l := LeftIdx(i);
+    r := RightIdx(i);
+    if (l < _Data.Count) and (_Pred(_Data[l], _Data[Heap])) then Heap := l;
+    if (r < _Data.Count) and (_Pred(_Data[r], _Data[Heap])) then Heap := r;
+    if Heap = i then Break;
+    USwap(_Data.Data[i], _Data.Data[Heap]);
+    i := Heap;
+  end;
+end;
+
+procedure TUHeap.Initialize;
+begin
+  _Pred := @PredicateMin;
+  _MaxHeap := False;
+end;
+
+procedure TUHeap.Finalize;
+begin
+end;
+
+procedure TUHeap.SetMaxHeap(const Value: Boolean);
+begin
+  if Value = _MaxHeap then Exit;
+  _MaxHeap := Value;
+  if _MaxHeap then
+  begin
+    _Pred := @PredicateMax;
+  end
+  else
+  begin
+    _Pred := @PredicateMin;
+  end;
+  if _Data.Count <= 1 then Exit;
+  Reorder;
+end;
+
+function TUHeap.IsEmpty: Boolean;
+begin
+  Result := _Data.IsEmpty;
+end;
+
+procedure TUHeap.Push(const Value: T);
+begin
+  SiftUp(_Data.Add(Value));
+end;
+
+procedure TUHeap.Push(const Values: array of T);
+  var i: Int32;
+begin
+  for i := 0 to High(Values) do
+  begin
+    SiftUp(_Data.Add(Values[i]));
+  end;
+end;
+
+function TUHeap.Pop: T;
+  var Temp: T;
+begin
+  if _Data.IsEmpty then Exit(Default(T));
+  Result := _Data[0];
+  Temp := _Data.Pop;
+  if IsEmpty then Exit;
+  _Data.Data[0] := Temp;
+  SiftDown(0);
+end;
+
+function TUHeap.Peek: T;
+begin
+  if _Data.IsEmpty then Exit(Default(T));
+  Result := _Data[0];
+end;
+
+function TUHeap.Count: Int32;
+begin
+  Result := _Data.Count;
+end;
+
+procedure TUHeap.Reorder;
+  var Arr: array of T;
+  var i: Int32;
+begin
+  Arr := nil;
+  SetLength(Arr, _Data.Count);
+  for i := 0 to High(Arr) do
+  begin
+    Arr[i] := _Data.Data[i];
+  end;
+  _Data.Clear;
+  Push(Arr);
+end;
+
+class operator TUHeap.Initialize(var v: TSelf);
+begin
+  v.Initialize;
+end;
+
+class operator TUHeap.Finalize(var v: TSelf);
+begin
+  v.Finalize;
+end;
+// TUHeap end
+
+// TURadixTree begin
+constructor TURadixTree.TNode.Create(const ARadix: String; const AIndex: Int32);
+begin
+  inherited Create;
+  Radix := ARadix;
+  Index := AIndex;
+end;
+
+destructor TURadixTree.TNode.Destroy;
+begin
+  Subset.Free;
+  inherited Destroy;
+end;
+
+operator > (const a, b: TURadixTree.TNode): Boolean;
+begin
+  Result := a.Radix > b.Radix;
+end;
+
+procedure TURadixTree.Initialize;
+begin
+  _Sorted := True;
+end;
+
+procedure TURadixTree.Finalize;
+begin
+  _Root.Free;
+end;
+
+procedure TURadixTree.Add(const Key: String; const Index: Int32);
+  var Radix: String;
+  function InsertNode(const Node: TNode; const Ref: PNode): Boolean;
+    var i, n: Int32;
+    var n0, n1: TNode;
+  begin
+    Result := Node.Radix[1] = Radix[1];
+    if not Result then Exit;
+    n := UMin(Length(Radix), Length(Node.Radix));
+    for i := 2 to n do
+    if Radix[i] <> Node.Radix[i] then
+    begin
+      n0 := TNode.Create(UStrSubStr(Radix, 1, i - 1), -1);
+      n0.Subset.Add(Node);
+      Ref^ := n0;
+      Node.Radix := UStrSubStr(Node.Radix, i, Length(Node.Radix) - i + 1);
+      n1 := TNode.Create(UStrSubStr(Radix, i, Length(Radix) - i + 1), Index);
+      n0.Subset.Add(n1);
+      Exit;
+    end;
+    if Length(Radix) = Length(Node.Radix) then
+    begin
+      Node.Index := Index;
+    end
+    else if Length(Radix) < Length(Node.Radix) then
+    begin
+      n0 := TNode.Create(Radix, Index);
+      n0.Subset.Add(Node);
+      Ref^ := n0;
+      Node.Radix := UStrSubStr(Node.Radix, Length(Radix) + 1, Length(Node.Radix) - Length(Radix));
+    end
+    else if Length(Radix) > Length(Node.Radix) then
+    begin
+      Radix := UStrSubStr(Radix, Length(Node.Radix) + 1, Length(Radix) - Length(Node.Radix));
+      for i := 0 to Node.Subset.LastIndex do
+      if InsertNode(Node.Subset.Data[i], Node.Subset[i]) then
+      begin
+        Exit;
+      end;
+      n0 := TNode.Create(Radix, Index);
+      Node.Subset.Add(n0);
+    end;
+  end;
+  var i: Int32;
+begin
+  if Length(Key) = 0 then Exit;
+  _Sorted := False;
+  Radix := Key;
+  for i := 0 to _Root.LastIndex do
+  if InsertNode(_Root.Data[i], _Root[i]) then
+  begin
+    Exit;
+  end;
+  _Root.Add(TNode.Create(Key, Index));
+end;
+
+function TURadixTree.Find(const Key: String): Int32;
+  var Offset: Int32;
+  function SearchSubset(constref Arr: TNodeArray): TNode;
+    var l, h, m, r, n: Int32;
+    var Node: TNode;
+  begin
+    l := 0;
+    h := Arr.LastIndex;
+    while (l <= h) do
+    begin
+      m := (l + h) shr 1;
+      Node := Arr.Data[m];
+      r := Ord(Node.Radix[1]) - Ord(Key[Offset]);
+      if (r < 0) then
+      begin
+	l := m + 1;
+      end
+      else if r > 0 then
+      begin
+	h := m - 1;
+      end
+      else
+      begin
+	n := 2;
+        Inc(Offset);
+	while (
+	  (n <= Length(Node.Radix))
+	  and (Offset <= Length(Key))
+	  and (Arr.Data[m].Radix[n] = Key[Offset])
+	) do
+        begin
+	  Inc(n);
+	  Inc(Offset);
+        end;
+	if (n = Length(Node.Radix) + 1) then
+        begin
+          if Offset > Length(Key) then
+          begin
+            Exit(Node)
+          end
+          else
+          begin
+            Exit(SearchSubset(Node.Subset));
+          end;
+        end;
+        Exit(nil);
+      end;
+    end;
+    Result := nil;
+  end;
+  var Node: TNode;
+begin
+  if Length(Key) = 0 then Exit(-1);
+  if _Root.IsEmpty then Exit(-1);
+  if not _Sorted then Sort;
+  Offset := 1;
+  Node := SearchSubset(_Root);
+  if Node = nil then Exit(-1);
+  if Offset = Length(Key) + 1 then Exit(Node.Index);
+  Result := -1;
+end;
+
+procedure TURadixTree.Sort;
+  procedure SortArr(var Arr: TNodeArray);
+    var i: Int32;
+  begin
+    specialize USort<TNode>(Arr);
+    for i := 0 to Arr.LastIndex do
+    begin
+      SortArr(Arr.Data[i].Subset);
+    end;
+  end;
+begin
+  _Sorted := True;
+  if _Root.IsEmpty then Exit;
+  SortArr(_Root);
+end;
+
+procedure TURadixTree.Dump;
+  procedure DumpNode(const Node: TNode; const Depth: String = '');
+    var i: Int32;
+    var NewDepth: String;
+  begin
+    Write(Depth, '"', Node.Radix, '"', ':');
+    if Node.Index > -1 then WriteLn(' ', Node.Index) else WriteLn;
+    NewDepth := Depth;
+    if Length(NewDepth) > 0 then
+    begin
+      NewDepth[Length(NewDepth)] := ' ';
+    end;
+    for i := 0 to Node.Subset.LastIndex do
+    begin
+      DumpNode(Node.Subset.Data[i], NewDepth + '|_');
+    end;
+  end;
+  var i: Int32;
+begin
+  for i := 0 to _Root.LastIndex do
+  begin
+    DumpNode(_Root.Data[i]);
+  end;
+end;
+
+class operator TURadixTree.Initialize(var v: TURadixTree);
+begin
+  v.Initialize;
+end;
+
+class operator TURadixTree.Finalize(var v: TURadixTree);
+begin
+  v.Finalize;
+end;
+// TURadixTree end
+
+// TUAtlasQuick begin
+procedure TUAtlasQuick.Setup(const AWidth, AHeight: UInt32);
+begin
+  FreeRects := nil;
+  UArrAppend(FreeRects, [0, 0, AWidth, AHeight]);
+end;
+
+function TUAtlasQuick.Allocate(
+  const Width, Height: UInt32;
+  out Placement: TUBounds2i
+): Boolean;
+  var BestRectIndex: Int32;
+  var MinArea, Area: TUFloat;
+  var FreeRect: TURect;
+  var RemWidth, RemHeight: UInt32;
+  var i: Int32;
+begin
+  BestRectIndex := -1;
+  MinArea := UMaxValueFloat;
+  for i := 0 to High(FreeRects) do
+  begin
+    if (FreeRects[i].w >= Width)
+    and (FreeRects[i].h >= Height) then
+    begin
+      Area := FreeRects[i].w * FreeRects[i].h;
+      if (Area < MinArea) then
+      begin
+        MinArea := Area;
+        BestRectIndex := i;
+      end;
+    end;
+  end;
+  if (BestRectIndex = -1) then Exit(False);
+  FreeRect := FreeRects[BestRectIndex];
+  UArrDelete(FreeRects, BestRectIndex);
+  RemWidth := FreeRect.w - Width;
+  RemHeight := FreeRect.h - Height;
+  if (RemWidth > RemHeight) then
+  begin
+    UArrAppend(FreeRects, [FreeRect.x + Width, FreeRect.y, RemWidth, FreeRect.h]);
+    UArrAppend(FreeRects, [FreeRect.x, FreeRect.y + Height, Width, RemHeight]);
+  end
+  else
+  begin
+    UArrAppend(FreeRects, [FreeRect.x, FreeRect.y + Height, FreeRect.w, RemHeight]);
+    UArrAppend(FreeRects, [FreeRect.x + Width, FreeRect.y, RemWidth, Height]);
+  end;
+  Placement := [[FreeRect.x, FreeRect.y], [FreeRect.x + Width, FreeRect.y + Height]];
+  Result := True;
+end;
+// TUAtlasQuick end
+
+// TUAtlasPacked begin
+class function TUAtlasPacked.Fits(
+  const rw, rh: Int32; const fr: TURect;
+  const h: THeuristic;
+  out Score1, Score2: Int32
+): Boolean;
+  var LeftoverX, LeftoverY: Int32;
+begin
+  if (rw > fr.w) or (rh > fr.h) then Exit(False);
+  LeftoverX := fr.w - rw;
+  LeftoverY := fr.h - rh;
+  case h of
+    ph_short_side_fit:
+    begin
+      Score1 := UMin(LeftoverX, LeftoverY);
+      Score2 := UMax(LeftoverX, LeftoverY);
+    end;
+    ph_long_side_fit:
+    begin
+      Score1 := UMax(LeftoverX, LeftoverY);
+      Score2 := UMin(LeftoverX, LeftoverY);
+    end;
+    ph_area_fit:
+    begin
+      Score1 := fr.w * fr.h - rw * rh;
+      Score2 := UMin(LeftoverX, LeftoverY);
+    end;
+    ph_bottom_left:
+    begin
+      Score1 := fr.y + rh;
+      Score2 := fr.x;
+    end;
+  end;
+  Result := True;
+end;
+
+procedure TUAtlasPacked.SplitAndPrune(const Placed: TURect);
+  var Next: specialize TArray<TURect>;
+  var NextCount: Int32;
+  procedure AddNext(const r: TURect);
+  begin
+    if NextCount >= Length(Next) then
+    begin
+      SetLength(Next, Length(Next) * 2);
+    end;
+    Next[NextCount] := r;
+    Inc(NextCount);
+  end;
+  var fr: TURect;
+begin
+  SetLength(Next, Length(FreeRects) * 2);
+  NextCount := 0;
+  for fr in FreeRects do
+  begin
+    if not Overlaps(fr, Placed) then
+    begin
+      AddNext(fr);
+      Continue;
+    end;
+    if Placed.x > fr.x then
+    begin
+      AddNext([fr.x, fr.y, placed.x - fr.x, fr.h]);
+    end;
+    if Placed.x + Placed.w < fr.x + fr.w then
+    begin
+      AddNext([
+        placed.x + placed.w, fr.y,
+        fr.x + fr.w - (Placed.x + Placed.w), fr.h
+      ]);
+    end;
+    if Placed.y > fr.y then
+    begin
+      AddNext([fr.x, fr.y, fr.w, Placed.y - fr.y]);
+    end;
+    if Placed.y + Placed.h < fr.y + fr.h then
+    begin
+      AddNext([
+        fr.x, Placed.y + Placed.h,
+        fr.w, fr.y + fr.h - (Placed.y + Placed.h)
+      ]);
+    end;
+  end;
+  RemoveContained(Next);
+  if NextCount <> Length(Next) then SetLength(Next, NextCount);
+  FreeRects := Next;
+end;
+
+class procedure TUAtlasPacked.RemoveContained(var Rects: TRectArray);
+  var i, j: Int32;
+begin
+  i := 0;
+  while i < High(Rects) do
+  begin
+    j := i + 1;
+    while j < Length(Rects) do
+    begin
+      if Rects[j].Contains(Rects[i]) then
+      begin
+        Rects[i] := Rects[High(Rects)];
+        SetLength(Rects, Length(Rects) - 1);
+        Dec(i);
+        Break;
+      end;
+      if Rects[i].Contains(Rects[j]) then
+      begin
+        Rects[j] := Rects[High(Rects)];
+        SetLength(Rects, Length(Rects) - 1);
+      end
+      else
+      begin
+        Inc(j);
+      end;
+    end;
+    Inc(i);
+  end;
+end;
+
+class function TUAtlasPacked.Overlaps(const a, b: TURect): Boolean;
+begin
+  Result := (
+    (a.x < b.x + b.w) and
+    (a.x + a.w > b.x) and
+    (a.y < b.y + b.h) and
+    (a.y + a.h > b.y)
+  );
+end;
+
+procedure TUAtlasPacked.Setup(const AWidth, AHeight: UInt32);
+begin
+  FreeRects := nil;
+  UArrAppend(FreeRects, [[0, 0, AWidth, AHeight]]);
+end;
+
+function TUAtlasPacked.Allocate(
+  const Width, Height: UInt32;
+  out Placement: TUBounds2i;
+  const Heuristic: THeuristic;
+  const Rotated: PBoolean
+): Boolean;
+  var BestScore1, BestScore2, BestFreeIdx: Int32;
+  var BestRotated: Boolean;
+  var i, s1, s2, pw, ph: Int32;
+  var fr, Chosen: TURect;
+begin
+  BestScore1 := UMaxValueInt32;
+  BestScore2 := UMaxValueInt32;
+  BestFreeIdx := -1;
+  BestRotated := False;
+  for i := 0 to High(FreeRects) do
+  begin
+    fr := FreeRects[i];
+    s1 := 0;
+    s2 := 0;
+    if (Fits(Width, Height, fr, Heuristic, s1, s2)) then
+    begin
+      if (s1 < BestScore1) or ((s1 = BestScore1) and (s2 < BestScore2)) then
+      begin
+        BestScore1 := s1;
+        BestScore2 := s2;
+        BestFreeIdx := i;
+        BestRotated := False;
+      end;
+    end;
+    if not Assigned(Rotated) then Continue;
+    if Width <> Height  then
+    begin
+      if (Fits(Height, Width, fr, Heuristic, s1, s2)) then
+      begin
+        if (s1 < BestScore1) or ((s1 = BestScore1) and (s2 < BestScore2)) then
+        begin
+          BestScore1 := s1;
+          BestScore2 := s2;
+          BestFreeIdx := i;
+          BestRotated := True;
+        end;
+      end;
+    end;
+  end;
+  if (BestFreeIdx = -1) then Exit(False);
+  if BestRotated then
+  begin
+    pw := Height;
+    ph := Width;
+  end
+  else
+  begin
+    pw := Width;
+    ph := Height;
+  end;
+  if Assigned(Rotated) then Rotated^ := BestRotated;
+  fr := FreeRects[BestFreeIdx];
+  Chosen := [fr.x, fr.y, pw, ph];
+  SplitAndPrune(Chosen);
+  Placement := [[Chosen.x, Chosen.y], [Chosen.r, Chosen.b]];
+  Result := True;
+end;
+// TUAtlasPacked end
+
+// TUGuid begin
+class function TUGuid.Make: TUGuid;
+  var RandomBytes: TUInt8Array;
+begin
+  RandomBytes := USysRandom(SizeOf(Result));
+  Move(RandomBytes[0], Result, SizeOf(Result));
+  Result.Data3 := (Result.Data3 and $0fff) or ($4000);
+  Result.Data4[0] := (Result.Data4[0] and $3f) or $80;
+end;
+
+class function TUGuid.Make(const GuidString: String): TUGuid;
+  function HexNum(const c: AnsiChar): UInt8;
+  begin
+    if c in ['a'..'f'] then Exit(10 + Ord(c) - Ord('a'));
+    if c in ['A'..'F'] then Exit(10 + Ord(c) - Ord('A'));
+    if c in ['0'..'9'] then Exit(Ord(c) - Ord('0'));
+    Result := 0;
+  end;
+  var p: Int32;
+  var i: Int32;
+  var c0, c1: AnsiChar;
+  var Remap: array[0..15] of UInt8 absolute Result;
+begin
+  if Length(GuidString) < 36 then Exit(Invalid);
+  Result := Zero;
+  p := 1;
+  if GuidString[p] = '{' then
+  begin
+    p += 2;
+    if Length(GuidString) < 38 then Exit(Invalid);
+    if GuidString[38] <> '}' then Exit(Invalid);
+  end;
+  for i := 0 to High(Remap) do
+  begin
+    if p + 1 > Length(GuidString) then Exit(Invalid);
+    if GuidString[p] = '-' then Inc(p);
+    c0 := GuidString[p]; Inc(p);
+    c1 := GuidString[p]; Inc(p);
+    if not (c0 in ['a'..'f', 'A'..'F', '0'..'9']) then Exit(Invalid);
+    if not (c1 in ['a'..'f', 'A'..'F', '0'..'9']) then Exit(Invalid);
+    Remap[i] := (HexNum(c0) shl 4) or HexNum(c1);
+  end;
+{$if defined(endian_little)}
+  Result.Data1 := UEndianSwap(Result.Data1);
+  Result.Data2 := UEndianSwap(Result.Data2);
+  Result.Data3 := UEndianSwap(Result.Data3);
+{$endif}
+end;
+
+class function TUGuid.Make(const Bytes: TUInt8Array): TUGuid;
+begin
+  if Length(Bytes) < SizeOf(Result) then Exit(Invalid);
+  UInit(Result, Bytes[0], SizeOf(Result));
+end;
+
+class function TUGuid.Zero: TUGuid;
+begin
+  UClear(Result, SizeOf(Result));
+end;
+
+class function TUGuid.Invalid: TUGuid;
+begin
+  FillChar(Result, SizeOf(Result), $ff);
+end;
+
+function TUGuid.IsValid: Boolean;
+  var i: Int32;
+  var Bytes: array[0..3] of UInt32 absolute Self;
+begin
+  for i := 0 to High(Bytes) do
+  begin
+    if Bytes[i] <> $ffffffff then Exit(True);
+  end;
+  Result := False;
+end;
+
+function TUGuid.ToString: String;
+begin
+  Result := Format(
+    '%.8X-%.4X-%.4X-%.2X%.2X-%.2X%.2X%.2X%.2X%.2X%.2X',
+    [
+      Data1, Data2, Data3, Data4[0], Data4[1],
+      Data4[2], Data4[3], Data4[4], Data4[5], Data4[6], Data4[7]
+    ]
+  );
+end;
+
+function TUGuid.ToStringLC: String;
+begin
+  Result := LowerCase(ToString);
+end;
+
+function TUGuid.ToBytes: TUInt8Array;
+begin
+  Result := TUInt8Array.Make(@Self, SizeOf(Self));
+end;
+// TUGuid end
+
+// TUDelegate begin
+procedure TUDelegate.Initialize;
+begin
+  _Proc := nil;
+end;
+
+procedure TUDelegate.Finalize;
+begin
+end;
+
+procedure TUDelegate.Add(const Proc: TUProcedureObj);
+begin
+  specialize UArrAppend<TUProcedureObj>(_Proc, Proc);
+end;
+
+procedure TUDelegate.Add(const Proc: TUProcedure);
+  type TDblPtr = array[0..1] of Pointer;
+  var DblPtr: TDblPtr;
+begin
+  DblPtr[0] := Proc;
+  DblPtr[1] := nil;
+  Add(TUProcedureObj(DblPtr));
+end;
+
+procedure TUDelegate.Remove(const Proc: TUProcedureObj);
+begin
+  specialize UArrRemove<TUProcedureObj>(_Proc, Proc);
+end;
+
+procedure TUDelegate.Remove(const Proc: TUProcedure);
+  type TDblPtr = array[0..1] of Pointer;
+  var DblPtr: TDblPtr;
+begin
+  DblPtr[0] := Proc;
+  DblPtr[1] := nil;
+  Remove(TUProcedureObj(DblPtr));
+end;
+
+procedure TUDelegate.Broadcast(Args: array of const);
+  var i: Int32;
+begin
+  for i := 0 to High(_Proc) do
+  begin
+    _Proc[i](Args);
+  end;
+end;
+
+class operator TUDelegate.Initialize(var v: TSelf);
+begin
+  v.Initialize;
+end;
+
+class operator TUDelegate.Finalize(var v: TSelf);
+begin
+  v.Finalize;
+end;
+// TUDelegate end
+
+// TUPtrHelper begin
+procedure TUPtrHelper.Read(out Output; const Size: UInt32);
+begin
+  UMove(Output, Self^, Size);
+  Inc(Self, Size);
+end;
+
+procedure TUPtrHelper.Write(const Data; const Size: UInt32);
+begin
+  UMove(Self^, Data, Size);
+  Inc(Self, Size);
+end;
+
+function TUPtrHelper.ReadBool: Boolean;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadUInt8: UInt8;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadUInt16: UInt16;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadUInt32: UInt32;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadUInt64: UInt64;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadInt8: Int8;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadInt16: Int16;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadInt32: Int32;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadInt64: Int64;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadFloat: Single;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+function TUPtrHelper.ReadDouble: Double;
+begin
+  Read(Result, SizeOf(Result));
+end;
+
+procedure TUPtrHelper.WriteBool(const Value: Boolean);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteUInt8(const Value: UInt8);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteUInt16(const Value: UInt16);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteUInt32(const Value: UInt32);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteUInt64(const Value: UInt64);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteInt8(const Value: Int8);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteInt16(const Value: Int16);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteInt32(const Value: Int32);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteInt64(const Value: Int64);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteFloat(const Value: Single);
+begin
+  Write(Value, SizeOf(Value));
+end;
+
+procedure TUPtrHelper.WriteDouble(const Value: Double);
+begin
+  Write(Value, SizeOf(Value));
+end;
+// TUPtrHelper end
 
 // TUXML begin
 function TUXML.TEnumerator.GetCurrent: TUXML;
@@ -9922,7 +12762,7 @@ begin
 end;
 
 function TUXML.WriteXML(const Offset: String): String;
-  var i: Integer;
+  var i: Int32;
 begin
   if IsPlainText then
   begin
@@ -9948,7 +12788,7 @@ begin
 end;
 
 function TUXML.GetContent: String;
-  var i: Integer;
+  var i: Int32;
 begin
   Result := _Content;
   for i := 0 to High(_Children) do
@@ -9958,7 +12798,7 @@ begin
   end;
 end;
 
-function TUXML.GetAttribute(const Index: Integer): TAttribute;
+function TUXML.GetAttribute(const Index: Int32): TAttribute;
 begin
   Result := _Attributes[Index];
 end;
@@ -9971,17 +12811,17 @@ begin
   Result := a.Value;
 end;
 
-function TUXML.GetAttributeCount: Integer;
+function TUXML.GetAttributeCount: Int32;
 begin
   Result := Length(_Attributes);
 end;
 
-function TUXML.GetChild(const Index: Integer): TUXML;
+function TUXML.GetChild(const Index: Int32): TUXML;
 begin
   Result := _Children[Index];
 end;
 
-function TUXML.GetChildCount: Integer;
+function TUXML.GetChildCount: Int32;
 begin
   Result := Length(_Children);
 end;
@@ -10048,7 +12888,7 @@ begin
 end;
 
 function TUXML.FindAttribute(const AttName: String): TAttribute;
-  var i: Integer;
+  var i: Int32;
 begin
   for i := 0 to High(_Attributes) do
   if _Attributes[i].Name = AttName then
@@ -10059,7 +12899,7 @@ begin
 end;
 
 function TUXML.FindChild(const NodeName: String): TUXML;
-  var i: Integer;
+  var i: Int32;
 begin
   for i := 0 to High(_Children) do
   if _Children[i].Name = NodeName then
@@ -10702,9 +13542,29 @@ begin
   {$pop}
 end;
 
+function UMemCompare(const MemA, MemB: Pointer; const Size: UInt32): Int8;
+  var MemArrA: PUInt8Arr absolute MemA;
+  var MemArrB: PUInt8Arr absolute MemB;
+  var i: UInt32;
+begin
+  if Size = 0 then Exit(0);
+  for i := 0 to Size - 1 do
+  begin
+    if MemArrA^[i] < MemArrB^[i] then Exit(-1);
+    if MemArrA^[i] > MemArrB^[i] then Exit(1);
+  end;
+  Result := 0;
+end;
+
 function UIntToPtr(const i: PtrUInt): Pointer;
 begin
   Result := nil; Result += i;
+end;
+
+function UPtrToInt(const p: Pointer): PtrUInt;
+  var n: PtrUInt absolute p;
+begin
+  Result := n;
 end;
 
 function UCopyVarRec(constref src: TVarRec): TVarRec;
@@ -10769,7 +13629,7 @@ begin
 end;
 
 function UCopyVarRecArr(constref src: array of TVarRec): TUVarRecArray;
-  var i: Integer;
+  var i: Int32;
 begin
   Result := nil;
   SetLength(Result, Length(src));
@@ -10810,7 +13670,7 @@ end;
 
 procedure UFinalizeVarRecArr(var arr: array of TVarRec);
 var
-  i: Integer;
+  i: Int32;
 begin
   for i := Low(arr) to High(arr) do
   begin
@@ -10818,12 +13678,12 @@ begin
   end;
 end;
 
-function UIntToBool(const i: Integer): Boolean;
+function UIntToBool(const i: Int32): Boolean;
 begin
   Result := i <> 0;
 end;
 
-function UBoolToInt(const b: Boolean): Integer;
+function UBoolToInt(const b: Boolean): Int32;
 begin
   if b then Exit(1) else Exit(0);
 end;
@@ -11784,105 +14644,109 @@ begin
   specialize USwap<TUMat>(a, b);
 end;
 
+function UIsInRange(const Value: Int32; const RangeMin, RangeMax: Int32): Boolean;
+begin
+  Result := (Value >= RangeMin) and (Value <= RangeMax);
+end;
+
 function UMaxValue(out v: TUInt8): TUInt8;
 begin
-  Result := $ff;
+  Result := UMaxValueUInt8;
 end;
 
 function UMaxValue(out v: TUInt16): TUInt16;
 begin
-  Result := $ffff;
+  Result := UMaxValueUInt16;
 end;
 
 function UMaxValue(out v: TUInt32): TUInt32;
 begin
-  Result := $ffffffff;
+  Result := UMaxValueUInt32;
 end;
 
 function UMaxValue(out v: TUInt64): TUInt64;
 begin
-  // $ffffffffffffffff; still does not work on all platforms)=
-  Result := $7fffffffffffffff;
+  Result := UMaxValueUInt64;
 end;
 
 function UMaxValue(out v: TInt8): TInt8;
 begin
-  Result := $7f;
+  Result := UMaxValueInt8;
 end;
 
 function UMaxValue(out v: TInt16): TInt16;
 begin
-  Result := $7fff;
+  Result := UMaxValueInt16;
 end;
 
 function UMaxValue(out v: TInt32): TInt32;
 begin
-  Result := $7fffffff;
+  Result := UMaxValueInt32;
 end;
 
 function UMaxValue(out v: TInt64): TInt64;
 begin
-  Result := $7fffffffffffffff;
+  Result := UMaxValueInt64;
 end;
 
 function UMaxValue(out v: TUFloat): TUFloat;
 begin
-  Result := 3.4E38;
+  Result := UMaxValueFloat;
 end;
 
 function UMaxValue(out v: TUDouble): TUDouble;
 begin
-  Result := 1.7E308;
+  Result := UMaxValueDouble;
 end;
 
 function UMinValue(out v: TUInt8): TUInt8;
 begin
-  Result := 0;
+  Result := UMinValueUInt8;
 end;
 
 function UMinValue(out v: TUInt16): TUInt16;
 begin
-  Result := 0;
+  Result := UMinValueUInt16;
 end;
 
 function UMinValue(out v: TUInt32): TUInt32;
 begin
-  Result := 0;
+  Result := UMinValueUInt32;
 end;
 
 function UMinValue(out v: TUInt64): TUInt64;
 begin
-  Result := 0;
+  Result := UMinValueUInt64;
 end;
 
 function UMinValue(out v: TInt8): TInt8;
 begin
-  Result := -$80;
+  Result := UMinValueInt8;
 end;
 
 function UMinValue(out v: TInt16): TInt16;
 begin
-  Result := -$8000;
+  Result := UMinValueInt16;
 end;
 
 function UMinValue(out v: TInt32): TInt32;
 begin
-  Result := -$80000000;
+  Result := UMinValueInt32;
 end;
 
 function UMinValue(out v: TInt64): TInt64;
 begin
-  Result := -$8000000000000000;
+  Result := UMinValueInt64;
 end;
 
 function UMinValue(out v: TUFloat): TUFloat;
 begin
-  Result := 1.5E-45;
+  Result := UMinValueFloat;
 end;
 
 function UMinValue(out v: TUDouble): TUDouble;
 begin
-  Result := 5.0E-324;
+  Result := UMinValueDouble;
 end;
 
 generic function UEnumToStr<T>(const Enum: T): String;
@@ -11893,13 +14757,14 @@ begin
 end;
 
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
-  var i: Integer;
+  var i: Int32;
   var ti, eti: PTypeInfo;
   var td, etd: PTypeData;
+  var Num: UInt32 absolute EnumSet;
 begin
   ti := PTypeInfo(TypeInfo(EnumSet));
   case ti^.Kind of
-    tkEnumeration: Result := GetEnumName(ti, UInt32(EnumSet));
+    tkEnumeration: Result := GetEnumName(ti, Num);
     tkSet:
     begin
       td := GetTypeData(ti);
@@ -11909,7 +14774,7 @@ begin
       Result := '[';
       for i := etd^.MinValue to etd^.MaxValue do
       begin
-        if ((1 shl (i - etd^.MinValue)) and UInt32(EnumSet)) > 0 then
+        if ((1 shl (i - etd^.MinValue)) and Num) > 0 then
         begin
           if Length(Result) > 1 then Result += ', ';
           Result += GetEnumName(eti, i);
@@ -12147,6 +15012,62 @@ begin
   end;
 end;
 
+generic function URoL<T>(const Value: T; const Bits: T): T;
+  var b: UInt8;
+  const s: UInt8 = SizeOf(T) * 8;
+begin
+  b := UInt8(Bits mod s);
+  Result := (Value shl b) or (Value shr (s - b));
+end;
+
+function URoL(const Value: UInt8; const Bits: UInt8): UInt8;
+begin
+  Result := specialize URoL<UInt8>(Value, Bits);
+end;
+
+function URoL(const Value: UInt16; const Bits: UInt16): UInt16;
+begin
+  Result := specialize URoL<UInt16>(Value, Bits);
+end;
+
+function URoL(const Value: UInt32; const Bits: UInt32): UInt32;
+begin
+  Result := specialize URoL<UInt32>(Value, Bits);
+end;
+
+function URoL(const Value: UInt64; const Bits: UInt64): UInt64;
+begin
+  Result := specialize URoL<UInt64>(Value, Bits);
+end;
+
+generic function URoR<T>(const Value: T; const Bits: T): T;
+  var b: UInt8;
+  const s: UInt8 = SizeOf(T) * 8;
+begin
+  b := UInt8(Bits mod s);
+  Result := (Value shl (s - b)) or (Value shr b);
+end;
+
+function URoR(const Value: UInt8; const Bits: UInt8): UInt8;
+begin
+  Result := specialize URoR<UInt8>(Value, Bits);
+end;
+
+function URoR(const Value: UInt16; const Bits: UInt16): UInt16;
+begin
+  Result := specialize URoR<UInt16>(Value, Bits);
+end;
+
+function URoR(const Value: UInt32; const Bits: UInt32): UInt32;
+begin
+  Result := specialize URoR<UInt32>(Value, Bits);
+end;
+
+function URoR(const Value: UInt64; const Bits: UInt64): UInt64;
+begin
+  Result := specialize URoR<UInt64>(Value, Bits);
+end;
+
 function URandomPi: TUFloat;
 begin
   Result := Random * Pi;
@@ -12230,124 +15151,344 @@ begin
 end;
 {$endif}
 
+procedure AddMat_Pas(out mr: TUMat; constref m0, m1: TUMat);
+begin
+  mr[0, 0] := m0[0, 0] + m1[0, 0];
+  mr[1, 0] := m0[1, 0] + m1[1, 0];
+  mr[2, 0] := m0[2, 0] + m1[2, 0];
+  mr[3, 0] := m0[3, 0] + m1[3, 0];
+  mr[0, 1] := m0[0, 1] + m1[0, 1];
+  mr[1, 1] := m0[1, 1] + m1[1, 1];
+  mr[2, 1] := m0[2, 1] + m1[2, 1];
+  mr[3, 1] := m0[3, 1] + m1[3, 1];
+  mr[0, 2] := m0[0, 2] + m1[0, 2];
+  mr[1, 2] := m0[1, 2] + m1[1, 2];
+  mr[2, 2] := m0[2, 2] + m1[2, 2];
+  mr[3, 2] := m0[3, 2] + m1[3, 2];
+  mr[0, 3] := m0[0, 3] + m1[0, 3];
+  mr[1, 3] := m0[1, 3] + m1[1, 3];
+  mr[2, 3] := m0[2, 3] + m1[2, 3];
+  mr[3, 3] := m0[3, 3] + m1[3, 3];
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure AddMat_SSE(out mr: TUMat; constref m0, m1: TUMat); assembler; nostackframe;
+asm
+  movaps xmm0, dqword ptr [m0]
+  movaps xmm1, dqword ptr [m1]
+  addps xmm0, xmm1
+  movaps [mr], xmm0
+  movaps xmm0, dqword ptr [m0 + 10h]
+  movaps xmm1, dqword ptr [m1 + 10h]
+  addps xmm0, xmm1
+  movaps [mr + 10h], xmm0
+  movaps xmm0, dqword ptr [m0 + 20h]
+  movaps xmm1, dqword ptr [m1 + 20h]
+  addps xmm0, xmm1
+  movaps [mr + 20h], xmm0
+  movaps xmm0, dqword ptr [m0 + 30h]
+  movaps xmm1, dqword ptr [m1 + 30h]
+  addps xmm0, xmm1
+  movaps [mr + 30h], xmm0
+end;
+{$endif}
+
+var AddMat: procedure (out mr: TUMat; constref m0, m1: TUMat) = @AddMat_Pas;
+
 function UAddMat(const m0, m1: TUMat): TUMat;
 begin
-  Result[0, 0] := m0[0, 0] + m1[0, 0];
-  Result[1, 0] := m0[1, 0] + m1[1, 0];
-  Result[2, 0] := m0[2, 0] + m1[2, 0];
-  Result[3, 0] := m0[3, 0] + m1[3, 0];
-  Result[0, 1] := m0[0, 1] + m1[0, 1];
-  Result[1, 1] := m0[1, 1] + m1[1, 1];
-  Result[2, 1] := m0[2, 1] + m1[2, 1];
-  Result[3, 1] := m0[3, 1] + m1[3, 1];
-  Result[0, 2] := m0[0, 2] + m1[0, 2];
-  Result[1, 2] := m0[1, 2] + m1[1, 2];
-  Result[2, 2] := m0[2, 2] + m1[2, 2];
-  Result[3, 2] := m0[3, 2] + m1[3, 2];
-  Result[0, 3] := m0[0, 3] + m1[0, 3];
-  Result[1, 3] := m0[1, 3] + m1[1, 3];
-  Result[2, 3] := m0[2, 3] + m1[2, 3];
-  Result[3, 3] := m0[3, 3] + m1[3, 3];
+  AddMat(Result, m0, m1);
 end;
+
+procedure AddMatFloat_Pas(out mr: TUMat; constref m0: TUMat; const s: TUFloat);
+begin
+  mr[0, 0] := m0[0, 0] + s;
+  mr[1, 0] := m0[1, 0] + s;
+  mr[2, 0] := m0[2, 0] + s;
+  mr[3, 0] := m0[3, 0] + s;
+  mr[0, 1] := m0[0, 1] + s;
+  mr[1, 1] := m0[1, 1] + s;
+  mr[2, 1] := m0[2, 1] + s;
+  mr[3, 1] := m0[3, 1] + s;
+  mr[0, 2] := m0[0, 2] + s;
+  mr[1, 2] := m0[1, 2] + s;
+  mr[2, 2] := m0[2, 2] + s;
+  mr[3, 2] := m0[3, 2] + s;
+  mr[0, 3] := m0[0, 3] + s;
+  mr[1, 3] := m0[1, 3] + s;
+  mr[2, 3] := m0[2, 3] + s;
+  mr[3, 3] := m0[3, 3] + s;
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure AddMatFloat_SSE(out mr: TUMat; constref m0: TUMat; const s: TUFloat); assembler; nostackframe;
+asm
+  movss xmm0, [s]
+  shufps xmm0, xmm0, 0
+  movaps xmm1, [m0 + 0h]
+  addps xmm1, xmm0
+  movaps [mr + 0h], xmm1
+  movaps xmm1, [m0 + 10h]
+  addps xmm1, xmm0
+  movaps [mr + 10h], xmm1
+  movaps xmm1, [m0 + 20h]
+  addps xmm1, xmm0
+  movaps [mr + 20h], xmm1
+  movaps xmm1, [m0 + 30h]
+  addps xmm1, xmm0
+  movaps [mr + 30h], xmm1
+end;
+{$endif}
+
+var AddMatFloat: procedure (out mr: TUMat; constref m0: TUMat; const s: TUFloat) = @AddMatFloat_Pas;
 
 function UAddMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 begin
-  Result[0, 0] := m[0, 0] + s;
-  Result[1, 0] := m[1, 0] + s;
-  Result[2, 0] := m[2, 0] + s;
-  Result[3, 0] := m[3, 0] + s;
-  Result[0, 1] := m[0, 1] + s;
-  Result[1, 1] := m[1, 1] + s;
-  Result[2, 1] := m[2, 1] + s;
-  Result[3, 1] := m[3, 1] + s;
-  Result[0, 2] := m[0, 2] + s;
-  Result[1, 2] := m[1, 2] + s;
-  Result[2, 2] := m[2, 2] + s;
-  Result[3, 2] := m[3, 2] + s;
-  Result[0, 3] := m[0, 3] + s;
-  Result[1, 3] := m[1, 3] + s;
-  Result[2, 3] := m[2, 3] + s;
-  Result[3, 3] := m[3, 3] + s;
+  AddMatFloat(Result, m, s);
 end;
+
+procedure SubMat_Pas(out mr: TUMat; constref m0, m1: TUMat);
+begin
+  mr[0, 0] := m0[0, 0] - m1[0, 0];
+  mr[1, 0] := m0[1, 0] - m1[1, 0];
+  mr[2, 0] := m0[2, 0] - m1[2, 0];
+  mr[3, 0] := m0[3, 0] - m1[3, 0];
+  mr[0, 1] := m0[0, 1] - m1[0, 1];
+  mr[1, 1] := m0[1, 1] - m1[1, 1];
+  mr[2, 1] := m0[2, 1] - m1[2, 1];
+  mr[3, 1] := m0[3, 1] - m1[3, 1];
+  mr[0, 2] := m0[0, 2] - m1[0, 2];
+  mr[1, 2] := m0[1, 2] - m1[1, 2];
+  mr[2, 2] := m0[2, 2] - m1[2, 2];
+  mr[3, 2] := m0[3, 2] - m1[3, 2];
+  mr[0, 3] := m0[0, 3] - m1[0, 3];
+  mr[1, 3] := m0[1, 3] - m1[1, 3];
+  mr[2, 3] := m0[2, 3] - m1[2, 3];
+  mr[3, 3] := m0[3, 3] - m1[3, 3];
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure SubMat_SSE(out mr: TUMat; constref m0, m1: TUMat); assembler; nostackframe;
+asm
+  movaps xmm0, [m0 + 0h]
+  movaps xmm1, [m1 + 0h]
+  addps xmm0, xmm1
+  movaps [mr + 0h], xmm0
+  movaps xmm0, [m0 + 10h]
+  movaps xmm1, [m1 + 10h]
+  addps xmm0, xmm1
+  movaps [mr + 10h], xmm0
+  movaps xmm0, [m0 + 20h]
+  movaps xmm1, [m1 + 20h]
+  addps xmm0, xmm1
+  movaps [mr + 20h], xmm0
+  movaps xmm0, [m0 + 30h]
+  movaps xmm1, [m1 + 30h]
+  addps xmm0, xmm1
+  movaps [mr + 30h], xmm0
+end;
+{$endif}
+
+var SubMat: procedure (out mr: TUMat; constref m0, m1: TUMat) = @SubMat_Pas;
 
 function USubMat(const m0, m1: TUMat): TUMat;
 begin
-  Result[0, 0] := m0[0, 0] - m1[0, 0];
-  Result[1, 0] := m0[1, 0] - m1[1, 0];
-  Result[2, 0] := m0[2, 0] - m1[2, 0];
-  Result[3, 0] := m0[3, 0] - m1[3, 0];
-  Result[0, 1] := m0[0, 1] - m1[0, 1];
-  Result[1, 1] := m0[1, 1] - m1[1, 1];
-  Result[2, 1] := m0[2, 1] - m1[2, 1];
-  Result[3, 1] := m0[3, 1] - m1[3, 1];
-  Result[0, 2] := m0[0, 2] - m1[0, 2];
-  Result[1, 2] := m0[1, 2] - m1[1, 2];
-  Result[2, 2] := m0[2, 2] - m1[2, 2];
-  Result[3, 2] := m0[3, 2] - m1[3, 2];
-  Result[0, 3] := m0[0, 3] - m1[0, 3];
-  Result[1, 3] := m0[1, 3] - m1[1, 3];
-  Result[2, 3] := m0[2, 3] - m1[2, 3];
-  Result[3, 3] := m0[3, 3] - m1[3, 3];
+  SubMat(Result, m0, m1);
 end;
+
+procedure SubMatFloat_Pas(out mr: TUMat; constref m0: TUMat; const s: TUFloat);
+begin
+  mr[0, 0] := m0[0, 0] - s;
+  mr[1, 0] := m0[1, 0] - s;
+  mr[2, 0] := m0[2, 0] - s;
+  mr[3, 0] := m0[3, 0] - s;
+  mr[0, 1] := m0[0, 1] - s;
+  mr[1, 1] := m0[1, 1] - s;
+  mr[2, 1] := m0[2, 1] - s;
+  mr[3, 1] := m0[3, 1] - s;
+  mr[0, 2] := m0[0, 2] - s;
+  mr[1, 2] := m0[1, 2] - s;
+  mr[2, 2] := m0[2, 2] - s;
+  mr[3, 2] := m0[3, 2] - s;
+  mr[0, 3] := m0[0, 3] - s;
+  mr[1, 3] := m0[1, 3] - s;
+  mr[2, 3] := m0[2, 3] - s;
+  mr[3, 3] := m0[3, 3] - s;
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure SubMatFloat_SSE(out mr: TUMat; constref m0: TUMat; const s: TUFloat); assembler; nostackframe;
+asm
+  movss xmm0, [s]
+  shufps xmm0, xmm0, 0
+  movaps xmm1, [m0 + 0h]
+  addps xmm1, xmm0
+  movaps [mr + 0h], xmm1
+  movaps xmm1, [m0 + 10h]
+  addps xmm1, xmm0
+  movaps [mr + 10h], xmm1
+  movaps xmm1, [m0 + 20h]
+  addps xmm1, xmm0
+  movaps [mr + 20h], xmm1
+  movaps xmm1, [m0 + 30h]
+  addps xmm1, xmm0
+  movaps [mr + 30h], xmm1
+end;
+{$endif}
+
+var SubMatFloat: procedure (out mr: TUMat; constref m0: TUMat; const s: TUFloat) = @SubMatFloat_Pas;
 
 function USubMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 begin
-  Result[0, 0] := m[0, 0] - s;
-  Result[1, 0] := m[1, 0] - s;
-  Result[2, 0] := m[2, 0] - s;
-  Result[3, 0] := m[3, 0] - s;
-  Result[0, 1] := m[0, 1] - s;
-  Result[1, 1] := m[1, 1] - s;
-  Result[2, 1] := m[2, 1] - s;
-  Result[3, 1] := m[3, 1] - s;
-  Result[0, 2] := m[0, 2] - s;
-  Result[1, 2] := m[1, 2] - s;
-  Result[2, 2] := m[2, 2] - s;
-  Result[3, 2] := m[3, 2] - s;
-  Result[0, 3] := m[0, 3] - s;
-  Result[1, 3] := m[1, 3] - s;
-  Result[2, 3] := m[2, 3] - s;
-  Result[3, 3] := m[3, 3] - s;
+  SubMatFloat(Result, m, s);
 end;
+
+procedure MulMat_Pas(out mr: TUMat; constref m0, m1: TUMat);
+begin
+  mr[0, 0] := m0[0, 0] * m1[0, 0] + m0[0, 1] * m1[1, 0] + m0[0, 2] * m1[2, 0] + m0[0, 3] * m1[3, 0];
+  mr[1, 0] := m0[1, 0] * m1[0, 0] + m0[1, 1] * m1[1, 0] + m0[1, 2] * m1[2, 0] + m0[1, 3] * m1[3, 0];
+  mr[2, 0] := m0[2, 0] * m1[0, 0] + m0[2, 1] * m1[1, 0] + m0[2, 2] * m1[2, 0] + m0[2, 3] * m1[3, 0];
+  mr[3, 0] := m0[3, 0] * m1[0, 0] + m0[3, 1] * m1[1, 0] + m0[3, 2] * m1[2, 0] + m0[3, 3] * m1[3, 0];
+  mr[0, 1] := m0[0, 0] * m1[0, 1] + m0[0, 1] * m1[1, 1] + m0[0, 2] * m1[2, 1] + m0[0, 3] * m1[3, 1];
+  mr[1, 1] := m0[1, 0] * m1[0, 1] + m0[1, 1] * m1[1, 1] + m0[1, 2] * m1[2, 1] + m0[1, 3] * m1[3, 1];
+  mr[2, 1] := m0[2, 0] * m1[0, 1] + m0[2, 1] * m1[1, 1] + m0[2, 2] * m1[2, 1] + m0[2, 3] * m1[3, 1];
+  mr[3, 1] := m0[3, 0] * m1[0, 1] + m0[3, 1] * m1[1, 1] + m0[3, 2] * m1[2, 1] + m0[3, 3] * m1[3, 1];
+  mr[0, 2] := m0[0, 0] * m1[0, 2] + m0[0, 1] * m1[1, 2] + m0[0, 2] * m1[2, 2] + m0[0, 3] * m1[3, 2];
+  mr[1, 2] := m0[1, 0] * m1[0, 2] + m0[1, 1] * m1[1, 2] + m0[1, 2] * m1[2, 2] + m0[1, 3] * m1[3, 2];
+  mr[2, 2] := m0[2, 0] * m1[0, 2] + m0[2, 1] * m1[1, 2] + m0[2, 2] * m1[2, 2] + m0[2, 3] * m1[3, 2];
+  mr[3, 2] := m0[3, 0] * m1[0, 2] + m0[3, 1] * m1[1, 2] + m0[3, 2] * m1[2, 2] + m0[3, 3] * m1[3, 2];
+  mr[0, 3] := m0[0, 0] * m1[0, 3] + m0[0, 1] * m1[1, 3] + m0[0, 2] * m1[2, 3] + m0[0, 3] * m1[3, 3];
+  mr[1, 3] := m0[1, 0] * m1[0, 3] + m0[1, 1] * m1[1, 3] + m0[1, 2] * m1[2, 3] + m0[1, 3] * m1[3, 3];
+  mr[2, 3] := m0[2, 0] * m1[0, 3] + m0[2, 1] * m1[1, 3] + m0[2, 2] * m1[2, 3] + m0[2, 3] * m1[3, 3];
+  mr[3, 3] := m0[3, 0] * m1[0, 3] + m0[3, 1] * m1[1, 3] + m0[3, 2] * m1[2, 3] + m0[3, 3] * m1[3, 3];
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulMat_SSE(out mr: TUMat; constref m0, m1: TUMat); assembler; nostackframe;
+asm
+  movss xmm0, dword ptr [m0]
+  movaps xmm4, [m1]
+  shufps xmm0, xmm0, 0
+  mulps xmm0, xmm4
+  movss xmm1, dword ptr [m0 + 4]
+  movaps xmm5, [m1 + 10h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm5
+  addps xmm0, xmm1
+  movss xmm1, dword ptr [m0 + 8]
+  movaps xmm6, [m1 + 20h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm6
+  addps xmm0, xmm1
+  movss xmm1, dword ptr [m0 + 0Ch]
+  movaps xmm7, [m1 + 30h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm7
+  addps xmm0, xmm1
+  movss xmm1, dword ptr [m0 + 10h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm4
+  movss xmm2, dword ptr [m0 + 14h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm5
+  addps xmm1, xmm2
+  movss xmm2, dword ptr [m0 + 18h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm6
+  addps xmm1, xmm2
+  movss xmm2, dword ptr [m0 + 1Ch]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm7
+  addps xmm1, xmm2
+  movss xmm2, dword ptr [m0 + 20h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm4
+  movss xmm3, dword ptr [m0 + 24h]
+  shufps xmm3, xmm3, 0
+  mulps xmm3, xmm5
+  addps xmm2, xmm3
+  movss xmm3, dword ptr [m0 + 28h]
+  shufps xmm3, xmm3, 0
+  mulps xmm3, xmm6
+  addps xmm2, xmm3
+  movss xmm3, dword ptr [m0 + 2Ch]
+  shufps xmm3, xmm3, 0
+  mulps xmm3, xmm7
+  addps xmm2, xmm3
+  movss xmm3, dword ptr [m0 + 30h]
+  movaps [mr], xmm0
+  shufps xmm3, xmm3, 0
+  mulps xmm3, xmm4
+  movss xmm4, dword ptr [m0 + 34h]
+  movaps [mr + 10h], xmm1
+  shufps xmm4, xmm4, 0
+  mulps xmm4, xmm5
+  addps xmm3, xmm4
+  movss xmm4, dword ptr [m0 + 38h]
+  movaps [mr + 20h], xmm2
+  shufps xmm4, xmm4, 0
+  mulps xmm4, xmm6
+  addps xmm3, xmm4
+  movss xmm4, dword ptr [m0 + 3Ch]
+  shufps xmm4, xmm4, 0
+  mulps xmm4, xmm7
+  addps xmm3, xmm4
+  movaps [mr + 30h], xmm3
+end;
+{$endif}
+
+var MulMat: procedure (out mr: TUMat; constref m0, m1: TUMat) = @MulMat_Pas;
 
 function UMulMat(const m0, m1: TUMat): TUMat;
 begin
-  Result[0, 0] := m0[0, 0] * m1[0, 0] + m0[0, 1] * m1[1, 0] + m0[0, 2] * m1[2, 0] + m0[0, 3] * m1[3, 0];
-  Result[1, 0] := m0[1, 0] * m1[0, 0] + m0[1, 1] * m1[1, 0] + m0[1, 2] * m1[2, 0] + m0[1, 3] * m1[3, 0];
-  Result[2, 0] := m0[2, 0] * m1[0, 0] + m0[2, 1] * m1[1, 0] + m0[2, 2] * m1[2, 0] + m0[2, 3] * m1[3, 0];
-  Result[3, 0] := m0[3, 0] * m1[0, 0] + m0[3, 1] * m1[1, 0] + m0[3, 2] * m1[2, 0] + m0[3, 3] * m1[3, 0];
-  Result[0, 1] := m0[0, 0] * m1[0, 1] + m0[0, 1] * m1[1, 1] + m0[0, 2] * m1[2, 1] + m0[0, 3] * m1[3, 1];
-  Result[1, 1] := m0[1, 0] * m1[0, 1] + m0[1, 1] * m1[1, 1] + m0[1, 2] * m1[2, 1] + m0[1, 3] * m1[3, 1];
-  Result[2, 1] := m0[2, 0] * m1[0, 1] + m0[2, 1] * m1[1, 1] + m0[2, 2] * m1[2, 1] + m0[2, 3] * m1[3, 1];
-  Result[3, 1] := m0[3, 0] * m1[0, 1] + m0[3, 1] * m1[1, 1] + m0[3, 2] * m1[2, 1] + m0[3, 3] * m1[3, 1];
-  Result[0, 2] := m0[0, 0] * m1[0, 2] + m0[0, 1] * m1[1, 2] + m0[0, 2] * m1[2, 2] + m0[0, 3] * m1[3, 2];
-  Result[1, 2] := m0[1, 0] * m1[0, 2] + m0[1, 1] * m1[1, 2] + m0[1, 2] * m1[2, 2] + m0[1, 3] * m1[3, 2];
-  Result[2, 2] := m0[2, 0] * m1[0, 2] + m0[2, 1] * m1[1, 2] + m0[2, 2] * m1[2, 2] + m0[2, 3] * m1[3, 2];
-  Result[3, 2] := m0[3, 0] * m1[0, 2] + m0[3, 1] * m1[1, 2] + m0[3, 2] * m1[2, 2] + m0[3, 3] * m1[3, 2];
-  Result[0, 3] := m0[0, 0] * m1[0, 3] + m0[0, 1] * m1[1, 3] + m0[0, 2] * m1[2, 3] + m0[0, 3] * m1[3, 3];
-  Result[1, 3] := m0[1, 0] * m1[0, 3] + m0[1, 1] * m1[1, 3] + m0[1, 2] * m1[2, 3] + m0[1, 3] * m1[3, 3];
-  Result[2, 3] := m0[2, 0] * m1[0, 3] + m0[2, 1] * m1[1, 3] + m0[2, 2] * m1[2, 3] + m0[2, 3] * m1[3, 3];
-  Result[3, 3] := m0[3, 0] * m1[0, 3] + m0[3, 1] * m1[1, 3] + m0[3, 2] * m1[2, 3] + m0[3, 3] * m1[3, 3];
+  MulMat(Result, m0, m1);
 end;
+
+procedure MulMatFloat_Pas(out mr: TUMat; constref m0: TUMat; const s: TUFloat);
+begin
+  mr[0, 0] := m0[0, 0] * s;
+  mr[1, 0] := m0[1, 0] * s;
+  mr[2, 0] := m0[2, 0] * s;
+  mr[3, 0] := m0[3, 0] * s;
+  mr[0, 1] := m0[0, 1] * s;
+  mr[1, 1] := m0[1, 1] * s;
+  mr[2, 1] := m0[2, 1] * s;
+  mr[3, 1] := m0[3, 1] * s;
+  mr[0, 2] := m0[0, 2] * s;
+  mr[1, 2] := m0[1, 2] * s;
+  mr[2, 2] := m0[2, 2] * s;
+  mr[3, 2] := m0[3, 2] * s;
+  mr[0, 3] := m0[0, 3] * s;
+  mr[1, 3] := m0[1, 3] * s;
+  mr[2, 3] := m0[2, 3] * s;
+  mr[3, 3] := m0[3, 3] * s;
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulMatFloat_SSE(out mr: TUMat; constref m0: TUMat; const s: TUFloat); assembler; nostackframe;
+asm
+  movss xmm0, [s]
+  shufps xmm0, xmm0, 0
+  movaps xmm1, [m0 + 0h]
+  mulps xmm1, xmm0
+  movaps [mr + 0h], xmm1
+  movaps xmm1, [m0 + 10h]
+  mulps xmm1, xmm0
+  movaps [mr + 10h], xmm1
+  movaps xmm1, [m0 + 20h]
+  mulps xmm1, xmm0
+  movaps [mr + 20h], xmm1
+  movaps xmm1, [m0 + 30h]
+  mulps xmm1, xmm0
+  movaps [mr + 30h], xmm1
+end;
+{$endif}
+
+var MulMatFloat: procedure (out mr: TUMat; constref m0: TUMat; const s: TUFloat) = @MulMatFloat_Pas;
 
 function UMulMatFloat(const m: TUMat; const s: TUFloat): TUMat;
 begin
-  Result[0, 0] := m[0, 0] * s;
-  Result[1, 0] := m[1, 0] * s;
-  Result[2, 0] := m[2, 0] * s;
-  Result[3, 0] := m[3, 0] * s;
-  Result[0, 1] := m[0, 1] * s;
-  Result[1, 1] := m[1, 1] * s;
-  Result[2, 1] := m[2, 1] * s;
-  Result[3, 1] := m[3, 1] * s;
-  Result[0, 2] := m[0, 2] * s;
-  Result[1, 2] := m[1, 2] * s;
-  Result[2, 2] := m[2, 2] * s;
-  Result[3, 2] := m[3, 2] * s;
-  Result[0, 3] := m[0, 3] * s;
-  Result[1, 3] := m[1, 3] * s;
-  Result[2, 3] := m[2, 3] * s;
-  Result[3, 3] := m[3, 3] * s;
+  MulMatFloat(Result, m, s);
 end;
 
 function UMulVec2Mat3x3(const v: TUVec2; const m: TUMat): TUVec2;
@@ -12376,33 +15517,131 @@ begin
   );
 end;
 
-function UMulVec3Mat3x3(const v: TUVec3; const m: TUMat): TUVec3;
+procedure MulVec3Mat3x3_Pas(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat);
 begin
-  Result := TUVec3.Make(
-    v.x * m[0, 0] + v.y * m[1, 0] + v.z * m[2, 0],
-    v.x * m[0, 1] + v.y * m[1, 1] + v.z * m[2, 1],
-    v.x * m[0, 2] + v.y * m[1, 2] + v.z * m[2, 2]
+  vr := TUVec3.Make(
+    v0.x * m0[0, 0] + v0.y * m0[1, 0] + v0.z * m0[2, 0],
+    v0.x * m0[0, 1] + v0.y * m0[1, 1] + v0.z * m0[2, 1],
+    v0.x * m0[0, 2] + v0.y * m0[1, 2] + v0.z * m0[2, 2]
   );
 end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulVec3Mat3x3_SSE(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat); assembler; nostackframe;
+asm
+  movups xmm0, [m0 + 0h]
+  movss xmm1, dword ptr [v0 + 0h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm0
+  movups xmm0, [m0 + 10h]
+  movss xmm2, dword ptr [v0 + 4h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movups xmm0, [m0 + 20h]
+  movss xmm2, dword ptr [v0 + 8h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movlps [vr], xmm1
+  movhlps xmm1, xmm1
+  movss dword ptr [vr + 8h], xmm1
+end;
+{$endif}
+
+var MulVec3Mat3x3: procedure (out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat) = @MulVec3Mat3x3_Pas;
+
+function UMulVec3Mat3x3(const v: TUVec3; const m: TUMat): TUVec3;
+begin
+  MulVec3Mat3x3(Result, v, m);
+end;
+
+procedure MulVec3Mat4x3_Pas(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat);
+begin
+  vr := TUVec3.Make(
+    v0.x * m0[0, 0] + v0.y * m0[1, 0] + v0.z * m0[2, 0] + m0[3, 0],
+    v0.x * m0[0, 1] + v0.y * m0[1, 1] + v0.z * m0[2, 1] + m0[3, 1],
+    v0.x * m0[0, 2] + v0.y * m0[1, 2] + v0.z * m0[2, 2] + m0[3, 2]
+  );
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulVec3Mat4x3_SSE(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat); assembler; nostackframe;
+asm
+  movups xmm0, [m0 + 0h]
+  movss xmm1, dword ptr [v0 + 0h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm0
+  movups xmm0, [m0 + 10h]
+  movss xmm2, dword ptr [v0 + 4h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movups xmm0, [m0 + 20h]
+  movss xmm2, dword ptr [v0 + 8h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movups xmm0, [m0 + 30h]
+  addps xmm1, xmm0
+  movlps [vr], xmm1
+  movhlps xmm1, xmm1
+  movss dword ptr [vr + 8], xmm1
+end;
+{$endif}
+
+var MulVec3Mat4x3: procedure (out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat) = @MulVec3Mat4x3_Pas;
 
 function UMulVec3Mat4x3(const v: TUVec3; const m: TUMat): TUVec3;
 begin
-  Result := TUVec3.Make(
-    v.x * m[0, 0] + v.y * m[1, 0] + v.z * m[2, 0] + m[3, 0],
-    v.x * m[0, 1] + v.y * m[1, 1] + v.z * m[2, 1] + m[3, 1],
-    v.x * m[0, 2] + v.y * m[1, 2] + v.z * m[2, 2] + m[3, 2]
+  MulVec3Mat4x3(Result, v, m);
+end;
+
+procedure MulVec3Mat4x4_Pas(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat);
+  var w: TUFloat;
+begin
+  w := 1 / (v0.x * m0[0, 3] + v0.y * m0[1, 3] + v0.z * m0[2, 3] + m0[3, 3]);
+  vr := TUVec3.Make(
+    (v0.x * m0[0, 0] + v0.y * m0[1, 0] + v0.z * m0[2, 0] + m0[3, 0]) * w,
+    (v0.x * m0[0, 1] + v0.y * m0[1, 1] + v0.z * m0[2, 1] + m0[3, 1]) * w,
+    (v0.x * m0[0, 2] + v0.y * m0[1, 2] + v0.z * m0[2, 2] + m0[3, 2]) * w
   );
 end;
 
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulVec3Mat4x4_SSE(out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat); assembler; nostackframe;
+asm
+  movups xmm0, [m0 + 0h]
+  movss xmm1, dword ptr [v0 + 0h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm0
+  movups xmm0, [m0 + 10h]
+  movss xmm2, dword ptr [v0 + 4h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movups xmm0, [m0 + 20h]
+  movss xmm2, dword ptr [v0 + 8h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movups xmm0, [m0 + 30h]
+  addps xmm1, xmm0
+  movaps xmm0, xmm1
+  shufps xmm0, xmm0, $ff
+  rcpps xmm0, xmm0
+  mulps xmm1, xmm0
+  movlps [vr], xmm1
+  movhlps xmm1, xmm1
+  movss dword ptr [vr + 8h], xmm1
+end;
+{$endif}
+
+var MulVec3Mat4x4: procedure (out vr: TUVec3; constref v0: TUVec3; constref m0: TUMat) = @MulVec3Mat4x4_Pas;
+
 function UMulVec3Mat4x4(const v: TUVec3; const m: TUMat): TUVec3;
-  var w: TUFloat;
 begin
-  w := 1 / (v.x * m[0, 3] + v.y * m[1, 3] + v.z * m[2, 3] + m[3, 3]);
-  Result := TUVec3.Make(
-    (v.x * m[0, 0] + v.y * m[1, 0] + v.z * m[2, 0] + m[3, 0]) * w,
-    (v.x * m[0, 1] + v.y * m[1, 1] + v.z * m[2, 1] + m[3, 1]) * w,
-    (v.x * m[0, 2] + v.y * m[1, 2] + v.z * m[2, 2] + m[3, 2]) * w
-  );
+  MulVec3Mat4x4(Result, v, m)
 end;
 
 function UMulVec3Quat(const v: TUVec3; const q: TUQuat): TUVec3;
@@ -12414,14 +15653,77 @@ begin
   Result := 2 * u.Dot(v) * u + (s * s - u.Dot(u)) * v + 2 * s * u.Cross(v);
 end;
 
+procedure MulVec4Mat_Pas(out vr: TUVec4; constref v0: TUVec4; constref m0: TUMat);
+begin
+  vr := TUVec4.Make(
+    v0.x * m0[0, 0] + v0.y * m0[1, 0] + v0.z * m0[2, 0] + v0.w * m0[3, 0],
+    v0.x * m0[0, 1] + v0.y * m0[1, 1] + v0.z * m0[2, 1] + v0.w * m0[3, 1],
+    v0.x * m0[0, 2] + v0.y * m0[1, 2] + v0.z * m0[2, 2] + v0.w * m0[3, 2],
+    v0.x * m0[0, 3] + v0.y * m0[1, 3] + v0.z * m0[2, 3] + v0.w * m0[3, 3]
+  );
+end;
+
+{$if defined(CPU386) or defined(CPUX64)}
+procedure MulVec4Mat_SSE(out vr: TUVec4; constref v0: TUVec4; constref m0: TUMat); assembler; nostackframe;
+asm
+  movaps xmm0, [m0 + 0h]
+  movss xmm1, dword ptr [v0 + 0h]
+  shufps xmm1, xmm1, 0
+  mulps xmm1, xmm0
+  movaps xmm0, [m0 + 10h]
+  movss xmm2, dword ptr [v0 + 4h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movaps xmm0, [m0 + 20h]
+  movss xmm2, dword ptr [v0 + 8h]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movaps xmm0, [m0 + 30h]
+  movss xmm2, dword ptr [v0 + 0Ch]
+  shufps xmm2, xmm2, 0
+  mulps xmm2, xmm0
+  addps xmm1, xmm2
+  movaps [vr], xmm1
+end;
+{$endif}
+
+var MulVec4Mat: procedure (out vr: TUVec4; constref v0: TUVec4; constref m0: TUMat) = @MulVec4Mat_Pas;
+
 function UMulVec4Mat(const v: TUVec4; const m: TUMat): TUVec4;
 begin
-  Result := TUVec4.Make(
-    v.x * m[0, 0] + v.y * m[1, 0] + v.z * m[2, 0] + v.w * m[3, 0],
-    v.x * m[0, 1] + v.y * m[1, 1] + v.z * m[2, 1] + v.w * m[3, 1],
-    v.x * m[0, 2] + v.y * m[1, 2] + v.z * m[2, 2] + v.w * m[3, 2],
-    v.x * m[0, 3] + v.y * m[1, 3] + v.z * m[2, 3] + v.w * m[3, 3]
-  );
+  MulVec4Mat(Result, v, m);
+end;
+
+function UMatInverse(const m: TUMat): TUMat;
+  var Det: TUFloat;
+begin
+  Det := (m[0, 0] * m[1, 1] * m[2, 2] * m[3, 3]) + (m[0, 0] * m[1, 2] * m[2, 3] * m[3, 1]) + (m[0, 0] * m[1, 3] * m[2, 1] * m[3, 2])
+  - (m[0, 0] * m[1, 3] * m[2, 2] * m[3, 1]) - (m[0, 0] * m[1, 2] * m[2, 1] * m[3, 3]) - (m[0, 0] * m[1, 1] * m[2, 3] * m[3, 2])
+  - (m[0, 1] * m[1, 0] * m[2, 2] * m[3, 3]) - (m[0, 2] * m[1, 0] * m[2, 3] * m[3, 1]) - (m[0, 3] * m[1, 0] * m[2, 1] * m[3, 2])
+  + (m[0, 3] * m[1, 0] * m[2, 2] * m[3, 1]) + (m[0, 2] * m[1, 0] * m[2, 1] * m[3, 3]) + (m[0, 1] * m[1, 0] * m[2, 3] * m[3, 2])
+  + (m[0, 1] * m[1, 2] * m[2, 0] * m[3, 3]) + (m[0, 2] * m[1, 3] * m[2, 0] * m[3, 1]) + (m[0, 3] * m[1, 1] * m[2, 0] * m[3, 2])
+  - (m[0, 3] * m[1, 2] * m[2, 0] * m[3, 1]) - (m[0, 2] * m[1, 1] * m[2, 0] * m[3, 3]) - (m[0, 1] * m[1, 3] * m[2, 0] * m[3, 2])
+  - (m[0, 1] * m[1, 2] * m[2, 3] * m[3, 0]) - (m[0, 2] * m[1, 3] * m[2, 1] * m[3, 0]) - (m[0, 3] * m[1, 1] * m[2, 2] * m[3, 0])
+  + (m[0, 3] * m[1, 2] * m[2, 1] * m[3, 0]) + (m[0, 2] * m[1, 1] * m[2, 3] * m[3, 0]) + (m[0, 1] * m[1, 3] * m[2, 2] * m[3, 0]);
+  Det := 1 / Det;
+  Result[0, 0] := (m[1,1]*m[2,2]*m[3,3] + m[1,2]*m[2,3]*m[3,1] + m[1,3]*m[2,1]*m[3,2] - m[1,3]*m[2,2]*m[3,1] - m[1,2]*m[2,1]*m[3,3] - m[1,1]*m[2,3]*m[3,2]) * Det;
+  Result[0, 1] := (-m[0,1]*m[2,2]*m[3,3] - m[0,2]*m[2,3]*m[3,1] - m[0,3]*m[2,1]*m[3,2] + m[0,3]*m[2,2]*m[3,1] + m[0,2]*m[2,1]*m[3,3] + m[0,1]*m[2,3]*m[3,2]) * Det;
+  Result[0, 2] := (m[0,1]*m[1,2]*m[3,3] + m[0,2]*m[1,3]*m[3,1] + m[0,3]*m[1,1]*m[3,2] - m[0,3]*m[1,2]*m[3,1] - m[0,2]*m[1,1]*m[3,3] - m[0,1]*m[1,3]*m[3,2]) * Det;
+  Result[0, 3] := (-m[0,1]*m[1,2]*m[2,3] - m[0,2]*m[1,3]*m[2,1] - m[0,3]*m[1,1]*m[2,2] + m[0,3]*m[1,2]*m[2,1] + m[0,2]*m[1,1]*m[2,3] + m[0,1]*m[1,3]*m[2,2]) * Det;
+  Result[1, 0] := (-m[1,0]*m[2,2]*m[3,3] - m[1,2]*m[2,3]*m[3,0] - m[1,3]*m[2,0]*m[3,2] + m[1,3]*m[2,2]*m[3,0] + m[1,2]*m[2,0]*m[3,3] + m[1,0]*m[2,3]*m[3,2]) * Det;
+  Result[1, 1] := (m[0,0]*m[2,2]*m[3,3] + m[0,2]*m[2,3]*m[3,0] + m[0,3]*m[2,0]*m[3,2] - m[0,3]*m[2,2]*m[3,0] - m[0,2]*m[2,0]*m[3,3] - m[0,0]*m[2,3]*m[3,2]) * Det;
+  Result[1, 2] := (-m[0,0]*m[1,2]*m[3,3] - m[0,2]*m[1,3]*m[3,0] - m[0,3]*m[1,0]*m[3,2] + m[0,3]*m[1,2]*m[3,0] + m[0,2]*m[1,0]*m[3,3] + m[0,0]*m[1,3]*m[3,2]) * Det;
+  Result[1, 3] := (m[0,0]*m[1,2]*m[2,3] + m[0,2]*m[1,3]*m[2,0] + m[0,3]*m[1,0]*m[2,2] - m[0,3]*m[1,2]*m[2,0] - m[0,2]*m[1,0]*m[2,3] - m[0,0]*m[1,3]*m[2,2]) * Det;
+  Result[2, 0] := (m[1,0]*m[2,1]*m[3,3] + m[1,1]*m[2,3]*m[3,0] + m[1,3]*m[2,0]*m[3,1] - m[1,3]*m[2,1]*m[3,0] - m[1,1]*m[2,0]*m[3,3] - m[1,0]*m[2,3]*m[3,1]) * Det;
+  Result[2, 1] := (-m[0,0]*m[2,1]*m[3,3] - m[0,1]*m[2,3]*m[3,0] - m[0,3]*m[2,0]*m[3,1] + m[0,3]*m[2,1]*m[3,0] + m[0,1]*m[2,0]*m[3,3] + m[0,0]*m[2,3]*m[3,1]) * Det;
+  Result[2, 2] := (m[0,0]*m[1,1]*m[3,3] + m[0,1]*m[1,3]*m[3,0] + m[0,3]*m[1,0]*m[3,1] - m[0,3]*m[1,1]*m[3,0] - m[0,1]*m[1,0]*m[3,3] - m[0,0]*m[1,3]*m[3,1]) * Det;
+  Result[2, 3] := (-m[0,0]*m[1,1]*m[2,3] - m[0,1]*m[1,3]*m[2,0] - m[0,3]*m[1,0]*m[2,1] + m[0,3]*m[1,1]*m[2,0] + m[0,1]*m[1,0]*m[2,3] + m[0,0]*m[1,3]*m[2,1]) * Det;
+  Result[3, 0] := (-m[1,0]*m[2,1]*m[3,2] - m[1,1]*m[2,2]*m[3,0] - m[1,2]*m[2,0]*m[3,1] + m[1,2]*m[2,1]*m[3,0] + m[1,1]*m[2,0]*m[3,2] + m[1,0]*m[2,2]*m[3,1]) * Det;
+  Result[3, 1] := (m[0,0]*m[2,1]*m[3,2] + m[0,1]*m[2,2]*m[3,0] + m[0,2]*m[2,0]*m[3,1] - m[0,2]*m[2,1]*m[3,0] - m[0,1]*m[2,0]*m[3,2] - m[0,0]*m[2,2]*m[3,1]) * Det;
+  Result[3, 2] := (-m[0,0]*m[1,1]*m[3,2] - m[0,1]*m[1,2]*m[3,0] - m[0,2]*m[1,0]*m[3,1] + m[0,2]*m[1,1]*m[3,0] + m[0,1]*m[1,0]*m[3,2] + m[0,0]*m[1,2]*m[3,1]) * Det;
+  Result[3, 3] := (m[0,0]*m[1,1]*m[2,2] + m[0,1]*m[1,2]*m[2,0] + m[0,2]*m[1,0]*m[2,1] - m[0,2]*m[1,1]*m[2,0] - m[0,1]*m[1,0]*m[2,2] - m[0,0]*m[1,2]*m[2,1]) * Det;
 end;
 
 function UMulQuat(const a, b: TUQuat): TUQuat;
@@ -12723,7 +16025,7 @@ begin
 end;
 
 function UDist3DBoundsToPlane(const b: TUBounds3f; const p: TUPlane): TUFloat;
-  var Pts: TUVec3Array;
+  var Pts: TUCuboid3f;
   var i: Int32;
   var d: TUFloat;
 begin
@@ -12789,6 +16091,16 @@ operator - (const v: TUVec2): TUVec2;
 begin
   Result[0] := -v[0];
   Result[1] := -v[1];
+end;
+
+operator * (const v: TUVec2; const r: TURot2): TUVec2;
+begin
+  Result := r.Transform(v);
+end;
+
+operator * (const r: TURot2; const v: TUVec2): TUVec2;
+begin
+  Result := r.TransformInv(v);
 end;
 
 operator + (const a, b: TUVec2i): TUVec2i;
@@ -12922,6 +16234,16 @@ end;
 operator := (const Str: String): TUInt8Array;
 begin
   Result := TUInt8Array.Make(Str);
+end;
+
+operator / (const a, b: String): String;
+begin
+  Result := a + DirectorySeparator + b;
+end;
+
+operator - (const a, b: String): String;
+begin
+  Result := UStrRemove(a, b);
 end;
 
 operator := (const v: TUVec2): TUVec2i;
@@ -13196,6 +16518,29 @@ begin
   Result := PUVec4(@v)^;
 end;
 
+operator = (const a, b: TUGuid): Boolean;
+begin
+  Result := (
+    (a.Data1 = b.Data1) and
+    (a.Data2 = b.Data2) and
+    (a.Data3 = b.Data3) and
+    (PUInt64(@a.Data4)^ = PUInt64(@b.Data4)^)
+  );
+end;
+
+operator < (const a, b: TUGuid): Boolean;
+  var i: Int32;
+begin
+  if a.Data1 <> b.Data1 then Exit(a.Data1 < b.Data1);
+  if a.Data2 <> b.Data2 then Exit(a.Data2 < b.Data2);
+  if a.Data3 <> b.Data3 then Exit(a.Data3 < b.Data3);
+  for i := 0 to High(a.Data4) do
+  begin
+    if a.Data4[i] <> b.Data4[i] then Exit(a.Data4[i] < b.Data4[i]);
+  end;
+  Result := False;
+end;
+
 operator + (const a, b: TUInt4096_Debug): TUInt4096_Debug;
 begin
   Result := TUInt4096_Debug.Addition(a, b);
@@ -13327,6 +16672,11 @@ begin
   Result := TUInt4096_Debug.BitXor(a, b);
 end;
 
+function UIsCharTrimable(const c: AnsiChar): Boolean;
+begin
+  Result := c in [#$9, #$a, #$b, #$c, #$d, #$20, #$a0];
+end;
+
 function UStrExprMatch(const Str, Expr: String): TUExprMatch;
   function CompareSeq(const StrPos: Int32; const Seq: String): Boolean;
     var i: Int32;
@@ -13428,6 +16778,102 @@ begin
   SetLength(Result, CurElement);
 end;
 
+function UStrReplace(const Str, Old, New: String): String;
+  var MatchArr: array of Int32;
+  var LenStr, LenOld, LenNew, LastIndex, MatchCount, i, j, p, n: Int32;
+  var Match: Boolean;
+begin
+  LenStr := Length(Str);
+  if LenStr = 0 then Exit(Str);
+  LenOld := Length(Old);
+  if LenOld = 0 then Exit(Str);
+  if LenOld > LenStr then Exit(Str);
+  LenNew := Length(New);
+  if LenNew = 0 then Exit(UStrRemove(Str, Old));
+  LastIndex := LenStr - LenOld + 1;
+  MatchCount := 0;
+  MatchArr := nil;
+  SetLength(MatchArr, LenStr div LenOld);
+  i := 1;
+  while i <= LastIndex do
+  begin
+    Match := True;
+    for j := 1 to LenOld do
+    if Str[i + j - 1] <> Old[j] then
+    begin
+      Match := False;
+      Break;
+    end;
+    if not Match then
+    begin
+      Inc(i);
+      Continue;
+    end;
+    MatchArr[MatchCount] := i;
+    Inc(MatchCount);
+    Inc(i, LenOld);
+  end;
+  if MatchCount = 0 then Exit(Str);
+  SetLength(Result, LenStr + (LenNew - LenOld) * MatchCount);
+  j := 1;
+  p := 1;
+  for i := 0 to MatchCount - 1 do
+  begin
+    n := MatchArr[i] - j;
+    if n > 0 then
+    begin
+      Move(Str[j], Result[p], n);
+      Inc(p, n);
+    end;
+    Move(New[1], Result[p], LenNew);
+    Inc(p, LenNew);
+    j := MatchArr[i] + LenOld;
+  end;
+  if LenStr >= j then Move(Str[j], Result[p], LenStr - j + 1);
+end;
+
+function UStrRemove(const Str, Pattern: String): String;
+  var i, j, s, d, StrLen, PatLen, LastIndex: Int32;
+  var Match: Boolean;
+begin
+  StrLen := Length(Str);
+  if StrLen = 0 then Exit(Str);
+  PatLen := Length(Pattern);
+  if StrLen < PatLen then Exit(Str);
+  SetLength(Result, StrLen);
+  s := 1;
+  i := 1;
+  d := 1;
+  LastIndex := StrLen - PatLen + 1;
+  while i <= LastIndex do
+  try
+    Match := True;
+    for j := 1 to PatLen do
+    begin
+      if Str[i + j - 1] <> Pattern[j] then
+      begin
+        Match := False;
+        Break;
+      end;
+    end;
+    if not Match then Continue;
+    if i > s then
+    begin
+      Move(Str[s], Result[d], i - s);
+      Inc(d, i - s);
+    end;
+    s := i + PatLen;
+  finally
+    Inc(i);
+  end;
+  if s < StrLen then
+  begin
+    Move(Str[s], Result[d], StrLen - s + 1);
+    Inc(d, StrLen - s + 1);
+  end;
+  if d - 1 < StrLen then SetLength(Result, d - 1);
+end;
+
 function UStrSubStr(
   const Str: String;
   const SubStrStart: Int32;
@@ -13462,7 +16908,7 @@ begin
 end;
 
 function UStrIsNumber(const Str: String; const AllowFloat: Boolean): Boolean;
-  var i, n: Integer;
+  var i, n: Int32;
   var af: Boolean;
 begin
   if Length(Str) < 1 then Exit(False);
@@ -13496,6 +16942,35 @@ begin
     end;
   end;
   Result := 0;
+end;
+
+function UStrTrimLeft(const Str: String): String;
+  var i: Int32;
+begin
+  Result := '';
+  for i := 1 to Length(Str) do
+  begin
+    if UIsCharTrimable(Str[i]) then Continue;
+    if i = Length(Str) then Exit;
+    Exit(UStrSubStr(Str, i, Length(Str) - i + 1));
+  end;
+end;
+
+function UStrTrimRight(const Str: String): String;
+  var i: Int32;
+begin
+  Result := '';
+  for i := Length(Str) downto 1 do
+  begin
+    if UIsCharTrimable(Str[i]) then Continue;
+    if i = 1 then Exit;
+    Exit(UStrSubStr(Str, 1, i));
+  end;
+end;
+
+function UStrTrim(const Str: String): String;
+begin
+  Result := UStrTrimLeft(UStrTrimRight(Str));
 end;
 
 function UStrClone(const Str: String): String;
@@ -13733,7 +17208,43 @@ begin
   Result := ExtractFileDir(ParamStr(0));
 end;
 
+function UConfigPath: String;
+begin
+{$if defined(windows)}
+  Result := UDataPath;
+{$elseif defined(linux)}
+  Result := GetEnvironmentVariable('XDG_CONFIG_HOME');
+  if Length(Result) > 0 then Exit;
+  Result := GetEnvironmentVariable('HOME') / '.config';
+{$else}
+  Result := '';
+{$endif}
+end;
+
+function UDataPath: String;
+begin
+{$if defined(windows)}
+  Result := GetEnvironmentVariable('APPDATA');
+{$elseif defined(linux)}
+  Result := GetEnvironmentVariable('HOME') / '.local/share';
+{$else}
+  Result := '';
+{$endif}
+end;
+
 var LogOffset: Int32 = 0;
+
+function UArgsString(
+  const Args: array of const;
+  const Index: Int32;
+  out Value: String
+): Boolean;
+begin
+  if not UIsInRange(Index, 0, High(Args)) then Exit(False);
+  if not Args[Index].VType = vtAnsiString then Exit(False);
+  Value := AnsiString(Args[Index].VAnsiString);
+  Result := True
+end;
 
 procedure ULog(const Text: String; const Offset: Int32);
   var Spaces: String;
@@ -13835,9 +17346,9 @@ begin
   end;
 end;
 
-generic procedure UArrSort<T>(var Arr: array of T);
-  procedure SortRange(const RangeStart, RangeEnd: Integer); overload;
-    var i, j: Integer;
+generic procedure USort<T>(var Arr: array of T);
+  procedure SortRange(const RangeStart, RangeEnd: Int32); overload;
+    var i, j: Int32;
     var tmp, pivot: T;
   begin
     if RangeEnd <= RangeStart then exit;
@@ -13863,9 +17374,9 @@ begin
   SortRange(Low(Arr), High(Arr));
 end;
 
-generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>);
-  procedure SortRange(const RangeStart, RangeEnd: Integer); overload;
-    var i, j: Integer;
+generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>);
+  procedure SortRange(const RangeStart, RangeEnd: Int32); overload;
+    var i, j: Int32;
     var tmp, pivot: T;
   begin
     if RangeEnd <= RangeStart then exit;
@@ -13889,44 +17400,74 @@ generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPred
   end;
 begin
   SortRange(Low(Arr), High(Arr));
+end;
+
+generic procedure USort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>);
+  procedure SortRange(const RangeStart, RangeEnd: Int32); overload;
+    var i, j: Int32;
+    var tmp, pivot: T;
+  begin
+    if RangeEnd <= RangeStart then exit;
+    i := RangeStart;
+    j := RangeEnd;
+    pivot := Arr[(RangeStart + RangeEnd) shr 1];
+    repeat
+      while Pred(pivot, Arr[i]) do Inc(i);
+      while Pred(Arr[j], pivot) do Dec(j);
+      if i <= j then
+      begin
+        tmp := Arr[i];
+        Arr[i] := Arr[j];
+        Arr[j] := tmp;
+        j := j - 1;
+        i := i + 1;
+      end;
+    until i > j;
+    if RangeStart < j then SortRange(RangeStart, j);
+    if i < RangeEnd then SortRange(i, RangeEnd);
+  end;
+begin
+  SortRange(Low(Arr), High(Arr));
+end;
+
+generic procedure USort<T>(var Arr: specialize TUArray<T>); overload;
+begin
+  specialize USort<T>(Arr.Data);
+end;
+
+generic procedure USort<T>(var Arr: specialize TUArray<T>; const Pred: specialize TUPredicate<T>); overload;
+begin
+  specialize USort<T>(Arr.Data, Pred);
+end;
+
+generic procedure USort<T>(var Arr: specialize TUArray<T>; const Pred: specialize TUPredicateObj<T>); overload;
+begin
+  specialize USort<T>(Arr.Data, Pred);
+end;
+
+generic procedure UArrSort<T>(var Arr: array of T);
+begin
+  specialize USort<T>(Arr);
+end;
+
+generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicate<T>);
+begin
+  specialize USort<T>(Arr, Pred);
 end;
 
 generic procedure UArrSort<T>(var Arr: array of T; const Pred: specialize TUPredicateObj<T>);
-  procedure SortRange(const RangeStart, RangeEnd: Integer); overload;
-    var i, j: Integer;
-    var tmp, pivot: T;
-  begin
-    if RangeEnd <= RangeStart then exit;
-    i := RangeStart;
-    j := RangeEnd;
-    pivot := Arr[(RangeStart + RangeEnd) shr 1];
-    repeat
-      while Pred(pivot, Arr[i]) do Inc(i);
-      while Pred(Arr[j], pivot) do Dec(j);
-      if i <= j then
-      begin
-        tmp := Arr[i];
-        Arr[i] := Arr[j];
-        Arr[j] := tmp;
-        j := j - 1;
-        i := i + 1;
-      end;
-    until i > j;
-    if RangeStart < j then SortRange(RangeStart, j);
-    if i < RangeEnd then SortRange(i, RangeEnd);
-  end;
 begin
-  SortRange(Low(Arr), High(Arr));
+  specialize USort<T>(Arr, Pred);
 end;
 
-generic function UArrAppend<T>(var Arr: specialize TUArray<T>; const Item: T): Int32;
+generic function UArrAppend<T>(var Arr: specialize TArray<T>; const Item: T): Int32;
 begin
   SetLength(Arr, Length(Arr) + 1);
   Result := High(Arr);
   Arr[Result] := Item;
 end;
 
-generic procedure UArrAppend<T>(var Arr: specialize TUArray<T>; const Other: specialize TUArray<T>);
+generic procedure UArrAppend<T>(var Arr: specialize TArray<T>; const Other: specialize TArray<T>);
   var i, n: Int32;
 begin
   n := Length(Arr);
@@ -13937,7 +17478,7 @@ begin
   end;
 end;
 
-generic procedure UArrInsert<T>(var Arr: specialize TUArray<T>; const Item: T; const Position: Int32);
+generic procedure UArrInsert<T>(var Arr: specialize TArray<T>; const Item: T; const Position: Int32);
   var i, j: Int32;
 begin
   SetLength(Arr, Length(Arr) + 1);
@@ -13951,7 +17492,28 @@ begin
   Arr[i] := Item;
 end;
 
-generic procedure UArrDelete<T>(var Arr: specialize TUArray<T>; const DelStart: Int32; const DelCount: Int32);
+generic procedure UArrInsert<T>(var Arr: specialize TArray<T>; const Other: specialize TArray<T>; const Position: Int32);
+  var p, i, j, n, d: Int32;
+begin
+  n := Length(Other);
+  if n = 0 then Exit;
+  if Position < 0 then p := 0
+  else if Position > High(Arr) then p := Length(Arr)
+  else p := Position;
+  d := High(Arr) - p;
+  SetLength(Arr, Length(Arr) + n);
+  for j := 0 to d do
+  begin
+    i := High(Arr) - j;
+    Arr[i] := Arr[i - n];
+  end;
+  for j := 0 to n - 1 do
+  begin
+    Arr[p + j] := Other[j];
+  end;
+end;
+
+generic procedure UArrDelete<T>(var Arr: specialize TArray<T>; const DelStart: Int32; const DelCount: Int32);
   var i, dc: Int32;
 begin
   dc := DelCount;
@@ -13964,7 +17526,7 @@ begin
   SetLength(Arr, Length(Arr) - dc);
 end;
 
-generic procedure UArrRemove<T>(var Arr: specialize TUArray<T>; const Item: T);
+generic procedure UArrRemove<T>(var Arr: specialize TArray<T>; const Item: T);
   var i, j, n: Int32;
 begin
   n := 0;
@@ -13980,14 +17542,14 @@ begin
   SetLength(Arr, Length(Arr) - n);
 end;
 
-generic function UArrPop<T>(var Arr: specialize TUArray<T>): T;
+generic function UArrPop<T>(var Arr: specialize TArray<T>): T;
 begin
   if Length(Arr) < 1 then Exit(Default(T));
   Result := Arr[High(Arr)];
   SetLength(Arr, Length(Arr) - 1);
 end;
 
-generic function UArrFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
+generic function UArrFind<T>(const Arr: specialize TArray<T>; const Item: T): Int32;
   var i: Int32;
 begin
   for i := 0 to High(Arr) do
@@ -13997,7 +17559,22 @@ begin
   Result := -1;
 end;
 
-generic procedure UArrClear<T>(var Arr: specialize TUArray<T>);
+generic function UArrayFind<T>(const Arr: specialize TUArray<T>; const Item: T): Int32;
+begin
+  Result := specialize UArrFind<T>(Arr.Data, Item);
+end;
+
+generic function UArrContains<T>(const Arr: specialize TArray<T>; const Item: T): Boolean;
+begin
+  Result := specialize UArrFind<T>(Arr, Item) > -1;
+end;
+
+generic function UArrayContains<T>(const Arr: specialize TUArray<T>; const Item: T): Boolean;
+begin
+  Result := specialize UArrayFind<T>(Arr, Item) > -1;
+end;
+
+generic procedure UArrClear<T>(var Arr: specialize TArray<T>);
   var i: Int32;
 begin
   for i := High(Arr) downto 0 do FreeAndNil(Arr[i]);
@@ -14023,7 +17600,7 @@ begin
   end;
 end;
 
-generic function UArrJoin<T>(const a, b: array of T): specialize TUArray<T>;
+generic function UArrJoin<T>(const a, b: array of T): specialize TArray<T>;
   var n: Int32;
 begin
   Result := nil;
@@ -14047,5 +17624,105 @@ begin
   Result := 0;
 end;
 // Functions end
+
+procedure InitializeMath;
+{$if defined(CPU386) or defined(CPUX64)}
+  procedure SetupSSE;
+  begin
+    AddMat := @AddMat_SSE;
+    AddMatFloat := @AddMatFloat_SSE;
+    SubMat := @SubMat_SSE;
+    SubMatFloat := @SubMatFloat_SSE;
+    MulMat := @MulMat_SSE;
+    MulMatFloat := @MulMatFloat_SSE;
+    MulVec3Mat3x3 := @MulVec3Mat3x3_SSE;
+    MulVec3Mat4x3 := @MulVec3Mat4x3_SSE;
+    MulVec3Mat4x4 := @MulVec3Mat4x4_SSE;
+    MulVec4Mat := @MulVec4Mat_SSE;
+  end;
+  type TCPUExt = record
+    var SSE: Boolean;
+    var SSE2: Boolean;
+    var AVX: Boolean;
+    var AVX2: Boolean;
+    var AVX512: Boolean;
+  end;
+  function CheckExt: TCPUExt;
+    type TCPUIDResult = array[0..3] of UInt32;
+    //type PCPUIDResult = ^TCPUIDResult;
+{$push}{$warnings off}
+    procedure GetCPUID(
+      const Leaf, SubLeaf: UInt32;
+      out Ax, Bx, Cx, Dx: UInt32
+    ); assembler;
+    asm
+      push rbx
+      mov eax, Leaf
+      mov ecx, SubLeaf
+      cpuid
+      mov Ax, eax
+      mov Bx, ebx
+      mov Cx, ecx
+      mov Dx, edx
+      //mov dword ptr [Info + 0], eax
+      //mov dword ptr [Info + 4], ebx
+      //mov dword ptr [Info + 8], ecx
+      //mov dword ptr [Info + 12], edx
+      pop rbx
+    end;
+{$pop}
+    function GetXCR0: UInt64; assembler;
+    asm
+      xor ecx, ecx
+      xgetbv
+      mov dword ptr [Result], eax
+      mov dword ptr [Result + 4], edx
+    end;
+    function CheckFeature(const CPUInfo: TCPUIDResult; const RegId, Bit: UInt32): Boolean;
+    begin
+      Result := CPUInfo[RegId] and (1 shl Bit) <> 0;
+    end;
+    var CPUInfo: TCPUIDResult;
+    var Ax: UInt32 absolute CPUInfo[0];
+    var Bx: UInt32 absolute CPUInfo[1];
+    var Cx: UInt32 absolute CPUInfo[2];
+    var Dx: UInt32 absolute CPUInfo[3];
+    var XCR0: UInt64;
+  begin
+    UClear(Result, SizeOf(Result));
+    GetCPUID(1, 0, Ax, Bx, Cx, Dx);
+    Result.SSE := CheckFeature(CPUInfo, 3, 25);
+    Result.SSE2 := CheckFeature(CPUInfo, 3, 26);
+    if not CheckFeature(CPUInfo, 2, 27) then Exit;
+    XCR0 := GetXCR0;
+    Result.AVX := (
+      CheckFeature(CPUInfo, 2, 28)
+      and (XCR0 and 6 = 6)
+    );
+    if not Result.AVX then Exit;
+    GetCPUID(0, 0, Ax, Bx, Cx, Dx);
+    if CPUInfo[0] < 7 then Exit;
+    GetCPUID(7, 0, Ax, Bx, Cx, Dx);
+    Result.AVX2 := CheckFeature(CPUInfo, 1, 5);
+    Result.AVX512 := (
+      CheckFeature(CPUInfo, 1, 16)
+      and (XCR0 and $e6 = $e6)
+    );
+  end;
+  var Ext: TCPUExt;
+begin
+  Ext := CheckExt;
+  if not Ext.SSE then Exit;
+  SetupSSE;
+end;
+{$else}
+begin
+end;
+{$endif}
+
+initialization
+begin
+  InitializeMath;
+end;
 
 end.

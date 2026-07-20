@@ -197,6 +197,7 @@ public
     CharId: UInt32;
     GlyphId: UInt32;
     class operator > (const a, b: TCharMap): Boolean;
+    class operator = (const a, b: TCharMap): Boolean;
   end;
   type TCharMapArray = array of TCharMap;
   type TGlyphArray = array of TGlyph;
@@ -340,10 +341,15 @@ public
       Bind: TUMat;
     end;
     type TJointList = array of TJoint;
-    type TWeight = record
+    type
+
+    { TWeight }
+
+ TWeight = record
       JointIndex: UInt32;
       JointWeight: TUFloat;
       class operator > (const a, b: TWeight): Boolean;
+      class operator = (const a, b: TWeight): Boolean;
     end;
     type TSubset = class
     private
@@ -3296,6 +3302,11 @@ class operator TUTrueTypeFont.TCharMap.>(const a, b: TCharMap): Boolean;
 begin
   Result := a.CharId > b.CharId;
 end;
+
+class operator TUTrueTypeFont.TCharMap.=(const a, b: TCharMap): Boolean;
+begin
+  Result := (a.CharId = b.CharId) and (a.GlyphId = b.GlyphId);
+end;
 // TUTrueTypeFont end
 
 
@@ -3444,6 +3455,11 @@ end;
 class operator TUSceneData.TSkinInterface.TWeight.>(const a, b: TWeight): Boolean;
 begin
   Result := a.JointWeight > b.JointWeight;
+end;
+
+class operator TUSceneData.TSkinInterface.TWeight.=(const a, b: TWeight): Boolean;
+begin
+  Result := (a.JointIndex = b.JointIndex) and (a.JointWeight = b.JointWeight);
 end;
 
 function TUSceneData.TSkinInterface.TSubset.GetVertexSize: UInt32;
@@ -7157,7 +7173,7 @@ begin
     end;
     if Length(Weights[i]) > 4 then
     begin
-      specialize UArrSort<TWeight>(Weights[i]);
+      specialize USort<TWeight>(Weights[i]);
       SetLength(Weights[i], 4);
       tw := 0;
       for j := 0 to High(Weights[i]) do

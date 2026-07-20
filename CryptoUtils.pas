@@ -9,14 +9,20 @@ uses
   Classes,
   CommonUtils;
 
-type TUDigestMD5 = array[0..15] of UInt8;
-type TUDigestSHA1 = array[0..19] of UInt8;
-type TUDigestSHA2_256 = array[0..31] of UInt8;
-type TUDigestSHA2_512 = array[0..63] of UInt8;
-type TUDigestSHA3_224 = array[0..27] of UInt8;
-type TUDigestSHA3_256 = array[0..31] of UInt8;
-type TUDigestSHA3_384 = array[0..47] of UInt8;
-type TUDigestSHA3_512 = array[0..63] of UInt8;
+type TUDigest_128 = array[0..15] of UInt8;
+type TUDigest_160 = array[0..19] of UInt8;
+type TUDigest_224 = array[0..27] of UInt8;
+type TUDigest_256 = array[0..31] of UInt8;
+type TUDigest_384 = array[0..47] of UInt8;
+type TUDigest_512 = array[0..63] of UInt8;
+type TUDigestMD5 = type TUDigest_128;
+type TUDigestSHA1 = type TUDigest_160;
+type TUDigestSHA2_256 = type TUDigest_256;
+type TUDigestSHA2_512 = type TUDigest_512;
+type TUDigestSHA3_224 = type TUDigest_224;
+type TUDigestSHA3_256 = type TUDigest_256;
+type TUDigestSHA3_384 = type TUDigest_384;
+type TUDigestSHA3_512 = type TUDigest_512;
 type TUFuncDigest = function (const Data: TUInt8Array): TUInt8Array;
 type TUFuncMAC = function (const Key, Data: TUInt8Array): TUInt8Array;
 
@@ -88,6 +94,13 @@ type TURSA = record
 public
   type TBigInt = TUInt8192;
   type TUBigIntArray = array of TBigInt;
+  type TKeyPublic = record
+    var n: TBigInt; // modulus
+    var e: TBigInt; // public exponent
+    function Size: Uint32;
+    function IsValid: Boolean;
+    class function MakeInvalid: TKeyPublic; static;
+  end;
   type TKey = record
     var n: TBigInt; // modulus
     var e: TBigInt; // public exponent
@@ -97,18 +110,12 @@ public
     var exp1: TBigInt; // d mod (p - 1)
     var exp2: TBigInt; // d mod (q - 1)
     var c: TBigInt; // q^-1 mod p
-    function Size: Uint32; // bit size
+    function Size: UInt32; // bit size
     function IsPublic: Boolean;
     function IsPrivate: Boolean;
     function IsCRT: Boolean;
     function IsValid: Boolean;
-    class function MakeInvalid: TKey; static;
-  end;
-  type TKeyPublic = record
-    var n: TBigInt;
-    var e: TBigInt;
-    function Size: Uint32;
-    function IsValid: Boolean;
+    function PublicKey: TKeyPublic;
     class function MakeInvalid: TKey; static;
   end;
 //public
@@ -245,7 +252,7 @@ private
   class function Encrypt_PKCS1(
     const Data: Pointer;
     const DataSize: UInt32;
-    const Key: TURSA.TKey
+    const Key: TURSA.TKeyPublic
   ): TBigInt; static;
   class function Decrypt_PKCS1_Str(
     const Cipher: TBigInt;
@@ -258,7 +265,7 @@ private
   class function Encrypt_OAEP(
     const Data: Pointer;
     const DataSize: UInt32;
-    const Key: TURSA.TKey
+    const Key: TURSA.TKeyPublic
   ): TBigInt; static;
   class function Decrypt_OAEP_Str(
     const Cipher: TBigInt;
@@ -286,7 +293,7 @@ private
   ): TUInt8Array; static;
   class function Verify(
     const Data, Signature: TUInt8Array;
-    const Key: TKey
+    const Key: TKeyPublic
   ): Boolean; static;
   class function ExportKeyPrivate_PKCS1_DER(const Key: TURSA.TKey): TUInt8Array; static;
   class function ImportKeyPrivate_PKCS1_DER(const Key: TUInt8Array): TURSA.TKey; static;
@@ -724,6 +731,18 @@ public
     class constructor CreateClass;
   end;
   type Montgomery = record
+    type TKeyPublic = record
+      var q: TBigInt;
+      function IsValid: Boolean;
+      class function Invalid: TKeyPublic; static;
+    end;
+    type TKey = record
+      var d: TBigInt;
+      var q: TBigInt;
+      function PublicKey: TKeyPublic;
+      function IsValid: Boolean;
+      class function Invalid: TKey; static;
+    end;
     type TCurve = record
       var p: TBigInt; // prime modulus
       var a: TBigInt; // param a
@@ -735,11 +754,11 @@ public
       function Sub(const v1, v2: TBigInt): TBigInt;
       function Mul(const v1, v2: TBigInt): TBigInt;
       function Inv(const v: TBigInt): TBigInt;
-    end;
-    type TKey = record
-      var d: TBigInt;
-      var q: TBigInt;
-      function IsValid: Boolean;
+      function ScalarMultiply(const k, p1: TBigInt): TBigInt;
+      function X25519(const k, p1: TBigInt): TBigInt;
+      function MakeKey: TKey;
+      function DerivePublicKey(const PrivateKey: TBigInt): TBigInt;
+      function SharedKey(const PublicKey: TBigInt; const PrivateKey: TBigInt): TBigInt;
     end;
     class var Curve_25519: TCurve;
     class var LowOrderPoints: array [0..4] of TBigInt;
@@ -784,7 +803,28 @@ public
       class operator = (const a, b: TPoint): Boolean;
     end;
     type TUInt8Arr32 = array[0..31] of UInt8;
-    type TPointCompressed = TUInt8Arr32;
+    type TKeyPublic = record
+      var q: TUInt8Arr32;
+      function IsValid: Boolean;
+      class function Invalid: TKeyPublic; static;
+    end;
+    type TKey = record
+      var d: TUInt8Arr32;
+      var q: TUInt8Arr32;
+      function PublicKey: TKeyPublic;
+      function IsValid: Boolean;
+      class function Invalid: TKey; static;
+    end;
+    type TSignature = record
+      var r: TUInt8Arr32;
+      var s: TUInt8Arr32;
+      class function Invalid: TSignature; static;
+      class function Make(const Bytes: TUInt8Array): TSignature; static;
+      function ToBytes: TUInt8Array;
+      function ToHex: String;
+      function ToBase64: String;
+      function ToHexLC: String;
+    end;
     type TCurve = record
       var p: TBigInt; // prime modulus
       var a: TBigInt; // param a
@@ -793,32 +833,58 @@ public
       var h: TBigInt; // cofactor
       var b: TPoint; // base point
       var SqrtM1: TBigInt; // cached sqrt(-1)
+      function IsValidSignature(const Signature: TSignature): Boolean;
       function IsOnCurve(const Point: TPoint): Boolean;
       function ToAffine(const Point: TPoint): TPoint;
       function Add(const v1, v2: TBigInt): TBigInt;
       function Sub(const v1, v2: TBigInt): TBigInt;
       function Mul(const v1, v2: TBigInt): TBigInt;
       function Inv(const v: TBigInt): TBigInt;
-    end;
-    type TKey = record
-      var d: TUInt8Arr32;
-      var q: TUInt8Arr32;
-      function IsValid: Boolean;
-      class function Invalid: TKey; static;
-    end;
-    type TSignature = record
-      var r: TUInt8Arr32;
-      var s: TUInt8Arr32;
-      function IsValid(const Curve: TCurve): Boolean;
-      class function Invalid: TSignature; static;
-      function ToHex: String;
+      function PointAdd(const p1, p2: TPoint): TPoint;
+      function PointDouble(const p1: TPoint): TPoint;
+      function ScalarMultiply(const k: TBigInt; const p1: TPoint): TPoint;
+      function PointCompress(const p1: TPoint): TUInt8Arr32;
+      function PointDecompress(const pc: TUInt8Arr32): TPoint;
+      function MakeKey(const Seed: array of UInt8): TKey;
+      function MakeKey: TKey;
+      function Sign(
+        const Key: TKey;
+        const Message: TUInt8Array
+      ): TSignature;
+      function Verify(
+        const PublicKey: TKeyPublic;
+        const Message: TUInt8Array;
+        const Signature: TSignature
+      ): Boolean;
+      function MakeKey_BLAKE3(const Seed: array of UInt8): TKey;
+      function MakeKey_BLAKE3: TKey;
+      function Sign_BLAKE3(
+        const Key: TKey;
+        const Message: TUInt8Array
+      ): TSignature;
+      function Verify_BLAKE3(
+        const PublicKey: TKeyPublic;
+        const Message: TUInt8Array;
+        const Signature: TSignature
+      ): Boolean;
+      function MakeKey_SHAKE(const Seed: array of UInt8): TKey;
+      function MakeKey_SHAKE: TKey;
+      function Sign_SHAKE(
+        const Key: TKey;
+        const Message: TUInt8Array
+      ): TSignature;
+      function Verify_SHAKE(
+        const PublicKey: TKeyPublic;
+        const Message: TUInt8Array;
+        const Signature: TSignature
+      ): Boolean;
     end;
     class var Curve_Ed25519: TCurve;
     class function PointAdd(const Curve: TCurve; const p, q: TPoint): TPoint; static;
     class function PointDouble(const Curve: TCurve; const p: TPoint): TPoint; static;
     class function ScalarMultiply(const Curve: TCurve; const k: TBigInt; const p: TPoint): TPoint; static;
-    class function PointCompress(const Curve: TCurve; const p: TPoint): TPointCompressed; static;
-    class function PointDecompress(const Curve: TCurve; const pc: TPointCompressed): TPoint; static;
+    class function PointCompress(const Curve: TCurve; const p: TPoint): TUInt8Arr32; static;
+    class function PointDecompress(const Curve: TCurve; const pc: TUInt8Arr32): TPoint; static;
     class function MakeKey(const Curve: TCurve; const Seed: array of UInt8): TKey; static;
     class function MakeKey(const Curve: TCurve): TKey; static;
     class function Sign_Ed25519(
@@ -828,7 +894,7 @@ public
     ): TSignature; static;
     class function Verify_Ed25519(
       const Curve: TCurve;
-      const PublicKey: TPointCompressed;
+      const PublicKey: TKeyPublic;
       const Message: TUInt8Array;
       const Signature: TSignature
     ): Boolean; static;
@@ -841,7 +907,7 @@ public
     ): TSignature; static;
     class function Verify_Ed25519_BLAKE3(
       const Curve: TCurve;
-      const PublicKey: TPointCompressed;
+      const PublicKey: TKeyPublic;
       const Message: TUInt8Array;
       const Signature: TSignature
     ): Boolean; static;
@@ -854,7 +920,7 @@ public
     ): TSignature; static;
     class function Verify_Ed25519_SHAKE(
       const Curve: TCurve;
-      const PublicKey: TPointCompressed;
+      const PublicKey: TKeyPublic;
       const Message: TUInt8Array;
       const Signature: TSignature
     ): Boolean; static;
@@ -862,10 +928,228 @@ public
   end;
 end;
 
+type TUKyber768 = record
+public
+  const N = 256;
+  const Q = 3329;
+  const K = 3;
+  const ETA = 2;
+  const ROOT_OF_UNITY = 17;
+  const POLYVEC_BYTES = 320 * K;
+  const POLYCIPHERTEXT_BYTES = 320 * K + 128;
+  const POLYCOMPRESSEDBYTES = 128;
+  const POLYVECCOMPRESSEDBYTES = K * 320;
+  const POLYBYTES = 384;
+  const POLYVECBYTES = K * POLYBYTES;
+  const SYMBYTES = 32;
+  const PUBLICKEYBYTES = POLYVECBYTES + SYMBYTES;
+  const SECRETKEYBYTES = POLYVECBYTES;
+  const NTT_Zetas: array [0..127] of Int16 = (
+    -1044, -758, -359, -1517, 1493, 1422, 287, 202,
+    -171, 622, 1577, 182, 962, -1202, -1474, 1468,
+    573, -1325, 264, 383, -829, 1458, -1602, -130,
+    -681, 1017, 732, 608, -1542, 411, -205, -1571,
+    1223, 652, -552, 1015, -1293, 1491, -282, -1544,
+    516, -8, -320, -666, -1618, -1162, 126, 1469,
+    -853, -90, -271, 830, 107, -1421, -247, -951,
+    -398, 961, -1508, -725, 448, -1065, 677, -1275,
+    -1103, 430, 555, 843, -1251, 871, 1550, 105,
+    422, 587, 177, -235, -291, -460, 1574, 1653,
+    -246, 778, 1159, -147, -777, 1483, -602, 1119,
+    -1590, 644, -872, 349, 418, 329, -156, -75,
+    817, 1097, 603, 610, 1322, -1285, -1465, 384,
+    -1215, -136, 1218, -1335, -874, 220, -1187, -1659,
+    -1185, -1530, -1278, 794, -1510, -854, -870, 478,
+    -108, -308, 996, 991, 958, -1460, 1522, 1628
+  );
+  type TPoly = array[0..N - 1] of Int16;
+  type TVec = array[0..K - 1] of TPoly;
+  type TMatrix = array[0..K - 1] of TVec;
+  type TPolyBytes = array[0..POLYBYTES - 1] of UInt8;
+  type PPolyBytes = ^TPolyBytes;
+  type TVecBytes = array[0..POLYVECBYTES - 1] of UInt8;
+  type PVecBytes = ^TVecBytes;
+  type TPublicKey = record
+    var t: TVec;
+    var rho: array[0..SYMBYTES - 1] of UInt8;
+  end;
+  type TSecretKey = record
+    var s: TVec;
+  end;
+  type TKeyPair = record
+    var PublicKey: TPublicKey;
+    var SecretKey: TSecretKey;
+  end;
+  class function MontgomeryReduce(const a: Int32): Int16; static;
+  class function BarrettReduce(const a: Int16): Int16; static;
+  class function FQMul(a, b: Int16): Int16; static;
+  class function ModQ(const a: Int64): Int32; static;
+  class function AddModQ(const a, b: Int32): Int32; static;
+  class function SubModQ(const a, b: Int32): Int32; static;
+  class function MulModQ(const a, b: Int32): Int32; static;
+  class function PolyAdd(const a, b: TPoly): TPoly; static;
+  class function PolySub(const a, b: TPoly): TPoly; static;
+  class function PolyMulNaive(const a, b: TPoly): TPoly; static;
+  class function PolyMul(const a, b: TPoly): TPoly; static;
+  class procedure PolyNTT(var Poly: TPoly); static;
+  class procedure PolyInvNTT(var Poly: TPoly); static;
+  class procedure VecNTT(var Vec: TVec); static;
+  class procedure VecInvNTT(var Vec: TVec); static;
+  class procedure ToMont(var Poly: TPoly); static;
+  class procedure ToMont(var Vec: TVec); static;
+  class procedure FromMont(var Poly: TPoly); static;
+  class procedure FromMont(var Vec: TVec); static;
+  class function SampleCBD(
+    const RandomBytes: array of UInt8;
+    const TheETA: Int32
+  ): TPoly; static;
+  class function SampleUniform(
+    const Seed: array of UInt8;
+    const Nonce1, Nonce2: UInt8
+  ): TPoly; static;
+  class function VectorAdd(const a, b: TVec): TVec; static;
+  class function MatrixVectorMul(
+    const Matrix: TMatrix;
+    const Vector: TVec
+  ): TVec; static;
+  class function PolyCompress(const Poly: TPoly): TUInt8Array; static;
+  class function PolyDecompress(const Data: array of UInt8): TPoly; static;
+  class procedure PolyToBytes(const Poly: TPoly; const DstBytes: PPolyBytes); static;
+  class function PolyToBytes(const Poly: TPoly): TUInt8Array; static;
+  class function PolyFromBytes(const SrcBytes: PPolyBytes): TPoly; static;
+  class function PolyFromBytes(const Data: array of UInt8): TPoly; static;
+  class function VecCompress(const Vec: TVec): TUInt8Array; static;
+  class function VecDecompress(const Data: array of UInt8): TVec; static;
+  class procedure VecToBytes(const Vec: TVec; const DstBytes: PVecBytes); static;
+  class function VecToBytes(const Vec: TVec): TUInt8Array; static;
+  class function VecFromBytes(const SrcBytes: PVecBytes): TVec; static;
+  class function VecFromBytes(const Data: array of UInt8): TVec; static;
+  class function GenerateKeyPair(
+    const Seed: array of UInt8
+  ): TKeyPair; static;
+  class function GenerateKeyPair: TKeyPair; static;
+  class function GenerateMatrix(
+    const Seed: array of UInt8;
+    const Transposed: Boolean
+  ): TMatrix; static;
+  class function PackPublicKey(const PublicKey: TPublicKey): TUInt8Array; static;
+  class function UnpackPublicKey(const Data: array of UInt8): TPublicKey; static;
+  class function PackSecretKey(const SecretKey: TSecretKey): TUInt8Array; static;
+  class function UnpackSecretKey(const Data: array of UInt8): TSecretKey; static;
+end;
+
+type TUKeccak = record
+public
+  type TState = array[0..4, 0..4] of UInt64;
+private
+  type TStateArr = array[0..24] of UInt64;
+  var _State: TState;
+  var _Rate: UInt32;
+  var _Pos: UInt32;
+  var _Domain: UInt8;
+public
+  procedure Init(const ARate: UInt32; const ADomain: UInt8 = 1);
+  procedure Absorb(const Data: Pointer; const Size: UInt32);
+  procedure Finalize;
+  function Squeeze(const OutSize: UInt32): TUInt8Array;
+  class procedure PermuteF1600(var State: TState); static;
+  class function Init: TState; static;
+  class procedure Init(out State: TState); static;
+  class function Absorb(
+    var State: TState;
+    const Pos: UInt32;
+    const Rate: UInt32;
+    const Data: Pointer;
+    const Size: UInt32
+  ): UInt32; static;
+  class procedure Finalize(
+    var State: TState;
+    const Pos: UInt32;
+    const Rate: UInt32;
+    const Domain: UInt8
+  ); static;
+  class function Squeeze(
+    var State: TState;
+    const Pos: UInt32;
+    const Rate: UInt32;
+    const OutSize: UInt32;
+    out Output: TUInt8Array
+  ): UInt32; static;
+  class function Hash(
+    const Rate: UInt32;
+    const Domain: UInt8;
+    const Data: Pointer;
+    const DataSize: UInt32;
+    const OutSize: UInt32
+  ): TUInt8Array; static;
+end;
+
+type TUSHAKE = record
+private
+  var _Keccak: TUKeccak;
+public
+  procedure Init(const ARate: UInt32);
+  procedure Absorb(const Data: Pointer; const Size: UInt32);
+  procedure Absorb(const Data: TUInt8Array);
+  procedure Absorb(const Data: String);
+  procedure Finalize;
+  function Squeeze(const OutSize: UInt32): TUInt8Array;
+  class function Hash(
+    const Rate: UInt32;
+    const Data: Pointer;
+    const DataSize: UInt32;
+    const OutSize: UInt32
+  ): TUInt8Array; static;
+end;
+
+type TUcSHAKE = record
+private
+  var _Keccak: TUKeccak;
+public
+  procedure Init(
+    const ARate: UInt32;
+    const FunctionName: TUInt8Array;
+    const Customization: TUInt8Array
+  );
+  procedure Init(
+    const ARate: UInt32;
+    const FunctionName: String;
+    const Customization: String
+  );
+  procedure Absorb(const Data: Pointer; const Size: UInt32);
+  procedure Absorb(const Data: TUInt8Array);
+  procedure Absorb(const Data: String);
+  procedure Finalize;
+  function Squeeze(const OutSize: UInt32): TUInt8Array;
+  class function Hash(
+    const Rate: UInt32;
+    const Data: Pointer;
+    const DataSize: UInt32;
+    const FunctionName: TUInt8Array;
+    const Customization: TUInt8Array;
+    const OutSize: UInt32
+  ): TUInt8Array; static;
+  class function Hash(
+    const Rate: UInt32;
+    const Data: TUInt8Array;
+    const FunctionName: TUInt8Array;
+    const Customization: TUInt8Array;
+    const OutSize: UInt32
+  ): TUInt8Array; static;
+  class function Hash(
+    const Rate: UInt32;
+    const Data: String;
+    const FunctionName: String;
+    const Customization: String;
+    const OutSize: UInt32
+  ): TUInt8Array; static;
+end;
+
 type TUBLAKE3 = record
 public
   type TKey = array[0..31] of UInt8;
   class function KeyFromHex(const Hex: String): TKey; static;
+  class function KeyFromBytes(const Bytes: TUInt8Array): TKey; static;
 private
   const BLOCK_LEN = 64;
   const CHUNK_LEN = 1024;
@@ -977,12 +1261,12 @@ public
     der_null = $05,
     der_object_identifier = $06,
     der_utf8_string = $0c,
-    der_sequence = $30,
-    der_set = $31,
     der_printable_string = $13,
     der_ia5_string = $16,
     der_utc_time = $17,
-    der_generalized_time = $18
+    der_generalized_time = $18,
+    der_sequence = $30,
+    der_set = $31
   );
 private
   var _Tag: TTag;
@@ -1110,7 +1394,7 @@ function UKMAC_256(
 
 function USign_RSA_SHA256(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
 function USign_RSA_SHA512(const Data: TUInt8Array; const Key: TURSA.TKey): TUInt8Array;
-function UVerify_RSA(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
+function UVerify_RSA(const Data, Signature: TUInt8Array; const Key: TURSA.TKeyPublic): Boolean;
 
 function UPBKDF2(
   const FuncAuth: TUFuncMAC;
@@ -1240,15 +1524,15 @@ function UImportRSAKey(const KeyASN1: String; const Password: TUInt8Array): TURS
 function UEncrypt_RSA_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UEncrypt_RSA_PKCS1(
-  const Data: TUInt8Array;
-  const Key: TURSA.TKey
+  const Data: array of UInt8;
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UEncrypt_RSA_PKCS1_Str(
   const Str: String;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UDecrypt_RSA_PKCS1_Str(
   const Cipher: TURSA.TBigInt;
@@ -1261,15 +1545,15 @@ function UDecrypt_RSA_PKCS1(
 function UEncrypt_RSA_OAEP(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UEncrypt_RSA_OAEP(
-  const Data: TUInt8Array;
-  const Key: TURSA.TKey
+  const Data: array of UInt8;
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UEncrypt_RSA_OAEP_Str(
   const Str: String;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 function UDecrypt_RSA_OAEP_Str(
   const Cipher: TURSA.TBigInt;
@@ -1484,9 +1768,12 @@ function USharedKey_ECDH(
   const PrivateKey: TUECC.TBigInt
 ): TUECC.TBigInt;
 
+function UDigestHashRate(const DigestSize: UInt32): UInt32;
+function UDigestHashRate(const Digest: array of UInt8): UInt32;
+
 implementation
 
-function TURSA.TKey.Size: Uint32;
+function TURSA.TKey.Size: UInt32;
 begin
   Result := n.BytesUsed * 8;
 end;
@@ -1511,6 +1798,12 @@ begin
   Result := IsPublic or IsPrivate;
 end;
 
+function TURSA.TKey.PublicKey: TKeyPublic;
+begin
+  Result.e := e;
+  Result.n := n;
+end;
+
 class function TURSA.TKey.MakeInvalid: TKey;
 begin
   Result.n := TBigInt.Invalid;
@@ -1533,7 +1826,7 @@ begin
   Result := n.IsValid and e.IsValid;
 end;
 
-class function TURSA.TKeyPublic.MakeInvalid: TKey;
+class function TURSA.TKeyPublic.MakeInvalid: TKeyPublic;
 begin
   Result.n := TBigInt.Invalid;
   Result.e := TBigInt.Invalid;
@@ -2013,6 +2306,7 @@ class function TURSA.MakePrimes(
 ): TUBigIntArray;
   var Threads: array of TMakePrimeThread;
   var Context: TMakePrimeContext;
+  var r: TUInt8Array;
   var i: Int32;
 begin
   if (PrimeCount < 1) or (ThreadCount < 1) then Exit(nil);
@@ -2025,9 +2319,10 @@ begin
   SetLength(Context.Primes, PrimeCount);
   for i := 0 to High(Threads) do
   begin
+    r := USysRandom(4);
     Threads[i] := TMakePrimeThread.Create(True);
     Threads[i].Context := @Context;
-    Threads[i].RandSeed := Random(High(UInt32));
+    Threads[i].RandSeed := PUInt32(@r[0])^;
   end;
   try
     for i := 0 to High(Threads) do
@@ -2343,7 +2638,7 @@ end;
 class function TURSA.Encrypt_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TBigInt;
   var Block: TBigInt;
 begin
@@ -2375,7 +2670,7 @@ end;
 class function TURSA.Encrypt_OAEP(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TBigInt;
   var Block: TBigInt;
 begin
@@ -2475,7 +2770,7 @@ end;
 
 class function TURSA.Verify(
   const Data, Signature: TUInt8Array;
-  const Key: TKey
+  const Key: TKeyPublic
 ): Boolean;
   var Hash: TUInt8Array;
   var PackedHash: TBigInt;
@@ -3760,58 +4055,6 @@ begin
   Result := USHA2_256(@Data[1], Length(Data));
 end;
 
-function UMillerRabinTest(const Number: TURSA.TBigInt; const Iterations: Int32): Boolean;
-  var Two: TURSA.TBigInt;
-  var Cmp: Int8;
-  var i: Int32;
-  var m, m_temp: UInt32;
-  var d, a, x, n_minus_1, n_minus_2: TURSA.TBigInt;
-begin
-  Two := 2;
-  Cmp := TURSA.TBigInt.Compare(Number, Two);
-  if Cmp < 0 then Exit(False);
-  if Cmp = 0 then Exit(True);
-  if not Number.IsOdd then Exit(False);
-  n_minus_1 := Number - TURSA.TBigInt.One;
-  d := n_minus_1;
-  m := 0;
-  while not d.IsOdd and (d > TURSA.TBigInt.Zero) do
-  begin
-    d := TURSA.TBigInt.ShrOne(d);
-    Inc(m);
-  end;
-  n_minus_2 := Number - Two;
-  for i := 1 to Iterations do
-  begin
-    a := TURSA.TBigInt.MakeRandomRange(Two, n_minus_2);
-    x := TURSA.TBigInt.ModPow(a, d, Number);
-    if (x = TURSA.TBigInt.One) or (x = n_minus_1) then Continue;
-    m_temp := m;
-    while m_temp > 1 do
-    begin
-      x := TURSA.TBigInt.ModPow(x, Two, Number);
-      if x = TURSA.TBigInt.One then Exit(False);
-      if x = n_minus_1 then Break;
-      Dec(m_temp);
-    end;
-    if not (x = n_minus_1) then Exit(False);
-  end;
-  Result := True;
-end;
-
-function UMakePrime(const BitCount: Int32): TURSA.TBigInt;
-  var TestCount: Int32;
-begin
-  TestCount := 0;
-  repeat
-    Result := TURSA.TBigInt.MakeRandom(BitCount);
-    Result := Result or (TURSA.TBigInt.One shl (BitCount - 1));
-    Result[0] := Result[0] or 1;
-    Inc(TestCount);
-    if TestCount mod 100 = 0 then WriteLn(TestCount);
-  until UMillerRabinTest(Result, 100);
-end;
-
 function USHA2_512(const Data: Pointer; const DataSize: UInt32): TUDigestSHA2_512;
   const K: array[0..79] of UInt64 = (
     UInt64($428a2f98d728ae22), UInt64($7137449123ef65cd), UInt64($b5c0fbcfec4d3b2f), UInt64($e9b5dba58189dbbc),
@@ -3937,121 +4180,17 @@ begin
   Result := USHA2_512(@Data[1], Length(Data));
 end;
 
-type TKeccakState = array[0..4, 0..4] of UInt64;
-procedure KeccakF1600(var State: TKeccakState);
-  function ROTL64(const x: UInt64; const n: UInt8): UInt64;
-  begin
-    Result := (x shl n) or (x shr (64 - n));
-  end;
-  const RoundConstants: array[0..23] of UInt64 = (
-    UInt64($0000000000000001), UInt64($0000000000008082), UInt64($800000000000808A), UInt64($8000000080008000),
-    UInt64($000000000000808B), UInt64($0000000080000001), UInt64($8000000080008081), UInt64($8000000000008009),
-    UInt64($000000000000008A), UInt64($0000000000000088), UInt64($0000000080008009), UInt64($000000008000000A),
-    UInt64($000000008000808B), UInt64($800000000000008B), UInt64($8000000000008089), UInt64($8000000000008003),
-    UInt64($8000000000008002), UInt64($8000000000000080), UInt64($000000000000800A), UInt64($800000008000000A),
-    UInt64($8000000080008081), UInt64($8000000000008080), UInt64($0000000080000001), UInt64($8000000080008008)
-  );
-  RotationOffsets: array[0..4, 0..4] of UInt8 = (
-    (0, 36, 3, 41, 18),
-    (1, 44, 10, 45, 2),
-    (62, 6, 43, 15, 61),
-    (28, 55, 25, 21, 56),
-    (27, 20, 39, 8, 14)
-  );
-  var r: Int32;
-  var x, y: Int32;
-  var C, D: array[0..4] of UInt64;
-  var B: TKeccakState;
-begin
-  for r := 0 to 23 do
-  begin
-    for x := 0 to 4 do
-    begin
-      C[x] := State[x, 0] xor State[x, 1] xor State[x, 2] xor State[x, 3] xor State[x, 4];
-    end;
-    for x := 0 to 4 do
-    begin
-      D[x] := C[(x + 4) mod 5] xor ROTL64(C[(x + 1) mod 5], 1);
-    end;
-    for x := 0 to 4 do
-    for y := 0 to 4 do
-    begin
-      State[x, y] := State[x, y] xor D[x];
-    end;
-    for x := 0 to 4 do
-    for y := 0 to 4 do
-    begin
-      B[y, (2 * x + 3 * y) mod 5] := ROTL64(State[x, y], RotationOffsets[x, y]);
-    end;
-    for x := 0 to 4 do
-    for y := 0 to 4 do
-    begin
-      State[x, y] := B[x, y] xor ((not B[(x + 1) mod 5, y]) and B[(x + 2) mod 5, y]);
-    end;
-    State[0, 0] := State[0, 0] xor RoundConstants[r];
-  end;
-end;
-
 function SHA3(const Data: Pointer; const DataSize: UInt32; const DigestSize: UInt32): TUInt8Array;
+  var Keccak: TUKeccak;
   var Rate: UInt32;
-  var State: TKeccakState;
-  var PaddedData: TUInt8Array;
-  var Digest: array[0..200 - 1] of UInt8;
-  var PadLen, x, y, i, j, n, BlockPos: Int32;
-  var w: UInt64;
 begin
   Result := nil;
   SetLength(Result, DigestSize);
-  Rate := 200 - (2 * DigestSize);
-  UClear(State, SizeOf(State));
-  PadLen := Rate - (DataSize mod Rate);
-  if PadLen = 0 then PadLen := Rate;
-  PaddedData := nil;
-  SetLength(PaddedData, DataSize + PadLen);
-  if DataSize > 0 then
-  begin
-    Move(Data^, PaddedData[0], DataSize);
-  end;
-  PaddedData[DataSize] := $06;
-  for i := DataSize + 1 to DataSize + PadLen - 2 do
-  begin
-    PaddedData[i] := $00;
-  end;
-  i := High(PaddedData);
-  PaddedData[i] := PaddedData[i] or $80;
-  for i := 0 to (Length(PaddedData) div Rate) - 1 do
-  begin
-    BlockPos := i * Rate;
-    for y := 0 to 4 do
-    for x := 0 to 4 do
-    begin
-      if (x + 5 * y) * 8 < Rate then
-      begin
-        w := 0;
-        for j := 0 to 7 do
-        begin
-          w := w or (UInt64(PaddedData[BlockPos + (x + 5 * y) * 8 + j]) shl (j * 8));
-        end;
-        State[x, y] := State[x, y] xor w;
-      end;
-    end;
-    KeccakF1600(State);
-  end;
-  n := 0;
-  while n < DigestSize do
-  begin
-    for y := 0 to 4 do
-    for x := 0 to 4 do
-    begin
-      if (x + 5 * y) * 8 < Rate then
-      for j := 0 to 7 do
-      begin
-        Digest[n] := Byte((State[x, y] shr (j * 8)) and $ff);
-        Inc(n);
-      end;
-    end;
-  end;
-  Move(Digest, Result[0], DigestSize);
+  Rate := UDigestHashRate(DigestSize);
+  Keccak.Init(Rate, 6);
+  Keccak.Absorb(Data, DataSize);
+  Keccak.Finalize;
+  Result := Keccak.Squeeze(DigestSize);
 end;
 
 function USHA3_224(const Data: Pointer; const DataSize: UInt32): TUDigestSHA3_224;
@@ -4122,67 +4261,6 @@ begin
   Result := USHA3_512(@Data[1], Length(Data));
 end;
 
-function KeccakSponge(
-  const Data: Pointer;
-  const DataSize: UInt32;
-  const OutputSize: Int32;
-  const SecLevel: UInt32;
-  const PaddingByte: UInt8 = $1f
-): TUInt8Array;
-  var Rate: UInt32;
-  var State: TKeccakState;
-  var PaddedData: TUInt8Array;
-  var i, j, BlockPos, SqueezedBytes: Int32;
-  var BlockCount, LastBlockLen, x, y: Int32;
-  var w: UInt64;
-begin
-  UClear(State, SizeOf(State));
-  Rate := 200 - (2 * SecLevel);
-  BlockCount := (DataSize * 8 + 2 + (Rate * 8 - 1)) div (Rate * 8);
-  LastBlockLen := (DataSize * 8 + 2) mod (Rate * 8);
-  if LastBlockLen = 0 then LastBlockLen := Rate * 8;
-  PaddedData := nil;
-  SetLength(PaddedData, BlockCount * Rate);
-  if DataSize > 0 then Move(Data^, PaddedData[0], DataSize);
-  PaddedData[DataSize] := PaddingByte;
-  for i := DataSize + 1 to High(PaddedData) do PaddedData[i] := $00;
-  PaddedData[High(PaddedData)] := PaddedData[High(PaddedData)] or $80;
-  for i := 0 to (Length(PaddedData) div Rate) - 1 do
-  begin
-    BlockPos := i * Rate;
-    for y := 0 to 4 do
-    for x := 0 to 4 do
-    if (x + 5 * y) * 8 < Rate then
-    begin
-      w := 0;
-      for j := 0 to 7 do
-      begin
-        w := w or (UInt64(PaddedData[BlockPos + (x + 5 * y) * 8 + j]) shl (j * 8));
-      end;
-      State[x, y] := State[x, y] xor w;
-    end;
-    KeccakF1600(State);
-  end;
-  Result := nil;
-  SetLength(Result, OutputSize);
-  SqueezedBytes := 0;
-  while SqueezedBytes < OutputSize do
-  begin
-    for y := 0 to 4 do
-    for x := 0 to 4 do
-    begin
-      if (x + 5 * y) * 8 < Rate then
-      for j := 0 to 7 do
-      begin
-        Result[SqueezedBytes] := UInt8((State[x, y] shr (j * 8)) and $ff);
-        Inc(SqueezedBytes);
-        if SqueezedBytes >= OutputSize then Exit;
-      end;
-    end;
-    KeccakF1600(State);
-  end;
-end;
-
 function SHAKE(
   const Data: Pointer;
   const DataSize: UInt32;
@@ -4190,7 +4268,7 @@ function SHAKE(
   const SecLevel: UInt32
 ): TUInt8Array;
 begin
-  Result := KeccakSponge(Data, DataSize, OutputSize, SecLevel, $1f);
+  Result := TUKeccak.Hash(UDigestHashRate(SecLevel), $1f, Data, DataSize, OutputSize);
 end;
 
 function USHAKE_128(const Data: Pointer; const DataSize: UInt32; const OutputSize: Int32): TUInt8Array;
@@ -4303,44 +4381,18 @@ begin
   end;
 end;
 
-function cSHAKE(
-  const Data: Pointer;
-  const DataSize: UInt32;
-  const OutputSize: UInt32;
-  const SecLevel: UInt32;
-  const FunctionName: TUInt8Array;
-  const Customization: TUInt8Array
-): TUInt8Array;
-  var Rate: UInt32;
-  var EncName, EncCustom, Prefix, Input: TUInt8Array;
-begin
-  if (Length(FunctionName) = 0)
-  and (Length(Customization) = 0) then
-  begin
-    Exit(SHAKE(Data, DataSize, OutputSize, SecLevel));
-  end;
-  Rate := 200 - (2 * SecLevel);
-  EncName := EncodeString(FunctionName);
-  EncCustom := EncodeString(Customization);
-  Prefix := UBytesJoin(EncName, EncCustom);
-  Prefix := BytePad(Prefix, Rate);
-  Input := nil;
-  SetLength(Input, Length(Prefix) + DataSize);
-  Move(Prefix[0], Input[0], Length(Prefix));
-  if DataSize > 0 then
-  begin
-    Move(Data^, Input[Length(Prefix)], DataSize);
-  end;
-  Result := KeccakSponge(@Input[0], Length(Input), OutputSize, SecLevel, $04);
-end;
-
 function UcSHAKE_128(
   const Data: Pointer;
   const DataSize, OutputSize: UInt32;
   const FunctionName, Customization: TUInt8Array
 ): TUInt8Array;
 begin
-  Result := cSHAKE(Data, DataSize, OutputSize, 16, FunctionName, Customization);
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_128)),
+    Data, DataSize,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UcSHAKE_128(
@@ -4349,7 +4401,12 @@ function UcSHAKE_128(
   const FunctionName, Customization: TUInt8Array
 ): TUInt8Array;
 begin
-  Result := cSHAKE(@Data[0], Length(Data), OutputSize, 16, FunctionName, Customization);
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_128)),
+    Data,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UcSHAKE_128(
@@ -4358,7 +4415,12 @@ function UcSHAKE_128(
   const FunctionName, Customization: String
 ): TUInt8Array;
 begin
-  Result := cSHAKE(@Data[1], Length(Data), OutputSize, 16, UStrToBytes(FunctionName), UStrToBytes(Customization));
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_128)),
+    Data,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UcSHAKE_256(
@@ -4367,7 +4429,12 @@ function UcSHAKE_256(
   const FunctionName, Customization: TUInt8Array
 ): TUInt8Array;
 begin
-  Result := cSHAKE(Data, DataSize, OutputSize, 32, FunctionName, Customization);
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_256)),
+    Data, DataSize,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UcSHAKE_256(
@@ -4376,7 +4443,12 @@ function UcSHAKE_256(
   const FunctionName, Customization: TUInt8Array
 ): TUInt8Array;
 begin
-  Result := cSHAKE(@Data[0], Length(Data), OutputSize, 32, FunctionName, Customization);
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_256)),
+    Data,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UcSHAKE_256(
@@ -4385,7 +4457,12 @@ function UcSHAKE_256(
   const FunctionName, Customization: String
 ): TUInt8Array;
 begin
-  Result := cSHAKE(@Data[1], Length(Data), OutputSize, 32, UStrToBytes(FunctionName), UStrToBytes(Customization));
+  Result := TUcSHAKE.Hash(
+    UDigestHashRate(SizeOf(TUDigest_256)),
+    Data,
+    FunctionName, Customization,
+    OutputSize
+  );
 end;
 
 function UBLAKE3_Hash(const Data: TUInt8Array; const OutputSize: UInt32): TUInt8Array;
@@ -4564,7 +4641,7 @@ function KMAC(
   var Rate: UInt32;
   var Input, PaddedKey, EncOutputSize: TUInt8Array;
 begin
-  Rate := 200 - (2 * SecLevel);
+  Rate := UDigestHashRate(SecLevel);
   PaddedKey := BytePad(EncodeString(Key), Rate);
   EncOutputSize := RightEncode(UInt64(OutputSize) * 8);
   Input := UBytesConcat([
@@ -4572,10 +4649,10 @@ begin
     UBytesMake(Data, DataSize),
     EncOutputSize
   ]);
-  Result := cSHAKE(
-    @Input[0], Length(Input),
-    OutputSize, SecLevel,
-    UStrToBytes('KMAC'), Customization
+  Result := TUcSHAKE.Hash(
+    Rate, @Input[0], Length(Input),
+    UStrToBytes('KMAC'), Customization,
+    OutputSize
   );
 end;
 
@@ -4653,7 +4730,7 @@ begin
   Result := TURSA.Sign_SHA512(Data, Key);
 end;
 
-function UVerify_RSA(const Data, Signature: TUInt8Array; const Key: TURSA.TKey): Boolean;
+function UVerify_RSA(const Data, Signature: TUInt8Array; const Key: TURSA.TKeyPublic): Boolean;
 begin
   Result := TURSA.Verify(Data, Signature, Key);
 end;
@@ -5065,15 +5142,15 @@ end;
 function UEncrypt_RSA_PKCS1(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := TURSA.Encrypt_PKCS1(Data, DataSize, Key);
 end;
 
 function UEncrypt_RSA_PKCS1(
-  const Data: TUInt8Array;
-  const Key: TURSA.TKey
+  const Data: array of UInt8;
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := TURSA.Encrypt_PKCS1(@Data[0], Length(Data), Key);
@@ -5081,7 +5158,7 @@ end;
 
 function UEncrypt_RSA_PKCS1_Str(
   const Str: String;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := UEncrypt_RSA_PKCS1(@Str[1], Length(Str), Key);
@@ -5106,15 +5183,15 @@ end;
 function UEncrypt_RSA_OAEP(
   const Data: Pointer;
   const DataSize: UInt32;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := TURSA.Encrypt_OAEP(Data, DataSize, Key);
 end;
 
 function UEncrypt_RSA_OAEP(
-  const Data: TUInt8Array;
-  const Key: TURSA.TKey
+  const Data: array of UInt8;
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := TURSA.Encrypt_OAEP(@Data[0], Length(Data), Key);
@@ -5122,7 +5199,7 @@ end;
 
 function UEncrypt_RSA_OAEP_Str(
   const Str: String;
-  const Key: TURSA.TKey
+  const Key: TURSA.TKeyPublic
 ): TURSA.TBigInt;
 begin
   Result := TURSA.Encrypt_OAEP(@Str[1], Length(Str), Key);
@@ -6785,9 +6862,58 @@ begin
   Result := TBigInt.ModPow(v, (p - 2), p);
 end;
 
+function TUECC.Montgomery.TCurve.ScalarMultiply(const k, p1: TBigInt): TBigInt;
+begin
+  Result := Montgomery.ScalarMultiply(Self, k, p1);
+end;
+
+function TUECC.Montgomery.TCurve.X25519(const k, p1: TBigInt): TBigInt;
+begin
+  Result := Montgomery.X25519(Self, k, p1);
+end;
+
+function TUECC.Montgomery.TCurve.MakeKey: TKey;
+begin
+  Result := Montgomery.MakeKey(Self);
+end;
+
+function TUECC.Montgomery.TCurve.DerivePublicKey(const PrivateKey: TBigInt): TBigInt;
+begin
+  Result := Montgomery.DerivePublicKey(Self, PrivateKey);
+end;
+
+function TUECC.Montgomery.TCurve.SharedKey(
+  const PublicKey: TBigInt;
+  const PrivateKey: TBigInt
+): TBigInt;
+begin
+  Result := Montgomery.SharedKey(Self, PublicKey, PrivateKey);
+end;
+
+function TUECC.Montgomery.TKey.PublicKey: TKeyPublic;
+begin
+  Result.q := q;
+end;
+
 function TUECC.Montgomery.TKey.IsValid: Boolean;
 begin
   Result := d.IsValid and q.IsValid;
+end;
+
+class function TUECC.Montgomery.TKey.Invalid: TKey;
+begin
+  Result.d := TBigInt.Invalid;
+  Result.q := TBigInt.Invalid;
+end;
+
+function TUECC.Montgomery.TKeyPublic.IsValid: Boolean;
+begin
+  Result := q.IsValid;
+end;
+
+class function TUECC.Montgomery.TKeyPublic.Invalid: TKeyPublic;
+begin
+  Result.q := TBigInt.Invalid;
 end;
 
 class function TUECC.Montgomery.IsLowOrderPoint(const p: TBigInt): Boolean;
@@ -6961,6 +7087,15 @@ begin
   Result := (a.x = b.x) and (a.y = b.y) and (a.z = b.z) and (a.t = b.t);
 end;
 
+function TUECC.Edwards.TCurve.IsValidSignature(const Signature: TSignature): Boolean;
+  var i: Int32;
+begin
+  if Edwards.IsAllZero(Signature.s) then Exit(False);
+  if Signature.s >= n then Exit(False);
+  for i := 0 to High(Signature.r) do if Signature.r[i] > 0 then Exit(True);
+  Result := False;
+end;
+
 function TUECC.Edwards.TCurve.IsOnCurve(const Point: TPoint): Boolean;
   var Affine: TPoint;
   var lhs, rhs, x2, y2, x2y2: TBigInt;
@@ -7007,6 +7142,117 @@ begin
   Result := TBigInt.ModPow(v, (p - 2), p);
 end;
 
+function TUECC.Edwards.TCurve.PointAdd(const p1, p2: TPoint): TPoint;
+begin
+  Result := Edwards.PointAdd(Self, p1, p2);
+end;
+
+function TUECC.Edwards.TCurve.PointDouble(const p1: TPoint): TPoint;
+begin
+  Result := Edwards.PointDouble(Self, p1);
+end;
+
+function TUECC.Edwards.TCurve.ScalarMultiply(const k: TBigInt; const p1: TPoint): TPoint;
+begin
+  Result := Edwards.ScalarMultiply(Self, k, p1);
+end;
+
+function TUECC.Edwards.TCurve.PointCompress(const p1: TPoint): TUInt8Arr32;
+begin
+  Result := Edwards.PointCompress(Self, p1);
+end;
+
+function TUECC.Edwards.TCurve.PointDecompress(const pc: TUInt8Arr32): TPoint;
+begin
+  Result := Edwards.PointDecompress(Self, pc);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey(const Seed: array of UInt8): TKey;
+begin
+  Result := Edwards.MakeKey(Self, Seed);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey: TKey;
+begin
+  Result := Edwards.MakeKey(Self);
+end;
+
+function TUECC.Edwards.TCurve.Sign(
+  const Key: TKey;
+  const Message: TUInt8Array
+): TSignature;
+begin
+  Result := Edwards.Sign_Ed25519(Self, Key, Message);
+end;
+
+function TUECC.Edwards.TCurve.Verify(
+  const PublicKey: TKeyPublic;
+  const Message: TUInt8Array;
+  const Signature: TSignature
+): Boolean;
+begin
+  Result := Edwards.Verify_Ed25519(Self, PublicKey, Message, Signature);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey_BLAKE3(const Seed: array of UInt8): TKey;
+begin
+  Result := Edwards.MakeKey_BLAKE3(Self, Seed);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey_BLAKE3: TKey;
+begin
+  Result := Edwards.MakeKey_BLAKE3(Self);
+end;
+
+function TUECC.Edwards.TCurve.Sign_BLAKE3(
+  const Key: TKey;
+  const Message: TUInt8Array
+): TSignature;
+begin
+  Result := Edwards.Sign_Ed25519_BLAKE3(Self, Key, Message);
+end;
+
+function TUECC.Edwards.TCurve.Verify_BLAKE3(
+  const PublicKey: TKeyPublic;
+  const Message: TUInt8Array;
+  const Signature: TSignature
+): Boolean;
+begin
+  Result := Edwards.Verify_Ed25519_BLAKE3(Self, PublicKey, Message, Signature);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey_SHAKE(const Seed: array of UInt8): TKey;
+begin
+  Result := Edwards.MakeKey_SHAKE(Self, Seed);
+end;
+
+function TUECC.Edwards.TCurve.MakeKey_SHAKE: TKey;
+begin
+  Result := Edwards.MakeKey_SHAKE(Self);
+end;
+
+function TUECC.Edwards.TCurve.Sign_SHAKE(
+  const Key: TKey;
+  const Message: TUInt8Array
+): TSignature;
+begin
+  Result := Edwards.Sign_Ed25519_SHAKE(Self, Key, Message);
+end;
+
+function TUECC.Edwards.TCurve.Verify_SHAKE(
+  const PublicKey: TKeyPublic;
+  const Message: TUInt8Array;
+  const Signature: TSignature
+): Boolean;
+begin
+  Result := Edwards.Verify_Ed25519_SHAKE(Self, PublicKey, Message, Signature);
+end;
+
+function TUECC.Edwards.TKey.PublicKey: TKeyPublic;
+begin
+  Result.q := q;
+end;
+
 function TUECC.Edwards.TKey.IsValid: Boolean;
 begin
   Result := not Edwards.IsAllZero(d) and not Edwards.IsAllZero(q);
@@ -7017,13 +7263,14 @@ begin
   UClear(Result, SizeOf(Result));
 end;
 
-function TUECC.Edwards.TSignature.IsValid(const Curve: TCurve): Boolean;
-  var i: Int32;
+function TUECC.Edwards.TKeyPublic.IsValid: Boolean;
 begin
-  if Edwards.IsAllZero(s) then Exit(False);
-  if s >= Curve.n then Exit(False);
-  for i := 0 to High(r) do if r[i] > 0 then Exit(True);
-  Result := False;
+  Result := not Edwards.IsAllZero(q);
+end;
+
+class function TUECC.Edwards.TKeyPublic.Invalid: TKeyPublic;
+begin
+  UClear(Result, SizeOf(Result));
 end;
 
 class function TUECC.Edwards.TSignature.Invalid: TSignature;
@@ -7031,9 +7278,32 @@ begin
   UClear(Result, SizeOf(Result));
 end;
 
+class function TUECC.Edwards.TSignature.Make(const Bytes: TUInt8Array): TSignature;
+begin
+  Result := Invalid;
+  if Length(Bytes) <> Length(Result.r) + Length(Result.s) then Exit;
+  UInit(Result.r, Bytes[0], SizeOf(Result.r));
+  UInit(Result.s, Bytes[SizeOf(Result.r)], SizeOf(Result.s));
+end;
+
+function TUECC.Edwards.TSignature.ToBytes: TUInt8Array;
+begin
+  Result := UBytesJoin(r, s);
+end;
+
 function TUECC.Edwards.TSignature.ToHex: String;
 begin
-  Result := UBytesToHexLC(UBytesJoin(r, s));
+  Result := UBytesToHex(ToBytes);
+end;
+
+function TUECC.Edwards.TSignature.ToBase64: String;
+begin
+  Result := UBytesToBase64(ToBytes);
+end;
+
+function TUECC.Edwards.TSignature.ToHexLC: String;
+begin
+  Result := UBytesToHexLC(ToBytes);
 end;
 
 class procedure TUECC.Edwards.Clamp(
@@ -7136,7 +7406,7 @@ end;
 class function TUECC.Edwards.PointCompress(
   const Curve: TCurve;
   const p: TPoint
-): TPointCompressed;
+): TUInt8Arr32;
   var Affine: TPoint;
   var BytesY: TUInt8Array;
   var i: Int32;
@@ -7157,7 +7427,7 @@ end;
 
 class function TUECC.Edwards.PointDecompress(
   const Curve: TCurve;
-  const pc: TPointCompressed
+  const pc: TUInt8Arr32
 ): TPoint;
 var
   BytesY: TUInt8Array;
@@ -7256,7 +7526,7 @@ end;
 
 class function TUECC.Edwards.Verify_Ed25519(
   const Curve: TCurve;
-  const PublicKey: TPointCompressed;
+  const PublicKey: TKeyPublic;
   const Message: TUInt8Array;
   const Signature: TSignature
 ): Boolean;
@@ -7269,12 +7539,12 @@ class function TUECC.Edwards.Verify_Ed25519(
   var AffineSB, AaffineRHram: TPoint;
   var Temp: TUInt8Array;
 begin
-  if not Signature.IsValid(Curve) then Exit(False);
-  A := PointDecompress(Curve, PublicKey);
+  if not Curve.IsValidSignature(Signature) then Exit(False);
+  A := PointDecompress(Curve, PublicKey.q);
   if not A.IsValid then Exit(False);
   R := PointDecompress(Curve, Signature.r);
   if not R.IsValid then Exit(False);
-  Temp := UBytesConcat([Signature.r, PublicKey, Message]);
+  Temp := UBytesConcat([Signature.r, PublicKey.q, Message]);
   Hram := TBigInt.Make(USHA2_512(Temp)) mod Curve.n;
   SB := ScalarMultiply(Curve, Signature.s, Curve.b);
   HramA := ScalarMultiply(Curve, Hram, A);
@@ -7342,7 +7612,7 @@ end;
 
 class function TUECC.Edwards.Verify_Ed25519_BLAKE3(
   const Curve: TCurve;
-  const PublicKey: TPointCompressed;
+  const PublicKey: TKeyPublic;
   const Message: TUInt8Array;
   const Signature: TSignature
 ): Boolean;
@@ -7355,12 +7625,12 @@ class function TUECC.Edwards.Verify_Ed25519_BLAKE3(
   var AffineSB, AaffineRHram: TPoint;
   var Temp: TUInt8Array;
 begin
-  if not Signature.IsValid(Curve) then Exit(False);
-  A := PointDecompress(Curve, PublicKey);
+  if not Curve.IsValidSignature(Signature) then Exit(False);
+  A := PointDecompress(Curve, PublicKey.q);
   if not A.IsValid then Exit(False);
   R := PointDecompress(Curve, Signature.r);
   if not R.IsValid then Exit(False);
-  Temp := UBytesConcat([Signature.r, PublicKey, Message]);
+  Temp := UBytesConcat([Signature.r, PublicKey.q, Message]);
   Hram := TBigInt.Make(UBLAKE3_Hash(Temp, 64)) mod Curve.n;
   SB := ScalarMultiply(Curve, Signature.s, Curve.b);
   HramA := ScalarMultiply(Curve, Hram, A);
@@ -7428,7 +7698,7 @@ end;
 
 class function TUECC.Edwards.Verify_Ed25519_SHAKE(
   const Curve: TCurve;
-  const PublicKey: TPointCompressed;
+  const PublicKey: TKeyPublic;
   const Message: TUInt8Array;
   const Signature: TSignature
 ): Boolean;
@@ -7441,12 +7711,12 @@ class function TUECC.Edwards.Verify_Ed25519_SHAKE(
   var AffineSB, AaffineRHram: TPoint;
   var Temp: TUInt8Array;
 begin
-  if not Signature.IsValid(Curve) then Exit(False);
-  A := PointDecompress(Curve, PublicKey);
+  if not Curve.IsValidSignature(Signature) then Exit(False);
+  A := PointDecompress(Curve, PublicKey.q);
   if not A.IsValid then Exit(False);
   R := PointDecompress(Curve, Signature.r);
   if not R.IsValid then Exit(False);
-  Temp := UBytesConcat([Signature.r, PublicKey, Message]);
+  Temp := UBytesConcat([Signature.r, PublicKey.q, Message]);
   Hram := TBigInt.Make(USHAKE_256(Temp, 64)) mod Curve.n;
   SB := ScalarMultiply(Curve, Signature.s, Curve.b);
   HramA := ScalarMultiply(Curve, Hram, A);
@@ -7470,6 +7740,912 @@ begin
   Curve_Ed25519.SqrtM1 := TBigInt.ModPow(2, (Curve_Ed25519.p - TBigInt.One) div 4, Curve_Ed25519.p);
 end;
 
+class function TUKyber768.MontgomeryReduce(const a: Int32): Int16;
+  const QINV = -3327;
+begin
+  Result := Int16(a) * QINV;
+  Result := (a - Int32(Result) * Q) shr 16;
+end;
+
+class function TUKyber768.BarrettReduce(const a: Int16): Int16;
+  var t: Int16;
+  const v: Int16 = ((1 shl 26) + (Q shr 1)) div Q;
+begin
+  t := (Int32(v) * a + (1 shl 25)) shr 26;
+  t *= Q;
+  Result := a - t;
+end;
+
+class function TUKyber768.FQMul(a, b: Int16): Int16;
+begin
+  Result := MontgomeryReduce(Int32(a) * b);
+end;
+
+class function TUKyber768.ModQ(const a: Int64): Int32;
+begin
+  Result := a mod Q;
+  if Result < 0 then Result += Q;
+end;
+
+class function TUKyber768.AddModQ(const a, b: Int32): Int32;
+begin
+  Result := ModQ(a + b);
+end;
+
+class function TUKyber768.SubModQ(const a, b: Int32): Int32;
+begin
+  Result := ModQ(a - b);
+end;
+
+class function TUKyber768.MulModQ(const a, b: Int32): Int32;
+begin
+  Result := ModQ(Int64(a) * Int64(b));
+end;
+
+class function TUKyber768.PolyAdd(const a, b: TPoly): TPoly;
+  var i: Int32;
+begin
+  for i := 0 to N - 1 do
+  begin
+    Result[i] := AddModQ(a[i], b[i]);
+  end;
+end;
+
+class function TUKyber768.PolySub(const a, b: TPoly): TPoly;
+  var i: Int32;
+begin
+  for i := 0 to N - 1 do
+  begin
+    Result[i] := SubModQ(a[i], b[i]);
+  end;
+end;
+
+class function TUKyber768.PolyMulNaive(const a, b: TPoly): TPoly;
+  var Temp: array[0..2 * N - 2] of Int32;
+  var i, j: Int32;
+begin
+  UClear(Temp, SizeOf(Temp));
+  for i := 0 to N - 1 do
+  for j := 0 to N - 1 do
+  begin
+    Temp[i + j] := AddModQ(Temp[i + j], MulModQ(a[i], b[j]));
+  end;
+  for i := 0 to N - 1 do
+  begin
+    Result[i] := Temp[i];
+    if i + N <= 2 * N - 2 then
+    begin
+      Result[i] := SubModQ(Result[i], Temp[i + N]);
+    end;
+  end;
+end;
+
+class function TUKyber768.PolyMul(const a, b: TPoly): TPoly;
+  var a_ntt, b_ntt: TPoly;
+  var i: Int32;
+begin
+  a_ntt := a;
+  b_ntt := b;
+  PolyNTT(a_ntt);
+  PolyNTT(b_ntt);
+  for i := 0 to N - 1 do
+  begin
+    Result[i] := MulModQ(a_ntt[i], b_ntt[i]);
+  end;
+  PolyInvNTT(Result);
+end;
+
+class procedure TUKyber768.PolyNTT(var Poly: TPoly);
+  var Len, Start, j, i: UInt32;
+  var t, zeta: Int16;
+begin
+  i := 1;
+  Len := 128;
+  while Len >= 2 do
+  begin
+    Start := 0;
+    while Start < 256 do
+    begin
+      Zeta := NTT_Zetas[i];
+      Inc(i);
+      j := Start;
+      while j < Start + Len do
+      begin
+        t := FQMul(Zeta, Poly[j + Len]);
+        Poly[j + Len] := Poly[j] - t;
+        Poly[j] := Poly[j] + t;
+        Inc(j);
+      end;
+      Start := start + 2 * len;
+    end;
+    Len := Len shr 1;
+  end;
+end;
+
+class procedure TUKyber768.PolyInvNTT(var Poly: TPoly);
+  var start, len, j, i: UInt32;
+  var t, zeta: Int16;
+  const f = 1441;
+begin
+  i := 127;
+  Len := 2;
+  while Len <= 128 do
+  begin
+    Start := 0;
+    while Start < 256 do
+    begin
+      Zeta := NTT_Zetas[i];
+      Dec(i);
+      j := Start;
+      while j < Start + Len do
+      begin
+        t := Poly[j];
+        Poly[j] := BarrettReduce(t + Poly[j + Len]);
+        Poly[j + Len] := Poly[j + Len] - t;
+        Poly[j + Len] := FQMul(Zeta, Poly[j + Len]);
+        Inc(j);
+      end;
+      Start := start + 2 * len;
+    end;
+    Len := Len shl 1;
+  end;
+  for j := 0 to 255 do
+  begin
+    Poly[j] := FQMul(Poly[j], f);
+  end;
+end;
+
+class procedure TUKyber768.VecNTT(var Vec: TVec);
+  var i: UInt32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    PolyNTT(Vec[i]);
+  end;
+end;
+
+class procedure TUKyber768.VecInvNTT(var Vec: TVec);
+  var i: UInt32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    PolyInvNTT(Vec[i]);
+  end;
+end;
+
+class procedure TUKyber768.ToMont(var Poly: TPoly);
+  const MONT_CONSTANT = 1353;
+  var i: UInt32;
+begin
+  for i := 0 to N - 1 do
+  begin
+    Poly[i] := FQMul(Poly[i], MONT_CONSTANT);
+  end;
+end;
+
+class procedure TUKyber768.ToMont(var Vec: TVec);
+  var i: UInt32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    ToMont(Vec[i]);
+  end;
+end;
+
+class procedure TUKyber768.FromMont(var Poly: TPoly);
+  var i: UInt32;
+begin
+  for i := 0 to N - 1 do
+  begin
+    Poly[i] := FQMul(Poly[i], 1);
+  end;
+end;
+
+class procedure TUKyber768.FromMont(var Vec: TVec);
+  var i: UInt32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    FromMont(Vec[i]);
+  end;
+end;
+
+class function TUKyber768.SampleCBD(
+  const RandomBytes: array of UInt8;
+  const TheETA: Int32
+): TPoly;
+  function GetBit(const BitInd: Int32): Boolean;
+    var ByteInd, Bit: Int32;
+  begin
+    ByteInd := BitInd div 8;
+    Bit := BitInd mod 8;
+    Result := ((RandomBytes[ByteInd] shr Bit) and 1) = 1;
+  end;
+  var i, j, a, b: Int32;
+  var BytePos, BitPos: Int32;
+begin
+  BytePos := 0;
+  for i := 0 to N - 1 do
+  begin
+    a := 0;
+    b := 0;
+    for j := 0 to TheETA - 1 do
+    begin
+      BitPos := (BytePos * 8 + j * 2);
+      if GetBit(BitPos) then Inc(a);
+      if GetBit(BitPos + 1) then Inc(b);
+    end;
+    Result[i] := ModQ(a - b);
+    Inc(BytePos, TheETA div 4);
+  end;
+end;
+
+class function TUKyber768.SampleUniform(
+  const Seed: array of UInt8;
+  const Nonce1, Nonce2: UInt8
+): TPoly;
+  var i, j: Int32;
+  var Val0, Val1: UInt16;
+  var Buf: TUInt8Array;
+  var Shake: TUSHAKE;
+  var Rate: UInt32;
+begin
+  Rate := UDigestHashRate(SizeOf(TUDigest_128));
+  Shake.Init(Rate);
+  Shake.Absorb(UBytesConcat([Seed, [Nonce1, Nonce2]]));
+  Shake.Finalize;
+  Buf := Shake.Squeeze(Rate);
+  j := 0;
+  i := 0;
+  while i < N do
+  begin
+    if j + 3 > Length(Buf) then
+    begin
+      Buf := Shake.Squeeze(Rate);
+      j := 0;
+    end;
+    Val0 := (UInt16(Buf[j]) or (UInt16(Buf[j + 1]) shl 8)) and $fff;
+    Val1 := (UInt16(Buf[j + 1]) shr 4) or (UInt16(Buf[j + 2]) shl 4);
+    Val1 := Val1 and $fff;
+    Inc(j, 3);
+    if (Val0 < Q) and (i < N) then
+    begin
+      Result[i] := Val0;
+      Inc(i);
+    end;
+    if (Val1 < Q) and (i < N) then
+    begin
+      Result[i] := Val1;
+      Inc(i);
+    end;
+  end;
+end;
+
+class function TUKyber768.VectorAdd(const a, b: TVec): TVec;
+  var i: Int32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    Result[i] := PolyAdd(a[i], b[i]);
+  end;
+end;
+
+class function TUKyber768.MatrixVectorMul(
+  const Matrix: TMatrix;
+  const Vector: TVec
+): TVec;
+  var i, j: Int32;
+  var Temp: TPoly;
+begin
+  for i := 0 to K - 1 do
+  begin
+    UClear(Result[i], SizeOf(Result[i]));
+    for j := 0 to K - 1 do
+    begin
+      Temp := PolyMul(Matrix[i][j], Vector[j]);
+      Result[i] := PolyAdd(Result[i], Temp);
+    end;
+  end;
+end;
+
+class function TUKyber768.PolyCompress(const Poly: TPoly): TUInt8Array;
+  var i, j: UInt32;
+  var u: Int16;
+  var d0: UInt32;
+  var t: array[0..7] of UInt8;
+  var r: PUInt8Arr;
+begin
+  Result := TUInt8Array.Make(POLYCOMPRESSEDBYTES);
+  r := @Result[0];
+  for i := 0 to N div 8 - 1 do
+  begin
+    for j := 0 to 8 - 1 do
+    begin
+      u := Poly[8 * i + j];
+      u += (u shr 15) and Q;
+      d0 := u shl 4;
+      d0 += 1665;
+      d0 *= 80635;
+      d0 := d0 shr 28;
+      t[j] := d0 and $f;
+    end;
+    r^[0] := t[0] or (t[1] shl 4);
+    r^[1] := t[2] or (t[3] shl 4);
+    r^[2] := t[4] or (t[5] shl 4);
+    r^[3] := t[6] or (t[7] shl 4);
+    Inc(Pointer(r), 4);
+  end;
+end;
+
+class function TUKyber768.PolyDecompress(const Data: array of UInt8): TPoly;
+  var i: UInt32;
+  var a: PUInt8Arr;
+begin
+  a := @Data[0];
+  for i := 0 to N div 2 - 1 do
+  begin
+    Result[2 * i + 0] := ((UInt16(a^[0] and 15) * Q) + 8) shr 4;
+    Result[2 * i + 1] := ((UInt16(a^[0] shr 4) * Q) + 8) shr 4;
+    Inc(Pointer(a), 1);
+  end;
+end;
+
+class procedure TUKyber768.PolyToBytes(
+  const Poly: TPoly;
+  const DstBytes: PPolyBytes
+);
+  var i: UInt32;
+  var t0, t1: UInt16;
+  var r: PUInt8Arr;
+begin
+  r := PUInt8Arr(DstBytes);
+  for i := 0 to N div 2 - 1 do
+  begin
+    t0 := Poly[2 * i];
+    t0 += (Int16(t0) shr 15) and Q;
+    t1 := Poly[2 * i + 1];
+    t1 += (Int16(t1) shr 15) and Q;
+    r^[0] := (t0 shr 0);
+    r^[1] := (t0 shr 8) or (t1 shl 4);
+    r^[2] := (t1 shr 4);
+    Inc(Pointer(r), 3);
+  end;
+end;
+
+class function TUKyber768.PolyToBytes(const Poly: TPoly): TUInt8Array;
+begin
+  Result := TUInt8Array.Make(POLYBYTES);
+  PolyToBytes(Poly, @Result[0]);
+end;
+
+class function TUKyber768.PolyFromBytes(const SrcBytes: PPolyBytes): TPoly;
+  var i: UInt32;
+begin
+  for i := 0 to N div 2 - 1 do
+  begin
+    Result[2 * i + 0] := ((SrcBytes^[3 * i + 0] shr 0) or (UInt16(SrcBytes^[3 * i + 1]) shl 8)) and $fff;
+    Result[2 * i + 1] := ((SrcBytes^[3 * i + 1] shr 4) or (UInt16(SrcBytes^[3 * i + 2]) shl 4)) and $fff;
+  end;
+end;
+
+class function TUKyber768.PolyFromBytes(const Data: array of UInt8): TPoly;
+begin
+  Result := PolyFromBytes(@Data[0]);
+end;
+
+class function TUKyber768.VecCompress(const Vec: TVec): TUInt8Array;
+  var i, j, _k: UInt32;
+  var d0: UInt64;
+  var t: array[0..3] of UInt16;
+  var r: PUInt8Arr;
+begin
+  Result := TUInt8Array.Make(POLYVECCOMPRESSEDBYTES);
+  r := @Result[0];
+  for i := 0 to K - 1 do
+  begin
+    for j := 0 to N div 4 - 1 do
+    begin
+      for _k := 0 to 4 - 1 do
+      begin
+        t[_k] := Vec[i][4 * j + _k];
+        t[_k] += (Int16(t[_k]) shr 15) and Q;
+        d0 := t[_k];
+        d0 := d0 shl 10;
+        d0 += 1665;
+        d0 *= 1290167;
+        d0 := d0 shr 32;
+        t[_k] := d0 and $3ff;
+      end;
+      r^[0] := (t[0] shr 0);
+      r^[1] := (t[0] shr 8) or (t[1] shl 2);
+      r^[2] := (t[1] shr 6) or (t[2] shl 4);
+      r^[3] := (t[2] shr 4) or (t[3] shl 6);
+      r^[4] := (t[3] shr 2);
+      Inc(Pointer(r), 5);
+    end;
+  end;
+end;
+
+class function TUKyber768.VecDecompress(const Data: array of UInt8): TVec;
+  var t: array[0..3] of UInt16;
+  var i, j, _k: UInt32;
+  var a: PUInt8Arr;
+begin
+  a := @Data[0];
+  for i := 0 to K - 1 do
+  begin
+    for j := 0 to N div 4 - 1 do
+    begin
+      t[0] := (a^[0] shr 0) or (UInt16(a^[1]) shl 8);
+      t[1] := (a^[1] shr 2) or (UInt16(a^[2]) shl 6);
+      t[2] := (a^[2] shr 4) or (UInt16(a^[3]) shl 4);
+      t[3] := (a^[3] shr 6) or (UInt16(a^[4]) shl 2);
+      Inc(Pointer(a), 5);
+      for _k := 0 to 4 - 1 do
+      begin
+        Result[i][4 * j + _k] := (UInt32(t[_k] and $3ff) * Q + 512) shr 10;
+      end;
+    end;
+  end;
+end;
+
+class procedure TUKyber768.VecToBytes(const Vec: TVec; const DstBytes: PVecBytes);
+  var i: Int32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    PolyToBytes(Vec[i], PPolyBytes(DstBytes) + i);
+  end;
+end;
+
+class function TUKyber768.VecToBytes(const Vec: TVec): TUInt8Array;
+begin
+  Result := TUInt8Array.Make(POLYVECBYTES);
+  VecToBytes(Vec, @Result[0]);
+end;
+
+class function TUKyber768.VecFromBytes(const SrcBytes: PVecBytes): TVec;
+  var i: UInt32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    Result[i] := PolyFromBytes(PPolyBytes(SrcBytes) + i);
+  end;
+end;
+
+class function TUKyber768.VecFromBytes(const Data: array of UInt8): TVec;
+begin
+  Result := VecFromBytes(@Data[0]);
+end;
+
+class function TUKyber768.GenerateKeyPair(const Seed: array of UInt8): TKeyPair;
+  var rho, sigma: array[0..SYMBYTES - 1] of UInt8;
+  var A: TMatrix;
+  var s, e: TVec;
+  var i: Int32;
+  var Nonce: UInt8;
+  var Hash: TUInt8Array;
+begin
+  if Length(Seed) <> SYMBYTES then Exit;
+  Hash := USHA3_512(Seed);
+  UInit(rho, Hash[0], SYMBYTES);
+  UInit(sigma, Hash[SYMBYTES], SYMBYTES);
+  A := GenerateMatrix(rho, False);
+  Nonce := 0;
+  for i := 0 to K - 1 do
+  begin
+    Hash := USHAKE_256(UBytesConcat([sigma, [Nonce]]), ETA * N div 4);
+    s[i] := SampleCBD(Hash, ETA);
+    Inc(Nonce);
+  end;
+  for i := 0 to K - 1 do
+  begin
+    Hash := USHAKE_256(UBytesConcat([sigma, [Nonce]]), ETA * N div 4);
+    e[i] := SampleCBD(Hash, ETA);
+    Inc(Nonce);
+  end;
+  VecNTT(s);
+  VecNTT(e);
+  Result.PublicKey.t := MatrixVectorMul(A, s);
+  Result.PublicKey.t := VectorAdd(Result.PublicKey.t, e);
+  Move(rho[0], Result.PublicKey.rho[0], SYMBYTES);
+  Result.SecretKey.s := s;
+end;
+
+class function TUKyber768.GenerateKeyPair: TKeyPair;
+begin
+  Result := GenerateKeyPair(USysRandom(32));
+end;
+
+class function TUKyber768.GenerateMatrix(
+  const Seed: array of UInt8;
+  const Transposed: Boolean
+): TMatrix;
+  var i, j: Int32;
+begin
+  for i := 0 to K - 1 do
+  begin
+    for j := 0 to K - 1 do
+    begin
+      if Transposed then
+      begin
+        Result[i][j] := SampleUniform(Seed, i, j)
+      end
+      else
+      begin
+        Result[i][j] := SampleUniform(Seed, j, i);
+      end;
+    end;
+  end;
+end;
+
+class function TUKyber768.PackPublicKey(const PublicKey: TPublicKey): TUInt8Array;
+begin
+  Result := TUInt8Array.Make(PUBLICKEYBYTES);
+  Move(VecToBytes(PublicKey.t)[0], Result[0], POLYVECBYTES);
+  Move(PublicKey.rho[0], Result[POLYVECBYTES], SYMBYTES);
+end;
+
+class function TUKyber768.UnpackPublicKey(const Data: array of UInt8): TPublicKey;
+begin
+  Result.t := VecFromBytes(Copy(Data, 0, POLYVECBYTES));
+  Move(Data[POLYVECBYTES], Result.rho[0], SYMBYTES);
+end;
+
+class function TUKyber768.PackSecretKey(const SecretKey: TSecretKey): TUInt8Array;
+begin
+  Result := VecToBytes(SecretKey.s);
+end;
+
+class function TUKyber768.UnpackSecretKey(const Data: array of UInt8): TSecretKey;
+begin
+  Result.s := VecFromBytes(Data);
+end;
+
+procedure TUKeccak.Init(const ARate: UInt32; const ADomain: UInt8);
+begin
+  _State := Init;
+  _Rate := ARate;
+  _Pos := 0;
+  _Domain := ADomain;
+end;
+
+procedure TUKeccak.Absorb(const Data: Pointer; const Size: UInt32);
+begin
+  _Pos := Absorb(_State, _Pos, _Rate, Data, Size);
+end;
+
+procedure TUKeccak.Finalize;
+begin
+  Finalize(_State, _Pos, _Rate, _Domain);
+  _Pos := 0;
+end;
+
+function TUKeccak.Squeeze(const OutSize: UInt32): TUInt8Array;
+begin
+  _Pos := Squeeze(_State, _Pos, _Rate, OutSize, Result);
+end;
+
+class procedure TUKeccak.PermuteF1600(var State: TState);
+  function ROTL64(const x: UInt64; const n: UInt8): UInt64;
+  begin
+    if n = 0 then Exit(x);
+    Result := (x shl n) or (x shr (64 - n));
+  end;
+  const NROUNDS = 24;
+  const RoundConstants: array [0..NROUNDS - 1] of UInt64 = (
+    UInt64($0000000000000001), UInt64($0000000000008082), UInt64($800000000000808a), UInt64($8000000080008000),
+    UInt64($000000000000808b), UInt64($0000000080000001), UInt64($8000000080008081), UInt64($8000000000008009),
+    UInt64($000000000000008a), UInt64($0000000000000088), UInt64($0000000080008009), UInt64($000000008000000a),
+    UInt64($000000008000808b), UInt64($800000000000008b), UInt64($8000000000008089), UInt64($8000000000008003),
+    UInt64($8000000000008002), UInt64($8000000000000080), UInt64($000000000000800a), UInt64($800000008000000a),
+    UInt64($8000000080008081), UInt64($8000000000008080), UInt64($0000000080000001), UInt64($8000000080008008)
+  );
+  const RotationOffsets: array[0..4, 0..4] of UInt8 = (
+    (0, 36, 3, 41, 18),
+    (1, 44, 10, 45, 2),
+    (62, 6, 43, 15, 61),
+    (28, 55, 25, 21, 56),
+    (27, 20, 39, 8, 14)
+  );
+  var r: Int32;
+  var x, y: Int32;
+  var C, D: array[0..4] of UInt64;
+  var B: TState;
+begin
+  for r := 0 to 23 do
+  begin
+    for x := 0 to 4 do
+    begin
+      C[x] := State[0, x] xor State[1, x] xor State[2, x] xor State[3, x] xor State[4, x];
+    end;
+    for x := 0 to 4 do
+    begin
+      D[x] := C[(x + 4) mod 5] xor ROTL64(C[(x + 1) mod 5], 1);
+    end;
+    for x := 0 to 4 do
+    for y := 0 to 4 do
+    begin
+      State[y, x] := State[y, x] xor D[x];
+    end;
+    for x := 0 to 4 do
+    for y := 0 to 4 do
+    begin
+      B[(2 * x + 3 * y) mod 5, y] := ROTL64(State[y, x], RotationOffsets[x, y]);
+    end;
+    for x := 0 to 4 do
+    for y := 0 to 4 do
+    begin
+      State[y, x] := B[y, x] xor ((not B[y, (x + 1) mod 5]) and B[y, (x + 2) mod 5]);
+    end;
+    State[0, 0] := State[0, 0] xor RoundConstants[r];
+  end;
+end;
+
+class function TUKeccak.Init: TState;
+begin
+  Init(Result);
+end;
+
+class procedure TUKeccak.Init(out State: TState);
+begin
+  UClear(State, SizeOf(State));
+end;
+
+class function TUKeccak.Absorb(
+  var State: TState;
+  const Pos: UInt32;
+  const Rate: UInt32;
+  const Data: Pointer;
+  const Size: UInt32
+): UInt32;
+  var StateArr: TStateArr absolute State;
+  var i, j, InLen, CurPos: Int64;
+  var InByte: PUInt8;
+begin
+  InByte := PUInt8(Data);
+  InLen := Size;
+  CurPos := Pos;
+  while (CurPos + InLen >= Rate) do
+  begin
+    for i := CurPos to Rate - 1 do
+    begin
+      j := i shr 3;
+      StateArr[j] := StateArr[j] xor UInt64(InByte^) shl (8 * (i mod 8));
+      Inc(InByte);
+    end;
+    InLen -= Rate - CurPos;
+    PermuteF1600(State);
+    CurPos := 0;
+  end;
+  Result := CurPos + InLen;
+  for i := CurPos to Int64(Result) - 1 do
+  begin
+    j := i shr 3;
+    StateArr[j] := StateArr[j] xor UInt64(InByte^) shl (8 * (i mod 8));
+    Inc(InByte);
+  end;
+end;
+
+class procedure TUKeccak.Finalize(
+  var State: TState;
+  const Pos: UInt32;
+  const Rate: UInt32;
+  const Domain: UInt8
+);
+  var StateArr: TStateArr absolute State;
+  var i: Int32;
+begin
+  i := Pos shr 3;
+  StateArr[i] := StateArr[i] xor UInt64(Domain) shl (8 * (Pos mod 8));
+  i := Rate div 8 - 1;
+  StateArr[i] := StateArr[i] xor UInt64(1) shl 63;
+  PermuteF1600(State);
+end;
+
+class function TUKeccak.Squeeze(
+  var State: TState;
+  const Pos: UInt32;
+  const Rate: UInt32;
+  const OutSize: UInt32;
+  out Output: TUInt8Array
+): UInt32;
+  var StateArr: TStateArr absolute State;
+  var i: Int32;
+  var OutLen: UInt32;
+  var CurPos: UInt32;
+  var OutByte: PUInt8;
+begin
+  if OutSize = 0 then Exit(Pos);
+  Output := TUInt8Array.Make(OutSize);
+  OutByte := @Output[0];
+  OutLen := OutSize;
+  CurPos := Pos;
+  while OutLen > 0 do
+  begin
+    if CurPos = Rate then
+    begin
+      PermuteF1600(State);
+      CurPos := 0;
+    end;
+    i := CurPos;
+    while (i < Rate) and (i < CurPos + OutLen) do
+    begin
+      OutByte^ := StateArr[i shr 3] shr (8 * (i mod 8));
+      Inc(OutByte);
+      Inc(i);
+    end;
+    OutLen -= i - CurPos;
+    CurPos := i;
+  end;
+  Result := CurPos;
+end;
+
+class function TUKeccak.Hash(
+  const Rate: UInt32;
+  const Domain: UInt8;
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutSize: UInt32
+): TUInt8Array;
+  var Keccak: TUKeccak;
+begin
+  Keccak.Init(Rate, Domain);
+  Keccak.Absorb(Data, DataSize);
+  Keccak.Finalize;
+  Result := Keccak.Squeeze(OutSize);
+end;
+
+// TUSHAKE begin
+procedure TUSHAKE.Init(const ARate: UInt32);
+begin
+  _Keccak.Init(ARate, $1f);
+end;
+
+procedure TUSHAKE.Absorb(const Data: Pointer; const Size: UInt32);
+begin
+  _Keccak.Absorb(Data, Size);
+end;
+
+procedure TUSHAKE.Absorb(const Data: TUInt8Array);
+begin
+  _Keccak.Absorb(@Data[0], Length(Data));
+end;
+
+procedure TUSHAKE.Absorb(const Data: String);
+begin
+  _Keccak.Absorb(@Data[1], Length(Data));
+end;
+
+procedure TUSHAKE.Finalize;
+begin
+  _Keccak.Finalize;
+end;
+
+function TUSHAKE.Squeeze(const OutSize: UInt32): TUInt8Array;
+begin
+  Result := _Keccak.Squeeze(OutSize);
+end;
+
+class function TUSHAKE.Hash(
+  const Rate: UInt32;
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const OutSize: UInt32
+): TUInt8Array;
+  var Shake: TUSHAKE;
+begin
+  Shake.Init(Rate);
+  Shake.Absorb(Data, DataSize);
+  Shake.Finalize;
+  Result := Shake.Squeeze(OutSize);
+end;
+// TUSHAKE end
+
+// TUcSHAKE begin
+procedure TUcSHAKE.Init(
+  const ARate: UInt32;
+  const FunctionName: TUInt8Array;
+  const Customization: TUInt8Array
+);
+  var Prefix: TUInt8Array;
+begin
+  if (Length(FunctionName) = 0)
+  and (Length(Customization) = 0) then
+  begin
+    _Keccak.Init(ARate, $1f);
+  end
+  else
+  begin
+    _Keccak.Init(ARate, $04);
+    Prefix := UBytesJoin(EncodeString(FunctionName), EncodeString(Customization));
+    Prefix := BytePad(Prefix, ARate);
+    _Keccak.Absorb(@Prefix[0], Length(Prefix));
+  end;
+end;
+
+procedure TUcSHAKE.Init(
+  const ARate: UInt32;
+  const FunctionName: String;
+  const Customization: String
+);
+begin
+  Init(ARate, UStrToBytes(FunctionName), UStrToBytes(Customization));
+end;
+
+procedure TUcSHAKE.Absorb(const Data: Pointer; const Size: UInt32);
+begin
+  _Keccak.Absorb(Data, Size);
+end;
+
+procedure TUcSHAKE.Absorb(const Data: TUInt8Array);
+begin
+  _Keccak.Absorb(@Data[0], Length(Data));
+end;
+
+procedure TUcSHAKE.Absorb(const Data: String);
+begin
+  _Keccak.Absorb(@Data[1], Length(Data));
+end;
+
+procedure TUcSHAKE.Finalize;
+begin
+  _Keccak.Finalize;
+end;
+
+function TUcSHAKE.Squeeze(const OutSize: UInt32): TUInt8Array;
+begin
+  Result := _Keccak.Squeeze(OutSize);
+end;
+
+class function TUcSHAKE.Hash(
+  const Rate: UInt32;
+  const Data: Pointer;
+  const DataSize: UInt32;
+  const FunctionName: TUInt8Array;
+  const Customization: TUInt8Array;
+  const OutSize: UInt32
+): TUInt8Array;
+  var cShake: TUcSHAKE;
+begin
+  cShake.Init(Rate, FunctionName, Customization);
+  cShake.Absorb(Data, DataSize);
+  cShake.Finalize;
+  Result := cShake.Squeeze(OutSize);
+end;
+
+class function TUcSHAKE.Hash(
+  const Rate: UInt32;
+  const Data: TUInt8Array;
+  const FunctionName: TUInt8Array;
+  const Customization: TUInt8Array;
+  const OutSize: UInt32
+): TUInt8Array;
+begin
+  Result := Hash(
+    Rate, @Data[0], Length(Data),
+    FunctionName, Customization,
+    OutSize
+  );
+end;
+
+class function TUcSHAKE.Hash(
+  const Rate: UInt32;
+  const Data: String;
+  const FunctionName: String;
+  const Customization: String;
+  const OutSize: UInt32
+): TUInt8Array;
+begin
+  Result := Hash(
+    Rate, @Data[1], Length(Data),
+    UStrToBytes(FunctionName), UStrToBytes(Customization),
+    OutSize
+  );
+end;
+// TUcSHAKE end
+
+// TUBLAKE3 begin
 class function TUBLAKE3.KeyFromHex(const Hex: String): TKey;
   var ByteCount: Int32;
   var i, j: Int32;
@@ -7487,6 +8663,13 @@ begin
     j := i * 2 + 1;
     Result[i] := UInt8(StrToInt('$' + Hex[j] + Hex[j + 1]));
   end;
+end;
+
+class function TUBLAKE3.KeyFromBytes(const Bytes: TUInt8Array): TKey;
+begin
+  UClear(Result, SizeOf(Result));
+  if Length(Bytes) = 0 then Exit;
+  Move(Bytes[0], Result, UMin(Length(Bytes), SizeOf(Result)));
 end;
 
 class function TUBLAKE3.ROTR32(const x: UInt32; const n: UInt8): UInt32;
@@ -7618,11 +8801,8 @@ begin
   Result := Hasher.Finalize(OutputSize);
 end;
 
-class function TUBLAKE3.KDF(
-  const Context: TUInt8Array;
-  const Password: TUInt8Array;
-  const OutputSize: Uint32
-): TUInt8Array;
+class function TUBLAKE3.KDF(const Context, Password: TUInt8Array;
+  const OutputSize: Uint32): TUInt8Array;
   var Hasher: THasher;
   var ContextKey: TUInt8Array;
   var Key: TKey;
@@ -7833,6 +9013,7 @@ begin
   end;
   PushStack(NewCV);
 end;
+// TUBLAKE3 end
 
 function UEncrypt_AES_PKCS7_ECB_128(
   const Data: TUInt8Array;
@@ -8215,6 +9396,16 @@ begin
     PublicKey,
     PrivateKey
   );
+end;
+
+function UDigestHashRate(const DigestSize: UInt32): UInt32;
+begin
+  Result := 200 - (2 * DigestSize);
+end;
+
+function UDigestHashRate(const Digest: array of UInt8): UInt32;
+begin
+  Result := UDigestHashRate(Length(Digest));
 end;
 
 end.

@@ -2,7 +2,9 @@
 {$modeswitch advancedrecords}
 {$modeswitch nestedprocvars}
 {$modeswitch typehelpers}
+{$modeswitch implicitfunctionspecialization}
 {$optimization autoinline}
+{$asmmode intel}
 {$macro on}
 {$warn 6058 off}
 {$warn 5024 off}
