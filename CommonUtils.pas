@@ -2082,6 +2082,46 @@ public
 end;
 operator > (const a, b: TURadixTree.TNode): Boolean;
 
+type TUAtlasQuick = record
+private
+  type TRectArray = specialize TArray<TURect>;
+  var FreeRects: TRectArray;
+public
+  procedure Setup(const AWidth, AHeight: UInt32);
+  function Allocate(
+    const Width, Height: UInt32;
+    out Placement: TUBounds2i
+  ): Boolean;
+end;
+
+type TUAtlasPacked = record
+public
+  type THeuristic = (
+    ph_short_side_fit,
+    ph_long_side_fit,
+    ph_area_fit,
+    ph_bottom_left
+  );
+private
+  type TRectArray = specialize TArray<TURect>;
+  var FreeRects: TRectArray;
+  class function Fits(
+    const rw, rh: Int32; const fr: TURect;
+    const h: THeuristic; out Score1, Score2: Int32
+  ): Boolean; static;
+  procedure SplitAndPrune(const Placed: TURect);
+  class procedure RemoveContained(var Rects: TRectArray); static;
+  class function Overlaps(const a, b: TURect): Boolean; static;
+public
+  procedure Setup(const AWidth, AHeight: UInt32);
+  function Allocate(
+    const Width, Height: UInt32;
+    out Placement: TUBounds2i;
+    const Heuristic: THeuristic = ph_short_side_fit;
+    const Rotated: PBoolean = nil
+  ): Boolean;
+end;
+
 type TUGuid = record
   var Data1: UInt32;
   var Data2: UInt16;
@@ -12082,6 +12122,256 @@ begin
   v.Finalize;
 end;
 // TURadixTree end
+
+// TUAtlasQuick begin
+procedure TUAtlasQuick.Setup(const AWidth, AHeight: UInt32);
+begin
+  FreeRects := nil;
+  UArrAppend(FreeRects, [0, 0, AWidth, AHeight]);
+end;
+
+function TUAtlasQuick.Allocate(
+  const Width, Height: UInt32;
+  out Placement: TUBounds2i
+): Boolean;
+  var BestRectIndex: Int32;
+  var MinArea, Area: TUFloat;
+  var FreeRect: TURect;
+  var RemWidth, RemHeight: UInt32;
+  var i: Int32;
+begin
+  BestRectIndex := -1;
+  MinArea := UMaxValueFloat;
+  for i := 0 to High(FreeRects) do
+  begin
+    if (FreeRects[i].w >= Width)
+    and (FreeRects[i].h >= Height) then
+    begin
+      Area := FreeRects[i].w * FreeRects[i].h;
+      if (Area < MinArea) then
+      begin
+        MinArea := Area;
+        BestRectIndex := i;
+      end;
+    end;
+  end;
+  if (BestRectIndex = -1) then Exit(False);
+  FreeRect := FreeRects[BestRectIndex];
+  UArrDelete(FreeRects, BestRectIndex);
+  RemWidth := FreeRect.w - Width;
+  RemHeight := FreeRect.h - Height;
+  if (RemWidth > RemHeight) then
+  begin
+    UArrAppend(FreeRects, [FreeRect.x + Width, FreeRect.y, RemWidth, FreeRect.h]);
+    UArrAppend(FreeRects, [FreeRect.x, FreeRect.y + Height, Width, RemHeight]);
+  end
+  else
+  begin
+    UArrAppend(FreeRects, [FreeRect.x, FreeRect.y + Height, FreeRect.w, RemHeight]);
+    UArrAppend(FreeRects, [FreeRect.x + Width, FreeRect.y, RemWidth, Height]);
+  end;
+  Placement := [[FreeRect.x, FreeRect.y], [FreeRect.x + Width, FreeRect.y + Height]];
+  Result := True;
+end;
+// TUAtlasQuick end
+
+// TUAtlasPacked begin
+class function TUAtlasPacked.Fits(
+  const rw, rh: Int32; const fr: TURect;
+  const h: THeuristic;
+  out Score1, Score2: Int32
+): Boolean;
+  var LeftoverX, LeftoverY: Int32;
+begin
+  if (rw > fr.w) or (rh > fr.h) then Exit(False);
+  LeftoverX := fr.w - rw;
+  LeftoverY := fr.h - rh;
+  case h of
+    ph_short_side_fit:
+    begin
+      Score1 := UMin(LeftoverX, LeftoverY);
+      Score2 := UMax(LeftoverX, LeftoverY);
+    end;
+    ph_long_side_fit:
+    begin
+      Score1 := UMax(LeftoverX, LeftoverY);
+      Score2 := UMin(LeftoverX, LeftoverY);
+    end;
+    ph_area_fit:
+    begin
+      Score1 := fr.w * fr.h - rw * rh;
+      Score2 := UMin(LeftoverX, LeftoverY);
+    end;
+    ph_bottom_left:
+    begin
+      Score1 := fr.y + rh;
+      Score2 := fr.x;
+    end;
+  end;
+  Result := True;
+end;
+
+procedure TUAtlasPacked.SplitAndPrune(const Placed: TURect);
+  var Next: specialize TArray<TURect>;
+  var NextCount: Int32;
+  procedure AddNext(const r: TURect);
+  begin
+    if NextCount >= Length(Next) then
+    begin
+      SetLength(Next, Length(Next) * 2);
+    end;
+    Next[NextCount] := r;
+    Inc(NextCount);
+  end;
+  var fr: TURect;
+begin
+  SetLength(Next, Length(FreeRects) * 2);
+  NextCount := 0;
+  for fr in FreeRects do
+  begin
+    if not Overlaps(fr, Placed) then
+    begin
+      AddNext(fr);
+      Continue;
+    end;
+    if Placed.x > fr.x then
+    begin
+      AddNext([fr.x, fr.y, placed.x - fr.x, fr.h]);
+    end;
+    if Placed.x + Placed.w < fr.x + fr.w then
+    begin
+      AddNext([
+        placed.x + placed.w, fr.y,
+        fr.x + fr.w - (Placed.x + Placed.w), fr.h
+      ]);
+    end;
+    if Placed.y > fr.y then
+    begin
+      AddNext([fr.x, fr.y, fr.w, Placed.y - fr.y]);
+    end;
+    if Placed.y + Placed.h < fr.y + fr.h then
+    begin
+      AddNext([
+        fr.x, Placed.y + Placed.h,
+        fr.w, fr.y + fr.h - (Placed.y + Placed.h)
+      ]);
+    end;
+  end;
+  RemoveContained(Next);
+  if NextCount <> Length(Next) then SetLength(Next, NextCount);
+  FreeRects := Next;
+end;
+
+class procedure TUAtlasPacked.RemoveContained(var Rects: TRectArray);
+  var i, j: Int32;
+begin
+  i := 0;
+  while i < High(Rects) do
+  begin
+    j := i + 1;
+    while j < Length(Rects) do
+    begin
+      if Rects[j].Contains(Rects[i]) then
+      begin
+        Rects[i] := Rects[High(Rects)];
+        SetLength(Rects, Length(Rects) - 1);
+        Dec(i);
+        Break;
+      end;
+      if Rects[i].Contains(Rects[j]) then
+      begin
+        Rects[j] := Rects[High(Rects)];
+        SetLength(Rects, Length(Rects) - 1);
+      end
+      else
+      begin
+        Inc(j);
+      end;
+    end;
+    Inc(i);
+  end;
+end;
+
+class function TUAtlasPacked.Overlaps(const a, b: TURect): Boolean;
+begin
+  Result := (
+    (a.x < b.x + b.w) and
+    (a.x + a.w > b.x) and
+    (a.y < b.y + b.h) and
+    (a.y + a.h > b.y)
+  );
+end;
+
+procedure TUAtlasPacked.Setup(const AWidth, AHeight: UInt32);
+begin
+  FreeRects := nil;
+  UArrAppend(FreeRects, [[0, 0, AWidth, AHeight]]);
+end;
+
+function TUAtlasPacked.Allocate(
+  const Width, Height: UInt32;
+  out Placement: TUBounds2i;
+  const Heuristic: THeuristic;
+  const Rotated: PBoolean
+): Boolean;
+  var BestScore1, BestScore2, BestFreeIdx: Int32;
+  var BestRotated: Boolean;
+  var i, s1, s2, pw, ph: Int32;
+  var fr, Chosen: TURect;
+begin
+  BestScore1 := UMaxValueInt32;
+  BestScore2 := UMaxValueInt32;
+  BestFreeIdx := -1;
+  BestRotated := False;
+  for i := 0 to High(FreeRects) do
+  begin
+    fr := FreeRects[i];
+    s1 := 0;
+    s2 := 0;
+    if (Fits(Width, Height, fr, Heuristic, s1, s2)) then
+    begin
+      if (s1 < BestScore1) or ((s1 = BestScore1) and (s2 < BestScore2)) then
+      begin
+        BestScore1 := s1;
+        BestScore2 := s2;
+        BestFreeIdx := i;
+        BestRotated := False;
+      end;
+    end;
+    if not Assigned(Rotated) then Continue;
+    if Width <> Height  then
+    begin
+      if (Fits(Height, Width, fr, Heuristic, s1, s2)) then
+      begin
+        if (s1 < BestScore1) or ((s1 = BestScore1) and (s2 < BestScore2)) then
+        begin
+          BestScore1 := s1;
+          BestScore2 := s2;
+          BestFreeIdx := i;
+          BestRotated := True;
+        end;
+      end;
+    end;
+  end;
+  if (BestFreeIdx = -1) then Exit(False);
+  if BestRotated then
+  begin
+    pw := Height;
+    ph := Width;
+  end
+  else
+  begin
+    pw := Width;
+    ph := Height;
+  end;
+  if Assigned(Rotated) then Rotated^ := BestRotated;
+  fr := FreeRects[BestFreeIdx];
+  Chosen := [fr.x, fr.y, pw, ph];
+  SplitAndPrune(Chosen);
+  Placement := [[Chosen.x, Chosen.y], [Chosen.r, Chosen.b]];
+  Result := True;
+end;
+// TUAtlasPacked end
 
 // TUGuid begin
 class function TUGuid.Make: TUGuid;
