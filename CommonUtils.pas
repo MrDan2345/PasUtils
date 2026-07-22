@@ -1793,6 +1793,7 @@ end;
 
 generic TUMap<TKey, TValue> = record
 public
+  type PValue = ^TValue;
   type TItem = record
     Key: TKey;
     Value: TValue;
@@ -1800,9 +1801,10 @@ public
   type TEqualValue = function (const a, b: TValue): Boolean;
 private
   var _Items: array of TItem;
-  function GetValue(const Index: Int32): TValue; inline;
+  function GetPtr(const Key: TKey): PValue;
 public
-  property Get[const Index: Int32]: TValue read GetValue; default;
+  property Get[const Key: TKey]: PValue read GetPtr; default;
+  function GetValue(const Index: Int32): TValue;
   function GetKey(const Index: Int32): TKey; inline;
   function Add(const Key: TKey; const Value: TValue): Int32;
   function HasKey(const Key: TKey): Boolean;
@@ -10923,6 +10925,14 @@ end;
 // TUShortStringReader end
 
 // TUMap begin
+function TUMap.GetPtr(const Key: TKey): PValue;
+  var i: Int32;
+begin
+  i := FindIndexByKey(Key);
+  if i < 0 then Exit(nil);
+  Result := @_Items[i].Value;
+end;
+
 function TUMap.GetValue(const Index: Int32): TValue;
 begin
   Result := FindValueByIndex(Index);
