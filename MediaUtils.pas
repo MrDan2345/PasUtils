@@ -566,6 +566,7 @@ public
   ); virtual;
 end;
 
+
 type TUSceneDataDAE = class (TUSceneData)
 public
   type TColladaObject = class
@@ -653,8 +654,8 @@ public
     var _Source: TColladaObject;
     var _Offset: Int32;
     var _Set: Int32;
-    function GetSize: UInt32; inline;
-    function GetCount: UInt32; inline;
+    function GetSize: UInt32;
+    function GetCount: UInt32;
   protected
     procedure ResolveLinks; override;
   public
@@ -685,11 +686,11 @@ public
     var _Count: Int32;
     var _ItemSize: Int32;
     var _ArrayType: TColladaArrayType;
-    function GetAsBool(const Index: Int32): PBoolean; inline;
-    function GetAsInt(const Index: Int32): PInt32; inline;
-    function GetAsFloat(const Index: Int32): PUFloat; inline;
-    function GetAsString(const Index: Int32): String; inline;
-    function GetRawData(const Offset: Int32): Pointer; inline;
+    function GetAsBool(const Index: Int32): PBoolean;
+    function GetAsInt(const Index: Int32): PInt32;
+    function GetAsFloat(const Index: Int32): PUFloat;
+    function GetAsString(const Index: Int32): String;
+    function GetRawData(const Offset: Int32): Pointer;
   public
     property ArrayType: TColladaArrayType read _ArrayType;
     property Count: Int32 read _Count;
@@ -758,9 +759,9 @@ public
     var _VertexLayout: TColladaInputList;
     var _InputStride: Int32;
     function GetVertexSize: Int32;
-    function GetIndices: PUInt32Arr; inline;
+    function GetIndices: PUInt32Arr;
     function GetVertexDescriptor: TUVertexDescriptor;
-    function GetInputSourceCount(const Index: UInt32): UInt32; inline;
+    function GetInputSourceCount(const Index: UInt32): UInt32;
     procedure Load(const XMLNode: TUXML); virtual;
     procedure InitializeObject; override;
   public
@@ -846,12 +847,12 @@ public
     var _Data: TObject;
   public
     property ParamType: TColladaEffectProfileParamType read _ParamType;
-    function AsSurface: TDataSurface; inline;
-    function AsSampler: TDataSampler; inline;
-    function AsFloat: TDataFloat; inline;
-    function AsFloat2: TDataFloat2; inline;
-    function AsFloat3: TDataFloat3; inline;
-    function AsFloat4: TDataFloat4; inline;
+    function AsSurface: TDataSurface;
+    function AsSampler: TDataSampler;
+    function AsFloat: TDataFloat;
+    function AsFloat2: TDataFloat2;
+    function AsFloat3: TDataFloat3;
+    function AsFloat4: TDataFloat4;
     constructor Create(const XMLNode: TUXML; const AParent: TColladaObject);
     destructor Destroy; override;
   end;
@@ -991,8 +992,8 @@ public
   private
     var _ControllerType: TColladaControllerType;
     var _Controller: TColladaObject;
-    function GetAsSkin: TColladaSkin; inline;
-    function GetAsMorph: TColladaMorph; inline;
+    function GetAsSkin: TColladaSkin;
+    function GetAsMorph: TColladaMorph;
   public
     property Controller: TColladaObject read _Controller;
     property ControllerType: TColladaControllerType read _ControllerType;
@@ -1020,11 +1021,11 @@ public
     var _DataType: TColladaArrayType;
     var _DataStride: UInt32;
     var _DataSize: UInt32;
-    function GetKey(const Index: Int32): PKey; inline;
-    function GetKeyCount: Int32; inline;
+    function GetKey(const Index: Int32): PKey;
+    function GetKeyCount: Int32;
     function FindKey(const Time: TUFloat): Int32;
-    function GetMaxTime: TUFloat; inline;
-    function GetSampleSize: UInt32; inline;
+    function GetMaxTime: TUFloat;
+    function GetSampleSize: UInt32;
   protected
     procedure ResolveLinks; override;
     procedure DumpData; override;
@@ -1052,7 +1053,7 @@ public
     var _Sampler: TColladaAnimationSampler;
     var _Target: TColladaObject;
     var _TargetProperty: String;
-    function GetMaxTime: TUFloat; inline;
+    function GetMaxTime: TUFloat;
   protected
     procedure ResolveLinks; override;
   public
@@ -3307,6 +3308,7 @@ begin
   Result := (a.CharId = b.CharId) and (a.GlyphId = b.GlyphId);
 end;
 // TUTrueTypeFont end
+
 
 // TUVertexAttribute begin
 class function TUVertexAttribute.Make(
@@ -7624,7 +7626,6 @@ begin
   FreeAndNil(_Root);
   inherited Destroy;
 end;
-
 // TUSceneDataDAE end
 
 end.
