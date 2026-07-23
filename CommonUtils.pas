@@ -1397,6 +1397,7 @@ private
 public
   property Ptr: TPtr read GetPtr write SetPtr;
   function IsValid: Boolean; inline;
+  procedure Reset;
   class operator Initialize(var v: TSelf);
   class operator := (const Value: TPtr): TSelf; inline;
   class operator := (const Value: Pointer): TSelf; inline;
@@ -1416,6 +1417,7 @@ public
   property Ptr: TPtr read GetPtr;
   function IsValid: Boolean; inline;
   function AsShared: TShared; inline;
+  procedure Reset;
   class operator := (const Value: TPtr): TSelf; inline;
   class operator := (const Value: TShared): TSelf; inline;
   class operator = (const a, b: TSelf): Boolean; inline;
@@ -2761,11 +2763,11 @@ const URadToDeg = 180 / UPi;
 const UMaxValueUInt8 = $ff;
 const UMaxValueUInt16 = $ffff;
 const UMaxValueUInt32 = $ffffffff;
-const UMaxValueUInt64 = $ffffffffffffffff;
+const UMaxValueUInt64 = UInt64($ffffffffffffffff);
 const UMaxValueInt8 = $7f;
 const UMaxValueInt16 = $7fff;
 const UMaxValueInt32 = $7fffffff;
-const UMaxValueInt64 = $7fffffffffffffff;
+const UMaxValueInt64 = Int64($7fffffffffffffff);
 const UMaxValueFloat = 3.4E38;
 const UMaxValueDouble = 1.7E308;
 const UMinValueUInt8 = 0;
@@ -8239,6 +8241,11 @@ begin
   Result := _Ptr <> nil;
 end;
 
+procedure TUSharedRef.Reset;
+begin
+  SetPtr(nil);
+end;
+
 class operator TUSharedRef.Initialize(var v: TSelf);
 begin
   v.Initialize;
@@ -8285,8 +8292,11 @@ begin
 end;
 
 function TUWeakRef.GetPtr: TPtr;
+  var Counter: TUWeakCounter;
 begin
-  Result := TPtr((_Weak as TUWeakCounter).Obj);
+  Counter := _Weak as TUWeakCounter;
+  if not Assigned(Counter) then Exit(nil);
+  Result := TPtr(Counter.Obj);
 end;
 
 function TUWeakRef.IsValid: Boolean;
@@ -8297,6 +8307,11 @@ end;
 function TUWeakRef.AsShared: TShared;
 begin
   if IsValid then Result := TPtr((_Weak as TUWeakCounter).Obj) else Result := nil;
+end;
+
+procedure TUWeakRef.Reset;
+begin
+  Assign(nil);
 end;
 
 class operator TUWeakRef.:= (const Value: TPtr): TSelf;
