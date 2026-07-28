@@ -2542,6 +2542,9 @@ function URoR(const Value: UInt8; const Bits: UInt8): UInt8; overload;
 function URoR(const Value: UInt16; const Bits: UInt16): UInt16; overload;
 function URoR(const Value: UInt32; const Bits: UInt32): UInt32; overload;
 function URoR(const Value: UInt64; const Bits: UInt64): UInt64; overload;
+function UTimeLoop(const Interval: UInt32 = 1000): UInt32;
+function UTimeLoopPi(const Interval: UInt32 = 1000): TUFloat;
+function UTimeLoopTwoPi(const Interval: UInt32 = 1000): TUFloat;
 function URandomPi: TUFloat;
 function URandom2Pi: TUFloat;
 function UThreadRandomize: UInt32;
@@ -15127,6 +15130,21 @@ end;
 function URoR(const Value: UInt64; const Bits: UInt64): UInt64;
 begin
   Result := specialize URoR<UInt64>(Value, Bits);
+end;
+
+function UTimeLoop(const Interval: UInt32): UInt32;
+begin
+  Result := GetTickCount64 mod Interval;
+end;
+
+function UTimeLoopPi(const Interval: UInt32): TUFloat;
+begin
+  Result := (GetTickCount64 mod Interval) * (UPi / Interval);
+end;
+
+function UTimeLoopTwoPi(const Interval: UInt32): TUFloat;
+begin
+  Result := (GetTickCount64 mod Interval) * (UTwoPi / Interval);
 end;
 
 function URandomPi: TUFloat;
