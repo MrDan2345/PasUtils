@@ -2668,6 +2668,7 @@ operator / (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const v: TUVec2; const f: TUFloat): TUVec2;
 operator * (const f: TUFloat; const v: TUVec2): TUVec2;
 operator - (const v: TUVec2): TUVec2;
+operator = (const a, b: TUVec2): Boolean;
 operator * (const v: TUVec2; const r: TURot2): TUVec2;
 operator * (const r: TURot2; const v: TUVec2): TUVec2;
 operator + (const a, b: TUVec2i): TUVec2i;
@@ -2714,6 +2715,7 @@ operator * (const f: TUFloat; const v: TUVec3): TUVec3;
 operator * (const v: TUVec3; const m: TUMat): TUVec3;
 operator * (const v: TUVec3; const q: TUQuat): TUVec3;
 operator - (const v: TUVec3): TUVec3;
+operator = (const a, b: TUVec3): Boolean;
 operator + (const a, b: TUVec3i): TUVec3i;
 operator - (const a, b: TUVec3i): TUVec3i;
 operator * (const a, b: TUVec3i): TUVec3i;
@@ -16172,6 +16174,13 @@ begin
   Result[1] := -v[1];
 end;
 
+operator = (const a, b: TUVec2): Boolean;
+  var i: Int32;
+begin
+  for i := 0 to High(TUVec2) do if Abs(a[i] - b[i]) > UEps then Exit(False);
+  Result := True;
+end;
+
 operator * (const v: TUVec2; const r: TURot2): TUVec2;
 begin
   Result := r.Transform(v);
@@ -16461,6 +16470,13 @@ begin
   Result[0] := -v[0];
   Result[1] := -v[1];
   Result[2] := -v[2];
+end;
+
+operator = (const a, b: TUVec3): Boolean;
+  var i: Int32;
+begin
+  for i := 0 to High(TUVec3) do if Abs(a[i] - b[i]) > UEps then Exit(False);
+  Result := True;
 end;
 
 operator + (const a, b: TUVec3i): TUVec3i;

@@ -3,6 +3,8 @@
 {$modeswitch nestedprocvars}
 {$modeswitch typehelpers}
 {$modeswitch implicitfunctionspecialization}
+{$modeswitch functionreferences}
+{$modeswitch anonymousfunctions}
 {$optimization autoinline}
 {$asmmode intel}
 {$macro on}
