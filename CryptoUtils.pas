@@ -928,23 +928,65 @@ public
   end;
 end;
 
-type TUKyber768 = record
-public
+type TUKyberFlavor512 = record
   const N = 256;
   const Q = 3329;
-  const K = 3;
-  const ETA = 2;
+  const K = 2;
+  const ETA1 = 3;
+  const ETA2 = 2;
   const ROOT_OF_UNITY = 17;
-  const POLYVEC_BYTES = 320 * K;
-  const POLYCIPHERTEXT_BYTES = 320 * K + 128;
-  const POLYCOMPRESSEDBYTES = 128;
-  const POLYVECCOMPRESSEDBYTES = K * 320;
+  const DU = 10;
+  const DV = 4;
+  const POLYCOMPRESSEDBYTES = N * DV div 8;
+  const POLYVECCOMPRESSEDBYTES = K * (N * DU div 8);
   const POLYBYTES = 384;
   const POLYVECBYTES = K * POLYBYTES;
   const SYMBYTES = 32;
   const PUBLICKEYBYTES = POLYVECBYTES + SYMBYTES;
   const SECRETKEYBYTES = POLYVECBYTES;
   const CIPHERTEXTBYTES = POLYVECCOMPRESSEDBYTES + POLYCOMPRESSEDBYTES;
+end;
+
+type TUKyberFlavor768 = record
+  const N = 256;
+  const Q = 3329;
+  const K = 3;
+  const ETA1 = 2;
+  const ETA2 = 2;
+  const ROOT_OF_UNITY = 17;
+  const DU = 10;
+  const DV = 4;
+  const POLYCOMPRESSEDBYTES = N * DV div 8;
+  const POLYVECCOMPRESSEDBYTES = K * (N * DU div 8);
+  const POLYBYTES = 384;
+  const POLYVECBYTES = K * POLYBYTES;
+  const SYMBYTES = 32;
+  const PUBLICKEYBYTES = POLYVECBYTES + SYMBYTES;
+  const SECRETKEYBYTES = POLYVECBYTES;
+  const CIPHERTEXTBYTES = POLYVECCOMPRESSEDBYTES + POLYCOMPRESSEDBYTES;
+end;
+
+type TUKyberFlavor1024 = record
+  const N = 256;
+  const Q = 3329;
+  const K = 4;
+  const ETA1 = 2;
+  const ETA2 = 2;
+  const ROOT_OF_UNITY = 17;
+  const DU = 11;
+  const DV = 5;
+  const POLYCOMPRESSEDBYTES = N * DV div 8;
+  const POLYVECCOMPRESSEDBYTES = K * (N * DU div 8);
+  const POLYBYTES = 384;
+  const POLYVECBYTES = K * POLYBYTES;
+  const SYMBYTES = 32;
+  const PUBLICKEYBYTES = POLYVECBYTES + SYMBYTES;
+  const SECRETKEYBYTES = POLYVECBYTES;
+  const CIPHERTEXTBYTES = POLYVECCOMPRESSEDBYTES + POLYCOMPRESSEDBYTES;
+end;
+
+type generic TUKyber<Flavor> = record
+public
   const NTT_Zetas: array [0..127] of Int16 = (
     -1044, -758, -359, -1517, 1493, 1422, 287, 202,
     -171, 622, 1577, 182, 962, -1202, -1474, 1468,
@@ -963,16 +1005,16 @@ public
     -1185, -1530, -1278, 794, -1510, -854, -870, 478,
     -108, -308, 996, 991, 958, -1460, 1522, 1628
   );
-  type TPoly = array[0..N - 1] of Int16;
-  type TVec = array[0..K - 1] of TPoly;
-  type TMatrix = array[0..K - 1] of TVec;
-  type TPolyBytes = array[0..POLYBYTES - 1] of UInt8;
+  type TPoly = array[0..Flavor.N - 1] of Int16;
+  type TVec = array[0..Flavor.K - 1] of TPoly;
+  type TMatrix = array[0..Flavor.K - 1] of TVec;
+  type TPolyBytes = array[0..Flavor.POLYBYTES - 1] of UInt8;
   type PPolyBytes = ^TPolyBytes;
-  type TVecBytes = array[0..POLYVECBYTES - 1] of UInt8;
+  type TVecBytes = array[0..Flavor.POLYVECBYTES - 1] of UInt8;
   type PVecBytes = ^TVecBytes;
   type TPublicKey = record
     var t: TVec;
-    var Rho: array[0..SYMBYTES - 1] of UInt8;
+    var Rho: array[0..Flavor.SYMBYTES - 1] of UInt8;
   end;
   type TSecretKey = record
     var s: TVec;
@@ -992,7 +1034,6 @@ public
   class function PolyAdd(const a, b: TPoly): TPoly; static;
   class function PolySub(const a, b: TPoly): TPoly; static;
   class function PolyMulNaive(const a, b: TPoly): TPoly; static;
-  class function PolyMulNTT(const a, b: TPoly): TPoly; static;
   class function PolyMul(const a, b: TPoly): TPoly; static;
   class procedure PolyNTT(var Poly: TPoly); static;
   class procedure PolyInvNTT(var Poly: TPoly); static;
@@ -1002,8 +1043,6 @@ public
   class procedure ToMont(var Vec: TVec); static;
   class procedure FromMont(var Poly: TPoly); static;
   class procedure FromMont(var Vec: TVec); static;
-  class procedure MatNTT(var Mat: TMatrix); static;
-  class procedure MayInvNTT(var Mat: TMatrix); static;
   class function SampleCBD(
     const RandomBytes: array of UInt8;
     const TheETA: Int32
@@ -1013,14 +1052,21 @@ public
     const Nonce1, Nonce2: UInt8
   ): TPoly; static;
   class function VectorAdd(const a, b: TVec): TVec; static;
-  class function MatrixVectorMulNTT(
-    const Matrix: TMatrix;
-    const Vector: TVec
-  ): TVec; static;
   class function MatrixVectorMul(
     const Matrix: TMatrix;
     const Vector: TVec
   ): TVec; static;
+  class function CompressCoeff(const v: Int16; const d: UInt8): UInt16; static;
+  class function DecompressCoeff(const y: UInt16; const d: UInt8): Int16; static;
+  class function PackBits(
+    const Data: array of UInt16;
+    const d, Size: Int32
+  ): TUInt8Array; static;
+  class procedure UnpackBits(
+    const Data: array of UInt8;
+    const d, Size: Int32;
+    const Output: PUInt16Arr
+  ); static;
   class procedure PolyReduce(var Poly: TPoly); static;
   class function PolyCompress(const Poly: TPoly): TUInt8Array; static;
   class function PolyDecompress(const Data: array of UInt8): TPoly; static;
@@ -1035,9 +1081,7 @@ public
   class function VecToBytes(const Vec: TVec): TUInt8Array; static;
   class function VecFromBytes(const SrcBytes: PVecBytes): TVec; static;
   class function VecFromBytes(const Data: array of UInt8): TVec; static;
-  class function GenerateKeyPair(
-    const Seed: array of UInt8
-  ): TKeyPair; static;
+  class function GenerateKeyPair(const Seed: array of UInt8): TKeyPair; static;
   class function GenerateKeyPair: TKeyPair; static;
   class function GenerateMatrix(
     const Seed: array of UInt8;
@@ -1073,6 +1117,9 @@ public
     const Count: UInt32 = 0
   ): String; static;
 end;
+type TUKyber512 = specialize TUKyber<TUKyberFlavor512>;
+type TUKyber768 = specialize TUKyber<TUKyberFlavor768>;
+type TUKyber1024 = specialize TUKyber<TUKyberFlavor1024>;
 
 type TUKeccak = record
 public
@@ -7776,105 +7823,93 @@ begin
   Curve_Ed25519.SqrtM1 := TBigInt.ModPow(2, (Curve_Ed25519.p - TBigInt.One) div 4, Curve_Ed25519.p);
 end;
 
-class function TUKyber768.MontgomeryReduce(const a: Int32): Int16;
+class function TUKyber.MontgomeryReduce(const a: Int32): Int16;
   const QINV = -3327;
 begin
   Result := Int16(a) * QINV;
-  Result := SarLongint(a - Int32(Result) * Q, 16);
+  Result := SarLongint(a - Int32(Result) * Flavor.Q, 16);
 end;
 
-class function TUKyber768.BarrettReduce(const a: Int16): Int16;
+class function TUKyber.BarrettReduce(const a: Int16): Int16;
   var t: Int16;
-  const v: Int16 = ((1 shl 26) + (Q shr 1)) div Q;
+  const v: Int16 = ((1 shl 26) + (Flavor.Q shr 1)) div Flavor.Q;
 begin
   t := SarLongint(Int32(v) * a + (1 shl 25), 26);
-  t *= Q;
+  t *= Flavor.Q;
   Result := a - t;
 end;
 
-class function TUKyber768.FQMul(a, b: Int16): Int16;
+class function TUKyber.FQMul(a, b: Int16): Int16;
 begin
   Result := MontgomeryReduce(Int32(a) * b);
 end;
 
-class function TUKyber768.ModQ(const a: Int64): Int32;
+class function TUKyber.ModQ(const a: Int64): Int32;
 begin
-  Result := a mod Q;
-  if Result < 0 then Result += Q;
+  Result := a mod Flavor.Q;
+  if Result < 0 then Result += Flavor.Q;
 end;
 
-class function TUKyber768.AddModQ(const a, b: Int32): Int32;
+class function TUKyber.AddModQ(const a, b: Int32): Int32;
 begin
   Result := ModQ(a + b);
 end;
 
-class function TUKyber768.SubModQ(const a, b: Int32): Int32;
+class function TUKyber.SubModQ(const a, b: Int32): Int32;
 begin
   Result := ModQ(a - b);
 end;
 
-class function TUKyber768.MulModQ(const a, b: Int32): Int32;
+class function TUKyber.MulModQ(const a, b: Int32): Int32;
 begin
   Result := ModQ(Int64(a) * Int64(b));
 end;
 
-class function TUKyber768.DistModQ(const a, b: Int32): Int32;
+class function TUKyber.DistModQ(const a, b: Int32): Int32;
 begin
   Result := ModQ(Abs(a - b));
-  Result := UMin(Result, Q - Result);
+  Result := UMin(Result, Flavor.Q - Result);
 end;
 
-class function TUKyber768.PolyAdd(const a, b: TPoly): TPoly;
+class function TUKyber.PolyAdd(const a, b: TPoly): TPoly;
   var i: Int32;
 begin
-  for i := 0 to N - 1 do
+  for i := 0 to Flavor.N - 1 do
   begin
     Result[i] := AddModQ(a[i], b[i]);
   end;
 end;
 
-class function TUKyber768.PolySub(const a, b: TPoly): TPoly;
+class function TUKyber.PolySub(const a, b: TPoly): TPoly;
   var i: Int32;
 begin
-  for i := 0 to N - 1 do
+  for i := 0 to Flavor.N - 1 do
   begin
     Result[i] := SubModQ(a[i], b[i]);
   end;
 end;
 
-class function TUKyber768.PolyMulNaive(const a, b: TPoly): TPoly;
-  var Temp: array[0..2 * N - 2] of Int32;
+class function TUKyber.PolyMulNaive(const a, b: TPoly): TPoly;
+  var Temp: array[0..2 * Flavor.N - 2] of Int32;
   var i, j: Int32;
 begin
   UClear(Temp, SizeOf(Temp));
-  for i := 0 to N - 1 do
-  for j := 0 to N - 1 do
+  for i := 0 to Flavor.N - 1 do
+  for j := 0 to Flavor.N - 1 do
   begin
     Temp[i + j] := AddModQ(Temp[i + j], MulModQ(a[i], b[j]));
   end;
-  for i := 0 to N - 1 do
+  for i := 0 to Flavor.N - 1 do
   begin
     Result[i] := Temp[i];
-    if i + N <= 2 * N - 2 then
+    if i + Flavor.N <= 2 * Flavor.N - 2 then
     begin
-      Result[i] := SubModQ(Result[i], Temp[i + N]);
+      Result[i] := SubModQ(Result[i], Temp[i + Flavor.N]);
     end;
   end;
 end;
 
-class function TUKyber768.PolyMulNTT(const a, b: TPoly): TPoly;
-  var a_ntt, b_ntt: TPoly;
-  var i: Int32;
-begin
-  a_ntt := a;
-  b_ntt := b;
-  PolyNTT(a_ntt);
-  PolyNTT(b_ntt);
-  Result := PolyMul(a_ntt, b_ntt);
-  PolyInvNTT(Result);
-end;
-
-class function TUKyber768.PolyMul(const a, b: TPoly): TPoly;
+class function TUKyber.PolyMul(const a, b: TPoly): TPoly;
   procedure BaseMul(
     var r0, r1: Int16;
     const a0, a1, b0, b1: Int16;
@@ -7890,7 +7925,7 @@ class function TUKyber768.PolyMul(const a, b: TPoly): TPoly;
   var i: Int32;
   var Zeta: Int16;
 begin
-  for i := 0 to N div 4 - 1 do
+  for i := 0 to Flavor.N div 4 - 1 do
   begin
     Zeta := NTT_Zetas[64 + i];
     BaseMul(
@@ -7904,7 +7939,7 @@ begin
   end;
 end;
 
-class procedure TUKyber768.PolyNTT(var Poly: TPoly);
+class procedure TUKyber.PolyNTT(var Poly: TPoly);
   var Len, Start, j, i: UInt32;
   var t, Zeta: Int16;
 begin
@@ -7931,7 +7966,7 @@ begin
   end;
 end;
 
-class procedure TUKyber768.PolyInvNTT(var Poly: TPoly);
+class procedure TUKyber.PolyInvNTT(var Poly: TPoly);
   var Start, Len, j, i: UInt32;
   var t, Zeta: Int16;
   const f = 1441;
@@ -7958,86 +7993,68 @@ begin
     end;
     Len := Len shl 1;
   end;
-  for j := 0 to N - 1 do
+  for j := 0 to Flavor.N - 1 do
   begin
     Poly[j] := FQMul(Poly[j], f);
   end;
 end;
 
-class procedure TUKyber768.VecNTT(var Vec: TVec);
+class procedure TUKyber.VecNTT(var Vec: TVec);
   var i: UInt32;
 begin
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
     PolyNTT(Vec[i]);
   end;
 end;
 
-class procedure TUKyber768.VecInvNTT(var Vec: TVec);
+class procedure TUKyber.VecInvNTT(var Vec: TVec);
   var i: UInt32;
 begin
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
     PolyInvNTT(Vec[i]);
   end;
 end;
 
-class procedure TUKyber768.ToMont(var Poly: TPoly);
+class procedure TUKyber.ToMont(var Poly: TPoly);
   const MONT_CONSTANT = 1353;
   var i: UInt32;
 begin
-  for i := 0 to N - 1 do
+  for i := 0 to Flavor.N - 1 do
   begin
     Poly[i] := FQMul(Poly[i], MONT_CONSTANT);
   end;
 end;
 
-class procedure TUKyber768.ToMont(var Vec: TVec);
+class procedure TUKyber.ToMont(var Vec: TVec);
   var i: UInt32;
 begin
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
     ToMont(Vec[i]);
   end;
 end;
 
-class procedure TUKyber768.FromMont(var Poly: TPoly);
+class procedure TUKyber.FromMont(var Poly: TPoly);
   var i: UInt32;
 begin
-  for i := 0 to N - 1 do
+  for i := 0 to Flavor.N - 1 do
   begin
     Poly[i] := FQMul(Poly[i], 1);
   end;
 end;
 
-class procedure TUKyber768.FromMont(var Vec: TVec);
+class procedure TUKyber.FromMont(var Vec: TVec);
   var i: UInt32;
 begin
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
     FromMont(Vec[i]);
   end;
 end;
 
-class procedure TUKyber768.MatNTT(var Mat: TMatrix);
-  var i: Int32;
-begin
-  for i := 0 to K - 1 do
-  begin
-    VecNTT(Mat[i]);
-  end;
-end;
-
-class procedure TUKyber768.MayInvNTT(var Mat: TMatrix);
-  var i: Int32;
-begin
-  for i := 0 to K - 1 do
-  begin
-    VecInvNTT(Mat[i]);
-  end;
-end;
-
-class function TUKyber768.SampleCBD(
+class function TUKyber.SampleCBD(
   const RandomBytes: array of UInt8;
   const TheETA: Int32
 ): TPoly;
@@ -8051,7 +8068,7 @@ class function TUKyber768.SampleCBD(
   var i, j, a, b: Int32;
   var BitPos: Int32;
 begin
-  for i := 0 to N - 1 do
+  for i := 0 to Flavor.N - 1 do
   begin
     a := 0;
     b := 0;
@@ -8065,7 +8082,7 @@ begin
   end;
 end;
 
-class function TUKyber768.SampleUniform(
+class function TUKyber.SampleUniform(
   const Seed: array of UInt8;
   const Nonce1, Nonce2: UInt8
 ): TPoly;
@@ -8082,7 +8099,7 @@ begin
   Buf := Shake.Squeeze(Rate);
   j := 0;
   i := 0;
-  while i < N do
+  while i < Flavor.N do
   begin
     if j + 3 > Length(Buf) then
     begin
@@ -8093,12 +8110,12 @@ begin
     Val1 := (UInt16(Buf[j + 1]) shr 4) or (UInt16(Buf[j + 2]) shl 4);
     Val1 := Val1 and $fff;
     Inc(j, 3);
-    if (Val0 < Q) and (i < N) then
+    if (Val0 < Flavor.Q) and (i < Flavor.N) then
     begin
       Result[i] := Val0;
       Inc(i);
     end;
-    if (Val1 < Q) and (i < N) then
+    if (Val1 < Flavor.Q) and (i < Flavor.N) then
     begin
       Result[i] := Val1;
       Inc(i);
@@ -8106,44 +8123,26 @@ begin
   end;
 end;
 
-class function TUKyber768.VectorAdd(const a, b: TVec): TVec;
+class function TUKyber.VectorAdd(const a, b: TVec): TVec;
   var i: Int32;
 begin
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
     Result[i] := PolyAdd(a[i], b[i]);
   end;
 end;
 
-class function TUKyber768.MatrixVectorMulNTT(
+class function TUKyber.MatrixVectorMul(
   const Matrix: TMatrix;
   const Vector: TVec
 ): TVec;
   var i, j: Int32;
   var Temp: TPoly;
 begin
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
     UClear(Result[i], SizeOf(Result[i]));
-    for j := 0 to K - 1 do
-    begin
-      Temp := PolyMulNTT(Matrix[i][j], Vector[j]);
-      Result[i] := PolyAdd(Result[i], Temp);
-    end;
-  end;
-end;
-
-class function TUKyber768.MatrixVectorMul(
-  const Matrix: TMatrix;
-  const Vector: TVec
-): TVec;
-  var i, j: Int32;
-  var Temp: TPoly;
-begin
-  for i := 0 to K - 1 do
-  begin
-    UClear(Result[i], SizeOf(Result[i]));
-    for j := 0 to K - 1 do
+    for j := 0 to Flavor.K - 1 do
     begin
       Temp := PolyMul(Matrix[i][j], Vector[j]);
       Result[i] := PolyAdd(Result[i], Temp);
@@ -8151,59 +8150,110 @@ begin
   end;
 end;
 
-class procedure TUKyber768.PolyReduce(var Poly: TPoly);
+class function TUKyber.CompressCoeff(const v: Int16; const d: UInt8): UInt16;
+  var u: Int16;
+begin
+  u := v mod Flavor.Q;
+  if u < 0 then u += Flavor.Q;
+  Result := UInt16((((UInt32(u) shl d) + 1665 - (d mod 2)) div Flavor.Q) and ((1 shl d) - 1));
+end;
+
+class function TUKyber.DecompressCoeff(const y: UInt16; const d: UInt8): Int16;
+  var u: UInt32;
+begin
+  u := UInt32(y and ((1 shl d) - 1));
+  Result := Int16((u * Flavor.Q + (1 shl (d - 1))) shr d);
+end;
+
+class function TUKyber.PackBits(
+  const Data: array of UInt16;
+  const d, Size: Int32
+): TUInt8Array;
+  var BitBuf: UInt32;
+  var BitsInBuf, i, OutIdx: Int32;
+begin
+  Result := TUInt8Array.Make((Size * d) div 8);
+  BitBuf := 0;
+  BitsInBuf := 0;
+  OutIdx := 0;
+  for i := 0 to Size - 1 do
+  begin
+    BitBuf := BitBuf or (UInt32(Data[i] and ((1 shl d) - 1)) shl BitsInBuf);
+    Inc(BitsInBuf, d);
+    while BitsInBuf >= 8 do
+    begin
+      Result[OutIdx] := UInt8(BitBuf and $ff);
+      Inc(OutIdx);
+      BitBuf := BitBuf shr 8;
+      Dec(BitsInBuf, 8);
+    end;
+  end;
+  if BitsInBuf > 0 then
+  begin
+    Result[OutIdx] := UInt8(BitBuf and $ff);
+  end;
+end;
+
+class procedure TUKyber.UnpackBits(
+  const Data: array of UInt8;
+  const d, Size: Int32;
+  const Output: PUInt16Arr
+);
+  var BitBuf: UInt32;
+  var BitsInBuf, InIdx, i: Int32;
+  var Mask: UInt16;
+begin
+  BitBuf := 0;
+  BitsInBuf := 0;
+  InIdx := 0;
+  Mask := (1 shl d) - 1;
+  for i := 0 to Size - 1 do
+  begin
+    while BitsInBuf < d do
+    begin
+      BitBuf := BitBuf or (UInt32(Data[InIdx]) shl BitsInBuf);
+      Inc(InIdx);
+      Inc(BitsInBuf, 8);
+    end;
+    Output^[i] := BitBuf and Mask;
+    BitBuf := BitBuf shr d;
+    Dec(BitsInBuf, d);
+  end;
+end;
+
+class procedure TUKyber.PolyReduce(var Poly: TPoly);
   var i: UInt32;
 begin
-  for i := 0 to N - 1 do
+  for i := 0 to Flavor.N - 1 do
   begin
     Poly[i] := BarrettReduce(Poly[i]);
-    if Poly[i] < 0 then Poly[i] += Q;
+    if Poly[i] < 0 then Poly[i] += Flavor.Q;
   end;
 end;
 
-class function TUKyber768.PolyCompress(const Poly: TPoly): TUInt8Array;
-  var i, j: UInt32;
-  var u: Int16;
-  var d0: UInt32;
-  var t: array[0..7] of UInt8;
-  var r: PUInt8Arr;
+class function TUKyber.PolyCompress(const Poly: TPoly): TUInt8Array;
+  var i: Int32;
+  var CompCoeffs: array[0..Flavor.N - 1] of UInt16;
 begin
-  Result := TUInt8Array.Make(POLYCOMPRESSEDBYTES);
-  r := @Result[0];
-  for i := 0 to N div 8 - 1 do
+  for i := 0 to Flavor.N - 1 do
   begin
-    for j := 0 to 8 - 1 do
-    begin
-      u := Poly[8 * i + j];
-      u += (u shr 15) and Q;
-      d0 := UInt32(u) shl 4;
-      d0 += 1665;
-      d0 *= 80635;
-      d0 := d0 shr 28;
-      t[j] := d0 and $f;
-    end;
-    r^[0] := t[0] or (t[1] shl 4);
-    r^[1] := t[2] or (t[3] shl 4);
-    r^[2] := t[4] or (t[5] shl 4);
-    r^[3] := t[6] or (t[7] shl 4);
-    Inc(Pointer(r), 4);
+    CompCoeffs[i] := CompressCoeff(Poly[i], Flavor.DV);
   end;
+  Result := PackBits(CompCoeffs, Flavor.DV, Flavor.N);
 end;
 
-class function TUKyber768.PolyDecompress(const Data: array of UInt8): TPoly;
-  var i: UInt32;
-  var a: PUInt8Arr;
+class function TUKyber.PolyDecompress(const Data: array of UInt8): TPoly;
+  var i: Int32;
+  var Unpacked: array [0..Flavor.N - 1] of UInt16;
 begin
-  a := @Data[0];
-  for i := 0 to N div 2 - 1 do
+  UnpackBits(Data, Flavor.DV, Flavor.N, @Unpacked);
+  for i := 0 to Flavor.N - 1 do
   begin
-    Result[2 * i + 0] := ((UInt16(a^[0] and 15) * Q) + 8) shr 4;
-    Result[2 * i + 1] := ((UInt16(a^[0] shr 4) * Q) + 8) shr 4;
-    Inc(Pointer(a), 1);
+    Result[i] := DecompressCoeff(Unpacked[i], Flavor.DV);
   end;
 end;
 
-class procedure TUKyber768.PolyToBytes(
+class procedure TUKyber.PolyToBytes(
   const Poly: TPoly;
   const DstBytes: PPolyBytes
 );
@@ -8212,12 +8262,12 @@ class procedure TUKyber768.PolyToBytes(
   var r: PUInt8Arr;
 begin
   r := PUInt8Arr(DstBytes);
-  for i := 0 to N div 2 - 1 do
+  for i := 0 to Flavor.N div 2 - 1 do
   begin
     t0 := Poly[2 * i];
-    t0 += (UInt16(t0) shr 15) and Q;
+    t0 += (UInt16(t0) shr 15) and Flavor.Q;
     t1 := Poly[2 * i + 1];
-    t1 += (UInt16(t1) shr 15) and Q;
+    t1 += (UInt16(t1) shr 15) and Flavor.Q;
     r^[0] := (t0 shr 0);
     r^[1] := ((t0 shr 8) and $f) or ((t1 shl 4) and $f0);
     r^[2] := (t1 shr 4);
@@ -8225,145 +8275,123 @@ begin
   end;
 end;
 
-class function TUKyber768.PolyToBytes(const Poly: TPoly): TUInt8Array;
+class function TUKyber.PolyToBytes(const Poly: TPoly): TUInt8Array;
 begin
-  Result := TUInt8Array.Make(POLYBYTES);
+  Result := TUInt8Array.Make(Flavor.POLYBYTES);
   PolyToBytes(Poly, @Result[0]);
 end;
 
-class function TUKyber768.PolyFromBytes(const SrcBytes: PPolyBytes): TPoly;
+class function TUKyber.PolyFromBytes(const SrcBytes: PPolyBytes): TPoly;
   var i: UInt32;
 begin
-  for i := 0 to N div 2 - 1 do
+  for i := 0 to Flavor.N div 2 - 1 do
   begin
     Result[2 * i + 0] := ((SrcBytes^[3 * i + 0] shr 0) or (UInt16(SrcBytes^[3 * i + 1]) shl 8)) and $fff;
     Result[2 * i + 1] := ((SrcBytes^[3 * i + 1] shr 4) or (UInt16(SrcBytes^[3 * i + 2]) shl 4)) and $fff;
   end;
 end;
 
-class function TUKyber768.PolyFromBytes(const Data: array of UInt8): TPoly;
+class function TUKyber.PolyFromBytes(const Data: array of UInt8): TPoly;
 begin
   Result := PolyFromBytes(@Data[0]);
 end;
 
-class procedure TUKyber768.VecReduce(var Vec: TVec);
+class procedure TUKyber.VecReduce(var Vec: TVec);
   var i: UInt32;
 begin
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
     PolyReduce(Vec[i]);
   end;
 end;
 
-class function TUKyber768.VecCompress(const Vec: TVec): TUInt8Array;
-  var i, j, _k: UInt32;
-  var d0: UInt64;
-  var t: array[0..3] of UInt16;
-  var r: PUInt8Arr;
+class function TUKyber.VecCompress(const Vec: TVec): TUInt8Array;
+  var k, i, CoeffIdx: Int32;
+  var CompCoeffs: array of UInt16;
 begin
-  Result := TUInt8Array.Make(POLYVECCOMPRESSEDBYTES);
-  r := @Result[0];
-  for i := 0 to K - 1 do
+  CompCoeffs := nil;
+  SetLength(CompCoeffs, Flavor.K * Flavor.N);
+  CoeffIdx := 0;
+  for k := 0 to Flavor.K - 1 do
   begin
-    for j := 0 to N div 4 - 1 do
+    for i := 0 to Flavor.N - 1 do
     begin
-      for _k := 0 to 4 - 1 do
-      begin
-        t[_k] := Vec[i][4 * j + _k];
-        t[_k] += (Int16(t[_k]) shr 15) and Q;
-        d0 := t[_k];
-        d0 := d0 shl 10;
-        d0 += 1665;
-        d0 *= 1290167;
-        d0 := d0 shr 32;
-        t[_k] := d0 and $3ff;
-      end;
-      r^[0] := (t[0] shr 0);
-      r^[1] := (t[0] shr 8) or (t[1] shl 2);
-      r^[2] := (t[1] shr 6) or (t[2] shl 4);
-      r^[3] := (t[2] shr 4) or (t[3] shl 6);
-      r^[4] := (t[3] shr 2);
-      Inc(Pointer(r), 5);
+      CompCoeffs[CoeffIdx] := CompressCoeff(Vec[k][i], Flavor.DU);
+      Inc(CoeffIdx);
+    end;
+  end;
+  Result := PackBits(CompCoeffs, Flavor.DU, Flavor.K * Flavor.N);
+end;
+
+class function TUKyber.VecDecompress(const Data: array of UInt8): TVec;
+  var k, i, CoeffIdx: Int32;
+  var Unpacked: array[0..Flavor.K * Flavor.N - 1] of UInt16;
+begin
+  UnpackBits(Data, Flavor.DU, Flavor.K * Flavor.N, @Unpacked);
+  CoeffIdx := 0;
+  for k := 0 to Flavor.K - 1 do
+  begin
+    for i := 0 to Flavor.N - 1 do
+    begin
+      Result[k][i] := DecompressCoeff(Unpacked[CoeffIdx], Flavor.DU);
+      Inc(CoeffIdx);
     end;
   end;
 end;
 
-class function TUKyber768.VecDecompress(const Data: array of UInt8): TVec;
-  var t: array[0..3] of UInt16;
-  var i, j, _k: UInt32;
-  var a: PUInt8Arr;
-begin
-  a := @Data[0];
-  for i := 0 to K - 1 do
-  begin
-    for j := 0 to N div 4 - 1 do
-    begin
-      t[0] := (a^[0] shr 0) or (UInt16(a^[1]) shl 8);
-      t[1] := (a^[1] shr 2) or (UInt16(a^[2]) shl 6);
-      t[2] := (a^[2] shr 4) or (UInt16(a^[3]) shl 4);
-      t[3] := (a^[3] shr 6) or (UInt16(a^[4]) shl 2);
-      Inc(Pointer(a), 5);
-      for _k := 0 to 4 - 1 do
-      begin
-        Result[i][4 * j + _k] := (UInt32(t[_k] and $3ff) * Q + 512) shr 10;
-      end;
-    end;
-  end;
-end;
-
-class procedure TUKyber768.VecToBytes(const Vec: TVec; const DstBytes: PVecBytes);
+class procedure TUKyber.VecToBytes(const Vec: TVec; const DstBytes: PVecBytes);
   var i: Int32;
 begin
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
     PolyToBytes(Vec[i], PPolyBytes(DstBytes) + i);
   end;
 end;
 
-class function TUKyber768.VecToBytes(const Vec: TVec): TUInt8Array;
+class function TUKyber.VecToBytes(const Vec: TVec): TUInt8Array;
 begin
-  Result := TUInt8Array.Make(POLYVECBYTES);
+  Result := TUInt8Array.Make(Flavor.POLYVECBYTES);
   VecToBytes(Vec, @Result[0]);
 end;
 
-class function TUKyber768.VecFromBytes(const SrcBytes: PVecBytes): TVec;
+class function TUKyber.VecFromBytes(const SrcBytes: PVecBytes): TVec;
   var i: UInt32;
 begin
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
     Result[i] := PolyFromBytes(PPolyBytes(SrcBytes) + i);
   end;
 end;
 
-class function TUKyber768.VecFromBytes(const Data: array of UInt8): TVec;
+class function TUKyber.VecFromBytes(const Data: array of UInt8): TVec;
 begin
   Result := VecFromBytes(@Data[0]);
 end;
 
-class function TUKyber768.GenerateKeyPair(const Seed: array of UInt8): TKeyPair;
-  var Rho, Sigma: array[0..SYMBYTES - 1] of UInt8;
+class function TUKyber.GenerateKeyPair(const Seed: array of UInt8): TKeyPair;
+  var Rho, Sigma: array[0..Flavor.SYMBYTES - 1] of UInt8;
   var A: TMatrix;
   var s, e: TVec;
   var i: Int32;
   var Nonce: UInt8;
   var Hash: TUInt8Array;
 begin
-  if Length(Seed) <> SYMBYTES then Exit;
+  if Length(Seed) <> Flavor.SYMBYTES then Exit;
   Hash := USHA3_512(Seed);
-  UInit(Rho, Hash[0], SYMBYTES);
-  UInit(Sigma, Hash[SYMBYTES], SYMBYTES);
+  UInit(Rho, Hash[0], Flavor.SYMBYTES);
+  UInit(Sigma, Hash[Flavor.SYMBYTES], Flavor.SYMBYTES);
   A := GenerateMatrix(Rho, False);
   Nonce := 0;
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
-    Hash := USHAKE_256(UBytesConcat([Sigma, [Nonce]]), ETA * N div 4);
-    s[i] := SampleCBD(Hash, ETA);
+    Hash := USHAKE_256(UBytesConcat([Sigma, [Nonce]]), Flavor.ETA1 * Flavor.N div 4);
+    s[i] := SampleCBD(Hash, Flavor.ETA1);
     Inc(Nonce);
   end;
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
-    Hash := USHAKE_256(UBytesConcat([Sigma, [Nonce]]), ETA * N div 4);
-    e[i] := SampleCBD(Hash, ETA);
+    Hash := USHAKE_256(UBytesConcat([Sigma, [Nonce]]), Flavor.ETA1 * Flavor.N div 4);
+    e[i] := SampleCBD(Hash, Flavor.ETA1);
     Inc(Nonce);
   end;
   VecNTT(s);
@@ -8372,24 +8400,24 @@ begin
   Result.PublicKey.t := MatrixVectorMul(A, s);
   ToMont(Result.PublicKey.t);
   Result.PublicKey.t := VectorAdd(Result.PublicKey.t, e);
-  Move(Rho[0], Result.PublicKey.Rho[0], SYMBYTES);
+  Move(Rho[0], Result.PublicKey.Rho[0], Flavor.SYMBYTES);
   Result.SecretKey.s := s;
 end;
 
-class function TUKyber768.GenerateKeyPair: TKeyPair;
+class function TUKyber.GenerateKeyPair: TKeyPair;
 begin
   Result := GenerateKeyPair(USysRandom(32));
 end;
 
-class function TUKyber768.GenerateMatrix(
+class function TUKyber.GenerateMatrix(
   const Seed: array of UInt8;
   const Transposed: Boolean
 ): TMatrix;
   var i, j: Int32;
 begin
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
-    for j := 0 to K - 1 do
+    for j := 0 to Flavor.K - 1 do
     begin
       if Transposed then
       begin
@@ -8403,85 +8431,85 @@ begin
   end;
 end;
 
-class function TUKyber768.PackPublicKey(const PublicKey: TPublicKey): TUInt8Array;
+class function TUKyber.PackPublicKey(const PublicKey: TPublicKey): TUInt8Array;
 begin
-  Result := TUInt8Array.Make(PUBLICKEYBYTES);
-  Move(VecToBytes(PublicKey.t)[0], Result[0], POLYVECBYTES);
-  Move(PublicKey.Rho[0], Result[POLYVECBYTES], SYMBYTES);
+  Result := TUInt8Array.Make(Flavor.PUBLICKEYBYTES);
+  Move(VecToBytes(PublicKey.t)[0], Result[0], Flavor.POLYVECBYTES);
+  Move(PublicKey.Rho[0], Result[Flavor.POLYVECBYTES], Flavor.SYMBYTES);
 end;
 
-class function TUKyber768.UnpackPublicKey(const Data: array of UInt8): TPublicKey;
+class function TUKyber.UnpackPublicKey(const Data: array of UInt8): TPublicKey;
 begin
-  Result.t := VecFromBytes(Copy(Data, 0, POLYVECBYTES));
-  Move(Data[POLYVECBYTES], Result.Rho[0], SYMBYTES);
+  Result.t := VecFromBytes(Copy(Data, 0, Flavor.POLYVECBYTES));
+  Move(Data[Flavor.POLYVECBYTES], Result.Rho[0], Flavor.SYMBYTES);
 end;
 
-class function TUKyber768.PackSecretKey(const SecretKey: TSecretKey): TUInt8Array;
+class function TUKyber.PackSecretKey(const SecretKey: TSecretKey): TUInt8Array;
 begin
   Result := VecToBytes(SecretKey.s);
 end;
 
-class function TUKyber768.UnpackSecretKey(const Data: array of UInt8): TSecretKey;
+class function TUKyber.UnpackSecretKey(const Data: array of UInt8): TSecretKey;
 begin
   Result.s := VecFromBytes(Data);
 end;
 
-class function TUKyber768.PolyFromMsg(const Msg: array of UInt8): TPoly;
+class function TUKyber.PolyFromMsg(const Msg: array of UInt8): TPoly;
   var i, j: Int32;
   var Mask: Int16;
 begin
-  for i := 0 to N div 8 - 1 do
+  for i := 0 to Flavor.N div 8 - 1 do
   begin
     for j := 0 to 7 do
     begin
       Mask := -Int16((Msg[i] shr j) and 1);
-      Result[8 * i + j] := Mask and ((Q + 1) div 2);
+      Result[8 * i + j] := Mask and ((Flavor.Q + 1) div 2);
     end;
   end;
 end;
 
-class function TUKyber768.PolyToMsg(const Poly: TPoly): TUInt8Array;
+class function TUKyber.PolyToMsg(const Poly: TPoly): TUInt8Array;
   var i, j: Int32;
   var t: UInt32;
   var c: Int16;
 begin
-  Result := TUInt8Array.Make(SYMBYTES);
-  for i := 0 to N div 8 - 1 do
+  Result := TUInt8Array.Make(Flavor.SYMBYTES);
+  for i := 0 to Flavor.N div 8 - 1 do
   begin
     Result[i] := 0;
     for j := 0 to 7 do
     begin
       c := Poly[8 * i + j];
-      if c < 0 then c += Q;
+      if c < 0 then c += Flavor.Q;
       t := UInt32(c) shl 1;
-      t += Q div 2;
-      t := t div Q;
+      t += Flavor.Q div 2;
+      t := t div Flavor.Q;
       t := t and 1;
       Result[i] := Result[i] or UInt8(t shl j);
     end;
   end;
 end;
 
-class function TUKyber768.CoeffsEqualModQ(const a, b: Int32): Boolean;
+class function TUKyber.CoeffsEqualModQ(const a, b: Int32): Boolean;
   var Diff: Int32;
 begin
-  Diff := (a - b) mod Q;
-  if Diff < 0 then Diff += Q;
+  Diff := (a - b) mod Flavor.Q;
+  if Diff < 0 then Diff += Flavor.Q;
   Result := Diff = 0;
 end;
 
-class function TUKyber768.GetNoisePoly(
+class function TUKyber.GetNoisePoly(
   const Seed: array of UInt8;
   const Nonce: UInt8;
   const TheETA: Int32
 ): TPoly;
   var Buf: TUInt8Array;
 begin
-  Buf := USHAKE_256(UBytesConcat([Seed, [Nonce]]), TheETA * N div 4);
+  Buf := USHAKE_256(UBytesConcat([Seed, [Nonce]]), TheETA * Flavor.N div 4);
   Result := SampleCBD(Buf, TheETA);
 end;
 
-class function TUKyber768.Encrypt(
+class function TUKyber.Encrypt(
   const pk: TPublicKey;
   const Msg: array of UInt8;
   const Coins: array of UInt8
@@ -8495,23 +8523,23 @@ class function TUKyber768.Encrypt(
 begin
   At := GenerateMatrix(pk.rho, True);
   Nonce := 0;
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
-    rVec[i] := GetNoisePoly(Coins, Nonce, ETA);
+    rVec[i] := GetNoisePoly(Coins, Nonce, Flavor.ETA1);
     Inc(Nonce);
   end;
-  for i := 0 to K - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
-    e1Vec[i] := GetNoisePoly(Coins, Nonce, ETA);
+    e1Vec[i] := GetNoisePoly(Coins, Nonce, Flavor.ETA2);
     Inc(Nonce);
   end;
   VecNTT(rVec);
-  e2 := GetNoisePoly(Coins, Nonce, ETA);
+  e2 := GetNoisePoly(Coins, Nonce, Flavor.ETA2);
   uVec := MatrixVectorMul(At, rVec);
   VecInvNTT(uVec);
   uVec := VectorAdd(uVec, e1Vec);
   vPoly := PolyMul(pk.t[0], rVec[0]);
-  for i := 1 to K - 1 do
+  for i := 1 to Flavor.K - 1 do
   begin
     tmp := PolyMul(pk.t[i], rVec[i]);
     vPoly := PolyAdd(vPoly, tmp);
@@ -8519,14 +8547,12 @@ begin
   PolyInvNTT(vPoly);
   vPoly := PolyAdd(vPoly, e2);
   vPoly := PolyAdd(vPoly, PolyFromMsg(Msg));
-  WriteLn(VecToStr(uVec, 16));
   uBytes := VecCompress(uVec);
-  WriteLn(PolyToStr(vPoly, 16));
   vBytes := PolyCompress(vPoly);
   Result := UBytesConcat([uBytes, vBytes]);
 end;
 
-class function TUKyber768.Decrypt(
+class function TUKyber.Decrypt(
   const sk: TSecretKey;
   const Ciphertext: array of UInt8
 ): TUInt8Array;
@@ -8535,16 +8561,14 @@ class function TUKyber768.Decrypt(
   var i: Int32;
   var uBytes, vBytes: TUInt8Array;
 begin
-  uBytes := Copy(Ciphertext, 0, POLYVECCOMPRESSEDBYTES);
-  vBytes := Copy(Ciphertext, POLYVECCOMPRESSEDBYTES, POLYCOMPRESSEDBYTES);
+  uBytes := Copy(Ciphertext, 0, Flavor.POLYVECCOMPRESSEDBYTES);
+  vBytes := Copy(Ciphertext, Flavor.POLYVECCOMPRESSEDBYTES, Flavor.POLYCOMPRESSEDBYTES);
   uVec := VecDecompress(uBytes);
-  WriteLn(VecToStr(uVec, 16));
   vPoly := PolyDecompress(vBytes);
-  WriteLn(PolyToStr(vPoly, 16));
   uVecNtt := uVec;
   VecNTT(uVecNtt);
   mp := PolyMul(sk.s[0], uVecNtt[0]);
-  for i := 1 to K - 1 do
+  for i := 1 to Flavor.K - 1 do
   begin
     tmp := PolyMul(sk.s[i], uVecNtt[i]);
     mp := PolyAdd(mp, tmp);
@@ -8555,13 +8579,13 @@ begin
   Result := PolyToMsg(mp);
 end;
 
-class function TUKyber768.PolyToStr(
+class function TUKyber.PolyToStr(
   const Poly: TPoly;
   const Count: UInt32
 ): String;
   var i, c: Int32;
 begin
-  if Count = 0 then c := N else c := UMin(N, Count);
+  if Count = 0 then c := Flavor.N else c := UMin(Flavor.N, Count);
   Result := IntToStr(Poly[0]);
   for i := 1 to c - 1 do
   begin
@@ -8569,17 +8593,17 @@ begin
   end;
 end;
 
-class function TUKyber768.VecToStr(
+class function TUKyber.VecToStr(
   const Vec: TVec;
   const Count: UInt32
 ): String;
   var i: Int32;
 begin
   Result := '';
-  for i := 0 to k - 1 do
+  for i := 0 to Flavor.K - 1 do
   begin
     Result += PolyToStr(Vec[i], Count);
-    if i < k - 1 then Result += #$a;
+    if i < Flavor.K - 1 then Result += #$a;
   end;
 end;
 
