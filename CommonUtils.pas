@@ -2388,6 +2388,7 @@ function USignOf(const v: Int32): Int32; inline; overload;
 function USignOf(const v: Int64): Int64; inline; overload;
 function USignOf(const v: TUFloat): TUFloat; inline; overload;
 function USignOf(const v: TUDouble): TUDouble; inline; overload;
+function UAlign(const v, a: UInt32): UInt32;
 generic function UMin<T>(const a, b: T): T; inline; overload;
 function UMin(const a, b: Int8): Int8; inline; overload;
 function UMin(const a, b: Int16): Int16; inline; overload;
@@ -13071,7 +13072,7 @@ begin
       t := p.NextToken;
       if t <> tt_number then
       begin
-        StrArr := UStrExplode(t.Value, 'E');
+        StrArr := UStrExplode(LowerCase(t.Value), 'e');
         if Length(StrArr) < 2 then Exit;
         if not UStrIsNumber(StrArr[0])
         or not UStrIsNumber(StrArr[1]) then Exit;
@@ -14063,6 +14064,11 @@ end;
 function USignOf(const v: TUDouble): TUDouble;
 begin
   Result := specialize USignOf<TUDouble>(v);
+end;
+
+function UAlign(const v, a: UInt32): UInt32;
+begin
+  Result := v + ((a - (v mod a)) mod a);
 end;
 
 generic function UMin<T>(const a, b: T): T;
