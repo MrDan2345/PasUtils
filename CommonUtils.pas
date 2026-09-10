@@ -1704,14 +1704,17 @@ public
   Strings: array of String;
   Symbols: array of String;
   Keywords: array of String;
+  Escape: array of String;
   CaseSensitive: Boolean;
   procedure AddComment(const ACommentStart, ACommentEnd: String);
   procedure AddCommentLine(const ACommentLine: String);
   procedure AddString(const AStringStartEnd: String);
   procedure AddSymbol(const ASymbol: String);
+  procedure AddEscape(const AEscape: String);
   procedure AddSymbols(const ASymbols: array of String);
   procedure AddKeyword(const AKeyword: String);
   procedure AddKeywords(const AKeywords: array of String);
+  procedure AddEscapes(const AEscapes: array of String);
   procedure Reset;
 end;
 type PUParserSyntax = ^TUParserSyntax;
@@ -10387,6 +10390,12 @@ begin
   Symbols[High(Symbols)] := ASymbol;
 end;
 
+procedure TUParserSyntax.AddEscape(const AEscape: String);
+begin
+  SetLength(Escapes, Length(Escapes) + 1);
+  Symbols[High(Escapes)] := AEscape;
+end;
+
 procedure TUParserSyntax.AddSymbols(const ASymbols: array of String);
   var i, n: Int32;
 begin
@@ -10407,6 +10416,14 @@ begin
   n := Length(Keywords);
   SetLength(Keywords, Length(Keywords) + Length(AKeywords));
   for i := 0 to High(AKeywords) do Keywords[n + i] := AKeywords[i];
+end;
+
+procedure TUParserSyntax.AddEscapes(const AEscapes: array of String);
+  var i, n: Int32;
+begin
+  n := Length(Escapes);
+  SetLength(Escapes, Length(Escapes) + Length(AEscapes));
+  for i := 0 to High(AEscapes) do Escapes[n + i] := AEscapes[i];
 end;
 
 procedure TUParserSyntax.Reset;
