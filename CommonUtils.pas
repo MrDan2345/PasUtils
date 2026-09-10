@@ -1704,7 +1704,7 @@ public
   Strings: array of String;
   Symbols: array of String;
   Keywords: array of String;
-  Escape: array of String;
+  Escapes: array of String;
   CaseSensitive: Boolean;
   procedure AddComment(const ACommentStart, ACommentEnd: String);
   procedure AddCommentLine(const ACommentLine: String);
@@ -1769,6 +1769,7 @@ public
   procedure AddString(const StringStartEnd: String);
   procedure AddSymbol(const Symbol: String);
   procedure AddKeyword(const Keyword: String);
+  procedure AddEscape(const Escape: String);
   procedure SkipSpaces;
   procedure StatePush;
   procedure StatePop;
@@ -10559,6 +10560,11 @@ end;
 procedure TUParser.AddKeyword(const Keyword: String);
 begin
   _DefaultSyntax.AddKeyword(Keyword);
+end;
+
+procedure TUParser.AddEscape(const Escape: String);
+begin
+  _DefaultSyntax.AddKeyword(Escape);
 end;
 
 procedure TUParser.SkipSpaces;
