@@ -1785,6 +1785,7 @@ public
   function IsAtCommentStart: Int32;
   function IsAtCommentEnd: Int32;
   function IsAtString: Int32;
+  function IsAtEscape: Int32;
   function IsAtEoF: Boolean;
   function IsAtNewLine: Boolean;
   function NextToken: TUParserToken; overload;
@@ -10394,7 +10395,7 @@ end;
 procedure TUParserSyntax.AddEscape(const AEscape: String);
 begin
   SetLength(Escapes, Length(Escapes) + 1);
-  Symbols[High(Escapes)] := AEscape;
+  Escapes[High(Escapes)] := AEscape;
 end;
 
 procedure TUParserSyntax.AddSymbols(const ASymbols: array of String);
@@ -10564,7 +10565,7 @@ end;
 
 procedure TUParser.AddEscape(const Escape: String);
 begin
-  _DefaultSyntax.AddKeyword(Escape);
+  _DefaultSyntax.AddEscape(Escape);
 end;
 
 procedure TUParser.SkipSpaces;
@@ -10790,6 +10791,29 @@ begin
   Result := -1;
 end;
 
+function TUParser.IsAtEscape: Int32;
+  var i, j: Int32;
+  var Match: Boolean;
+begin
+  for i := 0 to High(_Syntax^.Escapes) do
+  begin
+    Match := True;
+    for j := 0 to Length(_Syntax^.Escapes[i]) - 1 do
+    if (_Syntax^.CaseSensitive and (_Text[_Position + j] <> _Syntax^.Escapes[i][j + 1]))
+    or (not _Syntax^.CaseSensitive and (LowerCase(_Text[_Position + j]) <> LowerCase(_Syntax^.Escapes[i][j + 1]))) then
+    begin
+      Match := False;
+      Break;
+    end;
+    if Match then
+    begin
+      Result := i;
+      Exit;
+    end;
+  end;
+  Result := -1;
+end;
+
 function TUParser.IsAtEoF: Boolean;
 begin
   Result := _Position >= TextLength;
@@ -10826,6 +10850,7 @@ function TUParser.NextToken(out TokenType: TUTokenType): String;
   var IndCommentLine: Int32 absolute IndArr[1 * 2];
   var IndString: Int32 absolute IndArr[2 * 2];
   var IndSymbol: Int32 absolute IndArr[3 * 2];
+  var IndEscape: Int32;
   var i, j: Int32;
 begin
   while True do
@@ -10911,10 +10936,19 @@ begin
       i := IndString;
       TokenType := tt_string;
       Inc(_Position, Length(_Syntax^.Strings[i]));
-      while (_Position <= TextLength - Length(_Syntax^.Strings[i]))
-      and (IsAtString <> i) do
+      while (_Position <= TextLength - Length(_Syntax^.Strings[i])) do
       begin
-        Result := Result + _Text[_Position];
+        IndEscape := IsAtEscape;
+        if (IndEscape > -1) then
+        begin
+          Result += _Syntax^.Escapes[IndEscape];
+          Inc(_Position, Length(_Syntax^.Escapes[IndEscape]));
+          Result += _Text[_Position];
+          Inc(_Position);
+          Continue;
+        end;
+        if IsAtString = i then Break;
+        Result += _Text[_Position];
         Inc(_Position);
       end;
       if _Position <= TextLength - Length(_Syntax^.Strings[i]) then
@@ -13522,6 +13556,7 @@ begin
     AddSymbols(['{', '}', '[', ']', ':', ',', '.']);
     AddString('"');
     AddKeywords(['null', 'undefined']);
+    AddEscape('\');
   end;
   _NullNodeRef := TUJson.Create;
 end;
