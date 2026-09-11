@@ -14,6 +14,7 @@ type TUProcedureString = procedure (const Value: String) of object;
 
 type TUStrArray = array of String;
 type TUStrArrayArray = array of array of String;
+type TUStrPair = array[0..1] of String;
 type TUDateTimeArray = array of TDateTime;
 type TUVarRecArray = array of TVarRec;
 
@@ -2289,6 +2290,12 @@ private
   procedure SetNodeType(const AValue: TNodeType);
   function GetValue: String;
   procedure SetValue(const AValue: String);
+  function GetValueAsInt: Int32;
+  procedure SetValueAsInt(const AValue: Int32);
+  function GetValueAsFloat: TUFloat;
+  procedure SetValueAsFloat(const AValue: TUFloat);
+  function GetValueAsBool: Boolean;
+  procedure SetValueAsBool(const AValue: Boolean);
   function GetContent(const Key: String): TUJson; overload;
   function GetContent(const Index: Int32): TUJson; overload;
   function GetName(const Index: Int32): String;
@@ -2303,6 +2310,9 @@ private
 public
   property NodeType: TNodeType read _NodeType write SetNodeType;
   property Value: String read GetValue write SetValue;
+  property ValueAsInt: Int32 read GetValueAsInt write SetValueAsInt;
+  property ValueAsFloat: TUFloat read GetValueAsFloat write SetValueAsFloat;
+  property ValueAsBool: Boolean read GetValueAsBool write SetValueAsBool;
   property Content[const Key: String]: TUJson read GetContent; default;
   property Name[const Index: Int32]: String read GetName;
   property Element[const Index: Int32]: TUJson read GetElement;
@@ -2327,9 +2337,6 @@ public
   function AddValueFloat(const NewValue: TUFloat): TUJson;
   function AddObject(const ObjectName: String = ''): TUJson;
   function AddArray(const ArrayName: String = ''): TUJson;
-  function ValueAsInt: Int32;
-  function ValueAsFloat: TUFloat;
-  function ValueAsBool: Boolean;
   class constructor CreateClass;
   class destructor DestroyClass;
   constructor Create;
@@ -2526,7 +2533,7 @@ function UMinValue(out v: TUFloat): TUFloat; inline; overload;
 function UMinValue(out v: TUDouble): TUDouble; inline; overload;
 generic function UEnumToStr<T>(const Enum: T): String;
 generic function UEnumSetToStr<T>(const EnumSet: T): String;
-generic function USelect<T>(const Cond: Boolean; constref IfTrue: T; constref IfFalse: T): T; inline;
+generic function USelect<T>(const Cond: Boolean; constref IfTrue: T; constref IfFalse: T): T;
 function UCRC32(const CRC: UInt32; const Value: Pointer; const Count: UInt32): UInt32;
 function UCRC64(const CRC: UInt64; const Value: Pointer; const Count: UInt32): UInt64;
 function UFileCRC32(const FileName: String; const CRC: UInt32 = 0): UInt32;
@@ -2600,6 +2607,7 @@ function UIsCharTrimable(const c: AnsiChar): Boolean;
 function UStrExprMatch(const Str, Expr: String): TUExprMatch;
 function UStrExplode(const Str: String; const Separator: String; const AllowEmpty: Boolean = True): TUStrArray;
 function UStrReplace(const Str, Old, New: String): String;
+function UStrReplace(const Str: String; const ReplacePairs: array of TUStrPair): String;
 function UStrRemove(const Str, Pattern: String): String;
 function UStrSubStr(const Str: String; const SubStrStart: Int32; const SubStrLength: Int32 = 0): String;
 function UStrSubPos(const Str, SubStr: String): Int32;
@@ -13266,8 +13274,48 @@ end;
 
 procedure TUJson.SetValue(const AValue: String);
 begin
-  if _NodeType <> nt_value then Exit;
+  SetNodeType(nt_value);
   _Value := AValue;
+end;
+
+function TUJson.GetValueAsInt: Int32;
+begin
+  if _NodeType <> nt_value then Exit(0);
+  Result := StrToIntDef(_Value, 0);
+end;
+
+procedure TUJson.SetValueAsInt(const AValue: Int32);
+begin
+  SetNodeType(nt_value);
+  _Value := IntToStr(AValue);
+end;
+
+function TUJson.GetValueAsFloat: TUFloat;
+begin
+  if _NodeType <> nt_value then Exit(0);
+  Result := StrToFloatDef(_Value, 0);
+end;
+
+procedure TUJson.SetValueAsFloat(const AValue: TUFloat);
+begin
+  SetNodeType(nt_value);
+  _Value := FloatToStr(AValue);
+end;
+
+function TUJson.GetValueAsBool: Boolean;
+  var lc: String;
+begin
+  if _NodeType <> nt_value then Exit(False);
+  lc := LowerCase(_Value);
+  if lc = 'true' then Exit(True);
+  if lc = 'false' then Exit(False);
+  Result := StrToIntDef(lc, 0) <> 0;
+end;
+
+procedure TUJson.SetValueAsBool(const AValue: Boolean);
+begin
+  SetNodeType(nt_value);
+  _Value := specialize USelect<String>(AValue, 'true', 'false');
 end;
 
 function TUJson.GetContent(const Key: String): TUJson;
@@ -13525,28 +13573,6 @@ begin
     end;
     else Exit;
   end;
-end;
-
-function TUJson.ValueAsInt: Int32;
-begin
-  if _NodeType <> nt_value then Exit(0);
-  Result := StrToIntDef(_Value, 0);
-end;
-
-function TUJson.ValueAsFloat: TUFloat;
-begin
-  if _NodeType <> nt_value then Exit(0);
-  Result := StrToFloatDef(_Value, 0);
-end;
-
-function TUJson.ValueAsBool: Boolean;
-  var lc: String;
-begin
-  if _NodeType <> nt_value then Exit(False);
-  lc := LowerCase(_Value);
-  if lc = 'true' then Exit(True);
-  if lc = 'false' then Exit(False);
-  Result := StrToIntDef(lc, 0) <> 0;
 end;
 
 class constructor TUJson.CreateClass;
@@ -16989,6 +17015,72 @@ begin
     j := MatchArr[i] + LenOld;
   end;
   if LenStr >= j then Move(Str[j], Result[p], LenStr - j + 1);
+end;
+
+function UStrReplace(const Str: String; const ReplacePairs: array of TUStrPair): String;
+  procedure ExpandResult(const RequiredSize: Int32);
+    var CurrentSize: Int32;
+  begin
+    CurrentSize := Length(Result);
+    if CurrentSize >= RequiredSize then Exit;
+    SetLength(Result, UMax(RequiredSize, CurrentSize * 2));
+  end;
+  var sp, rp: Int32;
+  function MatchPair(const PairIdx: Int32): Boolean;
+    var i: Int32;
+  begin
+    if sp + Length(ReplacePairs[PairIdx][0]) > Length(Str) then Exit(False);
+    if Length(ReplacePairs[PairIdx][0]) = 0 then Exit(False);
+    for i := 1 to Length(ReplacePairs[PairIdx][0]) do
+    if Str[sp + i] <> ReplacePairs[PairIdx][0][i] then
+    begin
+      Exit(False);
+    end;
+    Result := True;
+  end;
+  var LenStr, LenPairs, i, MatchIdx, CurLen, MatchLen: Int32;
+begin
+  LenStr := Length(Str);
+  if LenStr = 0 then Exit(Str);
+  LenPairs := Length(ReplacePairs);
+  if LenPairs = 0 then Exit(Str);
+  SetLength(Result, Length(Str));
+  rp := 0;
+  sp := 0;
+  CurLen := 0;
+  while sp < Length(Str) do
+  begin
+    MatchIdx := -1;
+    for i := 0 to High(ReplacePairs) do
+    if MatchPair(i) then
+    begin
+      MatchIdx := i;
+      Break;
+    end;
+    if MatchIdx < 0 then
+    begin
+      Inc(CurLen);
+      Inc(sp);
+      Continue;
+    end;
+    MatchLen := Length(ReplacePairs[MatchIdx][1]);
+    ExpandResult(rp + CurLen + MatchLen);
+    if CurLen > 0 then
+    begin
+      Move(Str[sp - CurLen + 1], Result[rp + 1], CurLen);
+      Inc(rp, CurLen);
+      CurLen := 0;
+    end;
+    Move(ReplacePairs[MatchIdx][1][1], Result[rp + 1], MatchLen);
+    Inc(rp, MatchLen);
+    Inc(sp, Length(ReplacePairs[MatchIdx][0]));
+  end;
+  if CurLen > 0 then
+  begin
+    Move(Str[sp - CurLen + 1], Result[rp + 1], CurLen);
+    rp += CurLen;
+  end;
+  if Length(Result) <> rp then SetLength(Result, rp);
 end;
 
 function UStrRemove(const Str, Pattern: String): String;
