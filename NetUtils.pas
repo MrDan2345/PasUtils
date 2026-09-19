@@ -461,6 +461,7 @@ type TUSocketImpl = type helper for TUSocket
     const OptName: Int32;
     const OptVal: Int32
   ): Int32;
+  function SetTimeout(const Seconds: UInt32): Int32;
   function SelectRead(const TimeoutMs: UInt32 = UInt32(-1)): Int32;
   function SelectWrite(const TimeoutMs: UInt32 = UInt32(-1)): Int32;
   function SetBlocking(const Blocking: Boolean): Int32;
@@ -1072,6 +1073,26 @@ function TUSocketImpl.SetSockOpt(
 begin
   Result := SetSockOpt(SOL_SOCKET, OptName, @OptVal, SizeOf(OptVal));
 end;
+
+function TUSocketImpl.SetTimeout(const Seconds: UInt32): Int32;
+{$if defined(windows)}
+  var Value: UInt32;
+begin
+  Value := Seconds * 1000;
+  Result := UNetSetSockOpt(Self, SOL_SOCKET, SO_RCVTIMEO, @Value, SizeOf(Value));
+end;
+{$elseif defined(linux)}
+  var Value: TTimeVal;
+begin
+  Value.Sec := Seconds;
+  Value.USec := 0;
+  Result := UNetSetSockOpt(Self, SOL_SOCKET, SO_RCVTIMEO, @Value, SizeOf(Value));
+end;
+{$else}
+begin
+  Result := -1;
+end;
+{$endif}
 
 function TUSocketImpl.SelectRead(const TimeoutMs: UInt32): Int32;
   var tv: TTimeVal;

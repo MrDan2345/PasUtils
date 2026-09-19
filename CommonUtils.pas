@@ -2618,10 +2618,12 @@ function UStrTrimRight(const Str: String): String;
 function UStrTrim(const Str: String): String;
 function UStrClone(const Str: String): String;
 procedure UStrToFile(const FileName: String; const Str: String);
+function UFileToStr(const FileName: String): String;
 function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32 = 1): UInt32;
 function UStrUTF8ToUTF32(const StrUTF8: String): TUInt32Array;
 function UStrUTF32ToUTF8(const Code: UInt32): String;
-function UFileToStr(const FileName: String): String;
+procedure UBytesToFile(const FileName: String; const Bytes: TUInt8Array);
+function UFileToBytes(const FileName: String): TUInt8Array;
 function UDirSearch(const Path: String): TUStrArray;
 function UFileSearch(const Path: String): TUStrArray;
 procedure UCopyFilePrepare(const BufferSize: UInt32 = 1024 * 1024 * 1024);
@@ -17242,6 +17244,20 @@ begin
   end;
 end;
 
+function UFileToStr(const FileName: String): String;
+  var fs: TFileStream;
+begin
+  Result := '';
+  if not FileExists(FileName) then Exit;
+  fs := TFileStream.Create(FileName, fmOpenRead);
+  try
+    SetLength(Result, fs.Size);
+    fs.Read(Result[1], Length(Result));
+  finally
+    fs.Free;
+  end;
+end;
+
 function UStrUTF8ToUTF32(const StrUTF8: String; out NumBytes: Int32; const Start: Int32): UInt32;
   var StrSize: Int32;
   var Byte1, Byte2, Byte3, Byte4: Uint8;
@@ -17333,19 +17349,29 @@ begin
   else Result := '';
 end;
 
-function UFileToStr(const FileName: String): String;
+procedure UBytesToFile(const FileName: String; const Bytes: TUInt8Array);
   var fs: TFileStream;
 begin
-  Result := '';
-  if FileExists(FileName) then
-  begin
-    fs := TFileStream.Create(FileName, fmOpenRead);
-    try
-      SetLength(Result, fs.Size);
-      fs.Read(Result[1], Length(Result));
-    finally
-      fs.Free;
-    end;
+  fs := TFileStream.Create(FileName, fmCreate);
+  try
+    if Length(Bytes) = 0 then Exit;
+    fs.Write(Bytes[0], Length(Bytes));
+  finally
+    fs.Free;
+  end;
+end;
+
+function UFileToBytes(const FileName: String): TUInt8Array;
+  var fs: TFileStream;
+begin
+  Result := nil;
+  if not FileExists(FileName) then Exit;
+  fs := TFileStream.Create(FileName, fmOpenRead);
+  try
+    SetLength(Result, fs.Size);
+    fs.Read(Result[0], Length(Result));
+  finally
+    fs.Free;
   end;
 end;
 
