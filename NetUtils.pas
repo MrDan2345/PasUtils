@@ -429,6 +429,7 @@ type TUSocketImpl = type helper for TUSocket
     const Flags: Int32
   ): Int32;
   function Send(const Msg: AnsiString): Int32;
+  function Send(const Msg: TUInt8Array): Int32;
   function Recv(
     const Buffer: Pointer;
     const BufferLen: UInt32;
@@ -1007,6 +1008,11 @@ begin
   {$pop}
   ShortMsg[2047] := #0;
   Result := UNetSend(Self, @ShortMsg, SizeOf(ShortMsg), 0);
+end;
+
+function TUSocketImpl.Send(const Msg: TUInt8Array): Int32;
+begin
+  Result := UNetSend(Self, @Msg[0], Msg.Size, 0);
 end;
 
 function TUSocketImpl.Recv(
