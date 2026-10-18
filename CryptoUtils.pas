@@ -18,6 +18,7 @@ type TUDigest_512 = array[0..63] of UInt8;
 type TUDigestMD5 = type TUDigest_128;
 type TUDigestSHA1 = type TUDigest_160;
 type TUDigestSHA2_256 = type TUDigest_256;
+type TUDigestSHA2_384 = type TUDigest_384;
 type TUDigestSHA2_512 = type TUDigest_512;
 type TUDigestSHA3_224 = type TUDigest_224;
 type TUDigestSHA3_256 = type TUDigest_256;
@@ -1366,6 +1367,10 @@ function USHA1(const Data: String): TUDigestSHA1;
 function USHA2_256(const Data: Pointer; const DataSize: UInt32): TUDigestSHA2_256;
 function USHA2_256(const Data: TUInt8Array): TUDigestSHA2_256;
 function USHA2_256(const Data: String): TUDigestSHA2_256;
+
+function USHA2_384(const Data: Pointer; const DataSize: UInt32): TUDigestSHA2_384;
+function USHA2_384(const Data: TUInt8Array): TUDigestSHA2_384;
+function USHA2_384(const Data: String): TUDigestSHA2_384;
 
 function USHA2_512(const Data: Pointer; const DataSize: UInt32): TUDigestSHA2_512;
 function USHA2_512(const Data: TUInt8Array): TUDigestSHA2_512;
@@ -4138,6 +4143,132 @@ begin
   Result := USHA2_256(@Data[1], Length(Data));
 end;
 
+function USHA2_384(const Data: Pointer; const DataSize: UInt32): TUDigestSHA2_384;
+  const K: array[0..79] of UInt64 = (
+    UInt64($428a2f98d728ae22), UInt64($7137449123ef65cd), UInt64($b5c0fbcfec4d3b2f), UInt64($e9b5dba58189dbbc),
+    UInt64($3956c25bf348b538), UInt64($59f111f1b605d019), UInt64($923f82a4af194f9b), UInt64($ab1c5ed5da6d8118),
+    UInt64($d807aa98a3030242), UInt64($12835b0145706fbe), UInt64($243185be4ee4b28c), UInt64($550c7dc3d5ffb4e2),
+    UInt64($72be5d74f27b896f), UInt64($80deb1fe3b1696b1), UInt64($9bdc06a725c71235), UInt64($c19bf174cf692694),
+    UInt64($e49b69c19ef14ad2), UInt64($efbe4786384f25e3), UInt64($0fc19dc68b8cd5b5), UInt64($240ca1cc77ac9c65),
+    UInt64($2de92c6f592b0275), UInt64($4a7484aa6ea6e483), UInt64($5cb0a9dcbd41fbd4), UInt64($76f988da831153b5),
+    UInt64($983e5152ee66dfab), UInt64($a831c66d2db43210), UInt64($b00327c898fb213f), UInt64($bf597fc7beef0ee4),
+    UInt64($c6e00bf33da88fc2), UInt64($d5a79147930aa725), UInt64($06ca6351e003826f), UInt64($142929670a0e6e70),
+    UInt64($27b70a8546d22ffc), UInt64($2e1b21385c26c926), UInt64($4d2c6dfc5ac42aed), UInt64($53380d139d95b3df),
+    UInt64($650a73548baf63de), UInt64($766a0abb3c77b2a8), UInt64($81c2c92e47edaee6), UInt64($92722c851482353b),
+    UInt64($a2bfe8a14cf10364), UInt64($a81a664bbc423001), UInt64($c24b8b70d0f89791), UInt64($c76c51a30654be30),
+    UInt64($d192e819d6ef5218), UInt64($d69906245565a910), UInt64($f40e35855771202a), UInt64($106aa07032bbd1b8),
+    UInt64($19a4c116b8d2d0c8), UInt64($1e376c085141ab53), UInt64($2748774cdf8eeb99), UInt64($34b0bcb5e19b48a8),
+    UInt64($391c0cb3c5c95a63), UInt64($4ed8aa4ae3418acb), UInt64($5b9cca4f7763e373), UInt64($682e6ff3d6b2b8a3),
+    UInt64($748f82ee5defb2fc), UInt64($78a5636f43172f60), UInt64($84c87814a1f0ab72), UInt64($8cc702081a6439ec),
+    UInt64($90befffa23631e28), UInt64($a4506cebde82bde9), UInt64($bef9a3f7b2c67915), UInt64($c67178f2e372532b),
+    UInt64($ca273eceea26619c), UInt64($d186b8c721c0c207), UInt64($eada7dd6cde0eb1e), UInt64($f57d4f7fee6ed178),
+    UInt64($06f067aa72176fba), UInt64($0a637dc5a2c898a6), UInt64($113f9804bef90dae), UInt64($1b710b35131c471b),
+    UInt64($28db77f523047d84), UInt64($32caab7b40c72493), UInt64($3c9ebe0a15c9bebc), UInt64($431d67c49c100d4c),
+    UInt64($4cc5d4becb3e42b6), UInt64($597f299cfc657e2a), UInt64($5fcb6fab3ad6faec), UInt64($6c44198c4a475817)
+  );
+  function ROTR64(x: UInt64; n: Byte): UInt64;
+  begin
+    Result := (x shr n) or (x shl (64 - n));
+  end;
+  function Ch(x, y, z: UInt64): UInt64;
+  begin
+    Result := (x and y) xor ((not x) and z);
+  end;
+  function Maj(x, y, z: UInt64): UInt64;
+  begin
+    Result := (x and y) xor (x and z) xor (y and z);
+  end;
+  function Sigma0(x: UInt64): UInt64;
+  begin
+    Result := ROTR64(x, 28) xor ROTR64(x, 34) xor ROTR64(x, 39);
+  end;
+  function Sigma1(x: UInt64): UInt64;
+  begin
+    Result := ROTR64(x, 14) xor ROTR64(x, 18) xor ROTR64(x, 41);
+  end;
+  function Sigma0Small(x: UInt64): UInt64;
+  begin
+    Result := ROTR64(x, 1) xor ROTR64(x, 8) xor (x shr 7);
+  end;
+  function Sigma1Small(x: UInt64): UInt64;
+  begin
+    Result := ROTR64(x, 19) xor ROTR64(x, 61) xor (x shr 6);
+  end;
+  var H: array[0..7] of UInt64 = (
+    UInt64($cbbb9d5dc1059ed8),
+    UInt64($629a292a367cd507),
+    UInt64($9159015a3070dd17),
+    UInt64($152fecd8f70e5939),
+    UInt64($67332667ffc00b31),
+    UInt64($8eb44a8768581511),
+    UInt64($db0c2e0d64f98fa7),
+    UInt64($47b5481dbefa4fa4)
+  );
+  var W: array[0..79] of UInt64;
+  var wv_a, wv_b, wv_c, wv_d, wv_e, wv_f, wv_g, wv_h: UInt64;
+  var T1, T2: UInt64;
+  var i, j, t: Int32;
+  var PaddedData: TUInt8Array;
+  var OriginalLengthInBits: UInt64;
+  var PadLen: Int32;
+begin
+  OriginalLengthInBits := UInt64(DataSize) * 8;
+  PadLen := 111 - (DataSize mod 128);
+  if PadLen < 0 then PadLen := PadLen + 128;
+  PaddedData := nil;
+  SetLength(PaddedData, DataSize + PadLen + 1 + 16);
+  if DataSize > 0 then Move(Data^, PaddedData[0], DataSize);
+  PaddedData[DataSize] := $80;
+  for i := DataSize + 1 to High(PaddedData) - 16 do PaddedData[i] := $00;
+  for i := 0 to 7 do PaddedData[High(PaddedData) - 15 + i] := 0;
+  for i := 0 to 7 do PaddedData[High(PaddedData) - 7 + i] := PUInt8Arr(@OriginalLengthInBits)^[7 - i];
+  for i := 0 to (Length(PaddedData) div 128) - 1 do
+  begin
+    for t := 0 to 15 do
+    begin
+      W[t] := 0;
+      for j := 0 to 7 do
+      begin
+        W[t] := (W[t] shl 8) or PaddedData[i * 128 + t * 8 + j];
+      end;
+    end;
+    for t := 16 to 79 do
+    begin
+      W[t] := Sigma1Small(W[t - 2]) + W[t - 7] + Sigma0Small(W[t - 15]) + W[t - 16];
+    end;
+    wv_a := H[0]; wv_b := H[1]; wv_c := H[2]; wv_d := H[3];
+    wv_e := H[4]; wv_f := H[5]; wv_g := H[6]; wv_h := H[7];
+    for t := 0 to 79 do
+    begin
+      T1 := wv_h + Sigma1(wv_e) + Ch(wv_e, wv_f, wv_g) + K[t] + W[t];
+      T2 := Sigma0(wv_a) + Maj(wv_a, wv_b, wv_c);
+      wv_h := wv_g; wv_g := wv_f; wv_f := wv_e;
+      wv_e := wv_d + T1;
+      wv_d := wv_c; wv_c := wv_b; wv_b := wv_a;
+      wv_a := T1 + T2;
+    end;
+    H[0] := H[0] + wv_a; H[1] := H[1] + wv_b; H[2] := H[2] + wv_c;
+    H[3] := H[3] + wv_d; H[4] := H[4] + wv_e; H[5] := H[5] + wv_f;
+    H[6] := H[6] + wv_g; H[7] := H[7] + wv_h;
+  end;
+  for i := 0 to 5 do
+  for j := 0 to 7 do
+  begin
+    Result[i * 8 + j] := Byte(H[i] shr (56 - j * 8));
+  end;
+end;
+
+function USHA2_384(const Data: TUInt8Array): TUDigestSHA2_384;
+begin
+  Result := USHA2_384(@Data[0], Length(Data));
+end;
+
+function USHA2_384(const Data: String): TUDigestSHA2_384;
+begin
+  Result := USHA2_384(@Data[1], Length(Data));
+end;
+
+
 function USHA2_512(const Data: Pointer; const DataSize: UInt32): TUDigestSHA2_512;
   const K: array[0..79] of UInt64 = (
     UInt64($428a2f98d728ae22), UInt64($7137449123ef65cd), UInt64($b5c0fbcfec4d3b2f), UInt64($e9b5dba58189dbbc),
@@ -4207,7 +4338,7 @@ function USHA2_512(const Data: Pointer; const DataSize: UInt32): TUDigestSHA2_51
   var OriginalLengthInBits: UInt64;
   var PadLen: Int32;
 begin
-  OriginalLengthInBits := DataSize * 8;
+  OriginalLengthInBits := UINt64(DataSize) * 8;
   PadLen := 111 - (DataSize mod 128);
   if PadLen < 0 then PadLen := PadLen + 128;
   PaddedData := nil;
