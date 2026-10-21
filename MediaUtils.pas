@@ -287,6 +287,8 @@ public
     property Parent: TNodeInterface read _Parent write SetParent;
     property Ids: TUStrArray read _Ids;
     function MatchId(const Id: String): Boolean;
+    constructor Create;
+    constructor Create(const AName: String);
     destructor Destroy; override;
   end;
   type TNodeInterfaceList = TNodeInterface.TNodeList;
@@ -331,6 +333,7 @@ public
     var _Subsets: TSubsetList;
   public
     property Subsets: TSubsetList read _Subsets;
+    constructor Create(const SubsetCount: Int32);
     destructor Destroy; override;
   end;
   type TMeshInterfaceList = array of TMeshInterface;
@@ -341,11 +344,7 @@ public
       Bind: TUMat;
     end;
     type TJointList = array of TJoint;
-    type
-
-    { TWeight }
-
- TWeight = record
+    type TWeight = record
       JointIndex: UInt32;
       JointWeight: TUFloat;
       class operator > (const a, b: TWeight): Boolean;
@@ -1402,6 +1401,26 @@ public
   class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; override;
   procedure Load(const StreamHelper: TUStreamHelper); override;
   procedure Load(const FileName: String); override;
+  destructor Destroy; override;
+end;
+
+type TUSceneDataGLB = class (TUSceneData)
+private
+  const MagicGLTF: array[0..3] of AnsiChar = 'glTF';
+  const ChunkMeta: UInt32 = $4E4F534A;
+  const ChunkData: UInt32 = $004E4942;
+  type THeader = record
+    var Magic: array[0..3] of AnsiChar;
+    var Version: UInt32;
+    var DataSize: UInt32;
+  end;
+  type TChunk = record
+    var DataSize: UInt32;
+    var ChunkType: UInt32;
+  end;
+public
+  class function CanLoad(const StreamHelper: TUStreamHelper): Boolean; override;
+  procedure Load(const StreamHelper: TUStreamHelper); override;
   destructor Destroy; override;
 end;
 
@@ -3411,6 +3430,20 @@ begin
   Result := False;
 end;
 
+constructor TUSceneData.TNodeInterface.Create;
+begin
+  inherited Create;
+  _Name := '';
+  _Transform := TUMat.Identity;
+end;
+
+constructor TUSceneData.TNodeInterface.Create(const AName: String);
+begin
+  inherited Create;
+  _Name := AName;
+  _Transform := TUMat.Identity;
+end;
+
 destructor TUSceneData.TNodeInterface.Destroy;
 begin
   specialize UArrClear<TAttachment>(_Attachments);
@@ -3444,6 +3477,12 @@ begin
   FreeMemAndNil(_IndexData);
   FreeMemAndNil(_VertexData);
   inherited Destroy;
+end;
+
+constructor TUSceneData.TMeshInterface.Create(const SubsetCount: Int32);
+begin
+  inherited Create;
+  SetLength(_Subsets, SubsetCount);
 end;
 
 destructor TUSceneData.TMeshInterface.Destroy;
@@ -7627,5 +7666,230 @@ begin
   inherited Destroy;
 end;
 // TUSceneDataDAE end
+
+// TUSceneDataGLB begin
+class function TUSceneDataGLB.CanLoad(const StreamHelper: TUStreamHelper): Boolean;
+  var Header: THeader;
+begin
+  if StreamHelper.Size < SizeOf(THeader) then Exit(False);
+  StreamHelper.PosPush;
+  try
+    StreamHelper.ReadBuffer(@Header, SizeOf(THeader));
+    Result := (Header.Magic = MagicGLTF) and (Header.Version = 2);
+  finally
+    StreamHelper.PosPop;
+  end;
+end;
+
+procedure TUSceneDataGLB.Load(const StreamHelper: TUStreamHelper);
+  var Header: THeader;
+  var PosStart: Int64;
+  function ReadChunk(out Chunk: TChunk): Boolean;
+  begin
+    if StreamHelper.Position - PosStart + SizeOf(Chunk) > Header.DataSize then Exit(False);
+    StreamHelper.ReadBuffer(@Chunk, SizeOf(Chunk));
+    Result := True;
+  end;
+  type TBufferView = record
+    var Buffer: UInt32;
+    var Size: UInt32;
+    var Offset: UInt32;
+  end;
+  var BufferViews: array of TBufferView;
+  type TCompType = (ct_uin8, ct_int8, ct_uint16, ct_int16, ct_uint32, ct_int32, ct_float);
+  type TElementType = (et_scalar, et_vec2, et_vec3, et_vec4, et_mat4);
+  type TAccessor = record
+    var BufferView: UInt32;
+    var CompType: UInt32;
+    var ElementType: TElementType;
+  end;
+  var Meta: TUJsonRef;
+  var Nodes: TUJson;
+  var MetaBuffers: TUJson;
+  var MetaBufferViews: TUJson;
+  var MetaAccessors: TUJson;
+  var MetaMeshes: TUJson;
+  var AllNodes: array of TNodeInterface;
+  procedure LoadBufferViews;
+    function LoadBufferView(const MetaBufferView: TUJson): TBufferView;
+    begin
+      Result.Buffer := MetaBufferView['buffer'].ValueAsInt;
+      Result.Offset := MetaBufferView['byteOffset'].ValueAsInt;
+      Result.Size := MetaBufferView['byteLength'].ValueAsInt;
+    end;
+    var i: Int32;
+  begin
+    SetLength(BufferViews, MetaBufferViews.Count);
+    for i := 0 to High(BufferViews) do
+    begin
+      //BufferViews[i] := LoadBufferView(BufferViews[i]);
+    end;
+  end;
+  procedure LoadAccessors;
+  begin
+
+  end;
+  procedure LoadMeshes;
+    function LoadMesh(const Meta: TUJson): TMeshInterface;
+      function LoadSubset(const MetaPrim: TUJson): TMeshInterface.TSubset;
+      begin
+        Result := TMeshInterface.TSubset.Create;
+
+      end;
+      var i: Int32;
+      var MetaPrim: TUJson;
+    begin
+      MetaPrim := Meta['primitives'];
+      if not MetaPrim.IsValid then Exit(nil);
+      Result := TMeshInterface.Create(MetaPrim.Count);
+      for i := 0 to MetaPrim.Count - 1 do
+      begin
+        Result.Subsets[i] := LoadSubset(MetaPrim[i]);
+      end;
+    end;
+    var i: Int32;
+  begin
+    SetLength(_MeshList, MetaMeshes.Count);
+    for i := 0 to MetaMeshes.Count - 1 do
+    begin
+      //_MeshList := LoadMesh(MetaMeshes[i]);
+    end;
+  end;
+  procedure LoadNode(const Parent: TNodeInterface; const NodeIndex: Int32);
+    var Node: TNodeInterface;
+    var DataNode: TUJson;
+    var Data: TUJson;
+    var Xf: TUMat;
+    var Rotation: TUQuat;
+    var Scale, Translation: TUVec3;
+    var i, x, y: Int32;
+  begin
+    if Assigned(AllNodes[NodeIndex]) then
+    begin
+      WriteLn('Node already allocated, ', NodeIndex);
+      Exit;
+    end;
+    DataNode := Nodes[NodeIndex];
+    Node := TNodeInterface.Create(DataNode['name'].Value);
+    Node.Parent := Parent;
+    AllNodes[NodeIndex] := Node;
+    Data := DataNode['matrix'];
+    if Data.IsValid then
+    begin
+      for i := 0 to Data.Count - 1 do
+      begin
+        x := i mod 4;
+        y := i div 4;
+        Xf[x, y] := Data[i].ValueAsFloat;
+      end;
+    end
+    else
+    begin
+      Scale := TUVec3.One;
+      Data := DataNode['scale'];
+      if Data.IsValid then
+      begin
+        for i := 0 to UMin(High(Scale), Data.Count - 1) do
+        begin
+          Scale[i] := Data[i].ValueAsFloat;
+        end;
+      end;
+      Rotation := TUQuat.Identity;
+      Data := DataNode['rotation'];
+      if Data.IsValid then
+      begin
+        for i := 0 to UMin(High(Rotation), Data.Count - 1) do
+        begin
+          Rotation[i] := Data[i].ValueAsFloat;
+        end;
+      end;
+      Translation := TUVec3.Zero;
+      Data := DataNode['translation'];
+      if Data.IsValid then
+      begin
+        for i := 0 to UMin(High(Translation), Data.Count - 1) do
+        begin
+          Translation[i] := Data[i].ValueAsFloat;
+        end;
+      end;
+      Xf := TUMat.Scaling(Scale);
+      Xf := Xf * TUMat.Rotation(Rotation);
+      Xf := Xf * TUMat.Translation(Translation);
+    end;
+    Node.LocalTransform := Xf;
+    Data := DataNode['children'];
+    for i := 0 to Data.Count - 1 do
+    begin
+      LoadNode(Node, Data[i].ValueAsInt);
+    end;
+  end;
+  var Chunk: TChunk;
+  var MetaJson: String;
+  var Scene: TUJson;
+  var SceneNodes: TUJson;
+  var i: Int32;
+  var CurPos: UInt32;
+  var BufferOffsets: array of UInt32;
+begin
+  PosStart := StreamHelper.Position;
+  StreamHelper.ReadBuffer(@Header, SizeOf(THeader));
+  if Header.Magic <> MagicGLTF then Exit;
+  if Header.Version <> 2 then Exit;
+  if not ReadChunk(Chunk) then Exit;
+  if Chunk.ChunkType <> ChunkMeta then Exit;
+  MetaJson := '';
+  SetLength(MetaJson, Chunk.DataSize);
+  StreamHelper.ReadBuffer(@MetaJson[1], Length(MetaJson));
+  Meta := TUJson.Load(MetaJson);
+  UStrToFile('TestFmt.json', Meta.Ptr.FormatJson());
+  MetaBuffers := Meta.Ptr['buffers'];
+  if MetaBuffers.IsValid then
+  begin
+    BufferOffsets := nil;
+    SetLength(BufferOffsets, MetaBuffers.Count);
+    CurPos := UAlign(StreamHelper.Position - PosStart, 4);
+    StreamHelper.PosPush;
+    for i := 0 to High(BufferOffsets) do
+    begin
+      while True do
+      begin
+        StreamHelper.Position := PosStart + CurPos;
+        ReadChunk(Chunk);
+        CurPos += SizeOf(Chunk);
+        if Chunk.ChunkType = ChunkData then Break;
+        CurPos := UAlign(CurPos + Chunk.DataSize, 4);
+        if CurPos - PosStart + SizeOf(Chunk) >= Header.DataSize then Exit;
+      end;
+      BufferOffsets[i] := PosStart + CurPos;
+      CurPos := UAlign(CurPos + Chunk.DataSize, 4);
+    end;
+    StreamHelper.PosPop;
+  end;
+  MetaBufferViews := Meta.Ptr['bufferViews'];
+  if MetaBufferViews.IsValid then LoadBufferViews;
+  MetaAccessors := Meta.Ptr['accessors'];
+  if MetaAccessors.IsValid then LoadAccessors;
+  MetaMeshes := Meta.Ptr['meshes'];
+  if MetaMeshes.IsValid then LoadMeshes;
+  Nodes := Meta.Ptr['nodes'];
+  if not Nodes.IsValid then Exit;
+  Scene := Meta.Ptr['scenes'][Meta.Ptr['scene'].ValueAsInt];
+  if not Scene.IsValid then Exit;
+  SceneNodes := Scene['nodes'];
+  AllNodes := nil;
+  SetLength(AllNodes, Nodes.Count);
+  _RootNode := TNodeInterface.Create(Scene['name'].Value);
+  for i := 0 to SceneNodes.Count - 1 do
+  begin
+    LoadNode(_RootNode, SceneNodes[i].ValueAsInt);
+  end;
+
+end;
+
+destructor TUSceneDataGLB.Destroy;
+begin
+  inherited Destroy;
+end;
+// TUSceneDataGLB end
 
 end.
