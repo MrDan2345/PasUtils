@@ -1335,25 +1335,41 @@ public
   ): TUInt8Array; static;
 end;
 
-type TUASN1 = class (TURefClass)
+type TUASN1 = record
 public
+{$push}{$packenum 1}
   type TTag = (
-    der_boolean = $01,
-    der_integer = $02,
-    der_bit_string = $03,
-    der_octet_string = $04,
-    der_null = $05,
-    der_object_identifier = $06,
-    der_utf8_string = $0c,
-    der_printable_string = $13,
-    der_ia5_string = $16,
-    der_utc_time = $17,
-    der_generalized_time = $18,
-    der_sequence = $30,
-    der_set = $31
+    DER_Invalid = 0,
+    DER_Boolean = $01,
+    DER_Integer = $02,
+    DER_Bit_String = $03,
+    DER_Octet_String = $04,
+    DER_Null = $05,
+    DER_Object_Identifier = $06,
+    DER_UTF8_String = $0c,
+    DER_Printable_String = $13,
+    DER_IA5_String = $16,
+    DER_UTC_Time = $17,
+    DER_Generalized_Time = $18,
+    DER_Sequence = $30,
+    DER_Set = $31
   );
-private
-  var _Tag: TTag;
+{$pop}
+public
+  class function EncodeTLV(const Tag: TTag; const Value: array of UInt8): TUInt8Array; static;
+  class function DecodeTLV(const Data: TUInt8Array; var Index: Int32; out Tag: TTag): TUInt8Array; static;
+  class function DER_PackNumber(const NumberLE: array of UInt8; const Negative: Boolean = False): TUInt8Array; static;
+  class function DER_UnpacNumberk(const Data: TUInt8Array; out Negative: Boolean): TUInt8Array; static;
+  class function DER_PackOID(const StrOID: String): TUInt8Array; static;
+  class function DER_PackOID(const DataOID: TUInt32Array): TUInt8Array; static;
+  class function DER_UnpackOID(const Data: TUInt8Array): TUInt32Array; static;
+  class function DER_PackBitString(const Data: TUInt8Array; const BitLength: Int32): TUInt8Array; static;
+  class function DER_UnpackBitString(const Data: TUInt8Array; out BitLength: Int32): TUInt8Array; static;
+  class function DER_PackBool(const Value: Boolean): TUInt8Array; static;
+  class function DER_UnackBool(const Data: TUInt8Array): Boolean; static;
+  class function OIDToStr(const DataOID: TUInt32Array): String; static;
+  class function VerifyOID(const StrOID: String): Boolean; static;
+  class procedure DebugASN1(const Data: TUInt8Array; const Offset: String = ''); static;
 end;
 
 function UMD5(const Data: Pointer; const DataSize: UInt32): TUDigestMD5;
@@ -9450,6 +9466,374 @@ begin
   PushStack(NewCV);
 end;
 // TUBLAKE3 end
+
+// TUASN1 begin
+class function TUASN1.EncodeTLV(
+  const Tag: TTag;
+  const Value: array of UInt8
+): TUInt8Array;
+  var Len, TempLen, NumLenBytes, i: Int32;
+  var LenBytes: TUInt8Array;
+begin
+  Len := Length(Value);
+  if Len < 128 then
+  begin
+    LenBytes := [UInt8(Len)];
+  end
+  else
+  begin
+    TempLen := Len;
+    NumLenBytes := 0;
+    while TempLen > 0 do
+    begin
+      Inc(NumLenBytes);
+      TempLen := TempLen shr 8;
+    end;
+    LenBytes := TUInt8Array.Make(1 + NumLenBytes);
+    LenBytes[0] := $80 or UInt8(NumLenBytes);
+    TempLen := Len;
+    for i := NumLenBytes downto 1 do
+    begin
+      LenBytes[i] := Byte(TempLen and $ff);
+      TempLen := TempLen shr 8;
+    end;
+  end;
+  Result := UBytesConcat([[UInt8(Tag)], LenBytes, Value]);
+end;
+
+class function TUASN1.DecodeTLV(
+  const Data: TUInt8Array;
+  var Index: Int32; out Tag: TTag
+): TUInt8Array;
+  var Pos, Len, NumLenBytes, i: Int32;
+  var TagByte: UInt8;
+begin
+  Result := nil;
+  Tag := DER_Invalid;
+  Pos := Index;
+  if (Pos < 0) or (Pos >= Length(Data)) then Exit;
+  TagByte := Data[Pos]; Inc(Pos);
+  if Pos >= Length(Data) then Exit;
+  Len := Data[Pos]; Inc(Pos);
+  if (Len and $80) <> 0 then
+  begin
+    NumLenBytes := Len and $7f;
+    if (NumLenBytes = 0) or (NumLenBytes > 4) then Exit;
+    if NumLenBytes > Length(Data) - Pos then Exit;
+    if Data[Pos] = 0 then Exit;
+    Len := 0;
+    for i := 1 to NumLenBytes do
+    begin
+      if Len > (High(Int32) shr 8) then Exit;
+      Len := (Len shl 8) or Data[Pos];
+      Inc(Pos);
+    end;
+    if Len < 128 then Exit;
+  end;
+  if Len > Length(Data) - Pos then Exit;
+  Result := TUInt8Array.Make(Len);
+  if Len > 0 then Move(Data[Pos], Result[0], Len);
+  Inc(Pos, Len);
+  Tag := TTag(TagByte);
+  Index := Pos;
+end;
+
+class function TUASN1.DER_PackNumber(
+  const NumberLE: array of UInt8;
+  const Negative: Boolean
+): TUInt8Array;
+  var i, Len, Start: Int32;
+  var Carry, v: UInt32;
+  var Buf: TUInt8Array;
+begin
+  Len := Length(NumberLE);
+  while (Len > 0) and (NumberLE[Len - 1] = 0) do Dec(Len);
+  if Len = 0 then Exit([0]);
+  Buf := TUInt8Array.Make(Len + 1);
+  Buf[0] := 0;
+  for i := 0 to Len - 1 do Buf[Len - i] := NumberLE[i];
+  if Negative then
+  begin
+    Carry := 1;
+    for i := Len downto 0 do
+    begin
+      v := UInt32(Buf[i] xor $ff) + Carry;
+      Buf[i] := UInt8(v and $ff);
+      Carry := v shr 8;
+    end;
+  end;
+  Start := 0;
+  while (Start < Len) and (
+    ((Buf[Start] = $00) and (Buf[Start + 1] and $80 = 0)) or
+    ((Buf[Start] = $ff) and (Buf[Start + 1] and $80 <> 0))
+  ) do Inc(Start);
+  Result := TUInt8Array.Make(Len + 1 - Start);
+  for i := Start to Len do Result[i - Start] := Buf[i];
+end;
+
+class function TUASN1.DER_UnpacNumberk(
+  const Data: TUInt8Array;
+  out Negative: Boolean
+): TUInt8Array;
+  var i, ByteCount: Int32;
+  var Carry, v: UInt32;
+begin
+  Negative := False;
+  if Length(Data) = 0 then Exit([0]);
+  Negative := (Data[0] and $80) <> 0;
+  ByteCount := Length(Data);
+  Result := TUInt8Array.Make(ByteCount);
+  if Negative then
+  begin
+    Carry := 1;
+    for i := 0 to ByteCount - 1 do
+    begin
+      v := UInt32(Data[ByteCount - 1 - i] xor $ff) + Carry;
+      Result[i] := UInt8(v and $ff);
+      Carry := v shr 8;
+    end;
+  end
+  else
+  begin
+    for i := 0 to ByteCount - 1 do
+    begin
+      Result[i] := Data[ByteCount - 1 - i];
+    end;
+  end;
+  ByteCount := Length(Result);
+  while (ByteCount > 1) and (Result[ByteCount - 1] = 0) do Dec(ByteCount);
+  if ByteCount <> Length(Result) then SetLength(Result, ByteCount);
+end;
+
+class function TUASN1.DER_PackOID(const StrOID: String): TUInt8Array;
+  var StrArrOID: TUStrArray;
+  var ArrOID: TUInt32Array;
+  var i: Int32;
+begin
+  StrArrOID := UStrExplode(StrOID, '.', False);
+  if Length(StrArrOID) < 2 then Exit(nil);
+  ArrOID := TUInt32Array.Make(Length(StrArrOID));
+  for i := 0 to High(ArrOID) do
+  begin
+    ArrOID[i] := StrToIntDef(StrArrOID[i], 0);
+  end;
+  Result := DER_PackOID(ArrOID);
+end;
+
+class function TUASN1.DER_PackOID(const DataOID: TUInt32Array): TUInt8Array;
+  function GetVLQLen(const Value: UInt32): Int32;
+    var v: UInt32;
+  begin
+    Result := 0; v := Value;
+    if v = 0 then Exit(1);
+    while v > 0 do begin Inc(Result); v := v div 128; end;
+  end;
+  procedure WriteVLQ(const Value: UInt32; var Dst: Int32; const DestArr: TUInt8Array);
+    var v: UInt32;
+    var Temp: array[0..4] of UInt8;
+    var i, Count: Int32;
+  begin
+    v := Value;
+    Count := 0;
+    if v = 0 then
+    begin
+      DestArr[Dst] := 0;
+      Inc(Dst);
+      Exit;
+    end;
+    while v > 0 do
+    begin
+      Temp[Count] := UInt8(v mod 128);
+      if Count > 0 then Temp[Count] := Temp[Count] or $80;
+      Inc(Count);
+      v := v div 128;
+    end;
+    for i := Count - 1 downto 0 do
+    begin
+      DestArr[Dst] := Temp[i];
+      Inc(Dst);
+    end;
+  end;
+  var TotalSize: Int32;
+  var i, Dst: Int32;
+begin
+  if Length(DataOID) < 2 then Exit(nil);
+  TotalSize := 1;
+  for i := 2 to High(DataOID) do
+  begin
+    Inc(TotalSize, GetVLQLen(DataOID[i]));
+  end;
+  Result := TUInt8Array.Make(TotalSize);
+  Dst := 0;
+  Result[Dst] := UInt8(DataOID[0] * 40 + DataOID[1]);
+  Inc(Dst);
+  for i := 2 to High(DataOID) do
+  begin
+    WriteVLQ(DataOID[i], Dst, Result);
+  end;
+end;
+
+class function TUASN1.DER_UnpackOID(const Data: TUInt8Array): TUInt32Array;
+  var i, Count, Dst: Int32;
+  var v: UInt32;
+begin
+  Result := nil;
+  if Length(Data) = 0 then Exit;
+  Count := 2;
+  for i := 1 to High(Data) do
+  begin
+    if (Data[i] and $80 = 0) then Inc(Count);
+  end;
+  Result := TUInt32Array.Make(Count);
+  Result[0] := Data[0] div 40;
+  Result[1] := Data[0] mod 40;
+  Dst := 2;
+  v := 0;
+  for i := 1 to High(Data) do
+  begin
+    v := (v shl 7) or (Data[i] and $7F);
+    if (Data[i] and $80 <> 0) then Continue;
+    Result[Dst] := v;
+    Inc(Dst);
+    v := 0;
+  end;
+end;
+
+class function TUASN1.DER_PackBitString(
+  const Data: TUInt8Array;
+  const BitLength: Int32
+): TUInt8Array;
+  var UnusedBits, TotalBytes: Int32;
+  var i: Int32;
+begin
+  TotalBytes := (BitLength + 7) div 8;
+  UnusedBits := (TotalBytes * 8) - BitLength;
+  Result := TUInt8Array.Make(TotalBytes + 1);
+  Result[0] := UInt8(UnusedBits);
+  for i := 0 to TotalBytes - 1 do
+  begin
+    Result[i + 1] := Data[i];
+  end;
+end;
+
+class function TUASN1.DER_UnpackBitString(
+  const Data: TUInt8Array;
+  out BitLength: Int32
+): TUInt8Array;
+  var UnusedBits, ByteCount: Int32;
+begin
+  if Length(Data) = 0 then
+  begin
+    BitLength := 0;
+    Exit(nil);
+  end;
+  UnusedBits := Data[0];
+  ByteCount := Length(Data) - 1;
+  BitLength := (ByteCount * 8) - UnusedBits;
+  Result := TUInt8Array.Make(ByteCount);
+  if ByteCount > 0 then
+  begin
+    Move(Data[1], Result[0], ByteCount);
+  end;
+end;
+
+class function TUASN1.DER_PackBool(const Value: Boolean): TUInt8Array;
+begin
+  if Value then Exit([$ff]) else Exit([0]);
+end;
+
+class function TUASN1.DER_UnackBool(const Data: TUInt8Array): Boolean;
+begin
+  if Length(Data) = 0 then Exit(False);
+  Result := Data[0] > 0;
+end;
+
+class function TUASN1.OIDToStr(const DataOID: TUInt32Array): String;
+  var i: Int32;
+begin
+  if Length(DataOID) < 2 then Exit('');
+  Result := IntToStr(DataOID[0]);
+  for i := 1 to High(DataOID) do
+  begin
+    Result += '.' + IntToStr(DataOID[i]);
+  end;
+end;
+
+class function TUASN1.VerifyOID(const StrOID: String): Boolean;
+  var StrArrOID: TUStrArray;
+  var i, n: Int32;
+begin
+  StrArrOID := UStrExplode(StrOID, '.', False);
+  if Length(StrArrOID) < 2 then Exit(False);
+  for i := 0 to High(StrArrOID) do
+  begin
+    if not UStrIsNumber(StrArrOID[i]) then Exit(False);
+    n := StrToIntDef(StrArrOID[i], 0);
+    if n < 0 then Exit(False);
+  end;
+  Result := True;
+end;
+
+class procedure TUASN1.DebugASN1(const Data: TUInt8Array; const Offset: String);
+  function UnpackNumber(const NumberDataDER: TUInt8Array): TUInt4096;
+    var Negative: Boolean;
+  begin
+    Result := TUInt4096.Make(DER_UnpacNumberk(NumberDataDER, Negative));
+    Result.SetNegative(Negative);
+  end;
+  var Tag: TTag;
+  var Index: Int32;
+  var InnerData, ContainerData: TUInt8Array;
+begin
+  Index := 0;
+  while Index < Length(Data) do
+  begin
+    InnerData := DecodeTLV(Data, Index, Tag);
+    case Tag of
+      DER_Boolean:
+      begin
+        WriteLn(Offset, Tag, ': ', DER_UnackBool(InnerData));
+      end;
+      DER_Integer:
+      begin
+        WriteLn(Offset, Tag, ': ', UnpackNumber(InnerData).ToString);
+      end;
+      DER_Bit_String,
+      DER_Octet_String:
+      begin
+        WriteLn(Offset, Tag, ': ', UBytesToHex(InnerData));
+      end;
+      DER_Null:
+      begin
+        WriteLn(Offset, Tag);
+      end;
+      DER_Object_Identifier:
+      begin
+        WriteLn(Offset, Tag, ': ', OIDToStr(DER_UnpackOID(InnerData)));
+      end;
+      DER_UTF8_String,
+      DER_Printable_String,
+      DER_IA5_String,
+      DER_UTC_Time,
+      DER_Generalized_Time:
+      begin
+        WriteLn(Offset, Tag, ': ', UBytesToString(InnerData));
+      end;
+      DER_Sequence,
+      DER_Set:
+      begin
+        DebugASN1(InnerData, Offset + '  ');
+        Continue;
+      end;
+      else
+      begin
+        WriteLn(Offset, 'Invalid Tag: ', Tag);
+      end;
+    end;
+    Break;
+  end;
+end;
+// TUASN1 end
 
 function UEncrypt_AES_PKCS7_ECB_128(
   const Data: TUInt8Array;

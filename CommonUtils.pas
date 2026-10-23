@@ -12,7 +12,7 @@ type TUProcedureObj = procedure (const Args: array of const) of object;
 type TUFunction = function: Boolean of object;
 type TUProcedureString = procedure (const Value: String) of object;
 
-type TUStrArray = array of String;
+type TUStrArray = array of String; //TUStrArrayImpl
 type TUStrArrayArray = array of array of String;
 type TUStrPair = array[0..1] of String;
 type TUDateTimeArray = array of TDateTime;
@@ -33,6 +33,7 @@ type TUInt8 = type UInt8;
 type TUInt8Arr = array[UInt32] of TUInt8;
 type PUInt8Arr = ^TUInt8Arr;
 type TUInt8Array = array of TUInt8; // TUInt8ArrayImpl
+type TUInt8ArrayArray = array of TUInt8Array;
 type TUInt16 = type UInt16;
 type TUInt16Arr = array[UInt32] of TUInt16;
 type PUInt16Arr = ^TUInt16Arr;
@@ -40,7 +41,7 @@ type TUInt16Array = array of TUInt16;
 type TUInt32 = type UInt32;
 type TUInt32Arr = array[UInt32] of TUInt32;
 type PUInt32Arr = ^TUInt32Arr;
-type TUInt32Array = array of TUInt32;
+type TUInt32Array = array of TUInt32; // TUInt32ArrayImpl
 type TUInt64 = type UInt64;
 type TUInt64Arr = array[UInt32] of TUInt64;
 type PUInt64Arr = ^TUInt64Arr;
@@ -186,6 +187,11 @@ public
   class operator := (const v: Uint8): TUSwizzle;
 end;
 
+type TUStrArrayImpl = type helper for TUStrArray
+public
+  class function Make(const Size: UInt32): TUStrArray; static;
+end;
+
 type TUFloatImpl = type helper for TUFloat
 public
   function ToString: String; inline;
@@ -228,6 +234,11 @@ public
   function Append(const Num: UInt32): TUInt8Array;
   function IsEmpty: Boolean;
   function Size: UInt32;
+end;
+
+type TUInt32ArrayImpl = type helper for TUInt32Array
+public
+  class function Make(const Size: UInt32): TUInt32Array; static;
 end;
 
 type TUInt16Impl = type helper for TUInt16
@@ -2876,6 +2887,14 @@ begin
 end;
 // TUSwizzle end
 
+// TUStrArrayImpl begin
+class function TUStrArrayImpl.Make(const Size: UInt32): TUStrArray;
+begin
+  Result := nil;
+  SetLength(Result, Size);
+end;
+// TUStrArrayImpl end
+
 // TUFloatImpl begin
 function TUFloatImpl.ToString: String;
 begin
@@ -3043,6 +3062,14 @@ begin
   Result := Length(Self);
 end;
 // TUInt8ArrayImpl end
+
+// TUInt32ArrayImpl begin
+class function TUInt32ArrayImpl.Make(const Size: UInt32): TUInt32Array;
+begin
+  Result := nil;
+  SetLength(Result, Size);
+end;
+// TUInt32ArrayImpl end
 
 // TUInt16Impl begin
 function TUInt16Impl.GetBit(const Index: TUInt8): TUInt8;
