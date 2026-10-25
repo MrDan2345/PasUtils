@@ -683,6 +683,7 @@ public
       var y: TBigInt;
       class function AtInfinity: TPoint; static;
       function IsAtInfinity: Boolean;
+      function IsValid: Boolean;
       class operator = (const a, b: TPoint): Boolean;
     end;
     type TCurve = record
@@ -700,6 +701,7 @@ public
       var q: TPoint;
       function IsValid: Boolean;
     end;
+    type TKeyPublic = TPoint;
     type TSignature = record
       var r: TBigInt;
       var s: TBigInt;
@@ -6782,6 +6784,11 @@ begin
   Result := (x = TBigInt.Zero) and (y = TBigInt.Zero);
 end;
 
+function TUECC.Weierstrass.TPoint.IsValid: Boolean;
+begin
+  Result := not IsAtInfinity;
+end;
+
 class operator TUECC.Weierstrass.TPoint.=(const a, b: TPoint): Boolean;
 begin
   Result := (a.x = b.x) and (a.y = b.y);
@@ -9783,54 +9790,75 @@ class procedure TUASN1.DebugASN1(const Data: TUInt8Array; const Offset: String);
   end;
   var Tag: TTag;
   var Index: Int32;
-  var InnerData, ContainerData: TUInt8Array;
+  var InnerData: TUInt8Array;
+  var TagValue: UInt8;
+  var BitLength: Int32;
 begin
   Index := 0;
   while Index < Length(Data) do
   begin
     InnerData := DecodeTLV(Data, Index, Tag);
-    case Tag of
-      DER_Boolean:
+    if InnerData = nil then Break;
+    TagValue := UInt8(Tag);
+    if (TagValue >= $80) and (TagValue <= $BF) then
+    begin
+      WriteLn(Offset, 'Context-Specific Tag [', IntToHex(TagValue), ']: ');
+      if (TagValue and $20) <> 0 then
       begin
-        WriteLn(Offset, Tag, ': ', DER_UnackBool(InnerData));
-      end;
-      DER_Integer:
-      begin
-        WriteLn(Offset, Tag, ': ', UnpackNumber(InnerData).ToString);
-      end;
-      DER_Bit_String,
-      DER_Octet_String:
-      begin
-        WriteLn(Offset, Tag, ': ', UBytesToHex(InnerData));
-      end;
-      DER_Null:
-      begin
-        WriteLn(Offset, Tag);
-      end;
-      DER_Object_Identifier:
-      begin
-        WriteLn(Offset, Tag, ': ', OIDToStr(DER_UnpackOID(InnerData)));
-      end;
-      DER_UTF8_String,
-      DER_Printable_String,
-      DER_IA5_String,
-      DER_UTC_Time,
-      DER_Generalized_Time:
-      begin
-        WriteLn(Offset, Tag, ': ', UBytesToString(InnerData));
-      end;
-      DER_Sequence,
-      DER_Set:
-      begin
-        DebugASN1(InnerData, Offset + '  ');
-        Continue;
-      end;
+        DebugASN1(InnerData, Offset + '  ')
+      end
       else
       begin
-        WriteLn(Offset, 'Invalid Tag: ', Tag);
+        WriteLn(Offset, '  Value: ', UBytesToHex(InnerData));
+      end;
+    end
+    else
+    begin
+      case Tag of
+        DER_Boolean:
+        begin
+          WriteLn(Offset, Tag, ': ', DER_UnackBool(InnerData));
+        end;
+        DER_Integer:
+        begin
+          WriteLn(Offset, Tag, ': ', UnpackNumber(InnerData).ToString);
+        end;
+        DER_Bit_String:
+        begin
+          InnerData := DER_UnpackBitString(InnerData, BitLength);
+          WriteLn(Offset, Tag, '[', BitLength, ']: ', UBytesToHex(InnerData));
+        end;
+        DER_Octet_String:
+        begin
+          WriteLn(Offset, Tag, '[', Length(InnerData), ']: ', UBytesToHex(InnerData));
+        end;
+        DER_Null:
+        begin
+          WriteLn(Offset, Tag);
+        end;
+        DER_Object_Identifier:
+        begin
+          WriteLn(Offset, Tag, ': ', OIDToStr(DER_UnpackOID(InnerData)));
+        end;
+        DER_UTF8_String,
+        DER_Printable_String,
+        DER_IA5_String,
+        DER_UTC_Time,
+        DER_Generalized_Time:
+        begin
+          WriteLn(Offset, Tag, ': ', UBytesToString(InnerData));
+        end;
+        DER_Sequence, DER_Set:
+        begin
+          WriteLn(Offset, Tag, ': ');
+          DebugASN1(InnerData, Offset + '  ');
+        end;
+        else
+        begin
+          WriteLn(Offset, 'Unknown Tag: ', TagValue);
+        end;
       end;
     end;
-    Break;
   end;
 end;
 // TUASN1 end
