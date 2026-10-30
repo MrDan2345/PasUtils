@@ -276,6 +276,18 @@ type PUSockAddr6 = ^TUSockAddr6;
 
 type PPUAddrInfo = ^PUAddrInfo;
 PUAddrInfo = ^TUAddrInfo;
+{$if defined(windows)}
+TUAddrInfo = record
+  Flags: Int32;
+  Family: Int32;
+  SockType: Int32;
+  Protocol: Int32;
+  AddrLen: Int32;
+  CanonName: PAnsiChar;
+  Addr: PUSockAddr;
+  Next: PUAddrInfo;
+end;
+{$else}
 TUAddrInfo = record
   Flags: Int32;
   Family: Int32;
@@ -286,6 +298,7 @@ TUAddrInfo = record
   CanonName: PAnsiChar;
   Next: PUAddrInfo;
 end;
+{$endif}
 
 type PUHostEnt = ^TUHostEnt;
 TUHostEnt = record
