@@ -2721,6 +2721,7 @@ operator := (const Bytes: array of UInt16): TUInt8Array;
 operator := (const Bytes: array of UInt32): TUInt8Array;
 operator := (const Bytes: array of UInt64): TUInt8Array;
 operator := (const Str: String): TUInt8Array;
+operator + (const a, b: array of UInt8): TUInt8Array;
 operator / (const a, b: String): String;
 operator := (const v: TUVec2): TUVec2i;
 operator := (const v: UInt64): TUInt4096_Debug;
@@ -16441,6 +16442,11 @@ end;
 operator := (const Str: String): TUInt8Array;
 begin
   Result := TUInt8Array.Make(Str);
+end;
+
+operator + (const a, b: array of UInt8): TUInt8Array;
+begin
+  Result := UBytesJoin(a, b);
 end;
 
 operator / (const a, b: String): String;
