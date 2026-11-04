@@ -276,6 +276,18 @@ type PUSockAddr6 = ^TUSockAddr6;
 
 type PPUAddrInfo = ^PUAddrInfo;
 PUAddrInfo = ^TUAddrInfo;
+{$if defined(windows)}
+TUAddrInfo = record
+  Flags: Int32;
+  Family: Int32;
+  SockType: Int32;
+  Protocol: Int32;
+  AddrLen: Int32;
+  CanonName: PAnsiChar;
+  Addr: PUSockAddr;
+  Next: PUAddrInfo;
+end;
+{$else}
 TUAddrInfo = record
   Flags: Int32;
   Family: Int32;
@@ -286,6 +298,7 @@ TUAddrInfo = record
   CanonName: PAnsiChar;
   Next: PUAddrInfo;
 end;
+{$endif}
 
 type PUHostEnt = ^TUHostEnt;
 TUHostEnt = record
@@ -436,6 +449,11 @@ type TUSocketImpl = type helper for TUSocket
     const Flags: Int32
   ): Int32;
   function Recv: String;
+  function RecvAll(
+    const Buffer: Pointer;
+    const Size: Int32;
+    const Flags: Int32
+  ): Int32;
   function SendTo(
     const Buffer: Pointer;
     const BufferLen: UInt32;
@@ -1029,6 +1047,23 @@ function TUSocketImpl.Recv: String;
 begin
   UNetRecv(Self, @Buffer, SizeOf(Buffer), 0);
   Result := Buffer;
+end;
+
+function TUSocketImpl.RecvAll(
+  const Buffer: Pointer;
+  const Size: Int32;
+  const Flags: Int32
+): Int32;
+  var r, Rem: Int32;
+begin
+  Rem := Size;
+  while Rem > 0 do
+  begin
+    r := Recv(Buffer, Rem, Flags);
+    if r <= 0 then Exit(r);
+    Rem := Rem - r;
+  end;
+  Result := Size;
 end;
 
 function TUSocketImpl.SendTo(
