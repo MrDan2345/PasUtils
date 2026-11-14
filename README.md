@@ -1,3 +1,4 @@
 # PasUtils
-Common utilities for pascal
-Requires fpc trunk to compile
+Common utilities for pascal.
+
+Requires fpc trunk to compile.
