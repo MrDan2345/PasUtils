@@ -801,6 +801,7 @@ strict private
   function GetTopRight: TUVec2;
   function GetBottomLeft: TUVec2;
   function GetBottomRight: TUVec2;
+  function GetCenter: TUVec2;
 public
   const Zero: TUBounds2f = ((0, 0), (0, 0));
   property Min: TUVec2 read GetMin write SetMin;
@@ -810,6 +811,7 @@ public
   property TopRight: TUVec2 read GetTopRight;
   property BottomLeft: TUVec2 read GetBottomLeft;
   property BottomRight: TUVec2 read GetBottomRight;
+  property Center: TUVec2 read GetCenter;
   class function Make(const AMin, AMax: TUVec2): TUBounds2f; static; overload;
   class function Make(const ACenter: TUVec2): TUBounds2f; static; overload;
   class function Overlap(const a, b: TUBounds2f): Boolean; static;
@@ -5162,6 +5164,11 @@ end;
 function TUBounds2fImpl.GetBottomRight: TUVec2;
 begin
   Result := Self[1];
+end;
+
+function TUBounds2fImpl.GetCenter: TUVec2;
+begin
+  Result := (Self[0] + Self[1]) * 0.5;
 end;
 
 class function TUBounds2fImpl.Make(const AMin, AMax: TUVec2): TUBounds2f;
