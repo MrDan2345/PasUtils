@@ -1358,6 +1358,15 @@ public
   );
 {$pop}
 public
+  type TDumpASN1 = array of record
+    var OID: TUInt32Array;
+    var Description: String;
+    var Comment: String;
+  end;
+  class var DumpASN1: TDumpASN1;
+  class function DumpASN1Ready: Boolean; static;
+  class procedure LoadDumpASN1(const Path: String = ''); static;
+  class function FindDumpASN1(const OID: TUInt32Array): Int32; static;
   class function EncodeTLV(const Tag: TTag; const Value: array of UInt8): TUInt8Array; static;
   class function DecodeTLV(const Data: TUInt8Array; var Index: Int32; out Tag: TTag): TUInt8Array; static;
   class function DER_PackNumber(const NumberLE: array of UInt8; const Negative: Boolean = False): TUInt8Array; static;
@@ -1370,7 +1379,10 @@ public
   class function DER_PackBool(const Value: Boolean): TUInt8Array; static;
   class function DER_UnackBool(const Data: TUInt8Array): Boolean; static;
   class function OIDToStr(const DataOID: TUInt32Array): String; static;
+  class function StrToOID(const StrOID: String): TUInt32Array; static;
   class function VerifyOID(const StrOID: String): Boolean; static;
+  class function IsContextualTag(const Tag: TTag): Boolean; static;
+  class function IsConstrutedTag(const Tag: TTag): Boolean; static;
   class procedure DebugASN1(const Data: TUInt8Array; const Offset: String = ''); static;
 end;
 
@@ -9475,6 +9487,98 @@ end;
 // TUBLAKE3 end
 
 // TUASN1 begin
+class function TUASN1.DumpASN1Ready: Boolean;
+begin
+  Result := Length(DumpASN1) > 0;
+end;
+
+class procedure TUASN1.LoadDumpASN1(const Path: String);
+  function ExtractValue(const Str: String): String;
+    var Line: TUStrArray;
+  begin
+    Line := UStrExplode(Str, '=');
+    if Length(Line) < 2 then Exit;
+    Result := Line[1].Trim;
+  end;
+  function ParseOID(const Str: String): TUInt32Array;
+    var StrArrOID: TUStrArray;
+    var i: Int32;
+  begin
+    Result := nil;
+    StrArrOID := UStrExplode(Str, ' ', False);
+    SetLength(Result, Length(StrArrOID));
+    for i := 0 to High(StrArrOID) do
+    begin
+      Result[i] := StrToIntDef(StrArrOID[i], 0);
+    end;
+  end;
+  const DefaultFileName = 'dumpasn1.cfg';
+  var TryPath: String;
+  var StrList: TStringList;
+  var i, c: Int32;
+begin
+  TryPath := Path;
+  if not FileExists(TryPath) then
+  begin
+    TryPath := ExpandFileName(UAppPath / DefaultFileName);
+    if not FileExists(TryPath) then
+    begin
+      TryPath := ExpandFileName(UAppPath / '..' / DefaultFileName);
+      if not FileExists(TryPath) then Exit;
+    end;
+  end;
+  StrList := TStringList.Create;
+  try
+    StrList.LoadFromFile(TryPath);
+    c := 0;
+    for i := 0 to StrList.Count - 1 do
+    begin
+      if not StrList[i].StartsWith('OID') then Continue;
+      Inc(c);
+    end;
+    SetLength(DumpASN1, c);
+    c := -1;
+    for i := 0 to StrList.Count - 1 do
+    begin
+      if StrList[i].StartsWith('OID') then
+      begin
+        Inc(c);
+        DumpASN1[c].OID := ParseOID(ExtractValue(StrList[i]));
+      end;
+      if StrList[i].StartsWith('Comment') then
+      begin
+        DumpASN1[c].Comment := ExtractValue(StrList[i]);
+      end;
+      if StrList[i].StartsWith('Description') then
+      begin
+        DumpASN1[c].Description := ExtractValue(StrList[i]);
+      end;
+    end;
+  finally
+    StrList.Free;
+  end;
+end;
+
+class function TUASN1.FindDumpASN1(const OID: TUInt32Array): Int32;
+  function CmpOIDs(const a, b: TUInt32Array): Boolean;
+    var i: Int32;
+  begin
+    if Length(a) <> Length(b) then Exit(False);
+    for i := 0 to High(a) do
+    begin
+      if a[i] <> b[i] then Exit(False);
+    end;
+    Result := True;
+  end;
+  var i: Int32;
+begin
+  for i := 0 to High(DumpASN1) do
+  begin
+    if CmpOIDs(DumpASN1[i].OID, OID) then Exit(i);
+  end;
+  Result := -1;
+end;
+
 class function TUASN1.EncodeTLV(
   const Tag: TTag;
   const Value: array of UInt8
@@ -9766,6 +9870,20 @@ begin
   end;
 end;
 
+class function TUASN1.StrToOID(const StrOID: String): TUInt32Array;
+  var StrArrOID: TUStrArray;
+  var i, n: Int32;
+begin
+  Result := nil;
+  StrArrOID := UStrExplode(StrOID, '.', False);
+  if Length(StrArrOID) < 2 then Exit;
+  SetLength(Result, Length(StrArrOID));
+  for i := 0 to High(StrArrOID) do
+  begin
+    Result[i] := StrToIntDef(StrArrOID[i], 0);
+  end;
+end;
+
 class function TUASN1.VerifyOID(const StrOID: String): Boolean;
   var StrArrOID: TUStrArray;
   var i, n: Int32;
@@ -9781,6 +9899,18 @@ begin
   Result := True;
 end;
 
+class function TUASN1.IsContextualTag(const Tag: TTag): Boolean;
+  var TagValue: UInt8 absolute Tag;
+begin
+  Result := (TagValue >= $80) and (TagValue <= $BF);
+end;
+
+class function TUASN1.IsConstrutedTag(const Tag: TTag): Boolean;
+  var TagValue: UInt8 absolute Tag;
+begin
+  Result := (TagValue and $20) <> 0;
+end;
+
 class procedure TUASN1.DebugASN1(const Data: TUInt8Array; const Offset: String);
   function UnpackNumber(const NumberDataDER: TUInt8Array): TUInt4096;
     var Negative: Boolean;
@@ -9791,19 +9921,20 @@ class procedure TUASN1.DebugASN1(const Data: TUInt8Array; const Offset: String);
   var Tag: TTag;
   var Index: Int32;
   var InnerData: TUInt8Array;
-  var TagValue: UInt8;
   var BitLength: Int32;
+  var OID: TUInt32Array;
+  var DumpIdx: Int32;
 begin
+  if not DumpASN1Ready then LoadDumpASN1();
   Index := 0;
   while Index < Length(Data) do
   begin
     InnerData := DecodeTLV(Data, Index, Tag);
     if InnerData = nil then Break;
-    TagValue := UInt8(Tag);
-    if (TagValue >= $80) and (TagValue <= $BF) then
+    if IsContextualTag(Tag) then
     begin
-      WriteLn(Offset, 'Context-Specific Tag [', IntToHex(TagValue), ']: ');
-      if (TagValue and $20) <> 0 then
+      WriteLn(Offset, 'Context-Specific Tag [', IntToHex(UInt8(Tag)), ']: ');
+      if IsConstrutedTag(Tag) then
       begin
         DebugASN1(InnerData, Offset + '  ')
       end
@@ -9838,7 +9969,20 @@ begin
         end;
         DER_Object_Identifier:
         begin
-          WriteLn(Offset, Tag, ': ', OIDToStr(DER_UnpackOID(InnerData)));
+          OID := DER_UnpackOID(InnerData);
+          DumpIdx := FindDumpASN1(OID);
+          if DumpIdx > -1 then
+          begin
+            WriteLn(
+              Offset, Tag, ': ', OIDToStr(OID),
+              ' ', DumpASN1[DumpIdx].Description,
+              ' (', DumpASN1[DumpIdx].Comment, ')'
+            );
+          end
+          else
+          begin
+            WriteLn(Offset, Tag, ': ', OIDToStr(OID));
+          end;
         end;
         DER_UTF8_String,
         DER_Printable_String,
@@ -9855,7 +9999,7 @@ begin
         end;
         else
         begin
-          WriteLn(Offset, 'Unknown Tag: ', TagValue);
+          WriteLn(Offset, 'Unknown Tag: ', IntToHex(UInt8(Tag)));
         end;
       end;
     end;
