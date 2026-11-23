@@ -1357,6 +1357,7 @@ public
     DER_Set = $31
   );
 {$pop}
+  type TContent = array of TUASN1;
 public
   type TDumpASN1 = array of record
     var OID: TUInt32Array;
@@ -1374,8 +1375,8 @@ public
   class function DER_PackOID(const StrOID: String): TUInt8Array; static;
   class function DER_PackOID(const DataOID: TUInt32Array): TUInt8Array; static;
   class function DER_UnpackOID(const Data: TUInt8Array): TUInt32Array; static;
-  class function DER_PackBitString(const Data: TUInt8Array; const BitLength: Int32): TUInt8Array; static;
-  class function DER_UnpackBitString(const Data: TUInt8Array; out BitLength: Int32): TUInt8Array; static;
+  class function DER_PackBitString(const Data: TUInt8Array; const BitLength: UInt32): TUInt8Array; static;
+  class function DER_UnpackBitString(const Data: TUInt8Array; out BitLength: UInt32): TUInt8Array; static;
   class function DER_PackBool(const Value: Boolean): TUInt8Array; static;
   class function DER_UnackBool(const Data: TUInt8Array): Boolean; static;
   class function OIDToStr(const DataOID: TUInt32Array): String; static;
@@ -1383,7 +1384,20 @@ public
   class function VerifyOID(const StrOID: String): Boolean; static;
   class function IsContextualTag(const Tag: TTag): Boolean; static;
   class function IsConstrutedTag(const Tag: TTag): Boolean; static;
+  class function Load(const Data: TUInt8Array): TUASN1.TContent; static;
   class procedure DebugASN1(const Data: TUInt8Array; const Offset: String = ''); static;
+private
+  var _Tag: TTag;
+  var _Data: TUInt8Array;
+  var _Content: TContent;
+  var _Flags: UInt32;
+  class function Invalid: TUASN1; static;
+public
+  property Tag: TTag read _Tag;
+  property Data: TUInt8Array read _Data;
+  property Content: TContent read _Content;
+  property Flags: UInt32 read _Flags;
+  function IsValid: Boolean;
 end;
 
 function UMD5(const Data: Pointer; const DataSize: UInt32): TUDigestMD5;
@@ -9812,7 +9826,7 @@ end;
 
 class function TUASN1.DER_PackBitString(
   const Data: TUInt8Array;
-  const BitLength: Int32
+  const BitLength: UInt32
 ): TUInt8Array;
   var UnusedBits, TotalBytes: Int32;
   var i: Int32;
@@ -9829,7 +9843,7 @@ end;
 
 class function TUASN1.DER_UnpackBitString(
   const Data: TUInt8Array;
-  out BitLength: Int32
+  out BitLength: UInt32
 ): TUInt8Array;
   var UnusedBits, ByteCount: Int32;
 begin
@@ -9911,6 +9925,58 @@ begin
   Result := (TagValue and $20) <> 0;
 end;
 
+class function TUASN1.Load(const Data: TUInt8Array): TUASN1.TContent;
+  var Index: Int32;
+  var InnerData: TUInt8Array;
+  var Node: TUASN1;
+  var Negative: Boolean;
+begin
+  Result := nil;
+  Index := 0;
+  while Index < Length(Data) do
+  begin
+    Node := Invalid;
+    InnerData := DecodeTLV(Data, Index, Node._Tag);
+    if IsConstrutedTag(Node.Tag) then
+    begin
+      Node._Content := Load(InnerData);
+    end
+    else
+    case Node.Tag of
+      DER_Boolean:
+      begin
+        Node._Data := [UInt8(DER_UnackBool(InnerData))];
+      end;
+      DER_Integer:
+      begin
+        Node._Data := DER_UnpacNumberk(InnerData, Negative);
+        Node._Flags := UInt8(Negative);
+      end;
+      DER_Bit_String:
+      begin
+        Node._Data := DER_UnpackBitString(InnerData, Node._Flags);
+      end;
+      DER_Octet_String,
+      DER_UTF8_String,
+      DER_Printable_String,
+      DER_IA5_String,
+      DER_UTC_Time,
+      DER_Generalized_Time:
+      begin
+        Node._Data := InnerData;
+      end;
+      DER_Object_Identifier:
+      begin
+        Node._Data := DER_UnpackOID(InnerData).ToBytes;
+      end;
+      else
+      begin
+      end;
+    end;
+    specialize UArrAppend<TUASN1>(Result, Node);
+  end;
+end;
+
 class procedure TUASN1.DebugASN1(const Data: TUInt8Array; const Offset: String);
   function UnpackNumber(const NumberDataDER: TUInt8Array): TUInt4096;
     var Negative: Boolean;
@@ -9918,10 +9984,10 @@ class procedure TUASN1.DebugASN1(const Data: TUInt8Array; const Offset: String);
     Result := TUInt4096.Make(DER_UnpacNumberk(NumberDataDER, Negative));
     Result.SetNegative(Negative);
   end;
-  var Tag: TTag;
+  var CurTag: TTag;
   var Index: Int32;
   var InnerData: TUInt8Array;
-  var BitLength: Int32;
+  var BitLength: UInt32;
   var OID: TUInt32Array;
   var DumpIdx: Int32;
 begin
@@ -9929,12 +9995,12 @@ begin
   Index := 0;
   while Index < Length(Data) do
   begin
-    InnerData := DecodeTLV(Data, Index, Tag);
+    InnerData := DecodeTLV(Data, Index, CurTag);
     if InnerData = nil then Break;
-    if IsContextualTag(Tag) then
+    if IsContextualTag(CurTag) then
     begin
-      WriteLn(Offset, 'Context-Specific Tag [', IntToHex(UInt8(Tag)), ']: ');
-      if IsConstrutedTag(Tag) then
+      WriteLn(Offset, 'Context-Specific Tag [', IntToHex(UInt8(CurTag)), ']: ');
+      if IsConstrutedTag(CurTag) then
       begin
         DebugASN1(InnerData, Offset + '  ')
       end
@@ -9945,27 +10011,27 @@ begin
     end
     else
     begin
-      case Tag of
+      case CurTag of
         DER_Boolean:
         begin
-          WriteLn(Offset, Tag, ': ', DER_UnackBool(InnerData));
+          WriteLn(Offset, CurTag, ': ', DER_UnackBool(InnerData));
         end;
         DER_Integer:
         begin
-          WriteLn(Offset, Tag, ': ', UnpackNumber(InnerData).ToString);
+          WriteLn(Offset, CurTag, ': ', UnpackNumber(InnerData).ToString);
         end;
         DER_Bit_String:
         begin
           InnerData := DER_UnpackBitString(InnerData, BitLength);
-          WriteLn(Offset, Tag, '[', BitLength, ']: ', UBytesToHex(InnerData));
+          WriteLn(Offset, CurTag, '[', BitLength, ']: ', UBytesToHex(InnerData));
         end;
         DER_Octet_String:
         begin
-          WriteLn(Offset, Tag, '[', Length(InnerData), ']: ', UBytesToHex(InnerData));
+          WriteLn(Offset, CurTag, '[', Length(InnerData), ']: ', UBytesToHex(InnerData));
         end;
         DER_Null:
         begin
-          WriteLn(Offset, Tag);
+          WriteLn(Offset, CurTag);
         end;
         DER_Object_Identifier:
         begin
@@ -9974,14 +10040,14 @@ begin
           if DumpIdx > -1 then
           begin
             WriteLn(
-              Offset, Tag, ': ', OIDToStr(OID),
+              Offset, CurTag, ': ', OIDToStr(OID),
               ' ', DumpASN1[DumpIdx].Description,
               ' (', DumpASN1[DumpIdx].Comment, ')'
             );
           end
           else
           begin
-            WriteLn(Offset, Tag, ': ', OIDToStr(OID));
+            WriteLn(Offset, CurTag, ': ', OIDToStr(OID));
           end;
         end;
         DER_UTF8_String,
@@ -9990,20 +10056,33 @@ begin
         DER_UTC_Time,
         DER_Generalized_Time:
         begin
-          WriteLn(Offset, Tag, ': ', UBytesToString(InnerData));
+          WriteLn(Offset, CurTag, ': ', UBytesToString(InnerData));
         end;
         DER_Sequence, DER_Set:
         begin
-          WriteLn(Offset, Tag, ': ');
+          WriteLn(Offset, CurTag, ': ');
           DebugASN1(InnerData, Offset + '  ');
         end;
         else
         begin
-          WriteLn(Offset, 'Unknown Tag: ', IntToHex(UInt8(Tag)));
+          WriteLn(Offset, 'Unknown Tag: ', IntToHex(UInt8(CurTag)));
         end;
       end;
     end;
   end;
+end;
+
+class function TUASN1.Invalid: TUASN1;
+begin
+  Result._Tag := DER_Invalid;
+  Result._Data := nil;
+  Result._Content := nil;
+  Result._Flags := 0;
+end;
+
+function TUASN1.IsValid: Boolean;
+begin
+  Result := _Tag <> DER_Invalid;
 end;
 // TUASN1 end
 

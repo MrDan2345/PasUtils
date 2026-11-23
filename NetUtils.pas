@@ -452,8 +452,12 @@ type TUSocketImpl = type helper for TUSocket
   function RecvAll(
     const Buffer: Pointer;
     const Size: Int32;
-    const Flags: Int32
+    const Flags: Int32 = 0
   ): Int32;
+  function RecvAll(
+    const Size: Int32;
+    const Flags: Int32 = 0
+  ): TUInt8Array;
   function SendTo(
     const Buffer: Pointer;
     const BufferLen: UInt32;
@@ -1064,6 +1068,15 @@ begin
     Rem := Rem - r;
   end;
   Result := Size;
+end;
+
+function TUSocketImpl.RecvAll(const Size: Int32; const Flags: Int32): TUInt8Array;
+  var r: Int32;
+begin
+  if Size = 0 then Exit(nil);
+  Result := TUInt8Array.Make(Size);
+  r := RecvAll(@Result[0], Size, Flags);
+  if r < Size then Exit(nil);
 end;
 
 function TUSocketImpl.SendTo(

@@ -239,6 +239,9 @@ end;
 type TUInt32ArrayImpl = type helper for TUInt32Array
 public
   class function Make(const Size: UInt32): TUInt32Array; static;
+  function ToBytes: TUInt8Array;
+  function IsEmpty: Boolean;
+  function Size: UInt32;
 end;
 
 type TUInt16Impl = type helper for TUInt16
@@ -3071,6 +3074,22 @@ class function TUInt32ArrayImpl.Make(const Size: UInt32): TUInt32Array;
 begin
   Result := nil;
   SetLength(Result, Size);
+end;
+
+function TUInt32ArrayImpl.ToBytes: TUInt8Array;
+begin
+  if Size = 0 then Exit(nil);
+  Result := TUInt8Array.Make(@Self[0], Size * 4);
+end;
+
+function TUInt32ArrayImpl.IsEmpty: Boolean;
+begin
+  Result := Length(Self) = 0;
+end;
+
+function TUInt32ArrayImpl.Size: UInt32;
+begin
+  Result := Length(Self);
 end;
 // TUInt32ArrayImpl end
 
